@@ -1,5 +1,90 @@
 /* SIGOS – global styles */
 
+/* ── Form chrome — scoped to SIGOS doctypes ────────────────────────────── */
+body[data-route*="Vigilante"] .frappe-section,
+body[data-route*="Posto"] .frappe-section,
+body[data-route*="Rotatividade"] .frappe-section,
+body[data-route*="Ausencias"] .frappe-section,
+body[data-route*="Demissao"] .frappe-section,
+body[data-route*="Readimissao"] .frappe-section,
+body[data-route*="Repreensao"] .frappe-section,
+body[data-route*="Processo-Disciplinar"] .frappe-section,
+body[data-route*="Troca"] .frappe-section,
+body[data-route*="Turnos-Extras"] .frappe-section,
+body[data-route*="Deducoes"] .frappe-section,
+body[data-route*="Proventos"] .frappe-section,
+body[data-route*="Escala"] .frappe-section,
+body[data-route*="SIGOS-Settings"] .frappe-section {
+	border: 1px solid #e4e8ec;
+	border-radius: 10px;
+	margin-bottom: 16px;
+	overflow: hidden;
+	box-shadow: 0 1px 3px rgba(0,0,0,.04);
+	background: #fff;
+}
+
+body[data-route*="Vigilante"] .section-head,
+body[data-route*="Posto"] .section-head,
+body[data-route*="Rotatividade"] .section-head,
+body[data-route*="Ausencias"] .section-head,
+body[data-route*="Demissao"] .section-head,
+body[data-route*="Readimissao"] .section-head,
+body[data-route*="Repreensao"] .section-head,
+body[data-route*="Processo-Disciplinar"] .section-head,
+body[data-route*="Troca"] .section-head,
+body[data-route*="Turnos-Extras"] .section-head,
+body[data-route*="Deducoes"] .section-head,
+body[data-route*="Proventos"] .section-head,
+body[data-route*="Escala"] .section-head,
+body[data-route*="SIGOS-Settings"] .section-head {
+	background: #f6f8fa;
+	padding: 9px 16px;
+	font-size: .82em;
+	font-weight: 700;
+	letter-spacing: .04em;
+	text-transform: uppercase;
+	color: var(--sigos-primary, #1a3a5c);
+	border-bottom: 1px solid #e4e8ec;
+}
+
+/* ── Tab bar refinements ────────────────────────────────────────────────── */
+.form-tabs-list {
+	border-bottom: 2px solid #e4e8ec;
+	margin-bottom: 4px;
+}
+
+.form-tabs-list .tab-link {
+	font-size: .82em;
+	font-weight: 600;
+	letter-spacing: .03em;
+	padding: 8px 16px;
+	border-radius: 6px 6px 0 0;
+	color: #6c757d;
+	transition: color .15s, background .15s;
+}
+
+.form-tabs-list .tab-link:hover {
+	color: var(--sigos-primary, #1a3a5c);
+	background: #f0f3f6;
+}
+
+.form-tabs-list .tab-link.active {
+	color: var(--sigos-primary, #1a3a5c);
+	border-bottom: 3px solid var(--sigos-primary, #1a3a5c);
+	background: transparent;
+}
+
+/* ── Mandatory field asterisk color ────────────────────────────────────── */
+.reqd-asterisk { color: #e05c5c !important; }
+
+/* ── Read-only field style ──────────────────────────────────────────────── */
+.read-only .like-disabled-input,
+.read-only .form-control[disabled] {
+	background: #f8f9fb !important;
+	color: #555 !important;
+	border-color: #e8ebed !important;
+}
+
 :root {
 	--sigos-primary: #1a3a5c;
 	--sigos-accent:  #e8a020;

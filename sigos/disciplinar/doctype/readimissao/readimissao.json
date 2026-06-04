@@ -8,25 +8,18 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "naming_series",
   "data",
-  "col_break_1",
+  "sec_vig",
   "vigilante",
   "nome_do_vigilante",
+  "col_r1",
   "delegacao",
-  "col_break_2",
+  "sec_motivo",
   "motivo_readimissao",
+  "col_r2",
   "observacoes"
  ],
  "fields": [
-  {
-   "fieldname": "naming_series",
-   "fieldtype": "Select",
-   "label": "Série",
-   "options": "READ-.####",
-   "reqd": 1,
-   "set_only_once": 1
-  },
   {
    "fieldname": "data",
    "fieldtype": "Date",
@@ -35,8 +28,9 @@
    "default": "Today"
   },
   {
-   "fieldname": "col_break_1",
-   "fieldtype": "Column Break"
+   "fieldname": "sec_vig",
+   "fieldtype": "Section Break",
+   "label": "Vigilante"
   },
   {
    "fieldname": "vigilante",
@@ -54,20 +48,29 @@
    "read_only": 1
   },
   {
+   "fieldname": "col_r1",
+   "fieldtype": "Column Break"
+  },
+  {
    "fieldname": "delegacao",
    "fieldtype": "Link",
    "label": "Delegação",
    "options": "Delegacao"
   },
   {
-   "fieldname": "col_break_2",
-   "fieldtype": "Column Break"
+   "fieldname": "sec_motivo",
+   "fieldtype": "Section Break",
+   "label": "Motivo e Observações"
   },
   {
    "fieldname": "motivo_readimissao",
    "fieldtype": "Small Text",
    "label": "Motivo de Readmissão",
    "reqd": 1
+  },
+  {
+   "fieldname": "col_r2",
+   "fieldtype": "Column Break"
   },
   {
    "fieldname": "observacoes",

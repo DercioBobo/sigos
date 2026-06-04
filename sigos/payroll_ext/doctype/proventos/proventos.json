@@ -8,29 +8,21 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "naming_series",
   "funcionario",
   "tipo_de_subsidios",
   "col_break_1",
   "tipo_de_pagamento",
   "mes_referencia",
   "meses_a_pagar",
-  "sec_valores",
+  "sec_val",
   "valor_a_pagar",
-  "col_break_2",
+  "col_pv1",
   "valor_mensal",
+  "col_pv2",
   "data_de_inicio",
   "data_de_fim"
  ],
  "fields": [
-  {
-   "fieldname": "naming_series",
-   "fieldtype": "Select",
-   "label": "Série",
-   "options": "PROV-.####",
-   "reqd": 1,
-   "set_only_once": 1
-  },
   {
    "fieldname": "funcionario",
    "fieldtype": "Link",
@@ -70,9 +62,9 @@
    "default": "1"
   },
   {
-   "fieldname": "sec_valores",
+   "fieldname": "sec_val",
    "fieldtype": "Section Break",
-   "label": "Valores"
+   "label": "Valores e Periodicidade"
   },
   {
    "fieldname": "valor_a_pagar",
@@ -81,7 +73,7 @@
    "reqd": 1
   },
   {
-   "fieldname": "col_break_2",
+   "fieldname": "col_pv1",
    "fieldtype": "Column Break"
   },
   {
@@ -89,6 +81,10 @@
    "fieldtype": "Currency",
    "label": "Valor Mensal",
    "read_only": 1
+  },
+  {
+   "fieldname": "col_pv2",
+   "fieldtype": "Column Break"
   },
   {
    "fieldname": "data_de_inicio",

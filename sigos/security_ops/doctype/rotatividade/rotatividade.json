@@ -8,48 +8,47 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "naming_series",
+  "tab_rot_id",
   "data",
-  "col_break_1",
   "delegacao",
   "mecanografico",
-  "sec_vigilante",
+  "sec_rot_ant",
   "vigilante",
   "antigo_posto",
-  "col_break_2",
+  "col_rot_1",
   "cliente_antigo_posto",
   "categoria_vigilante",
   "regime",
+  "tab_rot_op",
   "sec_operacao",
   "abreviatura_op",
   "motivo",
-  "col_break_3",
+  "col_rot_2",
   "novo_posto",
   "sec_substituto",
   "alocar_vigilante_substituto",
   "novo_vigilante",
   "alocado_ao_posto",
-  "col_break_4",
+  "col_rot_3",
   "cliente_novo_posto",
   "categoria_vigilante_a_alocar",
   "sec_reserva",
   "novo_posto_do_reserva",
+  "tab_rot_doc",
   "sec_justificativas",
   "motivo_3meses",
   "motivo_rotatividade",
   "sec_demissao",
   "motiv_demi",
   "uniforme",
+  "col_break_4",
   "evidencia"
  ],
  "fields": [
   {
-   "fieldname": "naming_series",
-   "fieldtype": "Select",
-   "label": "Série",
-   "options": "ROT-.YYYY.-.####",
-   "reqd": 1,
-   "set_only_once": 1
+   "fieldname": "tab_rot_id",
+   "fieldtype": "Tab Break",
+   "label": "Vigilante e Posto"
   },
   {
    "fieldname": "data",
@@ -58,10 +57,6 @@
    "reqd": 1,
    "in_list_view": 1,
    "default": "Today"
-  },
-  {
-   "fieldname": "col_break_1",
-   "fieldtype": "Column Break"
   },
   {
    "fieldname": "delegacao",
@@ -78,9 +73,9 @@
    "read_only": 1
   },
   {
-   "fieldname": "sec_vigilante",
+   "fieldname": "sec_rot_ant",
    "fieldtype": "Section Break",
-   "label": "Vigilante a Rodar"
+   "label": "Situação Actual"
   },
   {
    "fieldname": "vigilante",
@@ -99,7 +94,7 @@
    "read_only": 1
   },
   {
-   "fieldname": "col_break_2",
+   "fieldname": "col_rot_1",
    "fieldtype": "Column Break"
   },
   {
@@ -124,6 +119,11 @@
    "read_only": 1
   },
   {
+   "fieldname": "tab_rot_op",
+   "fieldtype": "Tab Break",
+   "label": "Operação"
+  },
+  {
    "fieldname": "sec_operacao",
    "fieldtype": "Section Break",
    "label": "Operação"
@@ -144,7 +144,7 @@
    "in_list_view": 1
   },
   {
-   "fieldname": "col_break_3",
+   "fieldname": "col_rot_2",
    "fieldtype": "Column Break"
   },
   {
@@ -181,7 +181,7 @@
    "read_only": 1
   },
   {
-   "fieldname": "col_break_4",
+   "fieldname": "col_rot_3",
    "fieldtype": "Column Break"
   },
   {
@@ -209,6 +209,11 @@
    "fieldtype": "Link",
    "label": "Novo Posto do Reserva",
    "options": "Posto de Vigilancia"
+  },
+  {
+   "fieldname": "tab_rot_doc",
+   "fieldtype": "Tab Break",
+   "label": "Documentação"
   },
   {
    "fieldname": "sec_justificativas",
@@ -246,6 +251,10 @@
    "fieldtype": "Select",
    "label": "Uniforme",
    "options": "\nEntregue\nNão Entregue"
+  },
+  {
+   "fieldname": "col_break_4",
+   "fieldtype": "Column Break"
   },
   {
    "fieldname": "evidencia",

@@ -18,18 +18,18 @@
   "aviso_temporario",
   "data_fim_prevista",
   "aviso_expiracao_enviado",
-  "sec_ocupacao",
+  "sec_ocup",
   "indicador_ocupacao",
   "numero_de_vagas",
   "ocupacao_atual",
-  "col_break_ocup",
+  "col_pv_2",
   "status_ocupacao",
-  "sec_cliente",
+  "sec_contrato",
   "cliente",
   "project",
-  "col_break_cli",
+  "col_pv_3",
   "delegacao",
-  "sec_localizacao",
+  "sec_loc",
   "localizacao",
   "coordenadas"
  ],
@@ -111,7 +111,7 @@
    "read_only": 1
   },
   {
-   "fieldname": "sec_ocupacao",
+   "fieldname": "sec_ocup",
    "fieldtype": "Section Break",
    "label": "Ocupação"
   },
@@ -138,7 +138,7 @@
    "in_list_view": 1
   },
   {
-   "fieldname": "col_break_ocup",
+   "fieldname": "col_pv_2",
    "fieldtype": "Column Break"
   },
   {
@@ -151,7 +151,7 @@
    "in_standard_filter": 1
   },
   {
-   "fieldname": "sec_cliente",
+   "fieldname": "sec_contrato",
    "fieldtype": "Section Break",
    "label": "Cliente e Contrato"
   },
@@ -171,7 +171,7 @@
    "options": "Project"
   },
   {
-   "fieldname": "col_break_cli",
+   "fieldname": "col_pv_3",
    "fieldtype": "Column Break"
   },
   {
@@ -184,7 +184,7 @@
    "in_standard_filter": 1
   },
   {
-   "fieldname": "sec_localizacao",
+   "fieldname": "sec_loc",
    "fieldtype": "Section Break",
    "label": "Localização",
    "collapsible": 1

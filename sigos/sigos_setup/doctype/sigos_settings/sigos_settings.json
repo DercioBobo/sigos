@@ -5,44 +5,47 @@
  "document_type": "Other",
  "engine": "InnoDB",
  "field_order": [
-  "sec_operacoes",
+  "tab_ss_ops",
   "dias_minimos_rotatividade",
   "prazo_justificacao_faltas",
   "meses_horizonte_escala",
-  "col_break_ops",
+  "col_ss_op1",
+  "manter_meses_passados",
   "hora_limite_manha",
   "hora_limite_noite",
-  "manter_meses_passados",
-  "sec_rh",
+  "tab_ss_rh",
   "percentagem_maxima_emprestimo",
   "meses_maximos_emprestimo",
-  "col_break_rh",
+  "col_ss_rh1",
   "valor_padrao_uniforme",
   "meses_padrao_uniforme",
-  "sec_disciplinar",
+  "sec_ss_disc",
   "reprimendas_baixa_pd",
   "reprimendas_media_pd",
   "col_break_disc",
   "reprimendas_alta_pd",
-  "sec_payroll",
+  "tab_ss_pay",
+  "sec_ss_falt",
   "valor_subsidio_arma",
   "metodo_calculo_faltas",
+  "col_ss_pay1",
   "valor_fixo_por_falta",
   "base_dias_de_trabalho",
-  "col_break_pay",
+  "sec_ss_comp",
   "componente_faltas",
   "componente_retroativo",
+  "col_ss_pay2",
   "componente_subsidio_arma",
-  "sec_sistema",
+  "tab_ss_sis",
   "empresa_padrao",
-  "col_break_sis",
+  "col_ss_sis1",
   "aprovador_rh",
   "aprovador_operacoes"
  ],
  "fields": [
   {
-   "fieldname": "sec_operacoes",
-   "fieldtype": "Section Break",
+   "fieldname": "tab_ss_ops",
+   "fieldtype": "Tab Break",
    "label": "Operações"
   },
   {
@@ -67,7 +70,7 @@
    "description": "Quantos meses à frente a escala é gerada automaticamente (janela futura)"
   },
   {
-   "fieldname": "col_break_ops",
+   "fieldname": "col_ss_op1",
    "fieldtype": "Column Break"
   },
   {
@@ -92,8 +95,8 @@
    "description": "Hora limite para submissão de ausências do período da noite"
   },
   {
-   "fieldname": "sec_rh",
-   "fieldtype": "Section Break",
+   "fieldname": "tab_ss_rh",
+   "fieldtype": "Tab Break",
    "label": "Recursos Humanos"
   },
   {
@@ -110,7 +113,7 @@
    "default": "3"
   },
   {
-   "fieldname": "col_break_rh",
+   "fieldname": "col_ss_rh1",
    "fieldtype": "Column Break"
   },
   {
@@ -126,9 +129,9 @@
    "default": "6"
   },
   {
-   "fieldname": "sec_disciplinar",
+   "fieldname": "sec_ss_disc",
    "fieldtype": "Section Break",
-   "label": "Processo Disciplinar — Escalação Automática"
+   "label": "Escalação Automática PD"
   },
   {
    "fieldname": "reprimendas_baixa_pd",
@@ -154,9 +157,14 @@
    "default": "1"
   },
   {
-   "fieldname": "sec_payroll",
-   "fieldtype": "Section Break",
+   "fieldname": "tab_ss_pay",
+   "fieldtype": "Tab Break",
    "label": "Payroll"
+  },
+  {
+   "fieldname": "sec_ss_falt",
+   "fieldtype": "Section Break",
+   "label": "Cálculo de Faltas"
   },
   {
    "fieldname": "valor_subsidio_arma",
@@ -165,16 +173,16 @@
    "default": "300"
   },
   {
-   "fieldname": "col_break_pay",
-   "fieldtype": "Column Break"
-  },
-  {
    "fieldname": "metodo_calculo_faltas",
    "fieldtype": "Select",
    "label": "Método de Cálculo de Faltas",
    "options": "Proporcional ao Salário\nValor Fixo por Falta",
    "default": "Proporcional ao Salário",
    "description": "Proporcional: (Salário Base ÷ Dias de Trabalho) × Faltas Não Justificadas. Valor Fixo: Faltas Não Justificadas × Valor por Falta."
+  },
+  {
+   "fieldname": "col_ss_pay1",
+   "fieldtype": "Column Break"
   },
   {
    "fieldname": "valor_fixo_por_falta",
@@ -192,6 +200,11 @@
    "description": "Dias do Mês: total de dias do período (ex: 30). Dias Úteis: usa o total_working_days do HRMS."
   },
   {
+   "fieldname": "sec_ss_comp",
+   "fieldtype": "Section Break",
+   "label": "Componentes Salariais"
+  },
+  {
    "fieldname": "componente_faltas",
    "fieldtype": "Link",
    "label": "Salary Component — Faltas",
@@ -205,14 +218,18 @@
    "options": "Salary Component"
   },
   {
+   "fieldname": "col_ss_pay2",
+   "fieldtype": "Column Break"
+  },
+  {
    "fieldname": "componente_subsidio_arma",
    "fieldtype": "Link",
    "label": "Salary Component — Subsídio de Arma",
    "options": "Salary Component"
   },
   {
-   "fieldname": "sec_sistema",
-   "fieldtype": "Section Break",
+   "fieldname": "tab_ss_sis",
+   "fieldtype": "Tab Break",
    "label": "Sistema"
   },
   {
@@ -222,7 +239,7 @@
    "options": "Company"
   },
   {
-   "fieldname": "col_break_sis",
+   "fieldname": "col_ss_sis1",
    "fieldtype": "Column Break"
   },
   {

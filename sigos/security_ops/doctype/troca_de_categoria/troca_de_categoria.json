@@ -8,25 +8,18 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "naming_series",
   "data",
-  "col_break_1",
   "delegacao",
+  "sec_vig",
   "vigilante",
+  "sec_change",
   "categoria_atual",
-  "col_break_2",
+  "col_tc1",
   "categoria_nova",
+  "col_tc2",
   "motivo"
  ],
  "fields": [
-  {
-   "fieldname": "naming_series",
-   "fieldtype": "Select",
-   "label": "Série",
-   "options": "TC-.####",
-   "reqd": 1,
-   "set_only_once": 1
-  },
   {
    "fieldname": "data",
    "fieldtype": "Date",
@@ -35,14 +28,15 @@
    "default": "Today"
   },
   {
-   "fieldname": "col_break_1",
-   "fieldtype": "Column Break"
-  },
-  {
    "fieldname": "delegacao",
    "fieldtype": "Link",
    "label": "Delegação",
    "options": "Delegacao"
+  },
+  {
+   "fieldname": "sec_vig",
+   "fieldtype": "Section Break",
+   "label": "Vigilante"
   },
   {
    "fieldname": "vigilante",
@@ -53,6 +47,11 @@
    "in_list_view": 1
   },
   {
+   "fieldname": "sec_change",
+   "fieldtype": "Section Break",
+   "label": "Alteração de Categoria"
+  },
+  {
    "fieldname": "categoria_atual",
    "fieldtype": "Data",
    "label": "Categoria Atual",
@@ -60,7 +59,7 @@
    "read_only": 1
   },
   {
-   "fieldname": "col_break_2",
+   "fieldname": "col_tc1",
    "fieldtype": "Column Break"
   },
   {
@@ -69,6 +68,10 @@
    "label": "Categoria Nova",
    "options": "Categoria Vigilante",
    "reqd": 1
+  },
+  {
+   "fieldname": "col_tc2",
+   "fieldtype": "Column Break"
   },
   {
    "fieldname": "motivo",
