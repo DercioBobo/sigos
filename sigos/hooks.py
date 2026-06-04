@@ -46,8 +46,8 @@ fixtures = [
 		"dt": "Regime",
 		"filters": [["nome", "in", ["H24", "TDN", "TDU", "TDU-MT", "24h"]]],
 	},
-	{"dt": "Custom Field", "filters": [["module", "=", "SIGOS"]]},
-	{"dt": "Property Setter", "filters": [["module", "=", "SIGOS"]]},
+	{"dt": "Custom Field", "filters": [["module", "=", "SIGOS Setup"]]},
+	{"dt": "Property Setter", "filters": [["module", "=", "SIGOS Setup"]]},
 	{"dt": "Workflow", "filters": [["document_type", "in", [
 		"Vigilante", "Rotatividade", "Ausencias",
 		"Repreensao Disciplinar", "Processo Disciplinar",

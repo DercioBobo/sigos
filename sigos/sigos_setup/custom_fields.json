@@ -2,7 +2,7 @@
  {
   "doctype": "Custom Field",
   "dt": "Employee",
-  "module": "SIGOS",
+  "module": "SIGOS Setup",
   "fieldname": "custom_vigilante",
   "fieldtype": "Link",
   "options": "Vigilante",
@@ -13,7 +13,7 @@
  {
   "doctype": "Custom Field",
   "dt": "Employee",
-  "module": "SIGOS",
+  "module": "SIGOS Setup",
   "fieldname": "custom_mecanografico",
   "fieldtype": "Data",
   "label": "Mecanográfico",
@@ -22,7 +22,7 @@
  {
   "doctype": "Custom Field",
   "dt": "Employee",
-  "module": "SIGOS",
+  "module": "SIGOS Setup",
   "fieldname": "custom_categoria",
   "fieldtype": "Link",
   "label": "Categoria (SIGOS)",
@@ -33,7 +33,7 @@
  {
   "doctype": "Custom Field",
   "dt": "Employee",
-  "module": "SIGOS",
+  "module": "SIGOS Setup",
   "fieldname": "custom_regime",
   "fieldtype": "Link",
   "label": "Regime (SIGOS)",
@@ -44,7 +44,7 @@
  {
   "doctype": "Custom Field",
   "dt": "Employee",
-  "module": "SIGOS",
+  "module": "SIGOS Setup",
   "fieldname": "custom_delegacao",
   "fieldtype": "Link",
   "options": "Delegacao",
@@ -55,7 +55,7 @@
  {
   "doctype": "Custom Field",
   "dt": "Employee",
-  "module": "SIGOS",
+  "module": "SIGOS Setup",
   "fieldname": "custom_posto",
   "fieldtype": "Link",
   "options": "Posto de Vigilancia",
@@ -66,7 +66,7 @@
  {
   "doctype": "Custom Field",
   "dt": "Employee",
-  "module": "SIGOS",
+  "module": "SIGOS Setup",
   "fieldname": "custom_tipo_de_vigilante",
   "fieldtype": "Select",
   "label": "Tipo de Vigilante",
@@ -77,7 +77,7 @@
  {
   "doctype": "Custom Field",
   "dt": "Employee",
-  "module": "SIGOS",
+  "module": "SIGOS Setup",
   "fieldname": "custom_contanib",
   "fieldtype": "Data",
   "label": "Conta NIB",
@@ -86,7 +86,7 @@
  {
   "doctype": "Custom Field",
   "dt": "Salary Slip",
-  "module": "SIGOS",
+  "module": "SIGOS Setup",
   "fieldname": "custom_vigilante",
   "fieldtype": "Link",
   "options": "Vigilante",
@@ -98,7 +98,7 @@
  {
   "doctype": "Custom Field",
   "dt": "Salary Slip",
-  "module": "SIGOS",
+  "module": "SIGOS Setup",
   "fieldname": "custom_projecto",
   "fieldtype": "Link",
   "options": "Project",
@@ -109,7 +109,7 @@
  {
   "doctype": "Custom Field",
   "dt": "Salary Slip",
-  "module": "SIGOS",
+  "module": "SIGOS Setup",
   "fieldname": "custom_categoria",
   "fieldtype": "Data",
   "label": "Categoria",
@@ -120,7 +120,7 @@
  {
   "doctype": "Custom Field",
   "dt": "Salary Slip",
-  "module": "SIGOS",
+  "module": "SIGOS Setup",
   "fieldname": "custom_dias_de_trabalho",
   "fieldtype": "Int",
   "label": "Dias de Trabalho",
@@ -129,7 +129,7 @@
  {
   "doctype": "Custom Field",
   "dt": "Salary Slip",
-  "module": "SIGOS",
+  "module": "SIGOS Setup",
   "fieldname": "custom_faltas_no_mes",
   "fieldtype": "Int",
   "label": "Faltas no Mês",
@@ -139,7 +139,7 @@
  {
   "doctype": "Custom Field",
   "dt": "Salary Slip",
-  "module": "SIGOS",
+  "module": "SIGOS Setup",
   "fieldname": "custom_faltas_justificadas",
   "fieldtype": "Int",
   "label": "Faltas Justificadas",
@@ -149,7 +149,7 @@
  {
   "doctype": "Custom Field",
   "dt": "Salary Slip",
-  "module": "SIGOS",
+  "module": "SIGOS Setup",
   "fieldname": "custom_faltas_nao_justificadas",
   "fieldtype": "Int",
   "label": "Faltas Não Justificadas",
@@ -159,7 +159,7 @@
  {
   "doctype": "Custom Field",
   "dt": "Salary Slip",
-  "module": "SIGOS",
+  "module": "SIGOS Setup",
   "fieldname": "custom_dias_trabalhados",
   "fieldtype": "Int",
   "label": "Dias Trabalhados",
@@ -169,7 +169,7 @@
  {
   "doctype": "Custom Field",
   "dt": "Salary Slip",
-  "module": "SIGOS",
+  "module": "SIGOS Setup",
   "fieldname": "custom_dia_da_falta_inicio",
   "fieldtype": "Date",
   "label": "Início Período Faltas",
@@ -179,7 +179,7 @@
  {
   "doctype": "Custom Field",
   "dt": "Salary Slip",
-  "module": "SIGOS",
+  "module": "SIGOS Setup",
   "fieldname": "custom_dia_da_falta_fim",
   "fieldtype": "Date",
   "label": "Fim Período Faltas",
@@ -189,7 +189,7 @@
  {
   "doctype": "Custom Field",
   "dt": "Salary Slip",
-  "module": "SIGOS",
+  "module": "SIGOS Setup",
   "fieldname": "custom_taxable_earnings",
   "fieldtype": "Currency",
   "label": "Rendimentos Tributáveis",
@@ -199,7 +199,7 @@
  {
   "doctype": "Custom Field",
   "dt": "Salary Slip",
-  "module": "SIGOS",
+  "module": "SIGOS Setup",
   "fieldname": "custom_valor_a_reclamar",
   "fieldtype": "Currency",
   "label": "Valor Retroativo",
@@ -209,7 +209,7 @@
  {
   "doctype": "Custom Field",
   "dt": "Salary Slip",
-  "module": "SIGOS",
+  "module": "SIGOS Setup",
   "fieldname": "custom_valor_emprestimo_total",
   "fieldtype": "Currency",
   "label": "Empréstimo Total",
@@ -219,7 +219,7 @@
  {
   "doctype": "Custom Field",
   "dt": "Salary Slip",
-  "module": "SIGOS",
+  "module": "SIGOS Setup",
   "fieldname": "custom_valor_emprestimo_pago",
   "fieldtype": "Currency",
   "label": "Empréstimo Pago",
@@ -229,7 +229,7 @@
  {
   "doctype": "Custom Field",
   "dt": "Salary Slip",
-  "module": "SIGOS",
+  "module": "SIGOS Setup",
   "fieldname": "custom_valor_emprestimo_em_falta",
   "fieldtype": "Currency",
   "label": "Empréstimo em Falta",
@@ -239,7 +239,7 @@
  {
   "doctype": "Custom Field",
   "dt": "Salary Structure Assignment",
-  "module": "SIGOS",
+  "module": "SIGOS Setup",
   "fieldname": "custom_cliente",
   "fieldtype": "Link",
   "options": "Customer",
@@ -249,7 +249,7 @@
  {
   "doctype": "Custom Field",
   "dt": "Salary Structure Assignment",
-  "module": "SIGOS",
+  "module": "SIGOS Setup",
   "fieldname": "custom_project",
   "fieldtype": "Link",
   "options": "Project",
@@ -259,7 +259,7 @@
  {
   "doctype": "Custom Field",
   "dt": "Salary Structure Assignment",
-  "module": "SIGOS",
+  "module": "SIGOS Setup",
   "fieldname": "custom_salario",
   "fieldtype": "Select",
   "label": "Base Salarial",
@@ -269,7 +269,7 @@
  {
   "doctype": "Custom Field",
   "dt": "Payroll Entry",
-  "module": "SIGOS",
+  "module": "SIGOS Setup",
   "fieldname": "custom_customer",
   "fieldtype": "Link",
   "options": "Customer",
@@ -279,7 +279,7 @@
  {
   "doctype": "Custom Field",
   "dt": "Sales Invoice",
-  "module": "SIGOS",
+  "module": "SIGOS Setup",
   "fieldname": "custom_regime_h24",
   "fieldtype": "Currency",
   "label": "Valor/Vigilante H24",
@@ -288,7 +288,7 @@
  {
   "doctype": "Custom Field",
   "dt": "Sales Invoice",
-  "module": "SIGOS",
+  "module": "SIGOS Setup",
   "fieldname": "custom_regime_tdn",
   "fieldtype": "Currency",
   "label": "Valor/Vigilante TDN",
@@ -297,7 +297,7 @@
  {
   "doctype": "Custom Field",
   "dt": "Sales Invoice",
-  "module": "SIGOS",
+  "module": "SIGOS Setup",
   "fieldname": "custom_regime_tdu",
   "fieldtype": "Currency",
   "label": "Valor/Vigilante TDU",
@@ -306,7 +306,7 @@
  {
   "doctype": "Custom Field",
   "dt": "Sales Invoice",
-  "module": "SIGOS",
+  "module": "SIGOS Setup",
   "fieldname": "custom_total_vigilantes",
   "fieldtype": "Int",
   "label": "Total Vigilantes",
@@ -316,7 +316,7 @@
  {
   "doctype": "Custom Field",
   "dt": "Sales Invoice",
-  "module": "SIGOS",
+  "module": "SIGOS Setup",
   "fieldname": "custom_total_h24",
   "fieldtype": "Int",
   "label": "Total H24",
@@ -326,7 +326,7 @@
  {
   "doctype": "Custom Field",
   "dt": "Sales Invoice",
-  "module": "SIGOS",
+  "module": "SIGOS Setup",
   "fieldname": "custom_total_tdn",
   "fieldtype": "Int",
   "label": "Total TDN",
@@ -336,7 +336,7 @@
  {
   "doctype": "Custom Field",
   "dt": "Sales Invoice",
-  "module": "SIGOS",
+  "module": "SIGOS Setup",
   "fieldname": "custom_total_tdu",
   "fieldtype": "Int",
   "label": "Total TDU",
@@ -346,7 +346,7 @@
  {
   "doctype": "Custom Field",
   "dt": "Project",
-  "module": "SIGOS",
+  "module": "SIGOS Setup",
   "fieldname": "custom_valor_do_contrato",
   "fieldtype": "Currency",
   "label": "Valor do Contrato (por Vigilante)",
@@ -355,7 +355,7 @@
  {
   "doctype": "Custom Field",
   "dt": "Project",
-  "module": "SIGOS",
+  "module": "SIGOS Setup",
   "fieldname": "custom_subsidios",
   "fieldtype": "Table",
   "options": "Project Subsidio Item",
