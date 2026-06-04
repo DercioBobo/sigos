@@ -99,6 +99,9 @@ class Vigilante(Document):
 
 		try:
 			emp = frappe.new_doc("Employee")
+			parts = (self.nome_completo or "").strip().split()
+			emp.first_name = parts[0] if parts else self.nome_completo
+			emp.last_name  = " ".join(parts[1:]) if len(parts) > 1 else ""
 			emp.employee_name = self.nome_completo
 			emp.date_of_birth = self.data_de_nascimento
 			emp.gender = "Male" if self.sexo == "Masculino" else "Female"
