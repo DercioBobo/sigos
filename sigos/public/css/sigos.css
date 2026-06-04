@@ -143,6 +143,34 @@ thead .esc-name-col { z-index: 3; }
 }
 .esc-override-lg { background: #fff; color: #e05c5c; box-shadow: inset 0 0 0 2px #e05c5c; }
 
+/* ── Vigilante form — role-coloured tabs ────────────────────────────────── */
+.sigos-tab-ops,
+.sigos-tab-ops.active {
+	color: #1565C0 !important;
+	font-weight: 600;
+}
+.sigos-tab-ops.active {
+	border-bottom: 2px solid #1565C0 !important;
+}
+.sigos-tab-ops:hover {
+	color: #1976D2 !important;
+	background: rgba(21, 101, 192, 0.06) !important;
+}
+
+.sigos-tab-rh,
+.sigos-tab-rh.active {
+	color: #BF360C !important;
+	font-weight: 600;
+}
+.sigos-tab-rh.active {
+	border-bottom: 2px solid #BF360C !important;
+}
+.sigos-tab-rh:hover {
+	color: #E64A19 !important;
+	background: rgba(191, 54, 12, 0.06) !important;
+}
+
+/* ── Danger buttons (limpar, remover) ───────────────────────────────────── */
 /* Danger buttons (limpar, remover) */
 .btn-sigos-danger {
 	background-color: var(--sigos-danger) !important;

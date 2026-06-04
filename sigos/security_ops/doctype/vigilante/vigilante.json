@@ -12,6 +12,8 @@
   "foto",
   "col_break_header",
   "nome_completo",
+  "status",
+  "tab_geral",
   "data_de_nascimento",
   "idade",
   "sexo",
@@ -28,12 +30,7 @@
   "email",
   "residencia",
   "dependentes",
-  "sec_profissional",
-  "status",
-  "data_admissao",
-  "col_break_prof",
-  "motivo_de_admissao",
-  "empresa",
+  "tab_operacional",
   "sec_operacional",
   "delegacao",
   "categoria",
@@ -47,12 +44,18 @@
   "cliente",
   "projecto",
   "nome_do_projecto",
+  "sec_anexos",
+  "anexar_documento",
+  "tab_rh",
+  "sec_profissional",
+  "data_admissao",
+  "col_break_prof",
+  "motivo_de_admissao",
+  "empresa",
   "sec_id_prof",
   "mecanografico",
   "col_break_id",
   "codename",
-  "sec_anexos",
-  "anexar_documento",
   "sec_rh",
   "funcionario"
  ],
@@ -334,6 +337,21 @@
    "label": "Funcionário (Employee)",
    "options": "Employee",
    "read_only": 1
+  },
+  {
+   "fieldname": "tab_geral",
+   "fieldtype": "Tab Break",
+   "label": "Dados Gerais"
+  },
+  {
+   "fieldname": "tab_operacional",
+   "fieldtype": "Tab Break",
+   "label": "Dados Operacionais"
+  },
+  {
+   "fieldname": "tab_rh",
+   "fieldtype": "Tab Break",
+   "label": "Dados RH"
   }
  ],
  "links": [

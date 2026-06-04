@@ -15,6 +15,7 @@ frappe.ui.form.on("Vigilante", {
 		frm.trigger("_botoes_aprovacao");
 		sigos.danger_btn(frm, "limpar_escala");
 		_calcular_idade(frm);
+		_colorir_tabs(frm);
 	},
 
 	// ─── Field events ──────────────────────────────────────────────────────────
@@ -81,6 +82,22 @@ frappe.ui.form.on("Vigilante", {
 		}
 	},
 });
+
+// ─── Tab colours (Operacional = blue, RH = orange) ───────────────────────────
+function _colorir_tabs(frm) {
+	// Tabs render asynchronously; wait one tick then apply classes
+	setTimeout(() => {
+		$(frm.wrapper).find(".tab-link, .nav-link").each(function () {
+			const label = $(this).text().trim();
+			$(this).removeClass("sigos-tab-ops sigos-tab-rh");
+			if (label === __("Dados Operacionais")) {
+				$(this).addClass("sigos-tab-ops");
+			} else if (label === __("Dados RH")) {
+				$(this).addClass("sigos-tab-rh");
+			}
+		});
+	}, 150);
+}
 
 // ─── Age calculator ──────────────────────────────────────────────────────────
 function _calcular_idade(frm) {
