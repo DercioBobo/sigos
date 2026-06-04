@@ -73,14 +73,14 @@ def calcular_faltas_vigilante(vigilante: str, start_date, end_date) -> int:
 
 def atualizar_ocupacao_posto(posto_name: str):
 	"""
-	Recompute ocupacao_atual and status_ocupacao for a Posto de Vigilancia.
+	Recompute ocupacao_atual and status_ocupacao for a Posto De Vigilancia.
 	Call this whenever a Vigilante's posto changes or numero_de_vagas changes.
 	"""
 	if not posto_name:
 		return
 
 	try:
-		max_vagas = frappe.db.get_value("Posto de Vigilancia", posto_name, "numero_de_vagas") or 0
+		max_vagas = frappe.db.get_value("Posto De Vigilancia", posto_name, "numero_de_vagas") or 0
 
 		atual = frappe.db.count(
 			"Vigilante",
@@ -97,7 +97,7 @@ def atualizar_ocupacao_posto(posto_name: str):
 			status = "Excedido"
 
 		frappe.db.set_value(
-			"Posto de Vigilancia",
+			"Posto De Vigilancia",
 			posto_name,
 			{"ocupacao_atual": atual, "status_ocupacao": status},
 			update_modified=False,
@@ -112,7 +112,7 @@ def atualizar_ocupacao_posto(posto_name: str):
 def get_escalas_activas_com_vigilante(vigilante: str) -> list:
 	"""
 	Return all Activo Escalas that contain this vigilante.
-	Used to surface alerts after Rotatividade, Demissão, or Troca de Regime.
+	Used to surface alerts after Rotatividade, Demissão, or Troca De Regime.
 	"""
 	from sigos.security_ops.doctype.escala_do_vigilante.escala_do_vigilante import (
 		get_escalas_com_vigilante,
@@ -124,7 +124,7 @@ def alertar_escalas_desactualizadas(vigilante: str, motivo: str):
 	"""
 	Show a frappe.msgprint listing all active Escalas that still contain
 	this vigilante after a change that affects their assignment.
-	Called from Rotatividade, Demissão, Troca de Regime on_submit.
+	Called from Rotatividade, Demissão, Troca De Regime on_submit.
 	"""
 	escalas = get_escalas_activas_com_vigilante(vigilante)
 	if not escalas:

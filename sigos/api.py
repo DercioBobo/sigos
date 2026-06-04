@@ -12,8 +12,8 @@ def _vigilantes_com_escala_futura(excluir_escala=None):
 	return frappe.db.sql(
 		f"""
 		SELECT DISTINCT te.vigilante
-		FROM `tabTabela de Escala de Vigilante` te
-		JOIN `tabEscala do Vigilante` e ON e.name = te.parent
+		FROM `tabTabela De Escala De Vigilante` te
+		JOIN `tabEscala Do Vigilante` e ON e.name = te.parent
 		WHERE e.estado = 'Activo'
 		  AND te.data >= %(hoje)s
 		  {cond}
@@ -65,7 +65,7 @@ def alocar_reservas(posto, vigilantes, regime=None):
 	if not vigilantes:
 		return {"alocados": 0}
 
-	max_vagas = frappe.db.get_value("Posto de Vigilancia", posto, "numero_de_vagas") or 0
+	max_vagas = frappe.db.get_value("Posto De Vigilancia", posto, "numero_de_vagas") or 0
 	if max_vagas:
 		atual = frappe.db.count("Vigilante", {"posto_de_vigilancia": posto, "status": "Ativo"})
 		a_adicionar = sum(
@@ -197,8 +197,8 @@ def get_vigilante_data(vigilante, data):
 			te.regime,
 			te.turno,
 			te.periodo
-		FROM `tabTabela de Escala de Vigilante` te
-		JOIN `tabEscala do Vigilante` e ON e.name = te.parent
+		FROM `tabTabela De Escala De Vigilante` te
+		JOIN `tabEscala Do Vigilante` e ON e.name = te.parent
 		WHERE te.vigilante = %s
 		  AND te.data = %s
 		  AND e.estado = 'Activo'
@@ -214,8 +214,8 @@ def get_filtered_vigilantes(periodo, data):
 	results = frappe.db.sql(
 		"""
 		SELECT DISTINCT te.vigilante
-		FROM `tabTabela de Escala de Vigilante` te
-		JOIN `tabEscala do Vigilante` e ON e.name = te.parent
+		FROM `tabTabela De Escala De Vigilante` te
+		JOIN `tabEscala Do Vigilante` e ON e.name = te.parent
 		WHERE te.periodo = %s
 		  AND te.data = %s
 		  AND e.estado = 'Activo'
@@ -235,8 +235,8 @@ def get_vigilantes_on_folga(data):
 	return frappe.db.sql(
 		"""
 		SELECT te.vigilante, te.posto, te.turno
-		FROM `tabTabela de Escala de Vigilante` te
-		JOIN `tabEscala do Vigilante` e ON e.name = te.parent
+		FROM `tabTabela De Escala De Vigilante` te
+		JOIN `tabEscala Do Vigilante` e ON e.name = te.parent
 		JOIN `tabTurno` t ON t.name = te.turno
 		WHERE te.data = %(data)s
 		  AND t.e_folga = 1
@@ -320,8 +320,8 @@ def get_vigilantes_em_outra_escala(escala_name, vigilantes):
 	return frappe.db.sql(
 		"""
 		SELECT DISTINCT te.vigilante, e.name AS escala
-		FROM `tabTabela de Escala de Vigilante` te
-		JOIN `tabEscala do Vigilante` e ON e.name = te.parent
+		FROM `tabTabela De Escala De Vigilante` te
+		JOIN `tabEscala Do Vigilante` e ON e.name = te.parent
 		WHERE e.estado     = 'Activo'
 		  AND e.name       != %(escala)s
 		  AND te.data      >= %(hoje)s
@@ -349,7 +349,7 @@ def get_escalas_activas_para_vigilante(vigilante):
 		# Count future rows for this vigilante
 		from frappe.utils import today
 		e["linhas_futuras"] = frappe.db.count(
-			"Tabela de Escala de Vigilante",
+			"Tabela De Escala De Vigilante",
 			{"parent": e.name, "vigilante": vigilante, "data": [">=", today()]},
 		)
 
@@ -373,7 +373,7 @@ def actualizar_escala_apos_mudanca(
 	if accao in ("manter", "pular"):
 		return {"removido": 0, "adicionado": 0}
 
-	escala = frappe.get_doc("Escala do Vigilante", escala_name)
+	escala = frappe.get_doc("Escala Do Vigilante", escala_name)
 
 	# Capture the slot (turno_inicial) the removed guard occupied
 	vacated = next(
@@ -426,7 +426,7 @@ def actualizar_escala_apos_mudanca(
 @frappe.whitelist()
 def gerar_escala_posto(escala_name):
 	"""Manually generate/extend the escala (button). Reconcile runs in validate on save."""
-	escala = frappe.get_doc("Escala do Vigilante", escala_name)
+	escala = frappe.get_doc("Escala Do Vigilante", escala_name)
 	escala.reconciliar_escala()
 	escala.save(ignore_permissions=True)
 	return {"gerado_ate": str(escala.gerado_ate), "linhas": len(escala.tabela_de_escala)}
@@ -435,7 +435,7 @@ def gerar_escala_posto(escala_name):
 @frappe.whitelist()
 def limpar_futuro_escala(escala_name):
 	"""Remove all future, non-override rows."""
-	escala = frappe.get_doc("Escala do Vigilante", escala_name)
+	escala = frappe.get_doc("Escala Do Vigilante", escala_name)
 	escala.limpar_futuro()
 	escala.save(ignore_permissions=True)
 	return {"linhas": len(escala.tabela_de_escala)}
@@ -445,7 +445,7 @@ def limpar_futuro_escala(escala_name):
 def get_regime_turnos(regime):
 	"""
 	Return the ordered turno sequence for a regime.
-	Used by Escala do Vigilante JS to generate the schedule dynamically.
+	Used by Escala Do Vigilante JS to generate the schedule dynamically.
 	"""
 	from sigos.utils import get_regime_turno_sequence
 	return get_regime_turno_sequence(regime)
@@ -495,8 +495,8 @@ def get_vigilantes_da_escala(data, periodo, grupo_delegados=None):
 			te.regime,
 			te.periodo,
 			COALESCE(rti.n_de_faltas, 1) AS n_de_faltas
-		FROM `tabTabela de Escala de Vigilante` te
-		JOIN `tabEscala do Vigilante` e ON e.name = te.parent
+		FROM `tabTabela De Escala De Vigilante` te
+		JOIN `tabEscala Do Vigilante` e ON e.name = te.parent
 		JOIN `tabVigilante` v ON v.name = te.vigilante
 		JOIN `tabTurno` t ON t.name = te.turno
 		LEFT JOIN `tabRegime Turno Item` rti
@@ -728,7 +728,7 @@ def get_vigilantes_sem_posto(delegacao=None):
 	Return admitted vigilantes (Pre-Adimissao or Ativo) that:
 	  - have no posto assigned
 	  - have a linked Employee (funcionario is set)
-	Used by the Atribuir Vigilantes dialog on Posto de Vigilancia.
+	Used by the Atribuir Vigilantes dialog on Posto De Vigilancia.
 	"""
 	filters = {
 		"status":              ["in", ["Pre-Adimissão", "Ativo"]],
@@ -760,7 +760,7 @@ def atribuir_vigilantes_ao_posto(posto, vigilantes, regime=None):
 	if not vigilantes:
 		return {"atribuidos": 0, "erros": []}
 
-	posto_doc = frappe.get_doc("Posto de Vigilancia", posto)
+	posto_doc = frappe.get_doc("Posto De Vigilancia", posto)
 
 	if posto_doc.estado != "Ativo":
 		frappe.throw(
@@ -831,7 +831,7 @@ def atribuir_vigilantes_ao_posto(posto, vigilantes, regime=None):
 def get_escala_preview_posto(posto, dias=7):
 	"""
 	Return a 7-day schedule preview for every Escala at a posto.
-	Used by the Ver Escala dialog on Posto de Vigilancia.
+	Used by the Ver Escala dialog on Posto De Vigilancia.
 	"""
 	from frappe.utils import today, add_days, getdate
 
@@ -839,7 +839,7 @@ def get_escala_preview_posto(posto, dias=7):
 	fim  = add_days(hoje, int(dias) - 1)
 
 	escalas = frappe.get_all(
-		"Escala do Vigilante",
+		"Escala Do Vigilante",
 		filters={"posto_de_vigilancia": posto},
 		fields=["name", "estado", "regime_do_vigilante", "gerado_ate", "data_de_inicio"],
 		order_by="FIELD(estado,'Activo','Rascunho','Arquivado'), name",
@@ -849,7 +849,7 @@ def get_escala_preview_posto(posto, dias=7):
 	for esc in escalas:
 		# Day-by-day rows for the window
 		rows = frappe.get_all(
-			"Tabela de Escala de Vigilante",
+			"Tabela De Escala De Vigilante",
 			filters={
 				"parent": esc.name,
 				"data":   ["between", [str(hoje), str(fim)]],

@@ -1,4 +1,4 @@
-frappe.ui.form.on("Posto de Vigilancia", {
+frappe.ui.form.on("Posto De Vigilancia", {
 
 	onload(frm) {
 		frm.set_query("cliente", () => ({ filters: { disabled: 0 } }));

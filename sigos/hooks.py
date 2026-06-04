@@ -52,7 +52,7 @@ fixtures = [
 	{"dt": "Workflow", "filters": [["document_type", "in", [
 		"Vigilante", "Rotatividade", "Ausencias",
 		"Repreensao Disciplinar", "Processo Disciplinar",
-		"Demissao", "Readimissao", "Troca de Categoria", "Troca de Regime",
+		"Demissao", "Readimissao", "Troca De Categoria", "Troca De Regime",
 		"Deducoes", "Proventos", "Justificacao De Faltas", "Reclamacao De Salario",
 	]]]},
 	{"dt": "Workflow State", "filters": [["workflow_state_name", "in", [
@@ -78,10 +78,10 @@ doc_events = {
 	"Readimissao": {
 		"on_submit": "sigos.disciplinar.doctype.readimissao.readimissao.on_submit",
 	},
-	"Troca de Categoria": {
+	"Troca De Categoria": {
 		"on_submit": "sigos.security_ops.doctype.troca_de_categoria.troca_de_categoria.on_submit",
 	},
-	"Troca de Regime": {
+	"Troca De Regime": {
 		"on_submit": "sigos.security_ops.doctype.troca_de_regime.troca_de_regime.on_submit",
 	},
 	"Repreensao Disciplinar": {

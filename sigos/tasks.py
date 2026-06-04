@@ -14,7 +14,7 @@ def _verificar_postos_temporarios():
 	from frappe.utils import today
 
 	postos = frappe.get_all(
-		"Posto de Vigilancia",
+		"Posto De Vigilancia",
 		filters={
 			"tipo_de_posto": "Temporário",
 			"estado": "Ativo",
@@ -46,12 +46,12 @@ def _verificar_postos_temporarios():
 					),
 					"for_user": user,
 					"type": "Alert",
-					"document_type": "Posto de Vigilancia",
+					"document_type": "Posto De Vigilancia",
 					"document_name": p.name,
 				}).insert(ignore_permissions=True)
 
 			frappe.db.set_value(
-				"Posto de Vigilancia", p.name, "aviso_expiracao_enviado", 1, update_modified=False
+				"Posto De Vigilancia", p.name, "aviso_expiracao_enviado", 1, update_modified=False
 			)
 			frappe.db.commit()
 		except Exception as ex:
@@ -66,13 +66,13 @@ def _rolar_escalas():
 	only appends new horizon days and removes days past the keep-buffer.
 	"""
 	escalas = frappe.get_all(
-		"Escala do Vigilante",
+		"Escala Do Vigilante",
 		filters={"estado": "Activo"},
 		fields=["name"],
 	)
 	for e in escalas:
 		try:
-			doc = frappe.get_doc("Escala do Vigilante", e.name)
+			doc = frappe.get_doc("Escala Do Vigilante", e.name)
 			doc.reconciliar_escala()
 			doc.save(ignore_permissions=True)
 			frappe.db.commit()
@@ -87,7 +87,7 @@ def _rolar_escalas():
 def _atualizar_todas_ocupacoes():
 	"""Nightly recalculation of all posto occupation counters."""
 	from sigos.utils import atualizar_ocupacao_posto
-	postos = frappe.get_all("Posto de Vigilancia", fields=["name"])
+	postos = frappe.get_all("Posto De Vigilancia", fields=["name"])
 	for p in postos:
 		atualizar_ocupacao_posto(p.name)
 

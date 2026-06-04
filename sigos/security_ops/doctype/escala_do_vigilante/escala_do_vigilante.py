@@ -19,7 +19,7 @@ class EscalaDoVigilante(Document):
 		if not (self.posto_de_vigilancia and self.regime_do_vigilante):
 			return
 		existing = frappe.db.get_value(
-			"Escala do Vigilante",
+			"Escala Do Vigilante",
 			{
 				"posto_de_vigilancia": self.posto_de_vigilancia,
 				"regime_do_vigilante": self.regime_do_vigilante,
@@ -60,7 +60,7 @@ class EscalaDoVigilante(Document):
 		if not self.posto_de_vigilancia:
 			return
 		max_vagas = frappe.db.get_value(
-			"Posto de Vigilancia", self.posto_de_vigilancia, "numero_de_vagas"
+			"Posto De Vigilancia", self.posto_de_vigilancia, "numero_de_vagas"
 		) or 0
 		if not max_vagas:
 			return
@@ -223,8 +223,8 @@ def get_escalas_com_vigilante(vigilante: str) -> list:
 		"""
 		SELECT DISTINCT e.name, e.posto_de_vigilancia, e.regime_do_vigilante,
 		       e.data_de_inicio, e.gerado_ate
-		FROM `tabTabela de Escala de Vigilante` te
-		JOIN `tabEscala do Vigilante` e ON e.name = te.parent
+		FROM `tabTabela De Escala De Vigilante` te
+		JOIN `tabEscala Do Vigilante` e ON e.name = te.parent
 		WHERE te.vigilante = %(vig)s
 		  AND e.estado = 'Activo'
 		  AND te.data >= %(hoje)s

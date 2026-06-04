@@ -1,4 +1,4 @@
-frappe.ui.form.on("Troca de Regime", {
+frappe.ui.form.on("Troca De Regime", {
 
 	after_submit(frm) {
 		if (frm.doc.workflow_state !== "Aprovado") return;

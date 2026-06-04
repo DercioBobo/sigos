@@ -1,4 +1,4 @@
-frappe.ui.form.on("Alocacao de Material", {
+frappe.ui.form.on("Alocacao De Material", {
 	refresh(frm) {
 		frm.set_query("material", "material_a_alocar", function (doc, cdt, cdn) {
 			return {

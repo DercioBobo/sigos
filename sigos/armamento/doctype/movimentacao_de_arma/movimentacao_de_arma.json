@@ -72,7 +72,7 @@
    "fieldname": "novo_posto",
    "fieldtype": "Link",
    "label": "Novo Posto",
-   "options": "Posto de Vigilancia",
+   "options": "Posto De Vigilancia",
    "reqd": 1
   },
   {

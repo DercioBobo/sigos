@@ -42,7 +42,7 @@
    "fieldname": "posto_de_vigilancia",
    "fieldtype": "Link",
    "label": "Posto de Vigilância",
-   "options": "Posto de Vigilancia",
+   "options": "Posto De Vigilancia",
    "reqd": 1,
    "in_list_view": 1,
    "in_standard_filter": 1
@@ -156,14 +156,14 @@
    "fieldname": "tabela_de_escala",
    "fieldtype": "Table",
    "label": "Escala",
-   "options": "Tabela de Escala de Vigilante"
+   "options": "Tabela De Escala De Vigilante"
   }
  ],
  "links": [],
  "modified": "2026-06-02 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Security Ops",
- "name": "Escala do Vigilante",
+ "name": "Escala Do Vigilante",
  "naming_rule": "By \"Naming Series\" field",
  "owner": "Administrator",
  "permissions": [

@@ -87,7 +87,7 @@ class Vigilante(Document):
 			return
 
 		max_vagas = frappe.db.get_value(
-			"Posto de Vigilancia", self.posto_de_vigilancia, "numero_de_vagas"
+			"Posto De Vigilancia", self.posto_de_vigilancia, "numero_de_vagas"
 		) or 0
 
 		if not max_vagas:

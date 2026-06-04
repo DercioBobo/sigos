@@ -24,7 +24,7 @@ class TrocaDeRegime(Document):
 		except Exception as e:
 			frappe.log_error(
 				f"TrocaDeRegime {self.name}: erro ao atualizar regime do vigilante {self.vigilante}: {e}",
-				"SIGOS Troca de Regime",
+				"SIGOS Troca De Regime",
 			)
 
 		# Wizard triggered client-side via after_submit in troca_de_regime.js

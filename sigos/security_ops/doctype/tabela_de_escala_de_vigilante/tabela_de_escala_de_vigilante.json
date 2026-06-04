@@ -28,7 +28,7 @@
    "fieldname": "posto",
    "fieldtype": "Link",
    "label": "Posto",
-   "options": "Posto de Vigilancia",
+   "options": "Posto De Vigilancia",
    "in_list_view": 1
   },
   {
@@ -73,7 +73,7 @@
  "modified": "2026-06-02 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Security Ops",
- "name": "Tabela de Escala de Vigilante",
+ "name": "Tabela De Escala De Vigilante",
  "owner": "Administrator",
  "permissions": [],
  "sort_field": "modified",

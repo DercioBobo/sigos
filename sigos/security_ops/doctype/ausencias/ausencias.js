@@ -77,7 +77,7 @@ function _abrir_quick_add(frm) {
 		if (!total_escala) {
 			frappe.msgprint({
 				title: __("Escala não encontrada"),
-				message: __("Não foi encontrada nenhuma escala activa para esta data e período. Certifique-se de que existe uma Escala do Vigilante submetida e activa."),
+				message: __("Não foi encontrada nenhuma escala activa para esta data e período. Certifique-se de que existe uma Escala Do Vigilante submetida e activa."),
 				indicator: "orange",
 			});
 			return;

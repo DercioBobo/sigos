@@ -25,5 +25,5 @@ class TrocaDeCategoria(Document):
 		except Exception as e:
 			frappe.log_error(
 				f"TrocaDeCategoria {self.name}: erro ao atualizar categoria do vigilante {self.vigilante}: {e}",
-				"SIGOS Troca de Categoria"
+				"SIGOS Troca De Categoria"
 			)

@@ -1,4 +1,4 @@
-frappe.ui.form.on("Escala do Vigilante", {
+frappe.ui.form.on("Escala Do Vigilante", {
 
 	refresh(frm) {
 		_estado_buttons(frm);
@@ -13,7 +13,7 @@ frappe.ui.form.on("Escala do Vigilante", {
 
 	posto_de_vigilancia(frm) {
 		if (frm.doc.posto_de_vigilancia && !frm.doc.cliente) {
-			frappe.db.get_value("Posto de Vigilancia", frm.doc.posto_de_vigilancia, "cliente")
+			frappe.db.get_value("Posto De Vigilancia", frm.doc.posto_de_vigilancia, "cliente")
 				.then(r => frm.set_value("cliente", r.message?.cliente));
 		}
 	},
@@ -97,7 +97,7 @@ function _estado_buttons(frm) {
 function _set_estado(frm, novo) {
 	frappe.call({
 		method: "frappe.client.set_value",
-		args: { doctype: "Escala do Vigilante", name: frm.doc.name, fieldname: "estado", value: novo },
+		args: { doctype: "Escala Do Vigilante", name: frm.doc.name, fieldname: "estado", value: novo },
 		callback: () => frm.reload_doc(),
 	});
 }

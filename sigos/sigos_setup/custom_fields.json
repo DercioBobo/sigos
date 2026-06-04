@@ -68,7 +68,7 @@
   "module": "SIGOS Setup",
   "fieldname": "custom_posto",
   "fieldtype": "Link",
-  "options": "Posto de Vigilancia",
+  "options": "Posto De Vigilancia",
   "label": "Posto (SIGOS)",
   "insert_after": "custom_delegacao",
   "read_only": 1

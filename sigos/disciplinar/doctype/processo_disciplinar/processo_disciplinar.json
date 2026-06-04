@@ -107,7 +107,7 @@
    "fieldname": "posto",
    "fieldtype": "Link",
    "label": "Posto",
-   "options": "Posto de Vigilancia",
+   "options": "Posto De Vigilancia",
    "fetch_from": "vigilante.posto_de_vigilancia",
    "read_only": 1
   },

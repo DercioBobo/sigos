@@ -69,7 +69,7 @@ class PostoDeVigilancia(Document):
 			return
 		self._recalcular_ocupacao()
 
-		atual = frappe.db.get_value("Posto de Vigilancia", self.name, "ocupacao_atual") or 0
+		atual = frappe.db.get_value("Posto De Vigilancia", self.name, "ocupacao_atual") or 0
 		if self.numero_de_vagas and atual > self.numero_de_vagas:
 			frappe.msgprint(
 				_("O posto tem <b>{0}</b> vigilantes activos, acima da nova capacidade de "
@@ -93,12 +93,12 @@ class PostoDeVigilancia(Document):
 		# Ativo → Inativo: archive active escalas so they stop generating
 		if self.estado == "Inativo":
 			escalas = frappe.get_all(
-				"Escala do Vigilante",
+				"Escala Do Vigilante",
 				filters={"posto_de_vigilancia": self.name, "estado": "Activo"},
 				pluck="name",
 			)
 			for e in escalas:
-				frappe.db.set_value("Escala do Vigilante", e, "estado", "Arquivado", update_modified=False)
+				frappe.db.set_value("Escala Do Vigilante", e, "estado", "Arquivado", update_modified=False)
 
 			vigs = frappe.db.count("Vigilante", {"posto_de_vigilancia": self.name, "status": "Ativo"})
 
@@ -114,7 +114,7 @@ class PostoDeVigilancia(Document):
 		# Inativo → Ativo: just a hint (escalas are not auto-reactivated)
 		elif self.estado == "Ativo":
 			arquivadas = frappe.db.count(
-				"Escala do Vigilante",
+				"Escala Do Vigilante",
 				{"posto_de_vigilancia": self.name, "estado": "Arquivado"},
 			)
 			if arquivadas:
@@ -160,11 +160,11 @@ class PostoDeVigilancia(Document):
 			)
 
 		escalas = frappe.get_all(
-			"Escala do Vigilante", filters={"posto_de_vigilancia": self.name}, pluck="name"
+			"Escala Do Vigilante", filters={"posto_de_vigilancia": self.name}, pluck="name"
 		)
 		for e in escalas:
 			frappe.db.set_value(
-				"Escala do Vigilante", e, "cliente", self.cliente, update_modified=False
+				"Escala Do Vigilante", e, "cliente", self.cliente, update_modified=False
 			)
 
 		if vigs or escalas:
@@ -185,7 +185,7 @@ class PostoDeVigilancia(Document):
 				  "Transfira-os ou demita-os primeiro.").format(self.name, n_vig),
 				title=_("Posto em Uso"),
 			)
-		n_esc = frappe.db.count("Escala do Vigilante", {"posto_de_vigilancia": self.name})
+		n_esc = frappe.db.count("Escala Do Vigilante", {"posto_de_vigilancia": self.name})
 		if n_esc:
 			frappe.throw(
 				_("Não é possível eliminar o posto <b>{0}</b> — existe(m) {1} escala(s) associada(s). "

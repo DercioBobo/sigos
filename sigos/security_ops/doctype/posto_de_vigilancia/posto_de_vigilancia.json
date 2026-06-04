@@ -209,14 +209,14 @@
   },
   {
    "group": "Escalas",
-   "link_doctype": "Escala do Vigilante",
+   "link_doctype": "Escala Do Vigilante",
    "link_fieldname": "posto_de_vigilancia"
   }
  ],
  "modified": "2026-06-02 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Security Ops",
- "name": "Posto de Vigilancia",
+ "name": "Posto De Vigilancia",
  "naming_rule": "By \"Naming Series\" field",
  "owner": "Administrator",
  "permissions": [

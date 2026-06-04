@@ -34,7 +34,7 @@ def render_escala_print(doc, mes=None):
 	  - "YYYY-MM"        → that specific month
 	"""
 	if isinstance(doc, str):
-		doc = frappe.get_doc("Escala do Vigilante", doc)
+		doc = frappe.get_doc("Escala Do Vigilante", doc)
 
 	rows = doc.get("tabela_de_escala") or []
 	if not rows:

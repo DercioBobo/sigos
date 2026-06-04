@@ -1,7 +1,7 @@
 /**
  * SIGOS — Wizard de Actualização de Escala
  *
- * Called after Rotatividade, Demissão, or Troca de Regime is submitted.
+ * Called after Rotatividade, Demissão, or Troca De Regime is submitted.
  * Walks the ops manager through each active Escala (one per posto) that still
  * has FUTURE rows for the affected vigilante. Updates the escala's guard list;
  * day rows regenerate automatically via reconciliar_escala() on the server.

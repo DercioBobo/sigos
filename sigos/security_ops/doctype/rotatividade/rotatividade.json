@@ -89,7 +89,7 @@
    "fieldname": "antigo_posto",
    "fieldtype": "Link",
    "label": "Antigo Posto",
-   "options": "Posto de Vigilancia",
+   "options": "Posto De Vigilancia",
    "fetch_from": "vigilante.posto_de_vigilancia",
    "read_only": 1
   },
@@ -151,7 +151,7 @@
    "fieldname": "novo_posto",
    "fieldtype": "Link",
    "label": "Novo Posto",
-   "options": "Posto de Vigilancia"
+   "options": "Posto De Vigilancia"
   },
   {
    "fieldname": "sec_substituto",
@@ -176,7 +176,7 @@
    "fieldname": "alocado_ao_posto",
    "fieldtype": "Link",
    "label": "Alocado ao Posto",
-   "options": "Posto de Vigilancia",
+   "options": "Posto De Vigilancia",
    "fetch_from": "novo_vigilante.posto_de_vigilancia",
    "read_only": 1
   },
@@ -208,7 +208,7 @@
    "fieldname": "novo_posto_do_reserva",
    "fieldtype": "Link",
    "label": "Novo Posto do Reserva",
-   "options": "Posto de Vigilancia"
+   "options": "Posto De Vigilancia"
   },
   {
    "fieldname": "tab_rot_doc",
