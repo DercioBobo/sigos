@@ -14,6 +14,7 @@ frappe.ui.form.on("Vigilante", {
 		frm.trigger("_aplicar_permissoes");
 		frm.trigger("_botoes_aprovacao");
 		sigos.danger_btn(frm, "limpar_escala");
+		_calcular_idade(frm);
 	},
 
 	// ─── Field events ──────────────────────────────────────────────────────────
@@ -83,14 +84,19 @@ frappe.ui.form.on("Vigilante", {
 
 // ─── Age calculator ──────────────────────────────────────────────────────────
 function _calcular_idade(frm) {
-	if (!frm.doc.data_de_nascimento) {
-		frm.set_value("idade", null);
-		return;
-	}
-	const dob   = new Date(frm.doc.data_de_nascimento);
-	const hoje  = new Date();
-	let idade   = hoje.getFullYear() - dob.getFullYear();
-	const m     = hoje.getMonth() - dob.getMonth();
+	const val = frm.doc.data_de_nascimento
+		? _idade_de_dob(frm.doc.data_de_nascimento)
+		: null;
+	// set_value ignores read_only fields — write directly then refresh
+	frm.doc.idade = val;
+	frm.refresh_field("idade");
+}
+
+function _idade_de_dob(dob_str) {
+	const dob  = new Date(dob_str);
+	const hoje = new Date();
+	let idade  = hoje.getFullYear() - dob.getFullYear();
+	const m    = hoje.getMonth() - dob.getMonth();
 	if (m < 0 || (m === 0 && hoje.getDate() < dob.getDate())) idade--;
-	frm.set_value("idade", idade);
+	return idade;
 }

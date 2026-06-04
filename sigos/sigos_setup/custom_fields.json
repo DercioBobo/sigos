@@ -3,6 +3,16 @@
   "doctype": "Custom Field",
   "dt": "Employee",
   "module": "SIGOS Setup",
+  "fieldname": "custom_idade",
+  "fieldtype": "Int",
+  "label": "Idade",
+  "read_only": 1,
+  "insert_after": "date_of_birth"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Employee",
+  "module": "SIGOS Setup",
   "fieldname": "custom_vigilante",
   "fieldtype": "Link",
   "options": "Vigilante",

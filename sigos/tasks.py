@@ -93,18 +93,29 @@ def _atualizar_todas_ocupacoes():
 
 
 def _atualizar_idades():
-	"""Recalculate age for all active vigilantes."""
-	from frappe.utils import date_diff, today, getdate
+	"""Recalculate age for all Vigilantes and Employees."""
+	from frappe.utils import today, getdate
 
-	records = frappe.get_all(
+	hoje = getdate(today())
+
+	def _idade(dob_str):
+		dob = getdate(dob_str)
+		return hoje.year - dob.year - ((hoje.month, hoje.day) < (dob.month, dob.day))
+
+	for r in frappe.get_all(
 		"Vigilante",
 		filters={"data_de_nascimento": ["is", "set"]},
 		fields=["name", "data_de_nascimento"],
-	)
-	hoje = getdate(today())
-	for r in records:
-		dob = getdate(r.data_de_nascimento)
-		idade = (
-			hoje.year - dob.year - ((hoje.month, hoje.day) < (dob.month, dob.day))
+	):
+		frappe.db.set_value(
+			"Vigilante", r.name, "idade", _idade(r.data_de_nascimento), update_modified=False
 		)
-		frappe.db.set_value("Vigilante", r.name, "idade", idade, update_modified=False)
+
+	for r in frappe.get_all(
+		"Employee",
+		filters={"date_of_birth": ["is", "set"]},
+		fields=["name", "date_of_birth"],
+	):
+		frappe.db.set_value(
+			"Employee", r.name, "custom_idade", _idade(r.date_of_birth), update_modified=False
+		)
