@@ -825,3 +825,83 @@ def atribuir_vigilantes_ao_posto(posto, vigilantes, regime=None):
 			erros.append(f"{v}: erro interno.")
 
 	return {"atribuidos": atribuidos, "erros": erros}
+
+
+@frappe.whitelist()
+def get_escala_preview_posto(posto, dias=7):
+	"""
+	Return a 7-day schedule preview for every Escala at a posto.
+	Used by the Ver Escala dialog on Posto de Vigilancia.
+	"""
+	from frappe.utils import today, add_days, getdate
+
+	hoje = getdate(today())
+	fim  = add_days(hoje, int(dias) - 1)
+
+	escalas = frappe.get_all(
+		"Escala do Vigilante",
+		filters={"posto_de_vigilancia": posto},
+		fields=["name", "estado", "regime_do_vigilante", "gerado_ate", "data_de_inicio"],
+		order_by="FIELD(estado,'Activo','Rascunho','Arquivado'), name",
+	)
+
+	result = []
+	for esc in escalas:
+		# Day-by-day rows for the window
+		rows = frappe.get_all(
+			"Tabela de Escala de Vigilante",
+			filters={
+				"parent": esc.name,
+				"data":   ["between", [str(hoje), str(fim)]],
+			},
+			fields=["vigilante", "data", "turno", "periodo", "override"],
+			order_by="data, vigilante",
+		)
+
+		# Guard list (ordered)
+		guards_raw = frappe.get_all(
+			"Tab Vigilante Do Posto",
+			filters={"parent": esc.name},
+			fields=["vigilante"],
+			order_by="idx",
+		)
+
+		# Vigilante names
+		all_vigs = list({r.vigilante for r in rows} | {g.vigilante for g in guards_raw})
+		vig_map = {}
+		if all_vigs:
+			for v in frappe.get_all(
+				"Vigilante",
+				filters={"name": ["in", all_vigs]},
+				fields=["name", "nome_completo"],
+			):
+				vig_map[v.name] = v.nome_completo
+
+		# Index rows by (vigilante, date)
+		by_vd = {}
+		for r in rows:
+			by_vd[(r.vigilante, str(r.data))] = {
+				"turno":    r.turno,
+				"periodo":  r.periodo or "",
+				"override": r.override,
+			}
+
+		days = [str(add_days(hoje, i)) for i in range(int(dias))]
+
+		result.append({
+			"name":       esc.name,
+			"estado":     esc.estado,
+			"regime":     esc.regime_do_vigilante,
+			"gerado_ate": str(esc.gerado_ate) if esc.gerado_ate else None,
+			"days":       days,
+			"guards": [
+				{
+					"name": g.vigilante,
+					"nome": vig_map.get(g.vigilante, g.vigilante),
+					"dias": [by_vd.get((g.vigilante, d)) for d in days],
+				}
+				for g in guards_raw
+			],
+		})
+
+	return result
