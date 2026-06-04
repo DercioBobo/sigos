@@ -720,3 +720,108 @@ def get_ausencias(from_date=None, to_date=None, delegacao=None, periodo=None, li
 		},
 		"top_vigilantes": top_vigilantes,
 	}
+
+
+@frappe.whitelist()
+def get_vigilantes_sem_posto(delegacao=None):
+	"""
+	Return admitted vigilantes (Pre-Adimissao or Ativo) that:
+	  - have no posto assigned
+	  - have a linked Employee (funcionario is set)
+	Used by the Atribuir Vigilantes dialog on Posto de Vigilancia.
+	"""
+	filters = {
+		"status":              ["in", ["Pre-Adimissão", "Ativo"]],
+		"posto_de_vigilancia": ["is", "not set"],
+		"funcionario":         ["is", "set"],
+	}
+	if delegacao:
+		filters["delegacao"] = delegacao
+
+	return frappe.get_all(
+		"Vigilante",
+		filters=filters,
+		fields=["name", "nome_completo", "status", "categoria", "regime_do_vigilante", "delegacao"],
+		order_by="nome_completo",
+		limit_page_length=500,
+	)
+
+
+@frappe.whitelist()
+def atribuir_vigilantes_ao_posto(posto, vigilantes, regime=None):
+	"""
+	Assign unassigned admitted vigilantes to a posto.
+	Validates posto state, capacity, and employee link.
+	Saves via vig.save() so all Vigilante validations fire.
+	"""
+	import json
+	if isinstance(vigilantes, str):
+		vigilantes = json.loads(vigilantes)
+	if not vigilantes:
+		return {"atribuidos": 0, "erros": []}
+
+	posto_doc = frappe.get_doc("Posto de Vigilancia", posto)
+
+	if posto_doc.estado != "Ativo":
+		frappe.throw(
+			_("O posto <b>{0}</b> deve estar <b>Ativo</b> para receber vigilantes.").format(posto),
+			title=_("Posto Inactivo"),
+		)
+
+	max_vagas = posto_doc.numero_de_vagas or 0
+	if max_vagas:
+		atual = frappe.db.count(
+			"Vigilante",
+			{"posto_de_vigilancia": posto, "status": ["in", ["Pre-Adimissão", "Ativo"]]},
+		)
+		livres = max_vagas - atual
+		if len(vigilantes) > livres:
+			frappe.throw(
+				_("Capacidade excedida: <b>{0}</b> vaga(s) livre(s), tentou adicionar <b>{1}</b>.").format(
+					livres, len(vigilantes)
+				),
+				title=_("Capacidade do Posto"),
+			)
+
+	nome_proj = (
+		frappe.db.get_value("Project", posto_doc.project, "project_name")
+		if posto_doc.project else None
+	)
+
+	atribuidos = 0
+	erros = []
+
+	for v in vigilantes:
+		try:
+			vig = frappe.get_doc("Vigilante", v)
+
+			if vig.posto_de_vigilancia:
+				erros.append(
+					_("{0} já está no posto {1} — ignorado.").format(vig.nome_completo, vig.posto_de_vigilancia)
+				)
+				continue
+
+			if not vig.funcionario:
+				erros.append(
+					_("{0} sem Funcionário associado — use Admitir (RH) primeiro.").format(vig.nome_completo)
+				)
+				continue
+
+			vig.posto_de_vigilancia = posto
+			vig.tipo_de_posto       = posto_doc.tipo_de_posto
+			vig.cliente             = posto_doc.cliente
+			vig.projecto            = posto_doc.project
+			vig.nome_do_projecto    = nome_proj
+			if regime:
+				vig.regime_do_vigilante = regime
+
+			vig.save(ignore_permissions=True)
+			atribuidos += 1
+
+		except frappe.ValidationError as e:
+			erros.append(f"{vig.nome_completo}: {e}")
+		except Exception as e:
+			frappe.log_error(f"atribuir_vigilantes: {posto}/{v}: {e}", "SIGOS")
+			erros.append(f"{v}: erro interno.")
+
+	return {"atribuidos": atribuidos, "erros": erros}

@@ -11,11 +11,14 @@ frappe.ui.form.on("Posto de Vigilancia", {
 		_mostrar_indicador(frm);
 		_mostrar_aviso_temporario(frm);
 
-		// Bulk-allocate reserves ONLY for active temporary posts (deploy a team).
-		// Permanent posts never bulk-allocate — reserves there are one-off
-		// (substituto in Ausencias, single add in Escala).
-		if (!frm.is_new() && frm.doc.estado === "Ativo" && frm.doc.tipo_de_posto === "Temporário") {
-			frm.add_custom_button(__("Alocar Reservas"), () => _alocar_reservas(frm), __("Acções"));
+		if (!frm.is_new() && frm.doc.estado === "Ativo") {
+			// General assignment: admitted vigilantes without a posto
+			frm.add_custom_button(__("Atribuir Vigilantes"), () => _atribuir_vigilantes(frm), __("Acções"));
+
+			// Bulk-allocate reserves ONLY for active temporary posts (deploy a team).
+			if (frm.doc.tipo_de_posto === "Temporário") {
+				frm.add_custom_button(__("Alocar Reservas"), () => _alocar_reservas(frm), __("Acções"));
+			}
 		}
 
 		if (!frm.is_new() && frm.doc.tipo_de_posto === "Temporário") {
@@ -42,6 +45,109 @@ frappe.ui.form.on("Posto de Vigilancia", {
 		}));
 	},
 });
+
+// ─── Assign unassigned admitted vigilantes to this post ──────────────────────
+function _atribuir_vigilantes(frm) {
+	const max   = frm.doc.numero_de_vagas || 0;
+	const atual = frm.doc.ocupacao_atual  || 0;
+	const livres = max ? max - atual : null;
+
+	frappe.call({
+		method: "sigos.api.get_vigilantes_sem_posto",
+		args: { delegacao: frm.doc.delegacao || null },
+		freeze: true,
+		freeze_message: __("A procurar vigilantes disponíveis..."),
+		callback(r) {
+			const lista = r.message || [];
+
+			if (!lista.length) {
+				frappe.msgprint(
+					__("Nenhum vigilante disponível: todos os vigilantes admitidos já têm posto atribuído ou não têm Funcionário associado."),
+					__("Sem Disponíveis")
+				);
+				return;
+			}
+
+			const capacidade_html = max
+				? `<span style="color:${livres <= 0 ? '#e05c5c' : '#555'}">
+					${__("Vagas livres")}: <b>${livres}</b> (${atual}/${max})
+				   </span>`
+				: `<span style="color:#888">${__("Sem limite de vagas definido")}</span>`;
+
+			const d = new frappe.ui.Dialog({
+				title: __("Atribuir Vigilantes a {0}", [frm.doc.nome_do_posto || frm.doc.name]),
+				fields: [
+					{
+						fieldname: "info", fieldtype: "HTML",
+						options: `<div style="margin-bottom:10px;font-size:.9em">${capacidade_html}</div>`,
+					},
+					{
+						fieldname: "regime", fieldtype: "Link", label: __("Regime (opcional)"),
+						options: "Regime",
+						description: __("Se definido, atribuído a todos os vigilantes seleccionados"),
+					},
+					{
+						fieldname: "vigilantes", fieldtype: "MultiSelectPills",
+						label: __("Vigilantes sem posto"),
+						get_data: () => lista.map(v => ({
+							value: v.name,
+							description: [
+								v.nome_completo,
+								v.categoria  || "",
+								v.status,
+								v.delegacao  ? `· ${v.delegacao}` : "",
+							].filter(Boolean).join(" · "),
+						})),
+					},
+				],
+				primary_action_label: __("Atribuir"),
+				primary_action(vals) {
+					const escolhidos = vals.vigilantes || [];
+					if (!escolhidos.length) {
+						frappe.show_alert({ message: __("Seleccione pelo menos um vigilante."), indicator: "orange" }, 3);
+						return;
+					}
+					if (livres !== null && escolhidos.length > livres) {
+						frappe.show_alert({
+							message: __("Selecção ({0}) excede as vagas livres ({1}).").format(escolhidos.length, livres),
+							indicator: "red",
+						}, 5);
+						return;
+					}
+
+					frappe.call({
+						method: "sigos.api.atribuir_vigilantes_ao_posto",
+						args: { posto: frm.doc.name, vigilantes: escolhidos, regime: vals.regime || null },
+						freeze: true,
+						freeze_message: __("A atribuir..."),
+						callback(res) {
+							const { atribuidos, erros } = res.message || {};
+							d.hide();
+
+							if (atribuidos) {
+								frappe.show_alert({
+									message: __("{0} vigilante(s) atribuído(s) ao posto com sucesso.").format(atribuidos),
+									indicator: "green",
+								}, 6);
+							}
+
+							if (erros && erros.length) {
+								frappe.msgprint({
+									title: __("Avisos / Erros"),
+									message: erros.map(e => `• ${e}`).join("<br>"),
+									indicator: "orange",
+								});
+							}
+
+							frm.reload_doc();
+						},
+					});
+				},
+			});
+			d.show();
+		},
+	});
+}
 
 // ─── Allocate a team of reserves to this (temporary) post ─────────────────────
 function _alocar_reservas(frm) {
