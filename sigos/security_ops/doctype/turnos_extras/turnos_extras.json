@@ -9,11 +9,20 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "naming_series", "data", "col_break_1",
-  "delegacao", "posto",
-  "sec_vigilante", "vigilante", "regime", "col_break_2",
-  "turno", "periodo",
-  "sec_justificacao", "motivo", "aprovado_por"
+  "naming_series",
+  "data",
+  "col_break_1",
+  "delegacao",
+  "posto",
+  "sec_vigilante",
+  "vigilante",
+  "regime",
+  "col_break_2",
+  "turno",
+  "periodo",
+  "sec_justificacao",
+  "motivo",
+  "aprovado_por"
  ],
  "fields": [
   {
@@ -121,24 +130,49 @@
  "owner": "Administrator",
  "permissions": [
   {
-   "cancel": 1, "create": 1, "delete": 1, "read": 1, "report": 1,
-   "role": "System Manager", "submit": 1, "write": 1
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "submit": 1,
+   "write": 1
   },
   {
-   "cancel": 1, "create": 1, "delete": 0, "read": 1, "report": 1,
-   "role": "SIGOS Manager", "submit": 1, "write": 1
+   "cancel": 1,
+   "create": 1,
+   "delete": 0,
+   "read": 1,
+   "report": 1,
+   "role": "SIGOS Manager",
+   "submit": 1,
+   "write": 1
   },
   {
-   "cancel": 0, "create": 1, "delete": 0, "read": 1, "report": 1,
-   "role": "Aprovador Operações", "submit": 1, "write": 1
+   "cancel": 0,
+   "create": 1,
+   "delete": 0,
+   "read": 1,
+   "report": 1,
+   "role": "Aprovador Operações",
+   "submit": 1,
+   "write": 1
   },
   {
-   "cancel": 0, "create": 1, "delete": 0, "read": 1, "report": 1,
-   "role": "Operações SIGOS", "submit": 0, "write": 1
+   "cancel": 0,
+   "create": 1,
+   "delete": 0,
+   "read": 1,
+   "report": 1,
+   "role": "Operações SIGOS",
+   "submit": 0,
+   "write": 1
   }
  ],
  "sort_field": "data",
  "sort_order": "DESC",
  "states": [],
- "track_changes": 1
+ "track_changes": 1,
+ "app": "sigos"
 }

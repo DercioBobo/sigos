@@ -9,9 +9,20 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "naming_series", "data", "col_break_1", "periodo", "grupo_delegados",
-  "sec_atraso", "alerta_atraso", "motivo_atraso", "col_break_atraso", "hora_submissao_tardia",
-  "sec_tabela", "btn_adicionar_ausencia", "resumo_ausencias", "tabela_ausencia"
+  "naming_series",
+  "data",
+  "col_break_1",
+  "periodo",
+  "grupo_delegados",
+  "sec_atraso",
+  "alerta_atraso",
+  "motivo_atraso",
+  "col_break_atraso",
+  "hora_submissao_tardia",
+  "sec_tabela",
+  "btn_adicionar_ausencia",
+  "resumo_ausencias",
+  "tabela_ausencia"
  ],
  "fields": [
   {
@@ -113,28 +124,65 @@
  "owner": "Administrator",
  "permissions": [
   {
-   "cancel": 1, "create": 1, "delete": 1, "email": 1, "export": 1,
-   "print": 1, "read": 1, "report": 1, "role": "System Manager",
-   "share": 1, "submit": 1, "write": 1
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
   },
   {
-   "cancel": 1, "create": 1, "delete": 0, "email": 1, "export": 1,
-   "print": 1, "read": 1, "report": 1, "role": "SIGOS Manager",
-   "share": 1, "submit": 1, "write": 1
+   "cancel": 1,
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "SIGOS Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
   },
   {
-   "cancel": 0, "create": 1, "delete": 0, "email": 0, "export": 1,
-   "print": 1, "read": 1, "report": 1, "role": "Aprovador Operações",
-   "share": 0, "submit": 1, "write": 1
+   "cancel": 0,
+   "create": 1,
+   "delete": 0,
+   "email": 0,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Aprovador Operações",
+   "share": 0,
+   "submit": 1,
+   "write": 1
   },
   {
-   "cancel": 0, "create": 1, "delete": 0, "email": 0, "export": 0,
-   "print": 1, "read": 1, "report": 1, "role": "Operações SIGOS",
-   "share": 0, "submit": 0, "write": 1
+   "cancel": 0,
+   "create": 1,
+   "delete": 0,
+   "email": 0,
+   "export": 0,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Operações SIGOS",
+   "share": 0,
+   "submit": 0,
+   "write": 1
   }
  ],
  "sort_field": "data",
  "sort_order": "DESC",
  "states": [],
- "track_changes": 1
+ "track_changes": 1,
+ "app": "sigos"
 }

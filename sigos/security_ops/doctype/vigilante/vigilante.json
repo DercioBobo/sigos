@@ -8,16 +8,53 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "naming_series", "foto", "col_break_header",
-  "nome_completo", "data_de_nascimento", "idade", "sexo", "estado_civil",
-  "sec_documentos", "documento", "numero_documento", "col_break_docs", "nuit",
-  "sec_contacto", "contacto", "contacto_alternativo", "col_break_contacto", "email", "residencia", "dependentes",
-  "sec_profissional", "status", "data_admissao", "col_break_prof", "motivo_de_admissao", "empresa",
-  "sec_operacional", "delegacao", "categoria", "col_break_ops", "tipo_de_vigilante", "regime_do_vigilante",
-  "sec_alocacao", "posto_de_vigilancia", "tipo_de_posto", "col_break_aloc", "cliente", "projecto", "nome_do_projecto",
-  "sec_id_prof", "mecanografico", "col_break_id", "codename",
-  "sec_anexos", "anexar_documento",
-  "sec_rh", "funcionario"
+  "naming_series",
+  "foto",
+  "col_break_header",
+  "nome_completo",
+  "data_de_nascimento",
+  "idade",
+  "sexo",
+  "estado_civil",
+  "sec_documentos",
+  "documento",
+  "numero_documento",
+  "col_break_docs",
+  "nuit",
+  "sec_contacto",
+  "contacto",
+  "contacto_alternativo",
+  "col_break_contacto",
+  "email",
+  "residencia",
+  "dependentes",
+  "sec_profissional",
+  "status",
+  "data_admissao",
+  "col_break_prof",
+  "motivo_de_admissao",
+  "empresa",
+  "sec_operacional",
+  "delegacao",
+  "categoria",
+  "col_break_ops",
+  "tipo_de_vigilante",
+  "regime_do_vigilante",
+  "sec_alocacao",
+  "posto_de_vigilancia",
+  "tipo_de_posto",
+  "col_break_aloc",
+  "cliente",
+  "projecto",
+  "nome_do_projecto",
+  "sec_id_prof",
+  "mecanografico",
+  "col_break_id",
+  "codename",
+  "sec_anexos",
+  "anexar_documento",
+  "sec_rh",
+  "funcionario"
  ],
  "fields": [
   {
@@ -334,40 +371,91 @@
  "owner": "Administrator",
  "permissions": [
   {
-   "create": 1, "delete": 1, "email": 1, "export": 1,
-   "print": 1, "read": 1, "report": 1, "role": "System Manager",
-   "share": 1, "write": 1
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
   },
   {
-   "create": 1, "delete": 0, "email": 1, "export": 1,
-   "print": 1, "read": 1, "report": 1, "role": "SIGOS Manager",
-   "share": 1, "write": 1
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "SIGOS Manager",
+   "share": 1,
+   "write": 1
   },
   {
-   "create": 1, "delete": 0, "email": 0, "export": 1,
-   "print": 1, "read": 1, "report": 1, "role": "Aprovador RH",
-   "share": 0, "write": 1
+   "create": 1,
+   "delete": 0,
+   "email": 0,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Aprovador RH",
+   "share": 0,
+   "write": 1
   },
   {
-   "create": 1, "delete": 0, "email": 0, "export": 1,
-   "print": 1, "read": 1, "report": 1, "role": "Aprovador Operações",
-   "share": 0, "write": 1
+   "create": 1,
+   "delete": 0,
+   "email": 0,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Aprovador Operações",
+   "share": 0,
+   "write": 1
   },
   {
-   "create": 0, "delete": 0, "email": 0, "export": 1,
-   "print": 1, "read": 1, "report": 1, "role": "Operações SIGOS",
-   "share": 0, "write": 0
+   "create": 0,
+   "delete": 0,
+   "email": 0,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Operações SIGOS",
+   "share": 0,
+   "write": 0
   }
  ],
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [
-  {"color": "Orange", "title": "Pre-Adimissão RH"},
-  {"color": "Yellow", "title": "Pre-Adimissão"},
-  {"color": "Green", "title": "Ativo"},
-  {"color": "Gray", "title": "Inactivo"},
-  {"color": "Red", "title": "Demitido"}
+  {
+   "color": "Orange",
+   "title": "Pre-Adimissão RH"
+  },
+  {
+   "color": "Yellow",
+   "title": "Pre-Adimissão"
+  },
+  {
+   "color": "Green",
+   "title": "Ativo"
+  },
+  {
+   "color": "Gray",
+   "title": "Inactivo"
+  },
+  {
+   "color": "Red",
+   "title": "Demitido"
+  }
  ],
  "title_field": "nome_completo",
- "track_changes": 1
+ "track_changes": 1,
+ "app": "sigos"
 }

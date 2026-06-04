@@ -249,14 +249,23 @@
  "owner": "Administrator",
  "permissions": [
   {
-   "create": 1, "delete": 0, "read": 1, "role": "System Manager", "write": 1
+   "create": 1,
+   "delete": 0,
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
   },
   {
-   "create": 1, "delete": 0, "read": 1, "role": "SIGOS Manager", "write": 1
+   "create": 1,
+   "delete": 0,
+   "read": 1,
+   "role": "SIGOS Manager",
+   "write": 1
   }
  ],
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],
- "track_changes": 1
+ "track_changes": 1,
+ "app": "sigos"
 }

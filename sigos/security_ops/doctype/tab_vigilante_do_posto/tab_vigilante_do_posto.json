@@ -5,7 +5,14 @@
  "document_type": "Other",
  "editable_grid": 1,
  "engine": "InnoDB",
- "field_order": ["vigilante", "nome_completo", "tipo_de_vigilante", "regime_do_vigilante", "turno_inicial", "data"],
+ "field_order": [
+  "vigilante",
+  "nome_completo",
+  "tipo_de_vigilante",
+  "regime_do_vigilante",
+  "turno_inicial",
+  "data"
+ ],
  "fields": [
   {
    "fieldname": "vigilante",
@@ -66,5 +73,6 @@
  "permissions": [],
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "app": "sigos"
 }

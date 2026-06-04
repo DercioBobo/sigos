@@ -8,13 +8,30 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "naming_series", "nome_do_posto", "col_break_1",
-  "estado", "tipo_de_posto", "data_de_abertura",
-  "sec_temporario", "aviso_temporario", "data_fim_prevista", "aviso_expiracao_enviado",
-  "sec_ocupacao", "indicador_ocupacao",
-  "numero_de_vagas", "ocupacao_atual", "col_break_ocup", "status_ocupacao",
-  "sec_cliente", "cliente", "project", "col_break_cli", "delegacao",
-  "sec_localizacao", "localizacao", "coordenadas"
+  "naming_series",
+  "nome_do_posto",
+  "col_break_1",
+  "estado",
+  "tipo_de_posto",
+  "data_de_abertura",
+  "sec_temporario",
+  "aviso_temporario",
+  "data_fim_prevista",
+  "aviso_expiracao_enviado",
+  "sec_ocupacao",
+  "indicador_ocupacao",
+  "numero_de_vagas",
+  "ocupacao_atual",
+  "col_break_ocup",
+  "status_ocupacao",
+  "sec_cliente",
+  "cliente",
+  "project",
+  "col_break_cli",
+  "delegacao",
+  "sec_localizacao",
+  "localizacao",
+  "coordenadas"
  ],
  "fields": [
   {
@@ -204,32 +221,67 @@
  "owner": "Administrator",
  "permissions": [
   {
-   "create": 1, "delete": 1, "email": 1, "export": 1,
-   "print": 1, "read": 1, "report": 1, "role": "System Manager",
-   "share": 1, "write": 1
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
   },
   {
-   "create": 1, "delete": 0, "email": 1, "export": 1,
-   "print": 1, "read": 1, "report": 1, "role": "SIGOS Manager",
-   "share": 1, "write": 1
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "SIGOS Manager",
+   "share": 1,
+   "write": 1
   },
   {
-   "create": 1, "delete": 0, "email": 0, "export": 1,
-   "print": 1, "read": 1, "report": 1, "role": "Aprovador Operações",
-   "share": 0, "write": 1
+   "create": 1,
+   "delete": 0,
+   "email": 0,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Aprovador Operações",
+   "share": 0,
+   "write": 1
   },
   {
-   "create": 0, "delete": 0, "email": 0, "export": 1,
-   "print": 1, "read": 1, "report": 1, "role": "Operações SIGOS",
-   "share": 0, "write": 0
+   "create": 0,
+   "delete": 0,
+   "email": 0,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Operações SIGOS",
+   "share": 0,
+   "write": 0
   }
  ],
  "sort_field": "nome_do_posto",
  "sort_order": "ASC",
  "states": [
-  {"color": "Green", "title": "Ativo"},
-  {"color": "Gray",  "title": "Inativo"}
+  {
+   "color": "Green",
+   "title": "Ativo"
+  },
+  {
+   "color": "Gray",
+   "title": "Inativo"
+  }
  ],
  "title_field": "nome_do_posto",
- "track_changes": 1
+ "track_changes": 1,
+ "app": "sigos"
 }

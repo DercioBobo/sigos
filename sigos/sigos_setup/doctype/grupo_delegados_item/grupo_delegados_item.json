@@ -5,7 +5,9 @@
  "document_type": "Other",
  "editable_grid": 1,
  "engine": "InnoDB",
- "field_order": ["delegacao"],
+ "field_order": [
+  "delegacao"
+ ],
  "fields": [
   {
    "fieldname": "delegacao",
@@ -27,5 +29,6 @@
  "permissions": [],
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "app": "sigos"
 }

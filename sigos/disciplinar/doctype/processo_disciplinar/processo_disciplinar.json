@@ -8,12 +8,35 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "naming_series", "data", "col_break_1", "delegacao", "automatico",
-  "sec_colaborador", "vigilante", "nome_do_vigilante", "mecanografico", "col_break_2", "funcionario", "posto", "categoria",
-  "sec_processo", "repreensao_referente", "gravidade", "motivo", "col_break_3", "detalhes",
-  "sec_decisao", "decisao", "col_break_4",
-  "valor_a_pagar", "meses_a_pagar", "mes_referencia", "data_de_inicio", "descricao",
-  "uniforme", "termo_de_responsabilidade"
+  "naming_series",
+  "data",
+  "col_break_1",
+  "delegacao",
+  "automatico",
+  "sec_colaborador",
+  "vigilante",
+  "nome_do_vigilante",
+  "mecanografico",
+  "col_break_2",
+  "funcionario",
+  "posto",
+  "categoria",
+  "sec_processo",
+  "repreensao_referente",
+  "gravidade",
+  "motivo",
+  "col_break_3",
+  "detalhes",
+  "sec_decisao",
+  "decisao",
+  "col_break_4",
+  "valor_a_pagar",
+  "meses_a_pagar",
+  "mes_referencia",
+  "data_de_inicio",
+  "descricao",
+  "uniforme",
+  "termo_de_responsabilidade"
  ],
  "fields": [
   {
@@ -201,33 +224,79 @@
  "owner": "Administrator",
  "permissions": [
   {
-   "create": 1, "delete": 1, "email": 1, "export": 1,
-   "print": 1, "read": 1, "report": 1, "role": "System Manager",
-   "share": 1, "write": 1, "submit": 1, "cancel": 1
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1,
+   "submit": 1,
+   "cancel": 1
   },
   {
-   "create": 1, "delete": 0, "email": 1, "export": 1,
-   "print": 1, "read": 1, "report": 1, "role": "SIGOS Manager",
-   "share": 1, "write": 1, "submit": 1, "cancel": 1
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "SIGOS Manager",
+   "share": 1,
+   "write": 1,
+   "submit": 1,
+   "cancel": 1
   },
   {
-   "create": 1, "delete": 0, "email": 0, "export": 1,
-   "print": 1, "read": 1, "report": 1, "role": "Aprovador RH",
-   "share": 0, "write": 1, "submit": 1, "cancel": 1
+   "create": 1,
+   "delete": 0,
+   "email": 0,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Aprovador RH",
+   "share": 0,
+   "write": 1,
+   "submit": 1,
+   "cancel": 1
   },
   {
-   "create": 0, "delete": 0, "email": 0, "export": 1,
-   "print": 1, "read": 1, "report": 1, "role": "Aprovador Operações",
-   "share": 0, "write": 0, "submit": 0, "cancel": 0
+   "create": 0,
+   "delete": 0,
+   "email": 0,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Aprovador Operações",
+   "share": 0,
+   "write": 0,
+   "submit": 0,
+   "cancel": 0
   },
   {
-   "create": 0, "delete": 0, "email": 0, "export": 1,
-   "print": 1, "read": 1, "report": 1, "role": "Operações SIGOS",
-   "share": 0, "write": 0, "submit": 0, "cancel": 0
+   "create": 0,
+   "delete": 0,
+   "email": 0,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Operações SIGOS",
+   "share": 0,
+   "write": 0,
+   "submit": 0,
+   "cancel": 0
   }
  ],
  "sort_field": "modified",
  "sort_order": "DESC",
  "title_field": "nome_do_vigilante",
- "track_changes": 1
+ "track_changes": 1,
+ "app": "sigos"
 }

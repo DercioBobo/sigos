@@ -8,12 +8,24 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "naming_series", "data", "col_break_1",
-  "funcionario", "vigilante", "slip_do_funcionario",
-  "sec_periodo", "mes_a_ser_pago", "data_de_inicio", "col_break_2",
-  "data_de_fim", "valor_a_reclamar",
-  "sec_faltas", "dia_da_falta_inicio", "numero_faltas", "col_break_3",
-  "dia_da_falta_do_fim", "motivo"
+  "naming_series",
+  "data",
+  "col_break_1",
+  "funcionario",
+  "vigilante",
+  "slip_do_funcionario",
+  "sec_periodo",
+  "mes_a_ser_pago",
+  "data_de_inicio",
+  "col_break_2",
+  "data_de_fim",
+  "valor_a_reclamar",
+  "sec_faltas",
+  "dia_da_falta_inicio",
+  "numero_faltas",
+  "col_break_3",
+  "dia_da_falta_do_fim",
+  "motivo"
  ],
  "fields": [
   {
@@ -136,33 +148,79 @@
  "owner": "Administrator",
  "permissions": [
   {
-   "create": 1, "delete": 1, "email": 1, "export": 1,
-   "print": 1, "read": 1, "report": 1, "role": "System Manager",
-   "share": 1, "write": 1, "submit": 1, "cancel": 1
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1,
+   "submit": 1,
+   "cancel": 1
   },
   {
-   "create": 1, "delete": 0, "email": 1, "export": 1,
-   "print": 1, "read": 1, "report": 1, "role": "SIGOS Manager",
-   "share": 1, "write": 1, "submit": 1, "cancel": 1
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "SIGOS Manager",
+   "share": 1,
+   "write": 1,
+   "submit": 1,
+   "cancel": 1
   },
   {
-   "create": 1, "delete": 0, "email": 0, "export": 1,
-   "print": 1, "read": 1, "report": 1, "role": "Aprovador RH",
-   "share": 0, "write": 1, "submit": 1, "cancel": 1
+   "create": 1,
+   "delete": 0,
+   "email": 0,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Aprovador RH",
+   "share": 0,
+   "write": 1,
+   "submit": 1,
+   "cancel": 1
   },
   {
-   "create": 0, "delete": 0, "email": 0, "export": 1,
-   "print": 1, "read": 1, "report": 1, "role": "Aprovador Operações",
-   "share": 0, "write": 0, "submit": 0, "cancel": 0
+   "create": 0,
+   "delete": 0,
+   "email": 0,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Aprovador Operações",
+   "share": 0,
+   "write": 0,
+   "submit": 0,
+   "cancel": 0
   },
   {
-   "create": 0, "delete": 0, "email": 0, "export": 1,
-   "print": 1, "read": 1, "report": 1, "role": "Operações SIGOS",
-   "share": 0, "write": 0, "submit": 0, "cancel": 0
+   "create": 0,
+   "delete": 0,
+   "email": 0,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Operações SIGOS",
+   "share": 0,
+   "write": 0,
+   "submit": 0,
+   "cancel": 0
   }
  ],
  "sort_field": "modified",
  "sort_order": "DESC",
  "title_field": "funcionario",
- "track_changes": 1
+ "track_changes": 1,
+ "app": "sigos"
 }

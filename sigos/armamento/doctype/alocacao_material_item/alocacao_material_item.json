@@ -6,7 +6,9 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "material", "quantidade", "observacao"
+  "material",
+  "quantidade",
+  "observacao"
  ],
  "fields": [
   {
@@ -38,5 +40,6 @@
  "name": "Alocacao Material Item",
  "owner": "Administrator",
  "sort_field": "modified",
- "sort_order": "DESC"
+ "sort_order": "DESC",
+ "app": "sigos"
 }

@@ -6,11 +6,22 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "vigilante", "nome_do_vigilante", "mecanografico",
-  "delegacao", "posto", "regime", "turno", "periodo",
-  "tipo_de_ausencia", "n_de_faltas",
-  "proxima_accao", "vigilante_substituto", "vigilante_a_dobrar", "vigilante_a_adiantar",
-  "jutificativo", "data_justificativo"
+  "vigilante",
+  "nome_do_vigilante",
+  "mecanografico",
+  "delegacao",
+  "posto",
+  "regime",
+  "turno",
+  "periodo",
+  "tipo_de_ausencia",
+  "n_de_faltas",
+  "proxima_accao",
+  "vigilante_substituto",
+  "vigilante_a_dobrar",
+  "vigilante_a_adiantar",
+  "jutificativo",
+  "data_justificativo"
  ],
  "fields": [
   {
@@ -156,5 +167,6 @@
  "permissions": [],
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "app": "sigos"
 }
