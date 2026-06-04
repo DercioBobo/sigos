@@ -343,11 +343,6 @@
    "link_fieldname": "vigilante"
   },
   {
-   "group": "Operações",
-   "link_doctype": "Ausencias",
-   "link_fieldname": "tabela_ausencia.vigilante"
-  },
-  {
    "group": "Disciplinar",
    "link_doctype": "Repreensao Disciplinar",
    "link_fieldname": "vigilante"
@@ -356,11 +351,6 @@
    "group": "Disciplinar",
    "link_doctype": "Processo Disciplinar",
    "link_fieldname": "vigilante"
-  },
-  {
-   "group": "Escalas",
-   "link_doctype": "Escala do Vigilante",
-   "link_fieldname": "tabela_de_escala.vigilante"
   }
  ],
  "modified": "2026-06-02 00:00:00.000000",
