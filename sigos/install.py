@@ -6,6 +6,11 @@ import frappe
 def after_install():
 	_load_custom_fields()
 	_load_default_data()
+	# Tab Vigilante Do Posto links to Turno (SIGOS Setup). If Frappe syncs
+	# modules in filesystem alphabetical order, security_ops is processed before
+	# sigos_setup, so Turno may not exist yet when this child table is first synced.
+	# Reloading after seed data ensures the link validates and app is set correctly.
+	frappe.reload_doc("security_ops", "doctype", "tab_vigilante_do_posto", force=True)
 
 
 def _load_custom_fields():
