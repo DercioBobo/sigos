@@ -3,9 +3,44 @@ import os
 import frappe
 
 
+# Doctypes whose names contain lowercase prepositions (de/do) that frappe.unscrub()
+# title-cases, causing a name mismatch in orphan detection. Re-synced after every migrate.
+_UNSCRUB_MISMATCH = [
+	("security_ops", "posto_de_vigilancia"),
+	("security_ops", "troca_de_regime"),
+	("security_ops", "troca_de_categoria"),
+	("security_ops", "escala_do_vigilante"),
+	("security_ops", "tab_vigilante_do_posto"),
+	("security_ops", "tabela_de_escala_de_vigilante"),
+	("sigos_setup",  "grupo_de_delegados"),
+	("armamento",    "alocacao_de_material"),
+]
+
+
 def after_install():
 	_load_custom_fields()
 	_load_default_data()
+	_resync_mismatched_doctypes()
+
+
+def after_migrate():
+	_resync_mismatched_doctypes()
+
+
+def _resync_mismatched_doctypes():
+	"""
+	Frappe's orphan detection calls frappe.unscrub() on folder names, which
+	title-cases every word. Doctype names with lowercase prepositions ('de', 'do')
+	don't match, so they get deleted on every migrate. Re-sync them immediately after.
+	"""
+	for module, doctype in _UNSCRUB_MISMATCH:
+		try:
+			frappe.reload_doc(module, "doctype", doctype, force=True)
+		except Exception as e:
+			frappe.log_error(
+				f"SIGOS resync: {module}/{doctype} — {e}",
+				"SIGOS After Migrate",
+			)
 
 
 def _load_custom_fields():
