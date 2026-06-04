@@ -2,10 +2,36 @@ import json
 import os
 import frappe
 
+SIGOS_MODULES = ("Security Ops", "Disciplinar", "Payroll Ext", "Armamento", "SIGOS Setup")
+
 
 def after_install():
+	_fix_doctype_app_field()
 	_load_custom_fields()
 	_load_default_data()
+
+
+def after_migrate():
+	_fix_doctype_app_field()
+
+
+def _fix_doctype_app_field():
+	"""
+	Frappe v15 orphan detection uses doctype.app to confirm ownership.
+	If sync fails to set it (e.g. due to link-validation order during install),
+	those doctypes get deleted as orphaned on the next migrate.
+	This sets app = 'sigos' for every SIGOS doctype that is missing it.
+	"""
+	frappe.db.sql(
+		"""
+		UPDATE `tabDocType`
+		SET    app = 'sigos'
+		WHERE  module IN %(modules)s
+		  AND  (app IS NULL OR app = '')
+		""",
+		{"modules": SIGOS_MODULES},
+	)
+	frappe.db.commit()
 
 
 def _load_custom_fields():
@@ -36,7 +62,6 @@ def _load_default_data():
 		if not doctype:
 			continue
 
-		# Determine the name field for duplicate check
 		name_field = {
 			"Categoria Vigilante": "nome",
 			"Turno":               "turno_nome",
