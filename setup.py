@@ -1,10 +1,12 @@
 from setuptools import setup, find_packages
 
-with open("requirements.txt") as f:
-	install_requires = f.read().strip().split("\n")
-
 from pathlib import Path
-long_description = (Path(__file__).parent / "README.md").read_text()
+
+_req = Path("requirements.txt").read_text().strip()
+install_requires = [r for r in _req.splitlines() if r and not r.startswith("#")]
+
+_readme = Path(__file__).parent / "README.md"
+long_description = _readme.read_text(encoding="utf-8") if _readme.exists() else ""
 
 setup(
 	name="sigos",
