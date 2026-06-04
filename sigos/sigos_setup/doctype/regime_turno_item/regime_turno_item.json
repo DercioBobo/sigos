@@ -1,0 +1,62 @@
+{
+ "actions": [],
+ "creation": "2026-06-02 00:00:00.000000",
+ "doctype": "DocType",
+ "document_type": "Other",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": ["turno", "periodo", "e_folga", "n_de_faltas"],
+ "fields": [
+  {
+   "fieldname": "turno",
+   "fieldtype": "Link",
+   "label": "Turno",
+   "options": "Turno",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_grid_view": 1,
+   "columns": 3
+  },
+  {
+   "fieldname": "periodo",
+   "fieldtype": "Data",
+   "label": "Período",
+   "fetch_from": "turno.periodo",
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_grid_view": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "e_folga",
+   "fieldtype": "Check",
+   "label": "Folga",
+   "fetch_from": "turno.e_folga",
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_grid_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "n_de_faltas",
+   "fieldtype": "Int",
+   "label": "Nº Faltas",
+   "default": "1",
+   "in_list_view": 1,
+   "in_grid_view": 1,
+   "columns": 1,
+   "description": "Faltas contadas quando ausente neste turno (0 para folgas)"
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-06-02 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "SIGOS Setup",
+ "name": "Regime Turno Item",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

@@ -1,0 +1,235 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "naming_series:",
+ "creation": "2026-06-02 00:00:00.000000",
+ "doctype": "DocType",
+ "document_type": "Document",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series", "nome_do_posto", "col_break_1",
+  "estado", "tipo_de_posto", "data_de_abertura",
+  "sec_temporario", "aviso_temporario", "data_fim_prevista", "aviso_expiracao_enviado",
+  "sec_ocupacao", "indicador_ocupacao",
+  "numero_de_vagas", "ocupacao_atual", "col_break_ocup", "status_ocupacao",
+  "sec_cliente", "cliente", "project", "col_break_cli", "delegacao",
+  "sec_localizacao", "localizacao", "coordenadas"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Série",
+   "options": "PV-.####",
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "nome_do_posto",
+   "fieldtype": "Data",
+   "label": "Nome do Posto",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "col_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "estado",
+   "fieldtype": "Select",
+   "label": "Estado",
+   "options": "Ativo\nInativo",
+   "default": "Ativo",
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "tipo_de_posto",
+   "fieldtype": "Select",
+   "label": "Tipo de Posto",
+   "options": "Permanente\nTemporário",
+   "default": "Permanente",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "description": "Permanente = posto duradouro · Temporário = posto com fim previsto"
+  },
+  {
+   "fieldname": "data_de_abertura",
+   "fieldtype": "Date",
+   "label": "Data de Abertura",
+   "default": "Today",
+   "in_list_view": 1,
+   "reqd": 1,
+   "description": "Data em que o posto foi aberto (aplica-se a todos os tipos)"
+  },
+  {
+   "fieldname": "sec_temporario",
+   "fieldtype": "Section Break",
+   "label": "Posto Temporário",
+   "depends_on": "eval:doc.tipo_de_posto=='Temporário'"
+  },
+  {
+   "fieldname": "aviso_temporario",
+   "fieldtype": "HTML",
+   "label": "Aviso Temporário"
+  },
+  {
+   "fieldname": "data_fim_prevista",
+   "fieldtype": "Date",
+   "label": "Fim Previsto",
+   "depends_on": "eval:doc.tipo_de_posto=='Temporário'",
+   "description": "Data prevista de encerramento do posto temporário"
+  },
+  {
+   "fieldname": "aviso_expiracao_enviado",
+   "fieldtype": "Check",
+   "label": "Aviso de Expiração Enviado",
+   "default": "0",
+   "hidden": 1,
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_ocupacao",
+   "fieldtype": "Section Break",
+   "label": "Ocupação"
+  },
+  {
+   "fieldname": "indicador_ocupacao",
+   "fieldtype": "HTML",
+   "label": "Indicador de Ocupação",
+   "options": ""
+  },
+  {
+   "fieldname": "numero_de_vagas",
+   "fieldtype": "Int",
+   "label": "Máximo de Vigilantes",
+   "default": "1",
+   "reqd": 1,
+   "description": "Número máximo de vigilantes permitidos neste posto"
+  },
+  {
+   "fieldname": "ocupacao_atual",
+   "fieldtype": "Int",
+   "label": "Vigilantes Activos",
+   "read_only": 1,
+   "default": "0",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "col_break_ocup",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "status_ocupacao",
+   "fieldtype": "Select",
+   "label": "Estado de Ocupação",
+   "options": "Desfalcado\nCompleto\nExcedido\nSem Limite",
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "sec_cliente",
+   "fieldtype": "Section Break",
+   "label": "Cliente e Contrato"
+  },
+  {
+   "fieldname": "cliente",
+   "fieldtype": "Link",
+   "label": "Cliente",
+   "options": "Customer",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "label": "Contrato (Projecto)",
+   "options": "Project"
+  },
+  {
+   "fieldname": "col_break_cli",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "delegacao",
+   "fieldtype": "Link",
+   "label": "Delegação",
+   "options": "Delegacao",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "sec_localizacao",
+   "fieldtype": "Section Break",
+   "label": "Localização",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "localizacao",
+   "fieldtype": "Small Text",
+   "label": "Descrição da Localização"
+  },
+  {
+   "fieldname": "coordenadas",
+   "fieldtype": "Data",
+   "label": "Coordenadas GPS",
+   "description": "Latitude, Longitude"
+  }
+ ],
+ "links": [
+  {
+   "group": "Vigilantes",
+   "link_doctype": "Vigilante",
+   "link_fieldname": "posto_de_vigilancia"
+  },
+  {
+   "group": "Escalas",
+   "link_doctype": "Escala do Vigilante",
+   "link_fieldname": "posto_de_vigilancia"
+  }
+ ],
+ "modified": "2026-06-02 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Security Ops",
+ "name": "Posto de Vigilancia",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1, "delete": 1, "email": 1, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "System Manager",
+   "share": 1, "write": 1
+  },
+  {
+   "create": 1, "delete": 0, "email": 1, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "SIGOS Manager",
+   "share": 1, "write": 1
+  },
+  {
+   "create": 1, "delete": 0, "email": 0, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "Aprovador Operações",
+   "share": 0, "write": 1
+  },
+  {
+   "create": 0, "delete": 0, "email": 0, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "Operações SIGOS",
+   "share": 0, "write": 0
+  }
+ ],
+ "sort_field": "nome_do_posto",
+ "sort_order": "ASC",
+ "states": [
+  {"color": "Green", "title": "Ativo"},
+  {"color": "Gray",  "title": "Inativo"}
+ ],
+ "title_field": "nome_do_posto",
+ "track_changes": 1
+}

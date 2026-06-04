@@ -1,0 +1,2 @@
+include requirements.txt
+recursive-include sigos *.json *.js *.css *.html *.py

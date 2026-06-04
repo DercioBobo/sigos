@@ -1,0 +1,185 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "naming_series:",
+ "creation": "2026-06-02 00:00:00.000000",
+ "doctype": "DocType",
+ "document_type": "Document",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series", "posto_de_vigilancia", "col_break_1",
+  "cliente", "estado",
+  "sec_config", "regime_do_vigilante", "data_de_inicio", "col_break_per", "gerado_ate",
+  "sec_vigilantes", "sincronizar_vigilantes", "distribuir_turnos", "tab_vigilante_do_posto",
+  "sec_grid", "btn_gerar", "btn_limpar_futuro", "grid_escala",
+  "sec_dados", "tabela_de_escala"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Série",
+   "options": "ESC-.####",
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "posto_de_vigilancia",
+   "fieldtype": "Link",
+   "label": "Posto de Vigilância",
+   "options": "Posto de Vigilancia",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "col_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "cliente",
+   "fieldtype": "Link",
+   "label": "Cliente",
+   "options": "Customer",
+   "fetch_from": "posto_de_vigilancia.cliente",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "estado",
+   "fieldtype": "Select",
+   "label": "Estado",
+   "options": "Rascunho\nActivo\nArquivado",
+   "default": "Rascunho",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "sec_config",
+   "fieldtype": "Section Break",
+   "label": "Configuração"
+  },
+  {
+   "fieldname": "regime_do_vigilante",
+   "fieldtype": "Link",
+   "label": "Regime",
+   "options": "Regime",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "data_de_inicio",
+   "fieldtype": "Date",
+   "label": "Data de Início (âncora do ciclo)",
+   "reqd": 1,
+   "in_list_view": 1,
+   "description": "Data em que o ciclo começa. O turno inicial de cada vigilante é a sua posição nesta data."
+  },
+  {
+   "fieldname": "col_break_per",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "gerado_ate",
+   "fieldtype": "Date",
+   "label": "Gerado Até",
+   "read_only": 1,
+   "in_list_view": 1,
+   "description": "Última data gerada automaticamente"
+  },
+  {
+   "fieldname": "sec_vigilantes",
+   "fieldtype": "Section Break",
+   "label": "Vigilantes do Posto"
+  },
+  {
+   "fieldname": "sincronizar_vigilantes",
+   "fieldtype": "Button",
+   "label": "Sincronizar Vigilantes do Posto"
+  },
+  {
+   "fieldname": "distribuir_turnos",
+   "fieldtype": "Button",
+   "label": "Distribuir Turnos em Bloco"
+  },
+  {
+   "fieldname": "tab_vigilante_do_posto",
+   "fieldtype": "Table",
+   "label": "Vigilantes",
+   "options": "Tab Vigilante Do Posto"
+  },
+  {
+   "fieldname": "sec_grid",
+   "fieldtype": "Section Break",
+   "label": "Escala"
+  },
+  {
+   "fieldname": "btn_gerar",
+   "fieldtype": "Button",
+   "label": "Gerar / Estender Escala"
+  },
+  {
+   "fieldname": "btn_limpar_futuro",
+   "fieldtype": "Button",
+   "label": "Limpar Futuro"
+  },
+  {
+   "fieldname": "grid_escala",
+   "fieldtype": "HTML",
+   "label": "Calendário"
+  },
+  {
+   "fieldname": "sec_dados",
+   "fieldtype": "Section Break",
+   "label": "Dados (tabela)",
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:false"
+  },
+  {
+   "fieldname": "tabela_de_escala",
+   "fieldtype": "Table",
+   "label": "Escala",
+   "options": "Tabela de Escala de Vigilante"
+  }
+ ],
+ "links": [],
+ "modified": "2026-06-02 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Security Ops",
+ "name": "Escala do Vigilante",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1, "delete": 1, "email": 1, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "System Manager",
+   "share": 1, "write": 1
+  },
+  {
+   "create": 1, "delete": 0, "email": 1, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "SIGOS Manager",
+   "share": 1, "write": 1
+  },
+  {
+   "create": 1, "delete": 0, "email": 0, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "Aprovador Operações",
+   "share": 0, "write": 1
+  },
+  {
+   "create": 0, "delete": 0, "email": 0, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "Operações SIGOS",
+   "share": 0, "write": 0
+  }
+ ],
+ "sort_field": "data_de_inicio",
+ "sort_order": "DESC",
+ "states": [
+  {"color": "Yellow", "title": "Rascunho"},
+  {"color": "Green",  "title": "Activo"},
+  {"color": "Gray",   "title": "Arquivado"}
+ ],
+ "track_changes": 1
+}

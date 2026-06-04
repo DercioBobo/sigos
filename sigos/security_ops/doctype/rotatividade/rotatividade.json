@@ -1,0 +1,269 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "naming_series:",
+ "creation": "2026-06-02 00:00:00.000000",
+ "doctype": "DocType",
+ "document_type": "Document",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series", "data", "col_break_1", "delegacao", "mecanografico",
+  "sec_vigilante", "vigilante", "antigo_posto", "col_break_2", "cliente_antigo_posto", "categoria_vigilante", "regime",
+  "sec_operacao", "abreviatura_op", "motivo", "col_break_3", "novo_posto",
+  "sec_substituto", "alocar_vigilante_substituto", "novo_vigilante", "alocado_ao_posto", "col_break_4", "cliente_novo_posto", "categoria_vigilante_a_alocar",
+  "sec_reserva", "novo_posto_do_reserva",
+  "sec_justificativas", "motivo_3meses", "motivo_rotatividade",
+  "sec_demissao", "motiv_demi", "uniforme", "evidencia"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Série",
+   "options": "ROT-.YYYY.-.####",
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "data",
+   "fieldtype": "Date",
+   "label": "Data",
+   "reqd": 1,
+   "in_list_view": 1,
+   "default": "Today"
+  },
+  {
+   "fieldname": "col_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "delegacao",
+   "fieldtype": "Link",
+   "label": "Delegação",
+   "options": "Delegacao",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "mecanografico",
+   "fieldtype": "Data",
+   "label": "Mecanográfico",
+   "fetch_from": "vigilante.mecanografico",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_vigilante",
+   "fieldtype": "Section Break",
+   "label": "Vigilante a Rodar"
+  },
+  {
+   "fieldname": "vigilante",
+   "fieldtype": "Link",
+   "label": "Vigilante",
+   "options": "Vigilante",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "antigo_posto",
+   "fieldtype": "Link",
+   "label": "Antigo Posto",
+   "options": "Posto de Vigilancia",
+   "fetch_from": "vigilante.posto_de_vigilancia",
+   "read_only": 1
+  },
+  {
+   "fieldname": "col_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "cliente_antigo_posto",
+   "fieldtype": "Data",
+   "label": "Cliente (Antigo Posto)",
+   "fetch_from": "vigilante.cliente",
+   "read_only": 1
+  },
+  {
+   "fieldname": "categoria_vigilante",
+   "fieldtype": "Data",
+   "label": "Categoria do Vigilante",
+   "fetch_from": "vigilante.categoria",
+   "read_only": 1
+  },
+  {
+   "fieldname": "regime",
+   "fieldtype": "Data",
+   "label": "Regime",
+   "fetch_from": "vigilante.regime_do_vigilante",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_operacao",
+   "fieldtype": "Section Break",
+   "label": "Operação"
+  },
+  {
+   "fieldname": "abreviatura_op",
+   "fieldtype": "Select",
+   "label": "Abreviatura Op.",
+   "options": "\nAPV\nRVP",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "motivo",
+   "fieldtype": "Select",
+   "label": "Motivo",
+   "options": "\nTransferência\nReserva\nDemissão\nDisciplinar\nOutro",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "col_break_3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "novo_posto",
+   "fieldtype": "Link",
+   "label": "Novo Posto",
+   "options": "Posto de Vigilancia"
+  },
+  {
+   "fieldname": "sec_substituto",
+   "fieldtype": "Section Break",
+   "label": "Vigilante Substituto",
+   "depends_on": "eval:doc.abreviatura_op===\"RVP\""
+  },
+  {
+   "fieldname": "alocar_vigilante_substituto",
+   "fieldtype": "Select",
+   "label": "Alocar Vigilante Substituto",
+   "options": "\nSim\nNão",
+   "depends_on": "eval:doc.abreviatura_op===\"RVP\""
+  },
+  {
+   "fieldname": "novo_vigilante",
+   "fieldtype": "Link",
+   "label": "Novo Vigilante",
+   "options": "Vigilante"
+  },
+  {
+   "fieldname": "alocado_ao_posto",
+   "fieldtype": "Link",
+   "label": "Alocado ao Posto",
+   "options": "Posto de Vigilancia",
+   "fetch_from": "novo_vigilante.posto_de_vigilancia",
+   "read_only": 1
+  },
+  {
+   "fieldname": "col_break_4",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "cliente_novo_posto",
+   "fieldtype": "Data",
+   "label": "Cliente (Novo Posto)",
+   "fetch_from": "novo_vigilante.cliente",
+   "read_only": 1
+  },
+  {
+   "fieldname": "categoria_vigilante_a_alocar",
+   "fieldtype": "Data",
+   "label": "Categoria do Vigilante a Alocar",
+   "fetch_from": "novo_vigilante.categoria",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_reserva",
+   "fieldtype": "Section Break",
+   "label": "Posto de Reserva",
+   "depends_on": "eval:doc.motivo===\"Reserva\""
+  },
+  {
+   "fieldname": "novo_posto_do_reserva",
+   "fieldtype": "Link",
+   "label": "Novo Posto do Reserva",
+   "options": "Posto de Vigilancia"
+  },
+  {
+   "fieldname": "sec_justificativas",
+   "fieldtype": "Section Break",
+   "label": "Justificativas",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "motivo_3meses",
+   "fieldtype": "Small Text",
+   "label": "Motivo (< 3 Meses)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "motivo_rotatividade",
+   "fieldtype": "Small Text",
+   "label": "Motivo de Rotatividade",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_demissao",
+   "fieldtype": "Section Break",
+   "label": "Dados de Demissão",
+   "collapsible": 1,
+   "depends_on": "eval:doc.motivo===\"Demissão\""
+  },
+  {
+   "fieldname": "motiv_demi",
+   "fieldtype": "Select",
+   "label": "Motivo de Demissão",
+   "options": "\nAbandono\nRescisão\nOutro"
+  },
+  {
+   "fieldname": "uniforme",
+   "fieldtype": "Select",
+   "label": "Uniforme",
+   "options": "\nEntregue\nNão Entregue"
+  },
+  {
+   "fieldname": "evidencia",
+   "fieldtype": "Attach",
+   "label": "Evidência"
+  }
+ ],
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-06-02 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Security Ops",
+ "name": "Rotatividade",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1, "delete": 1, "email": 1, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "System Manager",
+   "share": 1, "write": 1, "submit": 1, "cancel": 1
+  },
+  {
+   "create": 1, "delete": 0, "email": 1, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "SIGOS Manager",
+   "share": 1, "write": 1, "submit": 1, "cancel": 1
+  },
+  {
+   "create": 0, "delete": 0, "email": 0, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "Aprovador RH",
+   "share": 0, "write": 0, "submit": 0, "cancel": 0
+  },
+  {
+   "create": 1, "delete": 0, "email": 0, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "Aprovador Operações",
+   "share": 0, "write": 1, "submit": 1, "cancel": 1
+  },
+  {
+   "create": 0, "delete": 0, "email": 0, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "Operações SIGOS",
+   "share": 0, "write": 0, "submit": 0, "cancel": 0
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "title_field": "vigilante",
+ "track_changes": 1
+}

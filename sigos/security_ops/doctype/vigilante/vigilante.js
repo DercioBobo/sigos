@@ -1,0 +1,96 @@
+frappe.ui.form.on("Vigilante", {
+	// ─── Setup ─────────────────────────────────────────────────────────────────
+	onload(frm) {
+		if (frm.is_new()) {
+			frm.set_value("status", "Pre-Adimissão RH");
+		}
+
+		frm.set_query("posto_de_vigilancia", () => ({
+			filters: { delegacao: frm.doc.delegacao },
+		}));
+	},
+
+	refresh(frm) {
+		frm.trigger("_aplicar_permissoes");
+		frm.trigger("_botoes_aprovacao");
+		sigos.danger_btn(frm, "limpar_escala");
+	},
+
+	// ─── Field events ──────────────────────────────────────────────────────────
+	data_de_nascimento(frm) {
+		_calcular_idade(frm);
+	},
+
+	delegacao(frm) {
+		frm.set_value("posto_de_vigilancia", "");
+		frm.set_query("posto_de_vigilancia", () => ({
+			filters: { delegacao: frm.doc.delegacao },
+		}));
+	},
+
+	// ─── Internal triggers ─────────────────────────────────────────────────────
+	_aplicar_permissoes(frm) {
+		// HR-only section: mecanografico, funcionario, data_admissao, empresa
+		const campos_rh = ["mecanografico", "funcionario", "data_admissao", "empresa", "motivo_de_admissao"];
+		const campos_ops = ["posto_de_vigilancia", "categoria", "tipo_de_vigilante", "regime_do_vigilante", "delegacao"];
+
+		const is_rh  = frappe.user.has_role("Aprovador RH")  || frappe.user.has_role("System Manager") || frappe.user.has_role("SIGOS Manager");
+		const is_ops = frappe.user.has_role("Aprovador Operações") || frappe.user.has_role("System Manager") || frappe.user.has_role("SIGOS Manager");
+
+		campos_rh.forEach(f  => frm.set_df_property(f, "read_only", is_rh  ? 0 : 1));
+		campos_ops.forEach(f => frm.set_df_property(f, "read_only", is_ops ? 0 : 1));
+
+		// funcionario always read-only (system-managed)
+		frm.set_df_property("funcionario", "read_only", 1);
+	},
+
+	_botoes_aprovacao(frm) {
+		if (frm.is_new()) return;
+
+		// RH: Pre-Adimissão RH → Pre-Adimissão
+		if (frappe.user.has_role("Aprovador RH") && frm.doc.status === "Pre-Adimissão RH") {
+			frm.add_custom_button(__("Admitir (RH)"), () => {
+				frappe.confirm(
+					__("Confirmar admissão pelo RH? Será criado o registo de Funcionário."),
+					() => {
+						frappe.call({
+							method: "frappe.client.set_value",
+							args: { doctype: "Vigilante", name: frm.doc.name, fieldname: "status", value: "Pre-Adimissão" },
+							callback: () => frm.reload_doc(),
+						});
+					}
+				);
+			}, __("Ações"));
+		}
+
+		// Ops: Pre-Adimissão → Ativo
+		if (frappe.user.has_role("Aprovador Operações") && frm.doc.status === "Pre-Adimissão") {
+			frm.add_custom_button(__("Ativar"), () => {
+				frappe.confirm(
+					__("Confirmar ativação do vigilante?"),
+					() => {
+						frappe.call({
+							method: "frappe.client.set_value",
+							args: { doctype: "Vigilante", name: frm.doc.name, fieldname: "status", value: "Ativo" },
+							callback: () => frm.reload_doc(),
+						});
+					}
+				);
+			}, __("Ações"));
+		}
+	},
+});
+
+// ─── Age calculator ──────────────────────────────────────────────────────────
+function _calcular_idade(frm) {
+	if (!frm.doc.data_de_nascimento) {
+		frm.set_value("idade", null);
+		return;
+	}
+	const dob   = new Date(frm.doc.data_de_nascimento);
+	const hoje  = new Date();
+	let idade   = hoje.getFullYear() - dob.getFullYear();
+	const m     = hoje.getMonth() - dob.getMonth();
+	if (m < 0 || (m === 0 && hoje.getDate() < dob.getDate())) idade--;
+	frm.set_value("idade", idade);
+}

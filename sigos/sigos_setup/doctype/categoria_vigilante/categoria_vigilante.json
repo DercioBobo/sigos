@@ -1,0 +1,76 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:nome",
+ "creation": "2026-06-02 00:00:00.000000",
+ "doctype": "DocType",
+ "document_type": "Document",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "nome", "descricao", "col_break_1", "pode_ser_substituto", "bloqueada"
+ ],
+ "fields": [
+  {
+   "fieldname": "nome",
+   "fieldtype": "Data",
+   "label": "Nome",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "descricao",
+   "fieldtype": "Small Text",
+   "label": "Descrição"
+  },
+  {
+   "fieldname": "col_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "pode_ser_substituto",
+   "fieldtype": "Check",
+   "label": "Pode ser Substituto",
+   "default": "0",
+   "in_list_view": 1,
+   "description": "Vigilantes com esta categoria podem cobrir ausências como substitutos"
+  },
+  {
+   "fieldname": "bloqueada",
+   "fieldtype": "Check",
+   "label": "Categoria de Sistema (bloqueada)",
+   "default": "0",
+   "in_list_view": 1,
+   "description": "Categorias bloqueadas não podem ser eliminadas"
+  }
+ ],
+ "links": [],
+ "modified": "2026-06-02 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "SIGOS Setup",
+ "name": "Categoria Vigilante",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1, "delete": 1, "email": 1, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "System Manager",
+   "share": 1, "write": 1
+  },
+  {
+   "create": 1, "delete": 0, "email": 0, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "SIGOS Manager",
+   "share": 0, "write": 1
+  },
+  {
+   "create": 0, "delete": 0, "email": 0, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "Operações SIGOS",
+   "share": 0, "write": 0
+  }
+ ],
+ "sort_field": "nome",
+ "sort_order": "ASC",
+ "title_field": "nome",
+ "track_changes": 0
+}

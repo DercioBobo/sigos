@@ -1,0 +1,722 @@
+import frappe
+from frappe import _
+
+
+def _vigilantes_com_escala_futura(excluir_escala=None):
+	"""
+	Vigilantes that have FUTURE rows (data >= today) in any active Escala.
+	With one-escala-per-posto, this is how we detect 'already scheduled elsewhere'.
+	"""
+	from frappe.utils import nowdate
+	cond = "AND e.name != %(excl)s" if excluir_escala else ""
+	return frappe.db.sql(
+		f"""
+		SELECT DISTINCT te.vigilante
+		FROM `tabTabela de Escala de Vigilante` te
+		JOIN `tabEscala do Vigilante` e ON e.name = te.parent
+		WHERE e.estado = 'Activo'
+		  AND te.data >= %(hoje)s
+		  {cond}
+		""",
+		{"hoje": nowdate(), "excl": excluir_escala or ""},
+		pluck="vigilante",
+	)
+
+
+@frappe.whitelist()
+def get_reservas_disponiveis(delegacao=None, excluir_escala=None):
+	"""
+	Return Ativo reserve-pool vigilantes (Categoria pode_ser_substituto = 1) that are
+	NOT already committed to an active escala. Used by the Escala 'Alocar Reservas' dialog.
+	"""
+	cats = frappe.get_all(
+		"Categoria Vigilante", filters={"pode_ser_substituto": 1}, pluck="name"
+	)
+	if not cats:
+		return []
+
+	ocupados = set(_vigilantes_com_escala_futura(excluir_escala=excluir_escala))
+
+	filters = {"status": "Ativo", "categoria": ["in", cats]}
+	if delegacao:
+		filters["delegacao"] = delegacao
+
+	vigs = frappe.get_all(
+		"Vigilante",
+		filters=filters,
+		fields=["name", "nome_completo", "categoria", "posto_de_vigilancia"],
+		order_by="nome_completo",
+		limit_page_length=500,
+	)
+	return [v for v in vigs if v.name not in ocupados]
+
+
+@frappe.whitelist()
+def alocar_reservas(posto, vigilantes, regime=None):
+	"""
+	Deploy a team of reserve guards to a (temporary) posto.
+	Assigns each to the posto + regime (vig.save → occupation, Employee sync, capacity).
+	Categoria is kept, so they return to the pool when the post closes.
+	The post's Escala (built separately) then picks them up via Sincronizar.
+	"""
+	import json
+	if isinstance(vigilantes, str):
+		vigilantes = json.loads(vigilantes)
+	if not vigilantes:
+		return {"alocados": 0}
+
+	max_vagas = frappe.db.get_value("Posto de Vigilancia", posto, "numero_de_vagas") or 0
+	if max_vagas:
+		atual = frappe.db.count("Vigilante", {"posto_de_vigilancia": posto, "status": "Ativo"})
+		a_adicionar = sum(
+			1 for v in vigilantes
+			if frappe.db.get_value("Vigilante", v, "posto_de_vigilancia") != posto
+		)
+		if atual + a_adicionar > max_vagas:
+			frappe.throw(
+				_("Capacidade excedida: o posto tem <b>{0}</b> vaga(s) livre(s), "
+				  "mas seleccionou <b>{1}</b> nova(s).").format(max_vagas - atual, a_adicionar),
+				title=_("Capacidade do Posto"),
+			)
+
+	alocados = 0
+	for v in vigilantes:
+		vig = frappe.get_doc("Vigilante", v)
+		vig.posto_de_vigilancia = posto
+		if regime:
+			vig.regime_do_vigilante = regime
+		vig.save(ignore_permissions=True)
+		alocados += 1
+
+	return {"alocados": alocados}
+
+
+@frappe.whitelist()
+def get_substitutos_disponiveis(doctype, txt, searchfield, start, page_len, filters):
+	"""
+	Frappe link search for vigilante_substituto.
+	Only returns Vigilantes whose Categoria Vigilante has pode_ser_substituto = 1.
+	"""
+	import json
+	if isinstance(filters, str):
+		filters = json.loads(filters)
+
+	delegacao = filters.get("delegacao") or ""
+	excluir   = filters.get("excluir")   or ""
+
+	cats = frappe.get_all(
+		"Categoria Vigilante",
+		filters={"pode_ser_substituto": 1},
+		pluck="name",
+	)
+	if not cats:
+		return []
+
+	delegacao_sql = "AND v.delegacao = %(delegacao)s" if delegacao else ""
+	excluir_sql   = "AND v.name != %(excluir)s"       if excluir   else ""
+
+	return frappe.db.sql(
+		f"""
+		SELECT v.name, v.nome_completo, v.categoria
+		FROM `tabVigilante` v
+		WHERE v.status    = 'Ativo'
+		  AND v.categoria IN %(cats)s
+		  AND (v.name LIKE %(txt)s OR v.nome_completo LIKE %(txt)s)
+		  {delegacao_sql}
+		  {excluir_sql}
+		ORDER BY v.nome_completo
+		LIMIT %(start)s, %(page_len)s
+		""",
+		{
+			"cats":      tuple(cats),
+			"txt":       f"%{txt}%",
+			"delegacao": delegacao,
+			"excluir":   excluir,
+			"start":     start,
+			"page_len":  page_len,
+		},
+	)
+
+
+@frappe.whitelist()
+def get_substitutos_para_wizard(doctype, txt, searchfield, start, page_len, filters):
+	"""
+	Wizard substituto search: pode_ser_substituto = 1 AND not in another active Escala
+	overlapping the given escala's period.
+	"""
+	import json
+	if isinstance(filters, str):
+		filters = json.loads(filters)
+
+	escala_name = filters.get("escala_name") or ""
+	excluir     = filters.get("excluir")     or ""
+
+	cats = frappe.get_all(
+		"Categoria Vigilante",
+		filters={"pode_ser_substituto": 1},
+		pluck="name",
+	)
+	if not cats:
+		return []
+
+	# Vigilantes already committed to a future schedule in another active Escala
+	ocupados = _vigilantes_com_escala_futura(excluir_escala=escala_name) if escala_name else []
+
+	excluidos = list(set(ocupados + ([excluir] if excluir else [])))
+	not_in    = "AND v.name NOT IN %(excluidos)s" if excluidos else ""
+
+	return frappe.db.sql(
+		f"""
+		SELECT v.name, v.nome_completo, v.categoria
+		FROM `tabVigilante` v
+		WHERE v.status    = 'Ativo'
+		  AND v.categoria IN %(cats)s
+		  AND (v.name LIKE %(txt)s OR v.nome_completo LIKE %(txt)s)
+		  {not_in}
+		ORDER BY v.nome_completo
+		LIMIT %(start)s, %(page_len)s
+		""",
+		{
+			"cats":      tuple(cats),
+			"txt":       f"%{txt}%",
+			"excluidos": tuple(excluidos) if excluidos else ("__none__",),
+			"start":     start,
+			"page_len":  page_len,
+		},
+	)
+
+
+@frappe.whitelist()
+def get_vigilante_data(vigilante, data):
+	"""Return schedule data (posto, regime, turno, periodo) for a vigilante on a given date."""
+	return frappe.db.sql(
+		"""
+		SELECT
+			te.vigilante,
+			te.posto,
+			te.regime,
+			te.turno,
+			te.periodo
+		FROM `tabTabela de Escala de Vigilante` te
+		JOIN `tabEscala do Vigilante` e ON e.name = te.parent
+		WHERE te.vigilante = %s
+		  AND te.data = %s
+		  AND e.estado = 'Activo'
+		""",
+		(vigilante, data),
+		as_dict=True
+	)
+
+
+@frappe.whitelist()
+def get_filtered_vigilantes(periodo, data):
+	"""Return distinct vigilantes active in the schedule for a given periodo and date."""
+	results = frappe.db.sql(
+		"""
+		SELECT DISTINCT te.vigilante
+		FROM `tabTabela de Escala de Vigilante` te
+		JOIN `tabEscala do Vigilante` e ON e.name = te.parent
+		WHERE te.periodo = %s
+		  AND te.data = %s
+		  AND e.estado = 'Activo'
+		""",
+		(periodo, data),
+		as_dict=True
+	)
+	return [r["vigilante"] for r in results]
+
+
+@frappe.whitelist()
+def get_vigilantes_on_folga(data):
+	"""Return vigilantes whose turno is a folga turn on the given date (from active Escalas)."""
+	if not data:
+		frappe.throw(_("Data é obrigatória"))
+
+	return frappe.db.sql(
+		"""
+		SELECT te.vigilante, te.posto, te.turno
+		FROM `tabTabela de Escala de Vigilante` te
+		JOIN `tabEscala do Vigilante` e ON e.name = te.parent
+		JOIN `tabTurno` t ON t.name = te.turno
+		WHERE te.data = %(data)s
+		  AND t.e_folga = 1
+		  AND e.estado = 'Activo'
+		""",
+		{"data": data},
+		as_dict=True
+	)
+
+
+@frappe.whitelist()
+def get_vigilantes_sem_escala_activa_query(doctype, txt, searchfield, start, page_len, filters):
+	"""
+	Frappe link search query — returns Vigilantes not in any active Escala
+	overlapping the given escala's period. Used by the wizard substituto picker.
+	"""
+	escala_name = filters.get("escala_name") or ""
+	excluir     = filters.get("excluir") or ""
+
+	if not escala_name:
+		return []
+
+	ocupados = _vigilantes_com_escala_futura(excluir_escala=escala_name)
+
+	excluidos = list(set(ocupados + ([excluir] if excluir else [])))
+
+	not_in = "AND v.name NOT IN %(excluidos)s" if excluidos else ""
+
+	return frappe.db.sql(
+		f"""
+		SELECT v.name, v.nome_completo
+		FROM `tabVigilante` v
+		WHERE v.status = 'Ativo'
+		  AND (v.name LIKE %(txt)s OR v.nome_completo LIKE %(txt)s)
+		  {not_in}
+		ORDER BY v.nome_completo
+		LIMIT %(start)s, %(page_len)s
+		""",
+		{
+			"txt":       f"%{txt}%",
+			"excluidos": tuple(excluidos) if excluidos else ("__none__",),
+			"start":     start,
+			"page_len":  page_len,
+		},
+	)
+
+
+@frappe.whitelist()
+def get_vigilantes_sem_escala_activa(escala_name, delegacao=None):
+	"""
+	Return Vigilante names that are NOT currently in any active Escala
+	with a period overlapping the given escala's period.
+	Used to filter the substituto picker in the wizard.
+	"""
+	ocupados = _vigilantes_com_escala_futura(excluir_escala=escala_name)
+
+	filters = [
+		["status", "=", "Ativo"],
+	]
+	if ocupados:
+		filters.append(["name", "not in", ocupados])
+	if delegacao:
+		filters.append(["delegacao", "=", delegacao])
+
+	return frappe.get_all("Vigilante", filters=filters, fields=["name", "nome_completo"], limit=200)
+
+
+@frappe.whitelist()
+def get_vigilantes_em_outra_escala(escala_name, vigilantes):
+	"""
+	Given a list of vigilante names, return those that already have FUTURE rows
+	in another active Escala.
+	"""
+	import json
+	from frappe.utils import nowdate
+	if isinstance(vigilantes, str):
+		vigilantes = json.loads(vigilantes)
+	if not vigilantes:
+		return []
+
+	return frappe.db.sql(
+		"""
+		SELECT DISTINCT te.vigilante, e.name AS escala
+		FROM `tabTabela de Escala de Vigilante` te
+		JOIN `tabEscala do Vigilante` e ON e.name = te.parent
+		WHERE e.estado     = 'Activo'
+		  AND e.name       != %(escala)s
+		  AND te.data      >= %(hoje)s
+		  AND te.vigilante IN %(vigilantes)s
+		""",
+		{
+			"escala":     escala_name,
+			"hoje":       nowdate(),
+			"vigilantes": tuple(vigilantes),
+		},
+		as_dict=True,
+	)
+
+
+@frappe.whitelist()
+def get_escalas_activas_para_vigilante(vigilante):
+	"""Return active Escalas containing this vigilante, with row counts."""
+	from sigos.utils import get_escalas_activas_com_vigilante
+	escalas = get_escalas_activas_com_vigilante(vigilante)
+
+	for e in escalas:
+		nome_vig = frappe.db.get_value("Vigilante", vigilante, "nome_completo")
+		e["nome_vigilante"] = nome_vig or vigilante
+
+		# Count future rows for this vigilante
+		from frappe.utils import today
+		e["linhas_futuras"] = frappe.db.count(
+			"Tabela de Escala de Vigilante",
+			{"parent": e.name, "vigilante": vigilante, "data": [">=", today()]},
+		)
+
+	return escalas
+
+
+@frappe.whitelist()
+def actualizar_escala_apos_mudanca(
+	escala_name, vigilante, accao, data_inicio=None,
+	novo_vigilante=None, turno_inicial=None, detectar_turno=0, novo_regime=None,
+):
+	"""
+	After a guard change, update the posto's Escala via its guard list.
+	Day rows regenerate automatically through reconciliar_escala() on save.
+
+	accao:
+	  "remover"    — remove vigilante from the escala's guard list
+	  "substituir" — remove vigilante, add novo_vigilante to the guard list
+	  "manter" / "pular" — nothing
+	"""
+	if accao in ("manter", "pular"):
+		return {"removido": 0, "adicionado": 0}
+
+	escala = frappe.get_doc("Escala do Vigilante", escala_name)
+
+	# Capture the slot (turno_inicial) the removed guard occupied
+	vacated = next(
+		(g.turno_inicial for g in escala.tab_vigilante_do_posto if g.vigilante == vigilante),
+		None,
+	)
+
+	# Remove the affected vigilante from the guard list
+	escala.set("tab_vigilante_do_posto", [
+		g for g in escala.tab_vigilante_do_posto if g.vigilante != vigilante
+	])
+
+	adicionado = 0
+	if accao == "substituir" and novo_vigilante:
+		if novo_vigilante in _vigilantes_com_escala_futura(excluir_escala=escala_name):
+			frappe.throw(
+				_("O vigilante <b>{0}</b> já está noutra escala activa. "
+				  "Um vigilante só pode estar numa escala.").format(novo_vigilante),
+				title=_("Vigilante em Escala Duplicada"),
+			)
+
+		# By default the replacement inherits the vacated slot (preserves coverage).
+		# If a turno was explicitly chosen, use it.
+		turno = turno_inicial if (turno_inicial and not detectar_turno) else vacated
+		if not turno:
+			from sigos.utils import get_regime_turno_sequence
+			seq = get_regime_turno_sequence(escala.regime_do_vigilante)
+			working = [t for t in seq if not t.get("e_folga")]
+			turno = working[0]["turno"] if working else None
+
+		# Collision: another guard already on this slot → swap them to the vacated slot
+		if turno and turno != vacated and vacated:
+			colidente = next(
+				(g for g in escala.tab_vigilante_do_posto if g.turno_inicial == turno),
+				None,
+			)
+			if colidente:
+				colidente.turno_inicial = vacated
+
+		escala.append("tab_vigilante_do_posto", {
+			"vigilante": novo_vigilante,
+			"turno_inicial": turno,
+		})
+		adicionado = 1
+
+	escala.save(ignore_permissions=True)  # validate → reconciliar regenerates day rows
+	return {"removido": 1, "adicionado": adicionado}
+
+
+@frappe.whitelist()
+def gerar_escala_posto(escala_name):
+	"""Manually generate/extend the escala (button). Reconcile runs in validate on save."""
+	escala = frappe.get_doc("Escala do Vigilante", escala_name)
+	escala.reconciliar_escala()
+	escala.save(ignore_permissions=True)
+	return {"gerado_ate": str(escala.gerado_ate), "linhas": len(escala.tabela_de_escala)}
+
+
+@frappe.whitelist()
+def limpar_futuro_escala(escala_name):
+	"""Remove all future, non-override rows."""
+	escala = frappe.get_doc("Escala do Vigilante", escala_name)
+	escala.limpar_futuro()
+	escala.save(ignore_permissions=True)
+	return {"linhas": len(escala.tabela_de_escala)}
+
+
+@frappe.whitelist()
+def get_regime_turnos(regime):
+	"""
+	Return the ordered turno sequence for a regime.
+	Used by Escala do Vigilante JS to generate the schedule dynamically.
+	"""
+	from sigos.utils import get_regime_turno_sequence
+	return get_regime_turno_sequence(regime)
+
+
+@frappe.whitelist()
+def get_turnos_do_regime_query(doctype, txt, searchfield, start, page_len, filters):
+	"""Link search: working (non-folga) turnos that belong to a regime."""
+	import json
+	if isinstance(filters, str):
+		filters = json.loads(filters)
+	regime = filters.get("regime") or ""
+	if not regime:
+		return []
+
+	return frappe.db.sql(
+		"""
+		SELECT t.name, t.periodo
+		FROM `tabRegime Turno Item` rti
+		JOIN `tabTurno` t ON t.name = rti.turno
+		WHERE rti.parent = %(regime)s
+		  AND (t.e_folga IS NULL OR t.e_folga = 0)
+		  AND (t.name LIKE %(txt)s)
+		ORDER BY rti.idx
+		LIMIT %(start)s, %(page_len)s
+		""",
+		{"regime": regime, "txt": f"%{txt}%", "start": start, "page_len": page_len},
+	)
+
+
+@frappe.whitelist()
+def get_vigilantes_da_escala(data, periodo, grupo_delegados=None):
+	"""
+	Return every vigilante expected on shift for data+periodo,
+	enriched with posto, turno, regime, delegacao and nome_completo.
+	Optionally scoped to the delegacoes in grupo_delegados.
+	Used by the Ausencias quick-add dialog and set_query filter.
+	"""
+	base_sql = """
+		SELECT
+			te.vigilante,
+			v.nome_completo,
+			v.mecanografico,
+			v.delegacao,
+			te.posto,
+			te.turno,
+			te.regime,
+			te.periodo,
+			COALESCE(rti.n_de_faltas, 1) AS n_de_faltas
+		FROM `tabTabela de Escala de Vigilante` te
+		JOIN `tabEscala do Vigilante` e ON e.name = te.parent
+		JOIN `tabVigilante` v ON v.name = te.vigilante
+		JOIN `tabTurno` t ON t.name = te.turno
+		LEFT JOIN `tabRegime Turno Item` rti
+			ON rti.parent = te.regime AND rti.turno = te.turno
+		WHERE e.estado = 'Activo'
+		  AND te.data = %(data)s
+		  AND te.periodo = %(periodo)s
+		  AND (t.e_folga IS NULL OR t.e_folga = 0)
+		{extra}
+		ORDER BY v.delegacao, v.nome_completo
+	"""
+	params = {"data": data, "periodo": periodo}
+
+	if grupo_delegados:
+		delegacoes = frappe.get_all(
+			"Grupo Delegados Item",
+			filters={"parent": grupo_delegados},
+			fields=["delegacao"],
+			pluck="delegacao",
+		)
+		if delegacoes:
+			# frappe.db.sql supports tuple for IN
+			params["delegacoes"] = tuple(delegacoes)
+			return frappe.db.sql(
+				base_sql.format(extra="AND v.delegacao IN %(delegacoes)s"),
+				params,
+				as_dict=True,
+			)
+
+	return frappe.db.sql(base_sql.format(extra=""), params, as_dict=True)
+
+
+@frappe.whitelist()
+def get_vigilantes(from_date=None, to_date=None, status=None, delegacao=None, projecto=None):
+	"""
+	Fetch Vigilante records with optional filters.
+	- from_date / to_date: filter by data_admissao
+	- status: exact match
+	- delegacao: exact match
+	- projecto: exact match
+	"""
+	filters = {}
+
+	if from_date and to_date:
+		filters["data_admissao"] = ["between", [from_date, to_date]]
+	elif from_date:
+		filters["data_admissao"] = [">=", from_date]
+	elif to_date:
+		filters["data_admissao"] = ["<=", to_date]
+
+	if status:
+		filters["status"] = status
+	if delegacao:
+		filters["delegacao"] = delegacao
+	if projecto:
+		filters["projecto"] = projecto
+
+	return frappe.get_all(
+		"Vigilante",
+		filters=filters,
+		fields=[
+			"name as docname",
+			"nome_completo",
+			"mecanografico",
+			"status",
+			"categoria",
+			"regime_do_vigilante",
+			"tipo_de_vigilante",
+			"delegacao",
+			"posto_de_vigilancia",
+			"tipo_de_posto",
+			"cliente",
+			"projecto",
+			"nome_do_projecto",
+			"data_admissao",
+			"motivo_de_admissao",
+			"empresa",
+			"sexo",
+			"data_de_nascimento",
+			"idade",
+			"contacto",
+			"residencia",
+			"dependentes",
+			"codename",
+			"documento",
+			"anexar_documento",
+			"funcionario",
+			"owner",
+			"creation",
+			"modified"
+		],
+		order_by="data_admissao desc, creation desc"
+	)
+
+
+@frappe.whitelist()
+def get_ausencias(from_date=None, to_date=None, delegacao=None, periodo=None, limit=500):
+	"""
+	Return absence rows with full summaries (total, justificadas, por_tipo, top_vigilantes).
+	rows: limited by the `limit` parameter.
+	summaries: computed over the full unfiltered dataset.
+	"""
+	conditions = ["a.docstatus < 2"]
+	params = {"limit": int(limit)}
+
+	if from_date and to_date:
+		conditions.append("a.data between %(from_date)s and %(to_date)s")
+		params.update({"from_date": from_date, "to_date": to_date})
+	elif from_date:
+		conditions.append("a.data >= %(from_date)s")
+		params["from_date"] = from_date
+	elif to_date:
+		conditions.append("a.data <= %(to_date)s")
+		params["to_date"] = to_date
+
+	if delegacao:
+		conditions.append("ta.delegacao = %(delegacao)s")
+		params["delegacao"] = delegacao
+
+	if periodo:
+		conditions.append("a.periodo = %(periodo)s")
+		params["periodo"] = periodo
+
+	where_sql = " and ".join(conditions)
+
+	# Raw rows (limited)
+	rows = frappe.db.sql(
+		f"""
+		select
+			a.name              as docname_parent,
+			a.data              as data,
+			a.periodo           as periodo,
+			ta.name             as rowname,
+			ta.vigilante        as vigilante,
+			ta.nome_do_vigilante as nome_do_vigilante,
+			ta.mecanografico    as mecanografico,
+			ta.tipo_de_ausencia as tipo_de_ausencia,
+			ta.turno            as turno,
+			ta.posto            as posto,
+			ta.delegacao        as delegacao,
+			ta.jutificativo     as jutificativo,
+			ta.data_justificativo as data_justificativo
+		from `tabTabela Ausencia` ta
+		join `tabAusencias` a on ta.parent = a.name
+		where {where_sql}
+		order by a.data desc, ta.modified desc
+		limit %(limit)s
+		""",
+		params,
+		as_dict=True
+	)
+
+	base_params = dict(params)
+
+	# Total count
+	total_registos = frappe.db.sql(
+		f"""
+		select count(1) as c
+		from `tabTabela Ausencia` ta
+		join `tabAusencias` a on ta.parent = a.name
+		where {where_sql}
+		""",
+		base_params,
+		as_dict=True
+	)[0]["c"] or 0
+
+	# Justificadas vs sem justificativo
+	just_row = frappe.db.sql(
+		f"""
+		select
+			sum(case when ta.jutificativo is not null or ta.data_justificativo is not null then 1 else 0 end) as justificadas,
+			sum(case when ta.jutificativo is null and ta.data_justificativo is null then 1 else 0 end) as sem_justificativo
+		from `tabTabela Ausencia` ta
+		join `tabAusencias` a on ta.parent = a.name
+		where {where_sql}
+		""",
+		base_params,
+		as_dict=True
+	)[0] or {"justificadas": 0, "sem_justificativo": 0}
+
+	# Por tipo
+	por_tipo_rows = frappe.db.sql(
+		f"""
+		select coalesce(ta.tipo_de_ausencia, '—') as tipo, count(1) as c
+		from `tabTabela Ausencia` ta
+		join `tabAusencias` a on ta.parent = a.name
+		where {where_sql}
+		group by coalesce(ta.tipo_de_ausencia, '—')
+		""",
+		base_params,
+		as_dict=True
+	)
+	por_tipo = {r["tipo"]: r["c"] for r in por_tipo_rows}
+
+	# Top vigilantes
+	top_vigilantes = frappe.db.sql(
+		f"""
+		select
+			coalesce(ta.vigilante, ta.nome_do_vigilante, '—') as vigilante_key,
+			max(ta.nome_do_vigilante) as nome,
+			count(1) as ocorrencias
+		from `tabTabela Ausencia` ta
+		join `tabAusencias` a on ta.parent = a.name
+		where {where_sql}
+		group by coalesce(ta.vigilante, ta.nome_do_vigilante, '—')
+		order by ocorrencias desc
+		limit 10
+		""",
+		base_params,
+		as_dict=True
+	)
+
+	return {
+		"rows": rows,
+		"summary": {
+			"total_registos": total_registos,
+			"ocorrencias_total": total_registos,
+			"justificadas": just_row.get("justificadas", 0) or 0,
+			"sem_justificativo": just_row.get("sem_justificativo", 0) or 0,
+			"por_tipo": por_tipo,
+		},
+		"top_vigilantes": top_vigilantes,
+	}

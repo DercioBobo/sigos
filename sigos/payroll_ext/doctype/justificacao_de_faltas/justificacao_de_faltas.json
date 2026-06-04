@@ -1,0 +1,156 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "naming_series:",
+ "creation": "2026-06-02 00:00:00.000000",
+ "doctype": "DocType",
+ "document_type": "Document",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series", "data_do_justificativo", "col_break_1",
+  "vigilante", "funcionario",
+  "sec_faltas", "dia_de_inicio", "dias_a_justificar", "col_break_2",
+  "dia_de_fim", "numero", "data_de_inicio", "data_de_fim",
+  "sec_justificativo", "justificativo", "observacoes"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Série",
+   "options": "JF-.####",
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "data_do_justificativo",
+   "fieldtype": "Date",
+   "label": "Data do Justificativo",
+   "reqd": 1,
+   "in_list_view": 1,
+   "default": "Today"
+  },
+  {
+   "fieldname": "col_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "vigilante",
+   "fieldtype": "Link",
+   "label": "Vigilante",
+   "options": "Vigilante",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "funcionario",
+   "fieldtype": "Link",
+   "label": "Funcionário",
+   "options": "Employee",
+   "fetch_from": "vigilante.funcionario",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_faltas",
+   "fieldtype": "Section Break",
+   "label": "Período das Faltas"
+  },
+  {
+   "fieldname": "dia_de_inicio",
+   "fieldtype": "Date",
+   "label": "Dia de Início",
+   "reqd": 1
+  },
+  {
+   "fieldname": "dias_a_justificar",
+   "fieldtype": "Int",
+   "label": "Dias a Justificar",
+   "reqd": 1,
+   "default": "1"
+  },
+  {
+   "fieldname": "col_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "dia_de_fim",
+   "fieldtype": "Date",
+   "label": "Dia de Fim",
+   "read_only": 1
+  },
+  {
+   "fieldname": "numero",
+   "fieldtype": "Int",
+   "label": "Total de Faltas",
+   "read_only": 1
+  },
+  {
+   "fieldname": "data_de_inicio",
+   "fieldtype": "Date",
+   "label": "Início do Mês",
+   "read_only": 1
+  },
+  {
+   "fieldname": "data_de_fim",
+   "fieldtype": "Date",
+   "label": "Fim do Mês",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_justificativo",
+   "fieldtype": "Section Break",
+   "label": "Justificativo"
+  },
+  {
+   "fieldname": "justificativo",
+   "fieldtype": "Attach",
+   "label": "Justificativo",
+   "reqd": 1
+  },
+  {
+   "fieldname": "observacoes",
+   "fieldtype": "Small Text",
+   "label": "Observações"
+  }
+ ],
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-06-02 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Payroll Ext",
+ "name": "Justificacao De Faltas",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1, "delete": 1, "email": 1, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "System Manager",
+   "share": 1, "write": 1, "submit": 1, "cancel": 1
+  },
+  {
+   "create": 1, "delete": 0, "email": 1, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "SIGOS Manager",
+   "share": 1, "write": 1, "submit": 1, "cancel": 1
+  },
+  {
+   "create": 1, "delete": 0, "email": 0, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "Aprovador RH",
+   "share": 0, "write": 1, "submit": 1, "cancel": 1
+  },
+  {
+   "create": 0, "delete": 0, "email": 0, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "Aprovador Operações",
+   "share": 0, "write": 0, "submit": 0, "cancel": 0
+  },
+  {
+   "create": 0, "delete": 0, "email": 0, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "Operações SIGOS",
+   "share": 0, "write": 0, "submit": 0, "cancel": 0
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "title_field": "vigilante",
+ "track_changes": 1
+}

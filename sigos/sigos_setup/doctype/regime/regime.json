@@ -1,0 +1,94 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:nome",
+ "creation": "2026-06-02 00:00:00.000000",
+ "doctype": "DocType",
+ "document_type": "Document",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "nome", "descricao", "col_break_1",
+  "tipo_ciclo", "dias_por_grupo",
+  "sec_turnos", "turnos"
+ ],
+ "fields": [
+  {
+   "fieldname": "nome",
+   "fieldtype": "Data",
+   "label": "Nome",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "descricao",
+   "fieldtype": "Small Text",
+   "label": "Descrição"
+  },
+  {
+   "fieldname": "col_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "tipo_ciclo",
+   "fieldtype": "Select",
+   "label": "Tipo de Ciclo",
+   "options": "Rotativo\nDias Úteis\nDias Úteis Alternado",
+   "reqd": 1,
+   "default": "Rotativo",
+   "in_list_view": 1,
+   "description": "Rotativo: cicla continuamente por todos os turnos. Dias Úteis: só dias úteis. Dias Úteis Alternado: dias úteis com troca de grupo a cada N dias."
+  },
+  {
+   "fieldname": "dias_por_grupo",
+   "fieldtype": "Int",
+   "label": "Dias por Grupo",
+   "default": "5",
+   "depends_on": "eval: doc.tipo_ciclo === 'Dias Úteis Alternado'",
+   "description": "Número de dias úteis consecutivos antes de trocar para o próximo turno (ex: 5 = uma semana de trabalho)"
+  },
+  {
+   "fieldname": "sec_turnos",
+   "fieldtype": "Section Break",
+   "label": "Sequência de Turnos"
+  },
+  {
+   "fieldname": "turnos",
+   "fieldtype": "Table",
+   "label": "Turnos",
+   "options": "Regime Turno Item",
+   "reqd": 1,
+   "description": "Defina os turnos em ordem de ciclo. O campo 'Nº Faltas' define quantas faltas são contadas quando o vigilante falta neste turno."
+  }
+ ],
+ "links": [],
+ "modified": "2026-06-02 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "SIGOS Setup",
+ "name": "Regime",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1, "delete": 1, "email": 1, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "System Manager",
+   "share": 1, "write": 1
+  },
+  {
+   "create": 1, "delete": 0, "email": 0, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "SIGOS Manager",
+   "share": 0, "write": 1
+  },
+  {
+   "create": 0, "delete": 0, "email": 0, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "Operações SIGOS",
+   "share": 0, "write": 0
+  }
+ ],
+ "sort_field": "nome",
+ "sort_order": "ASC",
+ "states": [],
+ "title_field": "nome",
+ "track_changes": 1
+}

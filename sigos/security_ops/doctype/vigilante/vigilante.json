@@ -1,0 +1,373 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "naming_series:",
+ "creation": "2026-06-02 00:00:00.000000",
+ "doctype": "DocType",
+ "document_type": "Document",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series", "foto", "col_break_header",
+  "nome_completo", "data_de_nascimento", "idade", "sexo", "estado_civil",
+  "sec_documentos", "documento", "numero_documento", "col_break_docs", "nuit",
+  "sec_contacto", "contacto", "contacto_alternativo", "col_break_contacto", "email", "residencia", "dependentes",
+  "sec_profissional", "status", "data_admissao", "col_break_prof", "motivo_de_admissao", "empresa",
+  "sec_operacional", "delegacao", "categoria", "col_break_ops", "tipo_de_vigilante", "regime_do_vigilante",
+  "sec_alocacao", "posto_de_vigilancia", "tipo_de_posto", "col_break_aloc", "cliente", "projecto", "nome_do_projecto",
+  "sec_id_prof", "mecanografico", "col_break_id", "codename",
+  "sec_anexos", "anexar_documento",
+  "sec_rh", "funcionario"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Série",
+   "options": "VIG-.####",
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "foto",
+   "fieldtype": "Attach Image",
+   "label": "Foto"
+  },
+  {
+   "fieldname": "col_break_header",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "nome_completo",
+   "fieldtype": "Data",
+   "label": "Nome Completo",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "data_de_nascimento",
+   "fieldtype": "Date",
+   "label": "Data de Nascimento"
+  },
+  {
+   "fieldname": "idade",
+   "fieldtype": "Int",
+   "label": "Idade",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sexo",
+   "fieldtype": "Select",
+   "label": "Sexo",
+   "options": "\nMasculino\nFeminino",
+   "reqd": 1
+  },
+  {
+   "fieldname": "estado_civil",
+   "fieldtype": "Select",
+   "label": "Estado Civil",
+   "options": "\nSolteiro\nCasado\nDivorciado\nViúvo\nUnião de Facto"
+  },
+  {
+   "fieldname": "sec_documentos",
+   "fieldtype": "Section Break",
+   "label": "Documentos de Identificação"
+  },
+  {
+   "fieldname": "documento",
+   "fieldtype": "Select",
+   "label": "Tipo de Documento",
+   "options": "\nBI\nPassaporte\nDIRE\nOutro"
+  },
+  {
+   "fieldname": "numero_documento",
+   "fieldtype": "Data",
+   "label": "Número do Documento"
+  },
+  {
+   "fieldname": "col_break_docs",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "nuit",
+   "fieldtype": "Data",
+   "label": "NUIT"
+  },
+  {
+   "fieldname": "sec_contacto",
+   "fieldtype": "Section Break",
+   "label": "Contactos e Residência"
+  },
+  {
+   "fieldname": "contacto",
+   "fieldtype": "Data",
+   "label": "Contacto Principal",
+   "options": "Phone"
+  },
+  {
+   "fieldname": "contacto_alternativo",
+   "fieldtype": "Data",
+   "label": "Contacto Alternativo",
+   "options": "Phone"
+  },
+  {
+   "fieldname": "col_break_contacto",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "email",
+   "fieldtype": "Data",
+   "label": "Email",
+   "options": "Email"
+  },
+  {
+   "fieldname": "residencia",
+   "fieldtype": "Small Text",
+   "label": "Residência"
+  },
+  {
+   "fieldname": "dependentes",
+   "fieldtype": "Int",
+   "label": "Nº de Dependentes",
+   "default": "0"
+  },
+  {
+   "fieldname": "sec_profissional",
+   "fieldtype": "Section Break",
+   "label": "Estado Profissional"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Estado",
+   "options": "Pre-Adimissão RH\nPre-Adimissão\nAtivo\nInactivo\nDemitido",
+   "default": "Pre-Adimissão RH",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "data_admissao",
+   "fieldtype": "Date",
+   "label": "Data de Admissão"
+  },
+  {
+   "fieldname": "col_break_prof",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "motivo_de_admissao",
+   "fieldtype": "Select",
+   "label": "Motivo de Admissão",
+   "options": "\nNova Contratação\nReadmissão\nTransferência\nSubstituição"
+  },
+  {
+   "fieldname": "empresa",
+   "fieldtype": "Link",
+   "label": "Empresa",
+   "options": "Company"
+  },
+  {
+   "fieldname": "sec_operacional",
+   "fieldtype": "Section Break",
+   "label": "Dados Operacionais"
+  },
+  {
+   "fieldname": "delegacao",
+   "fieldtype": "Link",
+   "label": "Delegação",
+   "options": "Delegacao",
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "categoria",
+   "fieldtype": "Link",
+   "label": "Categoria",
+   "options": "Categoria Vigilante",
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "col_break_ops",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "tipo_de_vigilante",
+   "fieldtype": "Select",
+   "label": "Tipo de Vigilante",
+   "options": "\nVigilante\nSupervisor\nChefe de Grupo\nChefe de Posto"
+  },
+  {
+   "fieldname": "regime_do_vigilante",
+   "fieldtype": "Link",
+   "label": "Regime",
+   "options": "Regime",
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "sec_alocacao",
+   "fieldtype": "Section Break",
+   "label": "Alocação"
+  },
+  {
+   "fieldname": "posto_de_vigilancia",
+   "fieldtype": "Link",
+   "label": "Posto de Vigilância",
+   "options": "Posto de Vigilancia",
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "tipo_de_posto",
+   "fieldtype": "Data",
+   "label": "Tipo de Posto",
+   "fetch_from": "posto_de_vigilancia.tipo_de_posto",
+   "read_only": 1
+  },
+  {
+   "fieldname": "col_break_aloc",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "cliente",
+   "fieldtype": "Link",
+   "label": "Cliente",
+   "options": "Customer",
+   "fetch_from": "posto_de_vigilancia.cliente",
+   "read_only": 1
+  },
+  {
+   "fieldname": "projecto",
+   "fieldtype": "Link",
+   "label": "Projecto",
+   "options": "Project",
+   "fetch_from": "posto_de_vigilancia.project",
+   "read_only": 1
+  },
+  {
+   "fieldname": "nome_do_projecto",
+   "fieldtype": "Data",
+   "label": "Nome do Projecto",
+   "fetch_from": "projecto.project_name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_id_prof",
+   "fieldtype": "Section Break",
+   "label": "Identificação Profissional"
+  },
+  {
+   "fieldname": "mecanografico",
+   "fieldtype": "Data",
+   "label": "Número Mecanográfico",
+   "in_list_view": 0,
+   "search_index": 1
+  },
+  {
+   "fieldname": "col_break_id",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "codename",
+   "fieldtype": "Data",
+   "label": "Codename / Alcunha"
+  },
+  {
+   "fieldname": "sec_anexos",
+   "fieldtype": "Section Break",
+   "label": "Documentos Anexos"
+  },
+  {
+   "fieldname": "anexar_documento",
+   "fieldtype": "Attach",
+   "label": "Documento Anexo"
+  },
+  {
+   "fieldname": "sec_rh",
+   "fieldtype": "Section Break",
+   "label": "Ligação RH",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "funcionario",
+   "fieldtype": "Link",
+   "label": "Funcionário (Employee)",
+   "options": "Employee",
+   "read_only": 1
+  }
+ ],
+ "links": [
+  {
+   "group": "Operações",
+   "link_doctype": "Rotatividade",
+   "link_fieldname": "vigilante"
+  },
+  {
+   "group": "Operações",
+   "link_doctype": "Ausencias",
+   "link_fieldname": "tabela_ausencia.vigilante"
+  },
+  {
+   "group": "Disciplinar",
+   "link_doctype": "Repreensao Disciplinar",
+   "link_fieldname": "vigilante"
+  },
+  {
+   "group": "Disciplinar",
+   "link_doctype": "Processo Disciplinar",
+   "link_fieldname": "vigilante"
+  },
+  {
+   "group": "Escalas",
+   "link_doctype": "Escala do Vigilante",
+   "link_fieldname": "tabela_de_escala.vigilante"
+  }
+ ],
+ "modified": "2026-06-02 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Security Ops",
+ "name": "Vigilante",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1, "delete": 1, "email": 1, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "System Manager",
+   "share": 1, "write": 1
+  },
+  {
+   "create": 1, "delete": 0, "email": 1, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "SIGOS Manager",
+   "share": 1, "write": 1
+  },
+  {
+   "create": 1, "delete": 0, "email": 0, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "Aprovador RH",
+   "share": 0, "write": 1
+  },
+  {
+   "create": 1, "delete": 0, "email": 0, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "Aprovador Operações",
+   "share": 0, "write": 1
+  },
+  {
+   "create": 0, "delete": 0, "email": 0, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "Operações SIGOS",
+   "share": 0, "write": 0
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [
+  {"color": "Orange", "title": "Pre-Adimissão RH"},
+  {"color": "Yellow", "title": "Pre-Adimissão"},
+  {"color": "Green", "title": "Ativo"},
+  {"color": "Gray", "title": "Inactivo"},
+  {"color": "Red", "title": "Demitido"}
+ ],
+ "title_field": "nome_completo",
+ "track_changes": 1
+}

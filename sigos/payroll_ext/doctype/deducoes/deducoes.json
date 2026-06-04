@@ -1,0 +1,177 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "naming_series:",
+ "creation": "2026-06-02 00:00:00.000000",
+ "doctype": "DocType",
+ "document_type": "Document",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series", "tipo", "estado", "col_break_1", "funcionario", "salario_base", "vigilante",
+  "sec_valores", "tipo_de_pagamento", "valor_a_pagar", "meses_a_pagar", "col_break_2",
+  "valor_mensal", "mes_referencia", "data_de_inicio", "data_de_fim",
+  "sec_info", "descricao", "processo_disciplinar", "termo_de_responsabilidade"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Série",
+   "options": "DED-.####",
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "tipo",
+   "fieldtype": "Select",
+   "label": "Tipo",
+   "options": "\nDeducoes Diversas\nUniforme\nEmprestimo\nProcesso Disciplinar",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "estado",
+   "fieldtype": "Select",
+   "label": "Estado",
+   "options": "Activo\nConcluído\nCancelado",
+   "default": "Activo",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "col_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "funcionario",
+   "fieldtype": "Link",
+   "label": "Funcionário",
+   "options": "Employee",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "salario_base",
+   "fieldtype": "Currency",
+   "label": "Salário Base",
+   "read_only": 1
+  },
+  {
+   "fieldname": "vigilante",
+   "fieldtype": "Link",
+   "label": "Vigilante",
+   "options": "Vigilante"
+  },
+  {
+   "fieldname": "sec_valores",
+   "fieldtype": "Section Break",
+   "label": "Valores"
+  },
+  {
+   "fieldname": "tipo_de_pagamento",
+   "fieldtype": "Select",
+   "label": "Tipo de Pagamento",
+   "options": "\nDeterminado\nEm Prestações"
+  },
+  {
+   "fieldname": "valor_a_pagar",
+   "fieldtype": "Currency",
+   "label": "Valor a Pagar",
+   "reqd": 1
+  },
+  {
+   "fieldname": "meses_a_pagar",
+   "fieldtype": "Int",
+   "label": "Meses a Pagar",
+   "default": "1"
+  },
+  {
+   "fieldname": "col_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "valor_mensal",
+   "fieldtype": "Currency",
+   "label": "Valor Mensal",
+   "read_only": 1
+  },
+  {
+   "fieldname": "mes_referencia",
+   "fieldtype": "Select",
+   "label": "Mês de Referência",
+   "options": "\nJaneiro\nFevereiro\nMarço\nAbril\nMaio\nJunho\nJulho\nAgosto\nSetembro\nOutubro\nNovembro\nDezembro"
+  },
+  {
+   "fieldname": "data_de_inicio",
+   "fieldtype": "Date",
+   "label": "Data de Início"
+  },
+  {
+   "fieldname": "data_de_fim",
+   "fieldtype": "Date",
+   "label": "Data de Fim",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_info",
+   "fieldtype": "Section Break",
+   "label": "Informação Adicional"
+  },
+  {
+   "fieldname": "descricao",
+   "fieldtype": "Small Text",
+   "label": "Descrição"
+  },
+  {
+   "fieldname": "processo_disciplinar",
+   "fieldtype": "Link",
+   "label": "Processo Disciplinar",
+   "options": "Processo Disciplinar",
+   "read_only": 1
+  },
+  {
+   "fieldname": "termo_de_responsabilidade",
+   "fieldtype": "Attach",
+   "label": "Termo de Responsabilidade"
+  }
+ ],
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-06-02 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Payroll Ext",
+ "name": "Deducoes",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1, "delete": 1, "email": 1, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "System Manager",
+   "share": 1, "write": 1, "submit": 1, "cancel": 1
+  },
+  {
+   "create": 1, "delete": 0, "email": 1, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "SIGOS Manager",
+   "share": 1, "write": 1, "submit": 1, "cancel": 1
+  },
+  {
+   "create": 1, "delete": 0, "email": 0, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "Aprovador RH",
+   "share": 0, "write": 1, "submit": 1, "cancel": 1
+  },
+  {
+   "create": 0, "delete": 0, "email": 0, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "Aprovador Operações",
+   "share": 0, "write": 0, "submit": 0, "cancel": 0
+  },
+  {
+   "create": 0, "delete": 0, "email": 0, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "Operações SIGOS",
+   "share": 0, "write": 0, "submit": 0, "cancel": 0
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "title_field": "funcionario",
+ "track_changes": 1
+}

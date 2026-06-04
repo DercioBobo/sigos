@@ -1,0 +1,70 @@
+{
+ "actions": [],
+ "creation": "2026-06-02 00:00:00.000000",
+ "doctype": "DocType",
+ "document_type": "Other",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": ["vigilante", "nome_completo", "tipo_de_vigilante", "regime_do_vigilante", "turno_inicial", "data"],
+ "fields": [
+  {
+   "fieldname": "vigilante",
+   "fieldtype": "Link",
+   "label": "Vigilante",
+   "options": "Vigilante",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_grid_view": 1
+  },
+  {
+   "fieldname": "nome_completo",
+   "fieldtype": "Data",
+   "label": "Nome",
+   "fetch_from": "vigilante.nome_completo",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "tipo_de_vigilante",
+   "fieldtype": "Data",
+   "label": "Tipo",
+   "fetch_from": "vigilante.tipo_de_vigilante",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "regime_do_vigilante",
+   "fieldtype": "Data",
+   "label": "Regime",
+   "fetch_from": "vigilante.regime_do_vigilante",
+   "read_only": 1
+  },
+  {
+   "fieldname": "turno_inicial",
+   "fieldtype": "Link",
+   "label": "Turno Inicial",
+   "options": "Turno",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_grid_view": 1,
+   "description": "Turno de início do ciclo para este vigilante"
+  },
+  {
+   "fieldname": "data",
+   "fieldtype": "Date",
+   "label": "Data Início",
+   "read_only": 1
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-06-02 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Security Ops",
+ "name": "Tab Vigilante Do Posto",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

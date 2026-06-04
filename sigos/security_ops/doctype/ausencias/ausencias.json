@@ -1,0 +1,140 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "naming_series:",
+ "creation": "2026-06-02 00:00:00.000000",
+ "doctype": "DocType",
+ "document_type": "Document",
+ "is_submittable": 1,
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series", "data", "col_break_1", "periodo", "grupo_delegados",
+  "sec_atraso", "alerta_atraso", "motivo_atraso", "col_break_atraso", "hora_submissao_tardia",
+  "sec_tabela", "btn_adicionar_ausencia", "resumo_ausencias", "tabela_ausencia"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Série",
+   "options": "AUS-.YYYY.-.####",
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "data",
+   "fieldtype": "Date",
+   "label": "Data",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "default": "Today"
+  },
+  {
+   "fieldname": "col_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "periodo",
+   "fieldtype": "Select",
+   "label": "Período",
+   "options": "\nManhã\nNoite",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "grupo_delegados",
+   "fieldtype": "Link",
+   "label": "Grupo de Delegados",
+   "options": "Grupo de Delegados",
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "sec_atraso",
+   "fieldtype": "Section Break",
+   "label": "Submissão Tardia",
+   "collapsible": 0
+  },
+  {
+   "fieldname": "alerta_atraso",
+   "fieldtype": "HTML",
+   "label": "Alerta Atraso",
+   "options": ""
+  },
+  {
+   "fieldname": "motivo_atraso",
+   "fieldtype": "Small Text",
+   "label": "Motivo do Atraso",
+   "read_only": 0,
+   "description": "Preencha se a submissão for fora do horário limite"
+  },
+  {
+   "fieldname": "col_break_atraso",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "hora_submissao_tardia",
+   "fieldtype": "Data",
+   "label": "Hora de Submissão",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_tabela",
+   "fieldtype": "Section Break",
+   "label": "Registo de Ausências"
+  },
+  {
+   "fieldname": "btn_adicionar_ausencia",
+   "fieldtype": "Button",
+   "label": "Registar Ausência"
+  },
+  {
+   "fieldname": "resumo_ausencias",
+   "fieldtype": "HTML",
+   "label": "Resumo",
+   "options": ""
+  },
+  {
+   "fieldname": "tabela_ausencia",
+   "fieldtype": "Table",
+   "label": "Tabela de Ausências",
+   "options": "Tabela Ausencia"
+  }
+ ],
+ "links": [],
+ "modified": "2026-06-02 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Security Ops",
+ "name": "Ausencias",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "cancel": 1, "create": 1, "delete": 1, "email": 1, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "System Manager",
+   "share": 1, "submit": 1, "write": 1
+  },
+  {
+   "cancel": 1, "create": 1, "delete": 0, "email": 1, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "SIGOS Manager",
+   "share": 1, "submit": 1, "write": 1
+  },
+  {
+   "cancel": 0, "create": 1, "delete": 0, "email": 0, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "Aprovador Operações",
+   "share": 0, "submit": 1, "write": 1
+  },
+  {
+   "cancel": 0, "create": 1, "delete": 0, "email": 0, "export": 0,
+   "print": 1, "read": 1, "report": 1, "role": "Operações SIGOS",
+   "share": 0, "submit": 0, "write": 1
+  }
+ ],
+ "sort_field": "data",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

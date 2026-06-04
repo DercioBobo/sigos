@@ -1,0 +1,144 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "naming_series:",
+ "creation": "2026-06-02 00:00:00.000000",
+ "doctype": "DocType",
+ "document_type": "Document",
+ "is_submittable": 1,
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series", "data", "col_break_1",
+  "delegacao", "posto",
+  "sec_vigilante", "vigilante", "regime", "col_break_2",
+  "turno", "periodo",
+  "sec_justificacao", "motivo", "aprovado_por"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Série",
+   "options": "TE-.YYYY.-.####",
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "data",
+   "fieldtype": "Date",
+   "label": "Data",
+   "reqd": 1,
+   "in_list_view": 1,
+   "default": "Today"
+  },
+  {
+   "fieldname": "col_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "delegacao",
+   "fieldtype": "Link",
+   "label": "Delegação",
+   "options": "Delegacao",
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "posto",
+   "fieldtype": "Link",
+   "label": "Posto",
+   "options": "Posto de Vigilancia",
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "sec_vigilante",
+   "fieldtype": "Section Break",
+   "label": "Vigilante"
+  },
+  {
+   "fieldname": "vigilante",
+   "fieldtype": "Link",
+   "label": "Vigilante",
+   "options": "Vigilante",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "regime",
+   "fieldtype": "Link",
+   "label": "Regime",
+   "options": "Regime",
+   "fetch_from": "vigilante.regime_do_vigilante",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "description": "Auto-preenchido pelo regime do vigilante. Pode ser alterado se o turno extra for noutro regime."
+  },
+  {
+   "fieldname": "col_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "turno",
+   "fieldtype": "Link",
+   "label": "Turno Extra",
+   "options": "Turno",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "periodo",
+   "fieldtype": "Data",
+   "label": "Período",
+   "fetch_from": "turno.periodo",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_justificacao",
+   "fieldtype": "Section Break",
+   "label": "Justificação"
+  },
+  {
+   "fieldname": "motivo",
+   "fieldtype": "Small Text",
+   "label": "Motivo do Turno Extra"
+  },
+  {
+   "fieldname": "aprovado_por",
+   "fieldtype": "Link",
+   "label": "Aprovado Por",
+   "options": "User",
+   "read_only": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-06-02 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Security Ops",
+ "name": "Turnos Extras",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "cancel": 1, "create": 1, "delete": 1, "read": 1, "report": 1,
+   "role": "System Manager", "submit": 1, "write": 1
+  },
+  {
+   "cancel": 1, "create": 1, "delete": 0, "read": 1, "report": 1,
+   "role": "SIGOS Manager", "submit": 1, "write": 1
+  },
+  {
+   "cancel": 0, "create": 1, "delete": 0, "read": 1, "report": 1,
+   "role": "Aprovador Operações", "submit": 1, "write": 1
+  },
+  {
+   "cancel": 0, "create": 1, "delete": 0, "read": 1, "report": 1,
+   "role": "Operações SIGOS", "submit": 0, "write": 1
+  }
+ ],
+ "sort_field": "data",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

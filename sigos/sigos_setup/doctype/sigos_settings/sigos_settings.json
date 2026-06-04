@@ -1,0 +1,262 @@
+{
+ "actions": [],
+ "creation": "2026-06-02 00:00:00.000000",
+ "doctype": "DocType",
+ "document_type": "Other",
+ "engine": "InnoDB",
+ "field_order": [
+  "sec_operacoes",
+  "dias_minimos_rotatividade",
+  "prazo_justificacao_faltas",
+  "meses_horizonte_escala",
+  "col_break_ops",
+  "hora_limite_manha",
+  "hora_limite_noite",
+  "manter_meses_passados",
+  "sec_rh",
+  "percentagem_maxima_emprestimo",
+  "meses_maximos_emprestimo",
+  "col_break_rh",
+  "valor_padrao_uniforme",
+  "meses_padrao_uniforme",
+  "sec_disciplinar",
+  "reprimendas_baixa_pd",
+  "reprimendas_media_pd",
+  "col_break_disc",
+  "reprimendas_alta_pd",
+  "sec_payroll",
+  "valor_subsidio_arma",
+  "metodo_calculo_faltas",
+  "valor_fixo_por_falta",
+  "base_dias_de_trabalho",
+  "col_break_pay",
+  "componente_faltas",
+  "componente_retroativo",
+  "componente_subsidio_arma",
+  "sec_sistema",
+  "empresa_padrao",
+  "col_break_sis",
+  "aprovador_rh",
+  "aprovador_operacoes"
+ ],
+ "fields": [
+  {
+   "fieldname": "sec_operacoes",
+   "fieldtype": "Section Break",
+   "label": "Operações"
+  },
+  {
+   "fieldname": "dias_minimos_rotatividade",
+   "fieldtype": "Int",
+   "label": "Dias Mínimos para Rotatividade",
+   "default": "90",
+   "description": "Número mínimo de dias no posto antes de uma rotatividade (regra dos 3 meses)"
+  },
+  {
+   "fieldname": "prazo_justificacao_faltas",
+   "fieldtype": "Int",
+   "label": "Prazo Justificação de Faltas (dias)",
+   "default": "3",
+   "description": "Número máximo de dias após a falta para apresentar justificativo"
+  },
+  {
+   "fieldname": "meses_horizonte_escala",
+   "fieldtype": "Int",
+   "label": "Meses de Horizonte da Escala",
+   "default": "2",
+   "description": "Quantos meses à frente a escala é gerada automaticamente (janela futura)"
+  },
+  {
+   "fieldname": "col_break_ops",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "manter_meses_passados",
+   "fieldtype": "Int",
+   "label": "Meses Passados a Manter",
+   "default": "1",
+   "description": "Quantos meses de escala passada são mantidos antes de serem removidos automaticamente"
+  },
+  {
+   "fieldname": "hora_limite_manha",
+   "fieldtype": "Time",
+   "label": "Hora Limite Submissão Manhã",
+   "default": "09:30:00",
+   "description": "Hora limite para submissão de ausências do período da manhã"
+  },
+  {
+   "fieldname": "hora_limite_noite",
+   "fieldtype": "Time",
+   "label": "Hora Limite Submissão Noite",
+   "default": "18:30:00",
+   "description": "Hora limite para submissão de ausências do período da noite"
+  },
+  {
+   "fieldname": "sec_rh",
+   "fieldtype": "Section Break",
+   "label": "Recursos Humanos"
+  },
+  {
+   "fieldname": "percentagem_maxima_emprestimo",
+   "fieldtype": "Percent",
+   "label": "Percentagem Máxima de Empréstimo",
+   "default": "30",
+   "description": "Percentagem máxima do salário base que pode ser emprestada"
+  },
+  {
+   "fieldname": "meses_maximos_emprestimo",
+   "fieldtype": "Int",
+   "label": "Meses Máximos de Empréstimo",
+   "default": "3"
+  },
+  {
+   "fieldname": "col_break_rh",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "valor_padrao_uniforme",
+   "fieldtype": "Currency",
+   "label": "Valor Padrão Uniforme",
+   "default": "3240"
+  },
+  {
+   "fieldname": "meses_padrao_uniforme",
+   "fieldtype": "Int",
+   "label": "Meses Padrão Uniforme",
+   "default": "6"
+  },
+  {
+   "fieldname": "sec_disciplinar",
+   "fieldtype": "Section Break",
+   "label": "Processo Disciplinar — Escalação Automática"
+  },
+  {
+   "fieldname": "reprimendas_baixa_pd",
+   "fieldtype": "Int",
+   "label": "Repreensões Baixa → Processo Disciplinar",
+   "default": "3",
+   "description": "Número de repreensões de gravidade Baixa que dispara um Processo Disciplinar automático"
+  },
+  {
+   "fieldname": "reprimendas_media_pd",
+   "fieldtype": "Int",
+   "label": "Repreensões Média → Processo Disciplinar",
+   "default": "2"
+  },
+  {
+   "fieldname": "col_break_disc",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "reprimendas_alta_pd",
+   "fieldtype": "Int",
+   "label": "Repreensões Alta → Processo Disciplinar",
+   "default": "1"
+  },
+  {
+   "fieldname": "sec_payroll",
+   "fieldtype": "Section Break",
+   "label": "Payroll"
+  },
+  {
+   "fieldname": "valor_subsidio_arma",
+   "fieldtype": "Currency",
+   "label": "Valor Subsídio de Arma",
+   "default": "300"
+  },
+  {
+   "fieldname": "col_break_pay",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "metodo_calculo_faltas",
+   "fieldtype": "Select",
+   "label": "Método de Cálculo de Faltas",
+   "options": "Proporcional ao Salário\nValor Fixo por Falta",
+   "default": "Proporcional ao Salário",
+   "description": "Proporcional: (Salário Base ÷ Dias de Trabalho) × Faltas Não Justificadas. Valor Fixo: Faltas Não Justificadas × Valor por Falta."
+  },
+  {
+   "fieldname": "valor_fixo_por_falta",
+   "fieldtype": "Currency",
+   "label": "Valor Fixo por Falta",
+   "depends_on": "eval: doc.metodo_calculo_faltas == 'Valor Fixo por Falta'",
+   "description": "Valor deduzido por cada falta não justificada (apenas para o método Valor Fixo)"
+  },
+  {
+   "fieldname": "base_dias_de_trabalho",
+   "fieldtype": "Select",
+   "label": "Base de Dias de Trabalho",
+   "options": "Dias do Mês\nDias Úteis (HRMS)",
+   "default": "Dias do Mês",
+   "description": "Dias do Mês: total de dias do período (ex: 30). Dias Úteis: usa o total_working_days do HRMS."
+  },
+  {
+   "fieldname": "componente_faltas",
+   "fieldtype": "Link",
+   "label": "Salary Component — Faltas",
+   "options": "Salary Component",
+   "description": "Componente salarial usado para deduzir faltas"
+  },
+  {
+   "fieldname": "componente_retroativo",
+   "fieldtype": "Link",
+   "label": "Salary Component — Retroativo",
+   "options": "Salary Component"
+  },
+  {
+   "fieldname": "componente_subsidio_arma",
+   "fieldtype": "Link",
+   "label": "Salary Component — Subsídio de Arma",
+   "options": "Salary Component"
+  },
+  {
+   "fieldname": "sec_sistema",
+   "fieldtype": "Section Break",
+   "label": "Sistema"
+  },
+  {
+   "fieldname": "empresa_padrao",
+   "fieldtype": "Link",
+   "label": "Empresa Padrão",
+   "options": "Company"
+  },
+  {
+   "fieldname": "col_break_sis",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "aprovador_rh",
+   "fieldtype": "Link",
+   "label": "Role — Aprovador RH",
+   "options": "Role",
+   "default": "Aprovador RH"
+  },
+  {
+   "fieldname": "aprovador_operacoes",
+   "fieldtype": "Link",
+   "label": "Role — Aprovador Operações",
+   "options": "Role",
+   "default": "Aprovador Operações"
+  }
+ ],
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-06-02 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "SIGOS Setup",
+ "name": "SIGOS Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1, "delete": 0, "read": 1, "role": "System Manager", "write": 1
+  },
+  {
+   "create": 1, "delete": 0, "read": 1, "role": "SIGOS Manager", "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

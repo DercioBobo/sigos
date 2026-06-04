@@ -1,0 +1,137 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "naming_series:",
+ "creation": "2026-06-02 00:00:00.000000",
+ "doctype": "DocType",
+ "document_type": "Document",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series", "data_de_demissao", "col_break_1",
+  "vigilante", "mecanografico", "delegacao", "col_break_2", "regime", "motivo",
+  "sec_entrega", "uniforme", "col_break_3", "observacoes"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Série",
+   "options": "DEM-.####",
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "data_de_demissao",
+   "fieldtype": "Date",
+   "label": "Data de Demissão",
+   "reqd": 1,
+   "in_list_view": 1,
+   "default": "Today"
+  },
+  {
+   "fieldname": "col_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "vigilante",
+   "fieldtype": "Link",
+   "label": "Vigilante",
+   "options": "Vigilante",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "mecanografico",
+   "fieldtype": "Data",
+   "label": "Mecanográfico",
+   "fetch_from": "vigilante.mecanografico",
+   "read_only": 1
+  },
+  {
+   "fieldname": "delegacao",
+   "fieldtype": "Link",
+   "label": "Delegação",
+   "options": "Delegacao",
+   "fetch_from": "vigilante.delegacao",
+   "read_only": 1
+  },
+  {
+   "fieldname": "col_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "regime",
+   "fieldtype": "Data",
+   "label": "Regime",
+   "fetch_from": "vigilante.regime_do_vigilante",
+   "read_only": 1
+  },
+  {
+   "fieldname": "motivo",
+   "fieldtype": "Select",
+   "label": "Motivo",
+   "options": "\nAbandono\nRescisão\nDisciplinar\nFim de Contrato\nOutro",
+   "reqd": 1
+  },
+  {
+   "fieldname": "sec_entrega",
+   "fieldtype": "Section Break",
+   "label": "Entrega de Material"
+  },
+  {
+   "fieldname": "uniforme",
+   "fieldtype": "Select",
+   "label": "Uniforme",
+   "options": "\nEntregue\nNão Entregue"
+  },
+  {
+   "fieldname": "col_break_3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "observacoes",
+   "fieldtype": "Small Text",
+   "label": "Observações"
+  }
+ ],
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-06-02 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Security Ops",
+ "name": "Demissao",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1, "delete": 1, "email": 1, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "System Manager",
+   "share": 1, "write": 1, "submit": 1, "cancel": 1
+  },
+  {
+   "create": 1, "delete": 0, "email": 1, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "SIGOS Manager",
+   "share": 1, "write": 1, "submit": 1, "cancel": 1
+  },
+  {
+   "create": 1, "delete": 0, "email": 0, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "Aprovador RH",
+   "share": 0, "write": 1, "submit": 1, "cancel": 1
+  },
+  {
+   "create": 0, "delete": 0, "email": 0, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "Aprovador Operações",
+   "share": 0, "write": 0, "submit": 0, "cancel": 0
+  },
+  {
+   "create": 0, "delete": 0, "email": 0, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "Operações SIGOS",
+   "share": 0, "write": 0, "submit": 0, "cancel": 0
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "title_field": "vigilante",
+ "track_changes": 1
+}

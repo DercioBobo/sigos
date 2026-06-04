@@ -1,0 +1,151 @@
+/* SIGOS – global styles */
+
+:root {
+	--sigos-primary: #1a3a5c;
+	--sigos-accent:  #e8a020;
+	--sigos-danger:  #e05c5c;
+	--sigos-success: #3ab07e;
+}
+
+/* Status badge colours */
+.indicator.ativo        { --indicator-color: var(--sigos-success); }
+.indicator.demitido     { --indicator-color: var(--sigos-danger); }
+.indicator.inactivo     { --indicator-color: #aaa; }
+.indicator.pre-adimissao { --indicator-color: var(--sigos-accent); }
+
+/* ── Posto occupation badge ─────────────────────────────────────────────── */
+.sigos-posto-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 14px;
+	border-radius: 6px;
+	font-size: .9em;
+	font-weight: 500;
+	margin: 4px 0 8px;
+}
+
+.badge-desfalcado {
+	background: #fff3cd;
+	border: 1px solid #ffc107;
+	color: #856404;
+}
+
+.badge-completo {
+	background: #d1e7dd;
+	border: 1px solid #198754;
+	color: #0f5132;
+}
+
+.badge-excedido {
+	background: #f8d7da;
+	border: 1px solid #dc3545;
+	color: #842029;
+}
+
+.badge-sem-limite {
+	background: #e2e3e5;
+	border: 1px solid #adb5bd;
+	color: #41464b;
+}
+
+.badge-count { font-size: 1.1em; font-weight: 700; }
+.badge-faltam {
+	background: rgba(0,0,0,.08);
+	border-radius: 4px;
+	padding: 1px 6px;
+	font-size: .85em;
+}
+
+/* ── Escala horizontal grid ─────────────────────────────────────────────── */
+.esc-grid-wrap {
+	overflow-x: auto;
+	border: 1px solid var(--border-color, #d1d8dd);
+	border-radius: 6px;
+	max-height: 70vh;
+}
+.esc-grid {
+	border-collapse: collapse;
+	font-size: 11px;
+	white-space: nowrap;
+}
+.esc-grid th, .esc-grid td {
+	border: 1px solid var(--border-color, #e8ebed);
+	text-align: center;
+	padding: 0;
+}
+.esc-name-col {
+	position: sticky;
+	left: 0;
+	z-index: 2;
+	background: var(--fg-color, #fff);
+	min-width: 150px;
+	max-width: 150px;
+	text-align: left !important;
+	padding: 4px 8px !important;
+	font-weight: 500;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	box-shadow: 1px 0 0 var(--border-color, #d1d8dd);
+}
+thead .esc-name-col { z-index: 3; }
+.esc-mes {
+	background: #f4f5f6;
+	font-weight: 600;
+	padding: 3px 6px !important;
+	text-align: center !important;
+}
+.esc-day {
+	min-width: 28px;
+	padding: 2px 0 !important;
+	background: #fafbfc;
+}
+.esc-dow { font-size: 9px; color: #999; line-height: 1; }
+.esc-dnum { font-size: 11px; font-weight: 600; line-height: 1.2; }
+.esc-weekend { background: #f0f1f3; }
+.esc-today { background: #fff3cd !important; box-shadow: inset 0 -2px 0 #e8a020; }
+
+.esc-cell {
+	min-width: 28px;
+	height: 26px;
+	cursor: pointer;
+	font-weight: 600;
+	color: #fff;
+	user-select: none;
+}
+.esc-cell[data-vig]:hover { outline: 2px solid #1a3a5c; outline-offset: -2px; }
+.esc-empty { background: #fff; cursor: default; }
+.esc-pastcell { opacity: .55; }
+
+.cell-manha { background: #4a90d9; }
+.cell-noite { background: #2c3e57; }
+.cell-tarde { background: #e8a020; }
+.cell-folga { background: #adb5bd; color: #fff; }
+
+.esc-override { box-shadow: inset 0 0 0 2px #e05c5c; }
+
+/* coverage row */
+.esc-cov-row td { border-bottom: 2px solid #ccc; }
+.esc-cov-row .esc-name-col { font-weight: 600; font-size: 10px; color: #555; }
+.esc-cov {
+	height: 18px;
+	font-size: 11px;
+	font-weight: 700;
+	line-height: 18px;
+}
+.cov-ok     { background: #e7f5ec; color: #198754; }
+.cov-gap    { background: #fff3cd; color: #b8860b; }
+.cov-double { background: #fde2e4; color: #d6336c; }
+
+.esc-legend { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+.esc-lg {
+	font-size: 10px; padding: 2px 8px; border-radius: 10px; color: #fff;
+}
+.esc-override-lg { background: #fff; color: #e05c5c; box-shadow: inset 0 0 0 2px #e05c5c; }
+
+/* Danger buttons (limpar, remover) */
+.btn-sigos-danger {
+	background-color: var(--sigos-danger) !important;
+	color: #fff !important;
+	border: none;
+}

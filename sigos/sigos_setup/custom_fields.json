@@ -1,0 +1,365 @@
+[
+ {
+  "doctype": "Custom Field",
+  "dt": "Employee",
+  "module": "SIGOS",
+  "fieldname": "custom_vigilante",
+  "fieldtype": "Link",
+  "options": "Vigilante",
+  "label": "Vigilante (SIGOS)",
+  "read_only": 1,
+  "insert_after": "employee_name"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Employee",
+  "module": "SIGOS",
+  "fieldname": "custom_mecanografico",
+  "fieldtype": "Data",
+  "label": "Mecanográfico",
+  "insert_after": "custom_vigilante"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Employee",
+  "module": "SIGOS",
+  "fieldname": "custom_categoria",
+  "fieldtype": "Link",
+  "label": "Categoria (SIGOS)",
+  "options": "Categoria Vigilante",
+  "insert_after": "custom_mecanografico",
+  "read_only": 1
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Employee",
+  "module": "SIGOS",
+  "fieldname": "custom_regime",
+  "fieldtype": "Link",
+  "label": "Regime (SIGOS)",
+  "options": "Regime",
+  "insert_after": "custom_categoria",
+  "read_only": 1
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Employee",
+  "module": "SIGOS",
+  "fieldname": "custom_delegacao",
+  "fieldtype": "Link",
+  "options": "Delegacao",
+  "label": "Delegação (SIGOS)",
+  "insert_after": "custom_regime",
+  "read_only": 1
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Employee",
+  "module": "SIGOS",
+  "fieldname": "custom_posto",
+  "fieldtype": "Link",
+  "options": "Posto de Vigilancia",
+  "label": "Posto (SIGOS)",
+  "insert_after": "custom_delegacao",
+  "read_only": 1
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Employee",
+  "module": "SIGOS",
+  "fieldname": "custom_tipo_de_vigilante",
+  "fieldtype": "Select",
+  "label": "Tipo de Vigilante",
+  "options": "\nVigilante\nSupervisor\nChefe de Grupo\nChefe de Posto",
+  "insert_after": "custom_posto",
+  "read_only": 1
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Employee",
+  "module": "SIGOS",
+  "fieldname": "custom_contanib",
+  "fieldtype": "Data",
+  "label": "Conta NIB",
+  "insert_after": "custom_tipo_de_vigilante"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Salary Slip",
+  "module": "SIGOS",
+  "fieldname": "custom_vigilante",
+  "fieldtype": "Link",
+  "options": "Vigilante",
+  "label": "Vigilante",
+  "fetch_from": "employee.custom_vigilante",
+  "read_only": 1,
+  "insert_after": "employee"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Salary Slip",
+  "module": "SIGOS",
+  "fieldname": "custom_projecto",
+  "fieldtype": "Link",
+  "options": "Project",
+  "label": "Projecto",
+  "read_only": 1,
+  "insert_after": "custom_vigilante"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Salary Slip",
+  "module": "SIGOS",
+  "fieldname": "custom_categoria",
+  "fieldtype": "Data",
+  "label": "Categoria",
+  "fetch_from": "employee.custom_categoria",
+  "read_only": 1,
+  "insert_after": "custom_projecto"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Salary Slip",
+  "module": "SIGOS",
+  "fieldname": "custom_dias_de_trabalho",
+  "fieldtype": "Int",
+  "label": "Dias de Trabalho",
+  "insert_after": "total_working_days"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Salary Slip",
+  "module": "SIGOS",
+  "fieldname": "custom_faltas_no_mes",
+  "fieldtype": "Int",
+  "label": "Faltas no Mês",
+  "read_only": 1,
+  "insert_after": "custom_dias_de_trabalho"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Salary Slip",
+  "module": "SIGOS",
+  "fieldname": "custom_faltas_justificadas",
+  "fieldtype": "Int",
+  "label": "Faltas Justificadas",
+  "read_only": 1,
+  "insert_after": "custom_faltas_no_mes"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Salary Slip",
+  "module": "SIGOS",
+  "fieldname": "custom_faltas_nao_justificadas",
+  "fieldtype": "Int",
+  "label": "Faltas Não Justificadas",
+  "read_only": 1,
+  "insert_after": "custom_faltas_justificadas"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Salary Slip",
+  "module": "SIGOS",
+  "fieldname": "custom_dias_trabalhados",
+  "fieldtype": "Int",
+  "label": "Dias Trabalhados",
+  "read_only": 1,
+  "insert_after": "custom_faltas_nao_justificadas"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Salary Slip",
+  "module": "SIGOS",
+  "fieldname": "custom_dia_da_falta_inicio",
+  "fieldtype": "Date",
+  "label": "Início Período Faltas",
+  "read_only": 1,
+  "insert_after": "custom_dias_trabalhados"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Salary Slip",
+  "module": "SIGOS",
+  "fieldname": "custom_dia_da_falta_fim",
+  "fieldtype": "Date",
+  "label": "Fim Período Faltas",
+  "read_only": 1,
+  "insert_after": "custom_dia_da_falta_inicio"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Salary Slip",
+  "module": "SIGOS",
+  "fieldname": "custom_taxable_earnings",
+  "fieldtype": "Currency",
+  "label": "Rendimentos Tributáveis",
+  "read_only": 1,
+  "insert_after": "gross_pay"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Salary Slip",
+  "module": "SIGOS",
+  "fieldname": "custom_valor_a_reclamar",
+  "fieldtype": "Currency",
+  "label": "Valor Retroativo",
+  "read_only": 1,
+  "insert_after": "custom_taxable_earnings"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Salary Slip",
+  "module": "SIGOS",
+  "fieldname": "custom_valor_emprestimo_total",
+  "fieldtype": "Currency",
+  "label": "Empréstimo Total",
+  "read_only": 1,
+  "insert_after": "custom_valor_a_reclamar"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Salary Slip",
+  "module": "SIGOS",
+  "fieldname": "custom_valor_emprestimo_pago",
+  "fieldtype": "Currency",
+  "label": "Empréstimo Pago",
+  "read_only": 1,
+  "insert_after": "custom_valor_emprestimo_total"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Salary Slip",
+  "module": "SIGOS",
+  "fieldname": "custom_valor_emprestimo_em_falta",
+  "fieldtype": "Currency",
+  "label": "Empréstimo em Falta",
+  "read_only": 1,
+  "insert_after": "custom_valor_emprestimo_pago"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Salary Structure Assignment",
+  "module": "SIGOS",
+  "fieldname": "custom_cliente",
+  "fieldtype": "Link",
+  "options": "Customer",
+  "label": "Cliente",
+  "insert_after": "employee"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Salary Structure Assignment",
+  "module": "SIGOS",
+  "fieldname": "custom_project",
+  "fieldtype": "Link",
+  "options": "Project",
+  "label": "Projecto",
+  "insert_after": "custom_cliente"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Salary Structure Assignment",
+  "module": "SIGOS",
+  "fieldname": "custom_salario",
+  "fieldtype": "Select",
+  "label": "Base Salarial",
+  "options": "\nBase\nOutro",
+  "insert_after": "custom_project"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Payroll Entry",
+  "module": "SIGOS",
+  "fieldname": "custom_customer",
+  "fieldtype": "Link",
+  "options": "Customer",
+  "label": "Filtrar por Cliente",
+  "insert_after": "company"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Sales Invoice",
+  "module": "SIGOS",
+  "fieldname": "custom_regime_h24",
+  "fieldtype": "Currency",
+  "label": "Valor/Vigilante H24",
+  "insert_after": "project"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Sales Invoice",
+  "module": "SIGOS",
+  "fieldname": "custom_regime_tdn",
+  "fieldtype": "Currency",
+  "label": "Valor/Vigilante TDN",
+  "insert_after": "custom_regime_h24"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Sales Invoice",
+  "module": "SIGOS",
+  "fieldname": "custom_regime_tdu",
+  "fieldtype": "Currency",
+  "label": "Valor/Vigilante TDU",
+  "insert_after": "custom_regime_tdn"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Sales Invoice",
+  "module": "SIGOS",
+  "fieldname": "custom_total_vigilantes",
+  "fieldtype": "Int",
+  "label": "Total Vigilantes",
+  "read_only": 1,
+  "insert_after": "custom_regime_tdu"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Sales Invoice",
+  "module": "SIGOS",
+  "fieldname": "custom_total_h24",
+  "fieldtype": "Int",
+  "label": "Total H24",
+  "read_only": 1,
+  "insert_after": "custom_total_vigilantes"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Sales Invoice",
+  "module": "SIGOS",
+  "fieldname": "custom_total_tdn",
+  "fieldtype": "Int",
+  "label": "Total TDN",
+  "read_only": 1,
+  "insert_after": "custom_total_h24"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Sales Invoice",
+  "module": "SIGOS",
+  "fieldname": "custom_total_tdu",
+  "fieldtype": "Int",
+  "label": "Total TDU",
+  "read_only": 1,
+  "insert_after": "custom_total_tdn"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Project",
+  "module": "SIGOS",
+  "fieldname": "custom_valor_do_contrato",
+  "fieldtype": "Currency",
+  "label": "Valor do Contrato (por Vigilante)",
+  "insert_after": "project_type"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Project",
+  "module": "SIGOS",
+  "fieldname": "custom_subsidios",
+  "fieldtype": "Table",
+  "options": "Project Subsidio Item",
+  "label": "Subsídios do Projecto",
+  "insert_after": "custom_valor_do_contrato"
+ }
+]
