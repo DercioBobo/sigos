@@ -3,6 +3,18 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import getdate, today
 
+# Statuses that require an active Employee record
+_REQUER_EMPLOYEE = frozenset({"Pre-Adimissão", "Ativo", "Inactivo", "Demitido"})
+
+# Canonical Vigilante → Employee status map (single source of truth, shared with sync.py)
+VIGILANTE_TO_EMP_STATUS = {
+	"Pre-Adimissão RH": "Active",
+	"Pre-Adimissão":    "Active",
+	"Ativo":            "Active",
+	"Inactivo":         "Suspended",
+	"Demitido":         "Left",
+}
+
 
 class Vigilante(Document):
 
@@ -15,12 +27,52 @@ class Vigilante(Document):
 	def validate(self):
 		self._validar_status_com_posto()
 		self._validar_capacidade_posto()
+		self._validar_link_employee()
 
 	def on_update(self):
 		self._criar_employee_se_necessario()
 		self._atualizar_ocupacao_postos()
 
 	# ─── Validation ────────────────────────────────────────────────────────────
+
+	def _validar_link_employee(self):
+		"""Enforce Employee link and status consistency for every operational status."""
+		if self.status not in _REQUER_EMPLOYEE:
+			return
+
+		if not self.funcionario:
+			frappe.throw(
+				_("Vigilante em estado <b>{0}</b> exige um Funcionário (Employee) associado. "
+				  "Use o botão <b>Admitir (RH)</b> para criar o registo.").format(self.status),
+				title=_("Funcionário Obrigatório"),
+			)
+
+		if not frappe.db.exists("Employee", self.funcionario):
+			frappe.throw(
+				_("O Funcionário <b>{0}</b> não existe. Verifique o campo Funcionário.").format(
+					self.funcionario
+				),
+				title=_("Funcionário Inválido"),
+			)
+
+		# Status consistency — auto-correct the Employee side; only warn user when
+		# the divergence is severe (Active employee being marked as Demitido vigilante
+		# or vice-versa) so they know something is being fixed.
+		expected = VIGILANTE_TO_EMP_STATUS.get(self.status)
+		if expected:
+			current = frappe.db.get_value("Employee", self.funcionario, "status")
+			if current != expected:
+				frappe.db.set_value(
+					"Employee", self.funcionario, "status", expected, update_modified=False
+				)
+				frappe.msgprint(
+					_("Estado do Funcionário <b>{0}</b> actualizado de <b>{1}</b> para <b>{2}</b> "
+					  "para reflectir o estado do Vigilante.").format(
+						self.funcionario, current, expected
+					),
+					indicator="blue",
+					alert=True,
+				)
 
 	def _validar_status_com_posto(self):
 		if self.status == "Ativo" and not self.posto_de_vigilancia:

@@ -1,11 +1,11 @@
 import frappe
+from sigos.security_ops.doctype.vigilante.vigilante import VIGILANTE_TO_EMP_STATUS
 
-VIGILANTE_TO_EMPLOYEE_STATUS = {
-	"Pre-Adimissão RH": "Active",
-	"Pre-Adimissão": "Active",
-	"Ativo": "Active",
-	"Inactivo": "Suspended",
-	"Demitido": "Left",
+# Unambiguous reverse map: only Suspended→Inactivo and Left→Demitido are safe
+# to push back; "Active" maps to multiple Vigilante states so we skip it.
+_EMP_TO_VIGILANTE_STATUS = {
+	"Suspended": "Inactivo",
+	"Left":      "Demitido",
 }
 
 GENDER_TO_SEXO = {"Male": "Masculino", "Female": "Feminino"}
@@ -13,7 +13,6 @@ SEXO_TO_GENDER = {"Masculino": "Male", "Feminino": "Female"}
 
 
 def vigilante_to_employee(doc, method=None):
-	# Use doc.flags (Frappe's built-in flag system) — survives across instances
 	if doc.flags.get("ignore_sync"):
 		return
 	if not doc.funcionario:
@@ -24,7 +23,7 @@ def vigilante_to_employee(doc, method=None):
 		emp.flags.ignore_sync = True
 		changed = False
 
-		new_status = VIGILANTE_TO_EMPLOYEE_STATUS.get(doc.status)
+		new_status = VIGILANTE_TO_EMP_STATUS.get(doc.status)
 		if new_status and emp.status != new_status:
 			emp.status = new_status
 			changed = True
@@ -69,9 +68,9 @@ def employee_to_vigilante(doc, method=None):
 		changed = False
 
 		personal_map = {
-			"employee_name":  "nome_completo",
-			"date_of_birth":  "data_de_nascimento",
-			"cell_number":    "contacto",
+			"employee_name":   "nome_completo",
+			"date_of_birth":   "data_de_nascimento",
+			"cell_number":     "contacto",
 			"date_of_joining": "data_admissao",
 		}
 		for emp_f, vig_f in personal_map.items():
@@ -85,6 +84,12 @@ def employee_to_vigilante(doc, method=None):
 			if sexo and vig.sexo != sexo:
 				vig.sexo = sexo
 				changed = True
+
+		# Reverse status sync: Employee Suspended/Left → Vigilante Inactivo/Demitido
+		new_vig_status = _EMP_TO_VIGILANTE_STATUS.get(doc.status)
+		if new_vig_status and vig.status != new_vig_status:
+			vig.status = new_vig_status
+			changed = True
 
 		if changed:
 			vig.save(ignore_permissions=True)
