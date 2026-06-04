@@ -6,11 +6,22 @@ import frappe
 def after_install():
 	_load_custom_fields()
 	_load_default_data()
-	# Tab Vigilante Do Posto links to Turno (SIGOS Setup). If Frappe syncs
-	# modules in filesystem alphabetical order, security_ops is processed before
-	# sigos_setup, so Turno may not exist yet when this child table is first synced.
-	# Reloading after seed data ensures the link validates and app is set correctly.
-	frappe.reload_doc("security_ops", "doctype", "tab_vigilante_do_posto", force=True)
+	_fix_tab_vigilante_do_posto()
+
+
+def after_migrate():
+	# "Tab Vigilante Do Posto" is a child table that links to Turno (SIGOS Setup).
+	# Frappe syncs modules alphabetically (security_ops before sigos_setup), so
+	# Turno may not exist when this doctype is first synced — leaving app=NULL.
+	# Orphan detection then deletes it every migrate. We restore it immediately after.
+	_fix_tab_vigilante_do_posto()
+
+
+def _fix_tab_vigilante_do_posto():
+	try:
+		frappe.reload_doc("security_ops", "doctype", "tab_vigilante_do_posto", force=True)
+	except Exception as e:
+		frappe.log_error(f"SIGOS: reload Tab Vigilante Do Posto failed: {e}", "SIGOS Install")
 
 
 def _load_custom_fields():
