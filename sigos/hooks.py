@@ -9,7 +9,6 @@ app_version = "0.0.1"
 required_apps = ["frappe", "erpnext", "hrms"]
 
 after_install = "sigos.install.after_install"
-after_migrate = "sigos.install.after_migrate"
 
 # ─── Assets ───────────────────────────────────────────────────────────────────
 app_include_css = ["/assets/sigos/css/sigos.css"]
