@@ -14,6 +14,7 @@ class TrocaDeRegime(Document):
 		try:
 			vigilante_doc = frappe.get_doc("Vigilante", self.vigilante)
 			vigilante_doc.regime_do_vigilante = self.novo_regime
+			vigilante_doc.flags.via_troca_regime = True  # bypass the direct-change guard
 			vigilante_doc.save(ignore_permissions=True)
 			frappe.msgprint(
 				_("Regime do vigilante <b>{0}</b> atualizado para <b>{1}</b>.").format(

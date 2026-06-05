@@ -28,6 +28,36 @@ def vigilante_to_employee(doc, method=None):
 			emp.status = new_status
 			changed = True
 
+		# ── Personal data (Vigilante → Employee) ──────────────────────────────
+		# Name: HRMS builds employee_name from first_name + last_name, so set the parts.
+		if doc.nome_completo:
+			parts = doc.nome_completo.strip().split()
+			first = parts[0] if parts else doc.nome_completo
+			last  = " ".join(parts[1:]) if len(parts) > 1 else ""
+			if emp.first_name != first or (emp.last_name or "") != last:
+				emp.first_name = first
+				emp.last_name = last
+				emp.employee_name = doc.nome_completo
+				changed = True
+
+		personal_map = {
+			"data_de_nascimento": "date_of_birth",
+			"contacto":           "cell_number",
+			"data_admissao":      "date_of_joining",
+		}
+		for vig_f, emp_f in personal_map.items():
+			val = getattr(doc, vig_f, None)
+			if val and getattr(emp, emp_f, None) != val:
+				setattr(emp, emp_f, val)
+				changed = True
+
+		if doc.sexo:
+			gender = SEXO_TO_GENDER.get(doc.sexo)
+			if gender and emp.gender != gender:
+				emp.gender = gender
+				changed = True
+
+		# ── Operational data (Vigilante → Employee custom fields) ─────────────
 		ops_map = {
 			"categoria":           "custom_categoria",
 			"regime_do_vigilante": "custom_regime",

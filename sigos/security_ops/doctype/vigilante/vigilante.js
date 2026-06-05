@@ -45,6 +45,14 @@ frappe.ui.form.on("Vigilante", {
 
 		// funcionario always read-only (system-managed)
 		frm.set_df_property("funcionario", "read_only", 1);
+
+		// Regime drives the Escala — once the guard exists, changes must go through
+		// "Troca De Regime" (which migrates the escala). Editable only on a new doc.
+		if (!frm.is_new()) {
+			frm.set_df_property("regime_do_vigilante", "read_only", 1);
+			frm.set_df_property("regime_do_vigilante", "description",
+				__("Para alterar o regime use o documento <b>Troca De Regime</b> — mantém a escala consistente."));
+		}
 	},
 
 	_botoes_aprovacao(frm) {

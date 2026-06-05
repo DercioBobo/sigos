@@ -30,6 +30,7 @@ class Vigilante(Document):
 		self._validar_status_com_posto()
 		self._validar_capacidade_posto()
 		self._validar_link_employee()
+		self._guardar_mudanca_regime()
 
 	def on_update(self):
 		self._atualizar_ocupacao_postos()
@@ -50,6 +51,32 @@ class Vigilante(Document):
 			self.status = "Ativo"
 
 	# ─── Validation ────────────────────────────────────────────────────────────
+
+	def _guardar_mudanca_regime(self):
+		"""
+		Block direct regime changes once the guard is scheduled. Regime drives the
+		Escala (one per posto+regime); changing it here would orphan the guard in an
+		escala built for the old regime. Changes must go through 'Troca De Regime',
+		which migrates the escala properly. Initial set (onboarding) is allowed.
+		"""
+		before = self.get_doc_before_save()
+		if not before:
+			return  # new doc — initial regime is fine
+		if before.regime_do_vigilante == self.regime_do_vigilante:
+			return  # unchanged
+		if self.flags.get("via_troca_regime"):
+			return  # the Troca De Regime flow set this — allow
+
+		from sigos.security_ops.doctype.escala_do_vigilante.escala_do_vigilante import (
+			get_escalas_com_vigilante,
+		)
+		if get_escalas_com_vigilante(self.name):
+			frappe.throw(
+				_("Não altere o <b>Regime</b> directamente aqui — o vigilante está numa "
+				  "escala activa. Use o documento <b>Troca De Regime</b>, que migra a escala "
+				  "corretamente e mantém tudo consistente."),
+				title=_("Use Troca De Regime"),
+			)
 
 	def _validar_link_employee(self):
 		"""Enforce Employee link and status consistency for every operational status."""
