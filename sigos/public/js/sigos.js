@@ -73,10 +73,10 @@ sigos.render_escala_bloco = function (esc, destacar) {
 	const DIAS_PT  = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 	const hoje_str = frappe.datetime.get_today();
 	const PERIODO_COLOR = {
-		"Manhã": { bg: "#4a90d9", label: "MNH" },
-		"Noite": { bg: "#2c3e57", label: "NOT" },
-		"Tarde": { bg: "#e8a020", label: "TAR" },
-		"":      { bg: "#adb5bd", label: "FLG" },
+		"Manhã": { bg: "#4a90d9" },
+		"Noite": { bg: "#2c3e57" },
+		"Tarde": { bg: "#e8a020" },
+		"":      { bg: "#adb5bd" },
 	};
 
 	const gerado_info = esc.gerado_ate
@@ -102,7 +102,7 @@ sigos.render_escala_bloco = function (esc, destacar) {
 		const day_headers = esc.days.map((d) => {
 			const dt = new Date(d + "T00:00:00");
 			const isHj = d === hoje_str;
-			return `<th style="min-width:52px;padding:5px 2px;text-align:center;background:${isHj ? "#fff3cd" : "#f4f5f6"};border:1px solid #e8ebed;${isHj ? "box-shadow:inset 0 -2px 0 #e8a020" : ""}">
+			return `<th style="min-width:72px;padding:5px 2px;text-align:center;background:${isHj ? "#fff3cd" : "#f4f5f6"};border:1px solid #e8ebed;${isHj ? "box-shadow:inset 0 -2px 0 #e8a020" : ""}">
 				<div style="font-size:9px;color:#999;line-height:1;font-weight:500">${DIAS_PT[dt.getDay()]}</div>
 				<div style="font-weight:700;font-size:.95em;line-height:1.5;color:${isHj ? "#856404" : "#333"}">${dt.getDate()}</div>
 			</th>`;
@@ -123,7 +123,7 @@ sigos.render_escala_bloco = function (esc, destacar) {
 				const pc = PERIODO_COLOR[dia.periodo] || PERIODO_COLOR[""];
 				const ring = dia.override ? "box-shadow:inset 0 0 0 2px #e05c5c;" : "";
 				return `<td style="border:1px solid #e8ebed;height:30px;padding:2px;${hl ? "background:#f4f8fd;" : ""}${ring}">
-					<div style="background:${pc.bg};color:#fff;border-radius:3px;height:100%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:10px;letter-spacing:.3px" title="${dia.turno}">${pc.label}</div>
+					<div style="background:${pc.bg};color:#fff;border-radius:3px;height:100%;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:10px;padding:0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${frappe.utils.escape_html(dia.turno)}">${frappe.utils.escape_html(dia.turno)}</div>
 				</td>`;
 			}).join("");
 			html += `<tr>
