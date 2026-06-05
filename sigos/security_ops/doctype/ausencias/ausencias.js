@@ -233,26 +233,31 @@ function _render_roster(dialog, filtro, selected) {
 			</div>`;
 	}).join("");
 
+	const pill = (cls, n, label) => `<span class="aus-pill ${cls}"><span class="aus-n">${n}</span> ${label}</span>`;
+
 	const html = `
 		<div class="aus-roster-head">
 			<div class="aus-counts">
-				<span class="aus-pill aus-pill-total">${roster.length} ${__("na escala")}</span>
-				<span class="aus-pill aus-pill-disp">${disp} ${__("disponíveis")}</span>
-				<span class="aus-pill aus-pill-done">${ja.size} ${__("registado(s)")}</span>
-				<span class="aus-pill aus-pill-sel" data-sel-count>${selected.size} ${__("seleccionado(s)")}</span>
+				${pill("aus-pill-total", roster.length, __("na escala"))}
+				${pill("aus-pill-disp", disp, __("disponíveis"))}
+				${pill("aus-pill-done", ja.size, __("registado(s)"))}
 			</div>
 			<div class="aus-bulk">
 				<button class="aus-mini-btn" data-action="all">${__("Seleccionar todos")}</button>
 				<button class="aus-mini-btn" data-action="none">${__("Limpar")}</button>
 			</div>
 		</div>
-		<div class="aus-roster">${cards || `<div class="aus-empty">${__("Nenhum vigilante corresponde à pesquisa.")}</div>`}</div>`;
+		<div class="aus-roster">${cards || `<div class="aus-empty">${__("Nenhum vigilante corresponde à pesquisa.")}</div>`}</div>
+		<div class="aus-selbar" data-sel-bar>
+			<span class="aus-sel-hero"><span class="aus-n" data-sel-count>${selected.size}</span> ${__("seleccionado(s)")}</span>
+		</div>`;
 
 	const $w = dialog.fields_dict.roster.$wrapper;
 	$w.html(html);
 
 	const refreshCount = () => {
-		$w.find("[data-sel-count]").text(`${selected.size} ${__("seleccionado(s)")}`);
+		$w.find("[data-sel-count]").text(selected.size);
+		$w.find("[data-sel-bar]").toggleClass("aus-selbar-active", selected.size > 0);
 		const $btn = dialog.$wrapper.find(".btn-primary");
 		$btn.text(selected.size ? __("Adicionar Seleccionados ({0})", [selected.size]) : __("Adicionar Seleccionados"));
 	};

@@ -163,14 +163,20 @@ body[data-route*="SIGOS-Settings"] .section-head {
 	flex-wrap: wrap;
 	margin-bottom: 10px;
 }
-.aus-counts { display: flex; gap: 6px; flex-wrap: wrap; }
+.aus-counts { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .aus-pill {
-	font-size: .75em; font-weight: 600; padding: 3px 10px; border-radius: 12px;
+	display: inline-flex; align-items: baseline; gap: 5px;
+	font-size: .72em; font-weight: 600; padding: 4px 11px; border-radius: 12px;
+	text-transform: uppercase; letter-spacing: .03em;
 }
-.aus-pill-total { background: #eef1f4; color: #555; }
+.aus-pill .aus-n {
+	font-family: var(--sigos-display);
+	font-size: 1.5em; font-weight: 700; line-height: 1;
+	font-variant-numeric: tabular-nums;
+}
+.aus-pill-total { background: #eef1f4; color: #5a636c; }
 .aus-pill-disp  { background: #fff3cd; color: #856404; }
 .aus-pill-done  { background: #f8d7da; color: #842029; }
-.aus-pill-sel   { background: #d1e7f5; color: #0c5460; }
 .aus-bulk { display: flex; gap: 6px; }
 .aus-mini-btn {
 	border: 1px solid #d0d7de; background: #fff; color: #444;
@@ -178,6 +184,33 @@ body[data-route*="SIGOS-Settings"] .section-head {
 	transition: all .12s;
 }
 .aus-mini-btn:hover { background: #f0f3f6; border-color: #adb5bd; }
+
+/* Selection hero bar — the operational payload (how many you're about to add) */
+.aus-selbar {
+	margin-top: 12px; padding: 10px 16px;
+	border-radius: 10px;
+	background: #f4f6f8;
+	border: 1px dashed #cdd5dd;
+	text-align: center;
+	transition: all .18s;
+}
+.aus-selbar-active {
+	background: linear-gradient(180deg, #234a73 0%, #1a3a5c 100%);
+	border: 1px solid #1a3a5c;
+	box-shadow: 0 3px 10px rgba(26,58,92,.22);
+}
+.aus-sel-hero {
+	display: inline-flex; align-items: baseline; gap: 7px;
+	font-size: .8em; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;
+	color: #8a949e; transition: color .18s;
+}
+.aus-selbar-active .aus-sel-hero { color: rgba(255,255,255,.85); }
+.aus-sel-hero .aus-n {
+	font-family: var(--sigos-display);
+	font-size: 2.1em; font-weight: 700; line-height: 1; color: #aeb7c0;
+	font-variant-numeric: tabular-nums; transition: color .18s;
+}
+.aus-selbar-active .aus-sel-hero .aus-n { color: #fff; }
 
 .aus-roster {
 	display: grid;
@@ -193,26 +226,37 @@ body[data-route*="SIGOS-Settings"] .section-head {
 	gap: 10px;
 	padding: 9px 12px;
 	border: 1px solid #e4e8ec;
-	border-radius: 8px;
-	background: #fff;
+	border-radius: 9px;
+	background: linear-gradient(180deg, #ffffff 0%, #fbfcfd 100%);
 	cursor: pointer;
-	transition: all .12s;
+	transition: all .14s cubic-bezier(.2,.7,.3,1);
 	user-select: none;
+	box-shadow: 0 1px 2px rgba(0,0,0,.04);
 	animation: sigos-fade-up .28s ease both;
 }
-.aus-card:hover { border-color: #4a90d9; box-shadow: 0 1px 4px rgba(74,144,217,.15); }
+.aus-card:hover {
+	border-color: #4a90d9;
+	box-shadow: 0 3px 10px rgba(74,144,217,.18);
+	transform: translateY(-1px);
+}
 .aus-card-sel {
-	border-color: #1565C0;
-	background: #eaf2fb;
-	box-shadow: inset 0 0 0 1px #1565C0;
+	border-color: #1a3a5c;
+	background: linear-gradient(180deg, #eef4fb 0%, #e3eefa 100%);
+	box-shadow: inset 0 0 0 1.5px #1a3a5c, 0 3px 10px rgba(26,58,92,.16);
+	transform: translateY(-1px);
 }
 .aus-card-done {
-	opacity: .6;
+	opacity: .55;
 	cursor: not-allowed;
-	background: #f8f9fb;
+	background: #f6f7f9;
+	box-shadow: none;
 }
-.aus-card-done:hover { border-color: #e4e8ec; box-shadow: none; }
-.aus-check { font-size: 1.2em; line-height: 1; color: #1565C0; min-width: 20px; text-align: center; }
+.aus-card-done:hover { border-color: #e4e8ec; box-shadow: none; transform: none; }
+.aus-check {
+	font-size: 1.25em; line-height: 1; color: #1a3a5c; min-width: 22px; text-align: center;
+	transition: transform .12s;
+}
+.aus-card-sel .aus-check { transform: scale(1.15); }
 .aus-card-done .aus-check { color: #198754; }
 .aus-info { flex: 1; min-width: 0; }
 .aus-name { font-weight: 600; font-size: .9em; color: #2c3e50; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
