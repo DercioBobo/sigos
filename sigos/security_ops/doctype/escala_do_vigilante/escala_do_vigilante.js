@@ -395,6 +395,10 @@ function _render_week(wrapper, toolbar, ctx) {
 		</th>`;
 	});
 
+	// Precompute weekend flag per day so the column tint runs down the whole table
+	const weekend = dias.map(d => { const w = new Date(d).getDay(); return w === 0 || w === 6; });
+	const weCls = i => weekend[i] ? "esc-wk-weekend-col" : "";
+
 	// Coverage row
 	let cov = "";
 	if (tipo_ciclo === "Rotativo") {
@@ -408,19 +412,20 @@ function _render_week(wrapper, toolbar, ctx) {
 		cov += `</tr>`;
 	}
 
-	// Guard rows — big cells with full turno labels
+	// Guard rows — big cells with full turno labels, staggered entrance
 	let body = cov;
-	guards.forEach(vig => {
-		body += `<tr><td class="esc-wk-name" title="${vig}">${nameMap[vig] || vig}</td>`;
-		dias.forEach(d => {
+	guards.forEach((vig, gi) => {
+		body += `<tr class="esc-wk-row" style="animation-delay:${Math.min(gi * 28, 320)}ms">
+			<td class="esc-wk-name" title="${vig}">${nameMap[vig] || vig}</td>`;
+		dias.forEach((d, di) => {
 			const r = cellMap[`${vig}|${d}`];
 			const isPast = d < hoje;
 			if (!r) {
-				body += `<td class="esc-wk-cell esc-wk-blank ${isPast ? "esc-wk-past" : ""}"></td>`;
+				body += `<td class="esc-wk-cell esc-wk-blank ${weCls(di)} ${isPast ? "esc-wk-past" : ""}"></td>`;
 			} else {
 				const cls = _PERIODO_CLS[r.periodo] || "cell-folga";
 				const ovr = r.override ? "esc-wk-override" : "";
-				body += `<td class="esc-wk-cell ${isPast ? "esc-wk-past" : ""}"
+				body += `<td class="esc-wk-cell ${weCls(di)} ${isPast ? "esc-wk-past" : ""}"
 					${isPast ? "" : `data-vig="${vig}" data-data="${d}"`}>
 					<div class="esc-wk-chip ${cls} ${ovr}" title="${r.turno}${r.override ? " (manual)" : ""}">
 						${frappe.utils.escape_html(r.turno)}${r.override ? ' <span class="esc-wk-star">✎</span>' : ""}

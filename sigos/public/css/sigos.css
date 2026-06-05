@@ -1,4 +1,16 @@
 /* SIGOS – global styles */
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&display=swap');
+
+:root {
+	/* Condensed display face for schedule numerals/headers — industrial register */
+	--sigos-display: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+}
+
+/* Tabular figures everywhere numbers line up in the boards */
+.esc-wk-table, .esc-grid, .esc-wk-range, .aus-counts {
+	font-variant-numeric: tabular-nums;
+	font-feature-settings: "tnum" 1;
+}
 
 /* ── Form chrome — scoped to SIGOS doctypes ────────────────────────────── */
 body[data-route*="Vigilante"] .frappe-section,
@@ -186,6 +198,7 @@ body[data-route*="SIGOS-Settings"] .section-head {
 	cursor: pointer;
 	transition: all .12s;
 	user-select: none;
+	animation: sigos-fade-up .28s ease both;
 }
 .aus-card:hover { border-color: #4a90d9; box-shadow: 0 1px 4px rgba(74,144,217,.15); }
 .aus-card-sel {
@@ -269,8 +282,10 @@ body[data-route*="SIGOS-Settings"] .section-head {
 .esc-wk-btn:hover:not([disabled]) { background: #f0f3f6; border-color: #adb5bd; }
 .esc-wk-btn[disabled] { opacity: .4; cursor: not-allowed; }
 .esc-wk-range {
-	font-size: 1.05em;
+	font-family: var(--sigos-display);
+	font-size: 1.35em;
 	font-weight: 700;
+	letter-spacing: .01em;
 	color: var(--sigos-primary, #1a3a5c);
 	min-width: 200px;
 	text-align: center;
@@ -311,9 +326,22 @@ body[data-route*="SIGOS-Settings"] .section-head {
 	background: #f6f8fa;
 }
 .esc-wk-weekend { background: #eef1f4; }
+/* Weekend tint carried down the whole column, not just the header */
+.esc-wk-table tbody td.esc-wk-weekend-col { background: rgba(26,58,92,.025); }
 .esc-wk-today { background: #fff3cd; box-shadow: inset 0 -3px 0 #e8a020; }
-.esc-wk-dow { font-size: .72em; color: #8a949e; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
-.esc-wk-dnum { font-size: 1.15em; font-weight: 700; color: #2c3e50; line-height: 1.3; }
+.esc-wk-dow { font-size: .72em; color: #8a949e; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.esc-wk-dnum {
+	font-family: var(--sigos-display);
+	font-size: 1.5em; font-weight: 700; color: var(--sigos-primary, #1a3a5c);
+	line-height: 1.2; letter-spacing: .01em;
+}
+
+/* Staggered row entrance — one orchestrated reveal on render */
+.esc-wk-row { animation: sigos-fade-up .34s cubic-bezier(.2,.7,.3,1) both; }
+@keyframes sigos-fade-up {
+	from { opacity: 0; transform: translateY(6px); }
+	to   { opacity: 1; transform: translateY(0); }
+}
 
 .esc-wk-cell {
 	padding: 5px;
@@ -340,11 +368,37 @@ body[data-route*="SIGOS-Settings"] .section-head {
 .esc-wk-blank { background: #fcfcfd; }
 .esc-wk-past { opacity: .5; }
 
-.esc-wk-covrow td { border-bottom: 2px solid #e0e5ea; }
+/* Coverage row = operational hero. Gaps must alarm. */
+.esc-wk-covrow td {
+	border-bottom: 2px solid #d6dce2;
+	background: #fafbfc;
+}
+.esc-wk-covrow .esc-wk-name {
+	font-family: var(--sigos-display);
+	text-transform: uppercase;
+	letter-spacing: .06em;
+	font-size: .8em;
+	color: var(--sigos-primary, #1a3a5c);
+	background: #f2f5f8;
+}
 .esc-wk-cov {
-	height: 24px;
-	font-size: 1em;
-	font-weight: 700;
+	height: 30px;
+	font-size: 1.25em;
+	font-weight: 800;
+}
+/* Gap = red, slightly pulsing so it can't be missed */
+.esc-wk-cov.cov-gap {
+	background: #fde2e4;
+	color: #c92a3b;
+	box-shadow: inset 0 0 0 2px #f5b5bb;
+	animation: sigos-alarm 1.6s ease-in-out infinite;
+}
+.esc-wk-cov.cov-double { background: #fff0d6; color: #b8860b; }
+.esc-wk-cov.cov-ok { background: #e7f5ec; color: #198754; }
+
+@keyframes sigos-alarm {
+	0%, 100% { background: #fde2e4; }
+	50%      { background: #f8c9ce; }
 }
 
 /* ── Escala empty state ─────────────────────────────────────────────────── */
@@ -407,9 +461,14 @@ body[data-route*="SIGOS-Settings"] .section-head {
 }
 thead .esc-name-col { z-index: 3; }
 .esc-mes {
-	background: #f4f5f6;
-	font-weight: 600;
-	padding: 3px 6px !important;
+	background: #f2f5f8;
+	font-family: var(--sigos-display);
+	font-weight: 700;
+	font-size: 1.05em;
+	letter-spacing: .03em;
+	text-transform: uppercase;
+	color: var(--sigos-primary, #1a3a5c);
+	padding: 4px 6px !important;
 	text-align: center !important;
 }
 .esc-day {
@@ -417,8 +476,11 @@ thead .esc-name-col { z-index: 3; }
 	padding: 2px 0 !important;
 	background: #fafbfc;
 }
-.esc-dow { font-size: 9px; color: #999; line-height: 1; }
-.esc-dnum { font-size: 11px; font-weight: 600; line-height: 1.2; }
+.esc-dow { font-size: 9px; color: #999; line-height: 1; text-transform: uppercase; letter-spacing: .02em; }
+.esc-dnum {
+	font-family: var(--sigos-display);
+	font-size: 13px; font-weight: 700; line-height: 1.1; color: var(--sigos-primary, #1a3a5c);
+}
 .esc-weekend { background: #f0f1f3; }
 .esc-today { background: #fff3cd !important; box-shadow: inset 0 -2px 0 #e8a020; }
 
@@ -434,25 +496,37 @@ thead .esc-name-col { z-index: 3; }
 .esc-empty { background: #fff; cursor: default; }
 .esc-pastcell { opacity: .55; }
 
-.cell-manha { background: #4a90d9; }
-.cell-noite { background: #2c3e57; }
-.cell-tarde { background: #e8a020; }
-.cell-folga { background: #adb5bd; color: #fff; }
+/* Period chips — gradient + bright top edge gives a physical, button-like depth */
+.cell-manha { background: linear-gradient(180deg, #62a2e2 0%, #4a90d9 52%, #3a7ec5 100%); }
+.cell-noite { background: linear-gradient(180deg, #3b5074 0%, #2c3e57 52%, #212f44 100%); }
+.cell-tarde { background: linear-gradient(180deg, #f2b13c 0%, #e8a020 52%, #d18f12 100%); }
+.cell-folga { background: linear-gradient(180deg, #bcc3ca 0%, #adb5bd 52%, #9aa2aa 100%); color: #fff; }
 
 .esc-override { box-shadow: inset 0 0 0 2px #e05c5c; }
 
-/* coverage row */
-.esc-cov-row td { border-bottom: 2px solid #ccc; }
-.esc-cov-row .esc-name-col { font-weight: 600; font-size: 10px; color: #555; }
+/* coverage row — compact view (also a hero, scaled down) */
+.esc-cov-row td { border-bottom: 2px solid #d6dce2; background: #fafbfc; }
+.esc-cov-row .esc-name-col {
+	font-family: var(--sigos-display);
+	text-transform: uppercase; letter-spacing: .05em;
+	font-weight: 700; font-size: 10px; color: var(--sigos-primary, #1a3a5c);
+	background: #f2f5f8;
+}
 .esc-cov {
-	height: 18px;
-	font-size: 11px;
-	font-weight: 700;
-	line-height: 18px;
+	height: 22px;
+	font-size: 13px;
+	font-weight: 800;
+	line-height: 22px;
 }
 .cov-ok     { background: #e7f5ec; color: #198754; }
 .cov-gap    { background: #fff3cd; color: #b8860b; }
 .cov-double { background: #fde2e4; color: #d6336c; }
+/* In the compact grid, a gap should also alarm */
+.esc-cov.cov-gap {
+	background: #fde2e4;
+	color: #c92a3b;
+	animation: sigos-alarm 1.6s ease-in-out infinite;
+}
 
 .esc-legend { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
 .esc-lg {
