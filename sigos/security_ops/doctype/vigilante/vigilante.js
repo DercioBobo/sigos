@@ -17,6 +17,17 @@ frappe.ui.form.on("Vigilante", {
 		_calcular_idade(frm);
 		_colorir_tabs(frm);
 		_setup_proximo_btn(frm);
+
+		// Ver Escala — only for active guards already assigned to a posto
+		if (!frm.is_new() && frm.doc.status === "Ativo" && frm.doc.posto_de_vigilancia) {
+			frm.add_custom_button(__("Ver Escala"), () => {
+				sigos.show_escala_preview({
+					posto: frm.doc.posto_de_vigilancia,
+					titulo: frm.doc.nome_completo || frm.doc.name,
+					destacar: frm.doc.name,   // highlight this guard's row
+				});
+			}, __("Acções"));
+		}
 	},
 
 	// ─── Field events ──────────────────────────────────────────────────────────
