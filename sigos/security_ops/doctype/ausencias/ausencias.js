@@ -77,7 +77,14 @@ function _abrir_quick_add(frm) {
 		if (!total_escala) {
 			frappe.msgprint({
 				title: __("Escala não encontrada"),
-				message: __("Não foi encontrada nenhuma escala activa para esta data e período. Certifique-se de que existe uma Escala Do Vigilante submetida e activa."),
+				message: __(
+					"Não foi encontrada nenhuma escala para esta data e período.<br><br>" +
+					"Verifique que:<ul>" +
+					"<li>Existe uma <b>Escala Do Vigilante</b> com estado <b>Activo</b> para o posto;</li>" +
+					"<li>A escala tem turnos gerados para <b>{0}</b> no período <b>{1}</b>;</li>" +
+					"<li>Os vigilantes não estão todos em folga nesse dia.</li></ul>",
+					[frappe.datetime.str_to_user(frm.doc.data) || "", frm.doc.periodo || ""]
+				),
 				indicator: "orange",
 			});
 			return;
