@@ -10,9 +10,32 @@ class EscalaDoVigilante(Document):
 		self._validar_um_por_posto()
 		self._validar_turnos()
 		self._validar_capacidade_posto()
+		self._auto_arquivar_se_vazia()   # before reconcile — skips generation when empty
 		self.reconciliar_escala()
 
 	# ─── Validation ────────────────────────────────────────────────────────────
+
+	def _auto_arquivar_se_vazia(self):
+		"""
+		Auto-archive an active escala when its LAST guard leaves (guard list goes
+		from non-empty to empty). Applies to every flow that removes guards
+		(Troca De Regime, Demissão, Rotatividade, manual). A brand-new empty
+		Rascunho is untouched — we only archive a transition to empty.
+		"""
+		if self.estado != "Activo":
+			return
+		if self.tab_vigilante_do_posto:
+			return  # still has guards
+		before = self.get_doc_before_save()
+		if before and before.tab_vigilante_do_posto:
+			self.estado = "Arquivado"
+			frappe.msgprint(
+				_("Escala <b>{0}</b> arquivada automaticamente — o último vigilante saiu.").format(
+					self.name
+				),
+				indicator="orange",
+				alert=True,
+			)
 
 	def _validar_um_por_posto(self):
 		"""Only one Escala per (posto, regime)."""
