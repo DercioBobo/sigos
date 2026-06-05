@@ -1,13 +1,9 @@
 frappe.ui.form.on("Troca De Regime", {
 
+	// Escala migration is handled automatically server-side (on_submit):
+	// the guard is moved from the old posto+regime escala to the new one.
 	after_submit(frm) {
-		if (frm.doc.workflow_state !== "Aprovado") return;
-		sigos.wizard_actualizar_escalas({
-			vigilante:       frm.doc.vigilante,
-			tipo:            "troca_regime",
-			novo_regime:     frm.doc.novo_regime,
-			regime_anterior: frm.doc.regime_atual,
-		});
+		frm.reload_doc();
 	},
 
 	onload(frm) {
