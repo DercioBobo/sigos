@@ -25,7 +25,8 @@ class Vigilante(Document):
 		self._calcular_idade()
 
 	def validate(self):
-		self._criar_employee_se_necessario()   # must run before the link check
+		self._validar_data_admissao()           # required before admission/Employee creation
+		self._criar_employee_se_necessario()    # must run before the link check
 		self._auto_activar_com_posto()
 		self._validar_status_com_posto()
 		self._validar_capacidade_posto()
@@ -51,6 +52,19 @@ class Vigilante(Document):
 			self.status = "Ativo"
 
 	# ─── Validation ────────────────────────────────────────────────────────────
+
+	def _validar_data_admissao(self):
+		"""
+		Data de Admissão must be set before RH admits (status leaves 'Pre-Adimissão RH').
+		It becomes the Employee's Date of Joining, so an empty value would force a
+		fallback to today() — RH must enter the real admission date.
+		"""
+		if self.status in _REQUER_EMPLOYEE and not self.data_admissao:
+			frappe.throw(
+				_("Preencha a <b>Data de Admissão</b> antes de admitir o vigilante — "
+				  "é a data de início (Date of Joining) do Funcionário."),
+				title=_("Data de Admissão Obrigatória"),
+			)
 
 	def _guardar_mudanca_regime(self):
 		"""
