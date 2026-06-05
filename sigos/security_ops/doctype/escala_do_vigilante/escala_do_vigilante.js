@@ -256,18 +256,27 @@ const _DOW = ["D", "S", "T", "Q", "Q", "S", "S"];
 const _MES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
 function _render_grid(frm, tipo_ciclo, seq) {
+	// Cache for instant re-render when the range toggle changes
+	frm._esc_tc = tipo_ciclo;
+	frm._esc_seq = seq;
+	if (frm._esc_range === undefined) frm._esc_range = "7";
+
 	const wrapper = frm.fields_dict.grid_escala?.$wrapper;
 	if (!wrapper) return;
 
 	const rows = frm.doc.tabela_de_escala || [];
 	if (!rows.length) {
-		wrapper.html(`<div class="text-muted" style="padding:20px;text-align:center;">
-			${__("Sem escala gerada. Sincronize os vigilantes, defina o turno inicial e clique em <b>Gerar / Estender Escala</b>.")}
+		wrapper.html(`<div class="esc-empty-state">
+			<div class="esc-empty-icon">📅</div>
+			<div class="esc-empty-title">${__("Sem escala gerada")}</div>
+			<div class="esc-empty-sub">${__("Sincronize os vigilantes, defina o turno inicial e clique em <b>Gerar / Estender Escala</b>.")}</div>
 		</div>`);
 		return;
 	}
 
-	const datas = [...new Set(rows.map(r => r.data))].sort();
+	const hoje = frappe.datetime.get_today();
+	const todasDatas = [...new Set(rows.map(r => r.data))].sort();
+	const datas = _aplicar_range(todasDatas, frm._esc_range, hoje);
 	const guardOrder = (frm.doc.tab_vigilante_do_posto || []).map(g => g.vigilante);
 	const guardsInRows = [...new Set(rows.map(r => r.vigilante))];
 	const guards = guardOrder.filter(g => guardsInRows.includes(g))
@@ -278,8 +287,6 @@ function _render_grid(frm, tipo_ciclo, seq) {
 
 	const cellMap = {};
 	rows.forEach(r => { cellMap[`${r.vigilante}|${r.data}`] = r; });
-
-	const hoje = frappe.datetime.get_today();
 
 	// Month header
 	let mesHeader = `<th class="esc-name-col"></th>`;
@@ -343,7 +350,21 @@ function _render_grid(frm, tipo_ciclo, seq) {
 		body += `</tr>`;
 	});
 
+	// Toolbar (range toggle + counter)
+	const toolbar = _render_toolbar(frm, todasDatas.length, datas.length);
+
+	// Coverage explainer (only for Rotativo, where coverage matters)
+	const coberturaHelp = tipo_ciclo === "Rotativo" ? `
+		<div class="esc-cobertura-help">
+			<span class="esc-ch-title">${__("Cobertura")}</span>
+			<span class="esc-ch-desc">${__("cada turno do dia tem vigilante?")}</span>
+			<span class="esc-ch-item"><span class="esc-ch-dot cov-ok">✓</span> ${__("completo")}</span>
+			<span class="esc-ch-item"><span class="esc-ch-dot cov-gap">▲</span> ${__("falta alguém")}</span>
+			<span class="esc-ch-item"><span class="esc-ch-dot cov-double">●</span> ${__("a mais")}</span>
+		</div>` : "";
+
 	wrapper.html(`
+		${toolbar}
 		<div class="esc-grid-wrap">
 			<table class="esc-grid">
 				<thead><tr>${mesHeader}</tr><tr>${dayHeader}</tr></thead>
@@ -356,8 +377,14 @@ function _render_grid(frm, tipo_ciclo, seq) {
 			<span class="esc-lg cell-tarde">Tarde</span>
 			<span class="esc-lg cell-folga">Folga</span>
 			<span class="esc-lg esc-override-lg">Manual</span>
-			${tipo_ciclo === "Rotativo" ? `<span class="esc-lg" style="background:#eee;color:#333;">Cobertura: ✓ ok · ▲ falta · ● duplo</span>` : ""}
-		</div>`);
+		</div>
+		${coberturaHelp}`);
+
+	// Range toggle
+	wrapper.find(".esc-range-btn").on("click", function () {
+		frm._esc_range = $(this).attr("data-range");
+		_render_grid(frm, frm._esc_tc, frm._esc_seq);
+	});
 
 	wrapper.find(".esc-cell[data-vig]").on("click", function () {
 		const vig = $(this).attr("data-vig");
@@ -368,6 +395,28 @@ function _render_grid(frm, tipo_ciclo, seq) {
 		}
 		_override_dialog(frm, vig, data);
 	});
+}
+
+// ─── Range filtering + toolbar ────────────────────────────────────────────────
+function _aplicar_range(todasDatas, range, hoje) {
+	if (range === "all") return todasDatas;
+	const n = range === "30" ? 30 : 7;
+	// Prefer today-forward; if the escala has no future days, show the most recent n
+	const futuras = todasDatas.filter(d => d >= hoje);
+	if (futuras.length) return futuras.slice(0, n);
+	return todasDatas.slice(-n);
+}
+
+function _render_toolbar(frm, total, showing) {
+	const ranges = [["7", __("7 dias")], ["30", __("1 mês")], ["all", __("Tudo")]];
+	const btns = ranges.map(([val, label]) =>
+		`<button class="esc-range-btn ${frm._esc_range === val ? "esc-range-active" : ""}" data-range="${val}">${label}</button>`
+	).join("");
+	return `
+		<div class="esc-toolbar">
+			<div class="esc-range-group">${btns}</div>
+			<div class="esc-showing">${__("A mostrar")} <b>${showing}</b> ${__("de")} ${total} ${__("dias")}</div>
+		</div>`;
 }
 
 function _abbr(turno) {
