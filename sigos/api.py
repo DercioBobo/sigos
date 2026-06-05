@@ -216,7 +216,8 @@ def get_filtered_vigilantes(periodo, data):
 		SELECT DISTINCT te.vigilante
 		FROM `tabTabela De Escala De Vigilante` te
 		JOIN `tabEscala Do Vigilante` e ON e.name = te.parent
-		WHERE te.periodo = %s
+		JOIN `tabTurno` t ON t.name = te.turno
+		WHERE t.periodo = %s
 		  AND te.data = %s
 		  AND e.estado = 'Activo'
 		""",
@@ -493,7 +494,7 @@ def get_vigilantes_da_escala(data, periodo, grupo_delegados=None):
 			te.posto,
 			te.turno,
 			te.regime,
-			te.periodo,
+			COALESCE(NULLIF(te.periodo, ''), t.periodo) AS periodo,
 			COALESCE(rti.n_de_faltas, 1) AS n_de_faltas
 		FROM `tabTabela De Escala De Vigilante` te
 		JOIN `tabEscala Do Vigilante` e ON e.name = te.parent
@@ -503,7 +504,7 @@ def get_vigilantes_da_escala(data, periodo, grupo_delegados=None):
 			ON rti.parent = te.regime AND rti.turno = te.turno
 		WHERE e.estado = 'Activo'
 		  AND te.data = %(data)s
-		  AND te.periodo = %(periodo)s
+		  AND t.periodo = %(periodo)s
 		  AND (t.e_folga IS NULL OR t.e_folga = 0)
 		{extra}
 		ORDER BY v.delegacao, v.nome_completo
