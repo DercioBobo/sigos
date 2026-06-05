@@ -256,7 +256,7 @@ const _DOW = ["D", "S", "T", "Q", "Q", "S", "S"];
 const _MES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
 function _render_grid(frm, tipo_ciclo, seq) {
-	// Cache for instant re-render when the range toggle changes
+	// Cache for instant re-render when the range/week changes
 	frm._esc_tc = tipo_ciclo;
 	frm._esc_seq = seq;
 	if (frm._esc_range === undefined) frm._esc_range = "7";
@@ -276,7 +276,7 @@ function _render_grid(frm, tipo_ciclo, seq) {
 
 	const hoje = frappe.datetime.get_today();
 	const todasDatas = [...new Set(rows.map(r => r.data))].sort();
-	const datas = _aplicar_range(todasDatas, frm._esc_range, hoje);
+
 	const guardOrder = (frm.doc.tab_vigilante_do_posto || []).map(g => g.vigilante);
 	const guardsInRows = [...new Set(rows.map(r => r.vigilante))];
 	const guards = guardOrder.filter(g => guardsInRows.includes(g))
@@ -287,6 +287,175 @@ function _render_grid(frm, tipo_ciclo, seq) {
 
 	const cellMap = {};
 	rows.forEach(r => { cellMap[`${r.vigilante}|${r.data}`] = r; });
+
+	const ctx = { frm, tipo_ciclo, seq, todasDatas, guards, nameMap, cellMap, hoje };
+
+	const toolbar = _render_toolbar(frm);
+	if (frm._esc_range === "7") {
+		_render_week(wrapper, toolbar, ctx);
+	} else {
+		_render_compact(wrapper, toolbar, ctx);
+	}
+
+	// Range toggle (shared)
+	wrapper.find(".esc-range-btn").on("click", function () {
+		frm._esc_range = $(this).attr("data-range");
+		frm._esc_week_start = undefined;   // reset week nav on mode change
+		_render_grid(frm, frm._esc_tc, frm._esc_seq);
+	});
+
+	_bind_cell_clicks(frm, wrapper, hoje);
+}
+
+// ─── Coverage helper (shared) ─────────────────────────────────────────────────
+function _coverage_for_day(d, ctx) {
+	const working = (ctx.seq || []).filter(s => !s.e_folga).map(s => s.turno);
+	if (!working.length) return null;
+	const counts = {};
+	ctx.guards.forEach(vig => {
+		const r = ctx.cellMap[`${vig}|${d}`];
+		if (r && working.includes(r.turno)) counts[r.turno] = (counts[r.turno] || 0) + 1;
+	});
+	const gap = working.filter(w => !counts[w]);
+	const dbl = working.filter(w => (counts[w] || 0) > 1);
+	if (dbl.length) return { icon: "●", cls: "cov-double", tip: "Duplicado: " + dbl.join(", ") };
+	if (gap.length) return { icon: "▲", cls: "cov-gap",    tip: "Sem cobertura: " + gap.join(", ") };
+	return { icon: "✓", cls: "cov-ok", tip: "Totalmente coberto" };
+}
+
+function _coverage_legend(tipo_ciclo) {
+	if (tipo_ciclo !== "Rotativo") return "";
+	return `
+		<div class="esc-cobertura-help">
+			<span class="esc-ch-title">${__("Cobertura")}</span>
+			<span class="esc-ch-desc">${__("cada turno do dia tem vigilante?")}</span>
+			<span class="esc-ch-item"><span class="esc-ch-dot cov-ok">✓</span> ${__("completo")}</span>
+			<span class="esc-ch-item"><span class="esc-ch-dot cov-gap">▲</span> ${__("falta alguém")}</span>
+			<span class="esc-ch-item"><span class="esc-ch-dot cov-double">●</span> ${__("a mais")}</span>
+		</div>`;
+}
+
+function _legend(tipo_ciclo) {
+	return `
+		<div class="esc-legend">
+			<span class="esc-lg cell-manha">Manhã</span>
+			<span class="esc-lg cell-noite">Noite</span>
+			<span class="esc-lg cell-tarde">Tarde</span>
+			<span class="esc-lg cell-folga">Folga</span>
+			<span class="esc-lg esc-override-lg">Manual</span>
+		</div>
+		${_coverage_legend(tipo_ciclo)}`;
+}
+
+// ─── WEEKLY board — spacious, navigable, full labels ──────────────────────────
+const _DOW_FULL = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+
+function _week_window(frm, todasDatas, hoje) {
+	// Anchor: stored start, else first date >= today, else first date
+	let start = frm._esc_week_start;
+	if (!start || todasDatas.indexOf(start) < 0) {
+		const futureIdx = todasDatas.findIndex(d => d >= hoje);
+		start = todasDatas[futureIdx >= 0 ? futureIdx : 0];
+	}
+	let s = todasDatas.indexOf(start);
+	if (s < 0) s = 0;
+	return { start: s, dias: todasDatas.slice(s, s + 7) };
+}
+
+function _render_week(wrapper, toolbar, ctx) {
+	const { frm, tipo_ciclo, todasDatas, guards, nameMap, cellMap, hoje } = ctx;
+	const { start, dias } = _week_window(frm, todasDatas, hoje);
+
+	const canPrev = start > 0;
+	const canNext = start + 7 < todasDatas.length;
+
+	const fmtRange = () => {
+		if (!dias.length) return "";
+		const a = new Date(dias[0]), b = new Date(dias[dias.length - 1]);
+		const fa = `${a.getDate()} ${_MES[a.getMonth()]}`;
+		const fb = `${b.getDate()} ${_MES[b.getMonth()]} ${b.getFullYear()}`;
+		return `${fa} – ${fb}`;
+	};
+
+	const nav = `
+		<div class="esc-week-nav">
+			<button class="esc-wk-btn" data-wk="prev" ${canPrev ? "" : "disabled"}>‹ ${__("Anterior")}</button>
+			<span class="esc-wk-range">${fmtRange()}</span>
+			<button class="esc-wk-btn" data-wk="next" ${canNext ? "" : "disabled"}>${__("Próxima")} ›</button>
+		</div>`;
+
+	// Header row
+	let head = `<th class="esc-wk-name">${__("Vigilante")}</th>`;
+	dias.forEach(d => {
+		const dt = new Date(d), dow = dt.getDay();
+		const we = dow === 0 || dow === 6, td = d === hoje;
+		head += `<th class="esc-wk-dayhead ${we ? "esc-wk-weekend" : ""} ${td ? "esc-wk-today" : ""}">
+			<div class="esc-wk-dow">${_DOW_FULL[dow]}</div>
+			<div class="esc-wk-dnum">${dt.getDate()}</div>
+		</th>`;
+	});
+
+	// Coverage row
+	let cov = "";
+	if (tipo_ciclo === "Rotativo") {
+		cov = `<tr class="esc-wk-covrow"><td class="esc-wk-name">${__("Cobertura")}</td>`;
+		dias.forEach(d => {
+			const c = _coverage_for_day(d, ctx);
+			cov += c
+				? `<td class="esc-wk-cov ${c.cls}" title="${c.tip}">${c.icon}</td>`
+				: `<td class="esc-wk-cov"></td>`;
+		});
+		cov += `</tr>`;
+	}
+
+	// Guard rows — big cells with full turno labels
+	let body = cov;
+	guards.forEach(vig => {
+		body += `<tr><td class="esc-wk-name" title="${vig}">${nameMap[vig] || vig}</td>`;
+		dias.forEach(d => {
+			const r = cellMap[`${vig}|${d}`];
+			const isPast = d < hoje;
+			if (!r) {
+				body += `<td class="esc-wk-cell esc-wk-blank ${isPast ? "esc-wk-past" : ""}"></td>`;
+			} else {
+				const cls = _PERIODO_CLS[r.periodo] || "cell-folga";
+				const ovr = r.override ? "esc-wk-override" : "";
+				body += `<td class="esc-wk-cell ${isPast ? "esc-wk-past" : ""}"
+					${isPast ? "" : `data-vig="${vig}" data-data="${d}"`}>
+					<div class="esc-wk-chip ${cls} ${ovr}" title="${r.turno}${r.override ? " (manual)" : ""}">
+						${frappe.utils.escape_html(r.turno)}${r.override ? ' <span class="esc-wk-star">✎</span>' : ""}
+					</div>
+				</td>`;
+			}
+		});
+		body += `</tr>`;
+	});
+
+	wrapper.html(`
+		${toolbar}
+		${nav}
+		<div class="esc-wk-wrap">
+			<table class="esc-wk-table">
+				<thead><tr>${head}</tr></thead>
+				<tbody>${body}</tbody>
+			</table>
+		</div>
+		${_legend(tipo_ciclo)}`);
+
+	wrapper.find('.esc-wk-btn[data-wk="prev"]').on("click", () => {
+		frm._esc_week_start = todasDatas[Math.max(0, start - 7)];
+		_render_grid(frm, frm._esc_tc, frm._esc_seq);
+	});
+	wrapper.find('.esc-wk-btn[data-wk="next"]').on("click", () => {
+		frm._esc_week_start = todasDatas[Math.min(todasDatas.length - 1, start + 7)];
+		_render_grid(frm, frm._esc_tc, frm._esc_seq);
+	});
+}
+
+// ─── COMPACT dense grid — month / full overview ───────────────────────────────
+function _render_compact(wrapper, toolbar, ctx) {
+	const { tipo_ciclo, todasDatas, guards, nameMap, cellMap, hoje } = ctx;
+	const datas = ctx.frm._esc_range === "all" ? todasDatas : todasDatas.slice(0, 30);
 
 	// Month header
 	let mesHeader = `<th class="esc-name-col"></th>`;
@@ -309,24 +478,15 @@ function _render_grid(frm, tipo_ciclo, seq) {
 			<div class="esc-dow">${_DOW[dow]}</div><div class="esc-dnum">${dt.getDate()}</div></th>`;
 	});
 
-	// Coverage row (Rotativo only — for TDU every guard shares the turn)
+	// Coverage row
 	let coverageRow = "";
 	if (tipo_ciclo === "Rotativo") {
-		const working = (seq || []).filter(s => !s.e_folga).map(s => s.turno);
 		coverageRow = `<tr class="esc-cov-row"><td class="esc-name-col">${__("Cobertura")}</td>`;
 		datas.forEach(d => {
-			const counts = {};
-			guards.forEach(vig => {
-				const r = cellMap[`${vig}|${d}`];
-				if (r && working.includes(r.turno)) counts[r.turno] = (counts[r.turno] || 0) + 1;
-			});
-			const gap = working.filter(w => !counts[w]);
-			const dbl = working.filter(w => (counts[w] || 0) > 1);
-			let icon, cls, tip;
-			if (dbl.length)      { icon = "●"; cls = "cov-double"; tip = "Duplicado: " + dbl.join(", "); }
-			else if (gap.length) { icon = "▲"; cls = "cov-gap";    tip = "Sem cobertura: " + gap.join(", "); }
-			else                 { icon = "✓"; cls = "cov-ok";     tip = "Totalmente coberto"; }
-			coverageRow += `<td class="esc-cov ${cls}" title="${tip}">${icon}</td>`;
+			const c = _coverage_for_day(d, ctx);
+			coverageRow += c
+				? `<td class="esc-cov ${c.cls}" title="${c.tip}">${c.icon}</td>`
+				: `<td class="esc-cov"></td>`;
 		});
 		coverageRow += `</tr>`;
 	}
@@ -350,19 +510,6 @@ function _render_grid(frm, tipo_ciclo, seq) {
 		body += `</tr>`;
 	});
 
-	// Toolbar (range toggle + counter)
-	const toolbar = _render_toolbar(frm, todasDatas.length, datas.length);
-
-	// Coverage explainer (only for Rotativo, where coverage matters)
-	const coberturaHelp = tipo_ciclo === "Rotativo" ? `
-		<div class="esc-cobertura-help">
-			<span class="esc-ch-title">${__("Cobertura")}</span>
-			<span class="esc-ch-desc">${__("cada turno do dia tem vigilante?")}</span>
-			<span class="esc-ch-item"><span class="esc-ch-dot cov-ok">✓</span> ${__("completo")}</span>
-			<span class="esc-ch-item"><span class="esc-ch-dot cov-gap">▲</span> ${__("falta alguém")}</span>
-			<span class="esc-ch-item"><span class="esc-ch-dot cov-double">●</span> ${__("a mais")}</span>
-		</div>` : "";
-
 	wrapper.html(`
 		${toolbar}
 		<div class="esc-grid-wrap">
@@ -371,24 +518,14 @@ function _render_grid(frm, tipo_ciclo, seq) {
 				<tbody>${body}</tbody>
 			</table>
 		</div>
-		<div class="esc-legend">
-			<span class="esc-lg cell-manha">Manhã</span>
-			<span class="esc-lg cell-noite">Noite</span>
-			<span class="esc-lg cell-tarde">Tarde</span>
-			<span class="esc-lg cell-folga">Folga</span>
-			<span class="esc-lg esc-override-lg">Manual</span>
-		</div>
-		${coberturaHelp}`);
+		${_legend(tipo_ciclo)}`);
+}
 
-	// Range toggle
-	wrapper.find(".esc-range-btn").on("click", function () {
-		frm._esc_range = $(this).attr("data-range");
-		_render_grid(frm, frm._esc_tc, frm._esc_seq);
-	});
-
-	wrapper.find(".esc-cell[data-vig]").on("click", function () {
+function _bind_cell_clicks(frm, wrapper, hoje) {
+	wrapper.find("[data-vig][data-data]").on("click", function () {
 		const vig = $(this).attr("data-vig");
 		const data = $(this).attr("data-data");
+		if (!vig || !data) return;
 		if (data < hoje) {
 			frappe.show_alert({ message: __("Não é possível editar dias passados."), indicator: "orange" }, 3);
 			return;
@@ -397,25 +534,18 @@ function _render_grid(frm, tipo_ciclo, seq) {
 	});
 }
 
-// ─── Range filtering + toolbar ────────────────────────────────────────────────
-function _aplicar_range(todasDatas, range, hoje) {
-	if (range === "all") return todasDatas;
-	const n = range === "30" ? 30 : 7;
-	// Prefer today-forward; if the escala has no future days, show the most recent n
-	const futuras = todasDatas.filter(d => d >= hoje);
-	if (futuras.length) return futuras.slice(0, n);
-	return todasDatas.slice(-n);
-}
-
-function _render_toolbar(frm, total, showing) {
-	const ranges = [["7", __("7 dias")], ["30", __("1 mês")], ["all", __("Tudo")]];
+// ─── Toolbar (range toggle) ────────────────────────────────────────────────────
+function _render_toolbar(frm) {
+	const ranges = [["7", __("Semana")], ["30", __("Mês")], ["all", __("Tudo")]];
 	const btns = ranges.map(([val, label]) =>
 		`<button class="esc-range-btn ${frm._esc_range === val ? "esc-range-active" : ""}" data-range="${val}">${label}</button>`
 	).join("");
 	return `
 		<div class="esc-toolbar">
 			<div class="esc-range-group">${btns}</div>
-			<div class="esc-showing">${__("A mostrar")} <b>${showing}</b> ${__("de")} ${total} ${__("dias")}</div>
+			<div class="esc-showing">${frm._esc_range === "7"
+				? __("Vista semanal — navegue com ‹ ›")
+				: (frm._esc_range === "30" ? __("Vista mensal compacta") : __("Toda a janela gerada"))}</div>
 		</div>`;
 }
 

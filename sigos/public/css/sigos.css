@@ -247,6 +247,106 @@ body[data-route*="SIGOS-Settings"] .section-head {
 .esc-showing { font-size: .82em; color: #888; }
 .esc-showing b { color: var(--sigos-primary, #1a3a5c); }
 
+/* ── Escala WEEKLY board ────────────────────────────────────────────────── */
+.esc-week-nav {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 16px;
+	margin: 4px 0 12px;
+}
+.esc-wk-btn {
+	border: 1px solid #d0d7de;
+	background: #fff;
+	color: var(--sigos-primary, #1a3a5c);
+	font-size: .85em;
+	font-weight: 600;
+	padding: 6px 16px;
+	border-radius: 8px;
+	cursor: pointer;
+	transition: all .12s;
+}
+.esc-wk-btn:hover:not([disabled]) { background: #f0f3f6; border-color: #adb5bd; }
+.esc-wk-btn[disabled] { opacity: .4; cursor: not-allowed; }
+.esc-wk-range {
+	font-size: 1.05em;
+	font-weight: 700;
+	color: var(--sigos-primary, #1a3a5c);
+	min-width: 200px;
+	text-align: center;
+}
+
+.esc-wk-wrap {
+	overflow-x: auto;
+	border: 1px solid #e4e8ec;
+	border-radius: 10px;
+}
+.esc-wk-table {
+	width: 100%;
+	border-collapse: collapse;
+	table-layout: fixed;
+}
+.esc-wk-table th, .esc-wk-table td {
+	border: 1px solid #eef1f4;
+	text-align: center;
+}
+.esc-wk-name {
+	width: 160px;
+	text-align: left !important;
+	padding: 10px 14px;
+	font-weight: 600;
+	font-size: .9em;
+	color: #2c3e50;
+	background: #fff;
+	position: sticky;
+	left: 0;
+	z-index: 2;
+	box-shadow: 1px 0 0 #e4e8ec;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.esc-wk-dayhead {
+	padding: 8px 4px;
+	background: #f6f8fa;
+}
+.esc-wk-weekend { background: #eef1f4; }
+.esc-wk-today { background: #fff3cd; box-shadow: inset 0 -3px 0 #e8a020; }
+.esc-wk-dow { font-size: .72em; color: #8a949e; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+.esc-wk-dnum { font-size: 1.15em; font-weight: 700; color: #2c3e50; line-height: 1.3; }
+
+.esc-wk-cell {
+	padding: 5px;
+	height: 46px;
+	vertical-align: middle;
+}
+.esc-wk-cell[data-vig] { cursor: pointer; }
+.esc-wk-chip {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 4px;
+	height: 100%;
+	border-radius: 6px;
+	color: #fff;
+	font-weight: 600;
+	font-size: .8em;
+	padding: 0 6px;
+	transition: transform .1s;
+}
+.esc-wk-cell[data-vig]:hover .esc-wk-chip { transform: scale(1.05); box-shadow: 0 2px 6px rgba(0,0,0,.18); }
+.esc-wk-override { box-shadow: inset 0 0 0 2px #e05c5c; }
+.esc-wk-star { font-size: .9em; opacity: .85; }
+.esc-wk-blank { background: #fcfcfd; }
+.esc-wk-past { opacity: .5; }
+
+.esc-wk-covrow td { border-bottom: 2px solid #e0e5ea; }
+.esc-wk-cov {
+	height: 24px;
+	font-size: 1em;
+	font-weight: 700;
+}
+
 /* ── Escala empty state ─────────────────────────────────────────────────── */
 .esc-empty-state { text-align: center; padding: 48px 24px; }
 .esc-empty-icon { font-size: 2.5em; margin-bottom: 10px; opacity: .8; }
