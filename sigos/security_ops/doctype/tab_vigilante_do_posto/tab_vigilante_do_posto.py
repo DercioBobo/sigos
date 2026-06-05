@@ -1,6 +1,4 @@
-import frappe
 from frappe.model.document import Document
 
-
-class TabVigilanteDoPostо(Document):
-	pass
+class TabVigilanteDoPosto(Document):
+    pass
