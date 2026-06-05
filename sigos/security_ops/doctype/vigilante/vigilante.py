@@ -25,13 +25,13 @@ class Vigilante(Document):
 		self._calcular_idade()
 
 	def validate(self):
+		self._criar_employee_se_necessario()   # must run before the link check
 		self._auto_activar_com_posto()
 		self._validar_status_com_posto()
 		self._validar_capacidade_posto()
 		self._validar_link_employee()
 
 	def on_update(self):
-		self._criar_employee_se_necessario()
 		self._atualizar_ocupacao_postos()
 
 	# ─── Auto-activation ─────────────────────────────────────────────────────────
@@ -159,23 +159,36 @@ class Vigilante(Document):
 		)
 
 	def _criar_employee_se_necessario(self):
-		"""Auto-create an Employee when RH approves (status moves to Pre-Adimissão)."""
+		"""
+		Auto-create an Employee when RH admits (status → Pre-Adimissão/Ativo).
+		Runs inside validate() so self.funcionario is set BEFORE the link check.
+		On failure it raises a clear error instead of silently leaving the guard
+		without an Employee (which would trip _validar_link_employee downstream).
+		"""
 		if self.funcionario:
 			return
 		if self.status not in ("Pre-Adimissão", "Ativo"):
 			return
 
+		empresa = self.empresa or frappe.db.get_single_value("SIGOS Settings", "empresa_padrao")
+		if not empresa:
+			frappe.throw(
+				_("Defina a <b>Empresa</b> do vigilante ou a <b>Empresa Padrão</b> em "
+				  "SIGOS Settings antes de admitir — é necessária para criar o Funcionário."),
+				title=_("Empresa em Falta"),
+			)
+
 		try:
 			emp = frappe.new_doc("Employee")
 			parts = (self.nome_completo or "").strip().split()
-			emp.first_name = parts[0] if parts else self.nome_completo
+			emp.first_name = parts[0] if parts else (self.nome_completo or "Sem Nome")
 			emp.last_name  = " ".join(parts[1:]) if len(parts) > 1 else ""
 			emp.employee_name = self.nome_completo
 			emp.date_of_birth = self.data_de_nascimento
 			emp.gender = "Male" if self.sexo == "Masculino" else "Female"
 			emp.cell_number = self.contacto
 			emp.date_of_joining = self.data_admissao or today()
-			emp.company = self.empresa or frappe.db.get_single_value("SIGOS Settings", "empresa_padrao")
+			emp.company = empresa
 			emp.status = "Active"
 			emp.custom_vigilante = self.name
 			emp.custom_mecanografico = self.mecanografico
@@ -186,13 +199,18 @@ class Vigilante(Document):
 
 			emp.flags.ignore_sync = True
 			emp.insert(ignore_permissions=True)
-
-			frappe.db.set_value("Vigilante", self.name, "funcionario", emp.name, update_modified=False)
-			self.funcionario = emp.name
-
-			frappe.msgprint(
-				_("Funcionário {0} criado automaticamente.").format(emp.name),
-				alert=True,
-			)
 		except Exception as e:
 			frappe.log_error(f"Erro ao criar Employee para Vigilante {self.name}: {e}", "SIGOS")
+			frappe.throw(
+				_("Não foi possível criar o Funcionário automaticamente:<br><b>{0}</b>").format(e),
+				title=_("Erro ao Criar Funcionário"),
+			)
+
+		# Set in memory — written when this Vigilante save commits (no db.set_value
+		# on a possibly-unsaved row). Name is already assigned (autoname runs before validate).
+		self.funcionario = emp.name
+		frappe.msgprint(
+			_("Funcionário <b>{0}</b> criado automaticamente.").format(emp.name),
+			indicator="green",
+			alert=True,
+		)
