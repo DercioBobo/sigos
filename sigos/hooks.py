@@ -61,41 +61,17 @@ fixtures = [
 ]
 
 # ─── Document Events ──────────────────────────────────────────────────────────
+# NOTE: A doctype's OWN lifecycle handlers (on_submit, before_save, etc.) live as
+# class methods on its controller and are auto-called by Frappe — they must NOT be
+# duplicated here (pointing a doc_event at a module-level function that doesn't exist
+# raises AttributeError on the event). Only cross-cutting hooks on OTHER apps'
+# doctypes belong below.
 doc_events = {
 	"Vigilante": {
 		"on_update": "sigos.sync.vigilante_to_employee",
 	},
 	"Employee": {
 		"on_update": "sigos.sync.employee_to_vigilante",
-	},
-	"Rotatividade": {
-		"on_submit": "sigos.security_ops.doctype.rotatividade.rotatividade.on_submit",
-		"before_submit": "sigos.security_ops.doctype.rotatividade.rotatividade.before_submit",
-	},
-	"Demissao": {
-		"on_submit": "sigos.security_ops.doctype.demissao.demissao.on_submit",
-	},
-	"Readimissao": {
-		"on_submit": "sigos.disciplinar.doctype.readimissao.readimissao.on_submit",
-	},
-	"Troca De Categoria": {
-		"on_submit": "sigos.security_ops.doctype.troca_de_categoria.troca_de_categoria.on_submit",
-	},
-	"Troca De Regime": {
-		"on_submit": "sigos.security_ops.doctype.troca_de_regime.troca_de_regime.on_submit",
-	},
-	"Repreensao Disciplinar": {
-		"on_update": "sigos.disciplinar.doctype.repreensao_disciplinar.repreensao_disciplinar.on_update",
-	},
-	"Processo Disciplinar": {
-		"on_update": "sigos.disciplinar.doctype.processo_disciplinar.processo_disciplinar.on_update",
-		"on_submit": "sigos.disciplinar.doctype.processo_disciplinar.processo_disciplinar.on_submit",
-	},
-	"Ausencias": {
-		"before_save": "sigos.security_ops.doctype.ausencias.ausencias.before_save",
-	},
-	"Movimentacao De Arma": {
-		"before_insert": "sigos.armamento.doctype.movimentacao_de_arma.movimentacao_de_arma.before_insert",
 	},
 	"Salary Slip": {
 		"before_insert": "sigos.payroll_ext.salary_slip_hooks.before_insert",
