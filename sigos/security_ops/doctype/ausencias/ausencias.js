@@ -175,8 +175,6 @@ function _abrir_quick_add(frm) {
 		return;
 	}
 
-	frappe.show_progress(__("A carregar escala..."), 0, 100, __("Por favor aguarde"));
-
 	frappe.call({
 		method: "sigos.api.get_vigilantes_da_escala",
 		args: {
@@ -184,14 +182,14 @@ function _abrir_quick_add(frm) {
 			periodo: frm.doc.periodo,
 			grupo_delegados: frm.doc.grupo_delegados || null,
 		},
+		freeze: true,
+		freeze_message: __("A carregar escala..."),
 		callback(r) {
-			frappe.hide_progress();
 			_escala_cache     = r.message || [];
 			_escala_cache_key = cache_key;
 			_mostrar();
 		},
 		error() {
-			frappe.hide_progress();
 			frappe.show_alert({ message: __("Erro ao carregar a escala."), indicator: "red" });
 		},
 	});
