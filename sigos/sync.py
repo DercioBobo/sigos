@@ -51,10 +51,16 @@ _OPS_MIRROR = [
 
 
 def _copy(src, dst, src_field, dst_field):
-	"""Copy src_field→dst_field if dst has the attr and the value differs. Returns True if changed."""
+	"""
+	Copy src_field→dst_field when the SOURCE has a real value and it differs.
+	Fill, don't clear: an empty source must never blank out the destination
+	(it would wipe required fields like Employee.date_of_joining / company).
+	"""
 	if not hasattr(dst, dst_field):
 		return False
 	val = getattr(src, src_field, None)
+	if val in (None, ""):
+		return False
 	if getattr(dst, dst_field, None) != val:
 		setattr(dst, dst_field, val)
 		return True
