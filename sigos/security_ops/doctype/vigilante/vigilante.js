@@ -16,6 +16,7 @@ frappe.ui.form.on("Vigilante", {
 		sigos.danger_btn(frm, "limpar_escala");
 		_calcular_idade(frm);
 		_colorir_tabs(frm);
+		_setup_proximo_btn(frm);
 	},
 
 	// ─── Field events ──────────────────────────────────────────────────────────
@@ -82,6 +83,34 @@ frappe.ui.form.on("Vigilante", {
 		}
 	},
 });
+
+// ─── "Próximo" tab navigation (only while creating) ──────────────────────────
+function _setup_proximo_btn(frm) {
+	if (!frm.is_new()) return;
+
+	const btn = frm.add_custom_button(__("Próximo →"), () => {
+		const $tabs = _form_tab_links(frm);
+		if ($tabs.length < 2) return;
+
+		const activeIdx = Math.max(0, $tabs.index($tabs.filter(".active")));
+		if (activeIdx >= $tabs.length - 1) {
+			frm.save();                       // last tab → save
+		} else {
+			$tabs.eq(activeIdx + 1).trigger("click");
+			frappe.utils.scroll_to(0);
+		}
+	});
+
+	// Make it stand out as the primary forward action
+	btn.removeClass("btn-default").addClass("btn-primary");
+}
+
+function _form_tab_links(frm) {
+	// Cover Frappe v15 selector variants
+	return $(frm.wrapper).find(
+		".form-tabs-list .nav-link, .form-tabs .nav-link, .nav-tabs .nav-link"
+	);
+}
 
 // ─── Tab colours (Operacional = blue, RH = orange) ───────────────────────────
 function _colorir_tabs(frm) {

@@ -89,7 +89,8 @@
   {
    "fieldname": "data_de_nascimento",
    "fieldtype": "Date",
-   "label": "Data de Nascimento"
+   "label": "Data de Nascimento",
+   "reqd": 1
   },
   {
    "fieldname": "idade",

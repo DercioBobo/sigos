@@ -25,6 +25,7 @@ class Vigilante(Document):
 		self._calcular_idade()
 
 	def validate(self):
+		self._auto_activar_com_posto()
 		self._validar_status_com_posto()
 		self._validar_capacidade_posto()
 		self._validar_link_employee()
@@ -32,6 +33,21 @@ class Vigilante(Document):
 	def on_update(self):
 		self._criar_employee_se_necessario()
 		self._atualizar_ocupacao_postos()
+
+	# ─── Auto-activation ─────────────────────────────────────────────────────────
+
+	def _auto_activar_com_posto(self):
+		"""
+		When a posto is assigned to an admitted vigilante (already has a Funcionário),
+		promote them to Ativo automatically. This keeps posto occupation counters
+		correct — occupation counts only Ativo vigilantes.
+		"""
+		if (
+			self.status == "Pre-Adimissão"
+			and self.posto_de_vigilancia
+			and self.funcionario
+		):
+			self.status = "Ativo"
 
 	# ─── Validation ────────────────────────────────────────────────────────────
 
