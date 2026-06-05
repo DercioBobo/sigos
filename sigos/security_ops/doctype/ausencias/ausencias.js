@@ -70,9 +70,7 @@ function _abrir_quick_add(frm) {
 	const cache_key = `${frm.doc.data}|${frm.doc.periodo}|${frm.doc.grupo_delegados || ""}`;
 
 	const _mostrar = () => {
-		const ja_adicionados = new Set((frm.doc.tabela_ausencia || []).map(r => r.vigilante));
-		const disponiveis    = (_escala_cache || []).filter(v => !ja_adicionados.has(v.vigilante));
-		const total_escala   = (_escala_cache || []).length;
+		const total_escala = (_escala_cache || []).length;
 
 		if (!total_escala) {
 			frappe.msgprint({
@@ -90,103 +88,85 @@ function _abrir_quick_add(frm) {
 			return;
 		}
 
-		if (_quick_dialog) {
-			_quick_dialog.hide();
-			_quick_dialog = null;
-		}
+		if (_quick_dialog) { _quick_dialog.hide(); _quick_dialog = null; }
+
+		// Selection state lives across re-renders (search filtering)
+		const selected = new Set();
 
 		_quick_dialog = new frappe.ui.Dialog({
-			title: __("Registar Ausência"),
+			title: __("Registar Ausências — {0} · {1}", [
+				frappe.datetime.str_to_user(frm.doc.data) || "", frm.doc.periodo || "",
+			]),
+			size: "large",
 			fields: [
 				{
-					fieldtype: "HTML",
-					options: `
-						<div class="sigos-dialog-info">
-							<span class="badge badge-pill badge-light">${total_escala} na escala</span>
-							<span class="badge badge-pill badge-warning">${disponiveis.length} disponíveis</span>
-							<span class="badge badge-pill badge-danger">${ja_adicionados.size} já registado(s)</span>
-						</div>`,
+					fieldname: "tipo_de_ausencia", fieldtype: "Select", label: __("Tipo de Ausência"),
+					options: "Falta\nAtraso\nSaída Antecipada\nSuspensão\nLicença\nOutro",
+					default: "Falta", reqd: 1,
 				},
+				{ fieldname: "cb1", fieldtype: "Column Break" },
 				{
-					fieldname: "vigilante",
-					fieldtype: "Link",
-					label: __("Vigilante"),
-					options: "Vigilante",
-					reqd: 1,
-					get_query: () => ({
-						filters: [
-							["Vigilante", "name", "in", disponiveis.map(v => v.vigilante)],
-						],
-					}),
-					description: __("Apenas vigilantes da escala activa deste período"),
-				},
-				{
-					fieldname: "tipo_de_ausencia",
-					fieldtype: "Select",
-					label: __("Tipo de Ausência"),
-					options: "\nFalta\nAtraso\nSaída Antecipada\nSuspensão\nLicença\nOutro",
-					reqd: 1,
-					default: "Falta",
-				},
-				{
-					fieldname: "proxima_accao",
-					fieldtype: "Select",
-					label: __("Próxima Acção"),
-					options: "\nSem Ação\nSubstituto\nDobra de Turno\nAdiantamento de Turno",
+					fieldname: "proxima_accao", fieldtype: "Select", label: __("Próxima Acção (aplicada a todos)"),
+					options: "Sem Ação\nSubstituto\nDobra de Turno\nAdiantamento de Turno",
 					default: "Sem Ação",
 				},
+				{ fieldname: "sb1", fieldtype: "Section Break" },
+				{
+					fieldname: "pesquisa", fieldtype: "Data", label: __("Pesquisar vigilante"),
+					description: __("Filtra por nome, mecanográfico ou posto"),
+				},
+				{ fieldname: "roster", fieldtype: "HTML" },
 			],
-			primary_action_label: __("Adicionar e Continuar"),
+			primary_action_label: __("Adicionar Seleccionados"),
 			primary_action(values) {
-				const vdata = (_escala_cache || []).find(v => v.vigilante === values.vigilante);
-				if (!vdata) {
-					frappe.show_alert({ message: __("Vigilante não encontrado na escala."), indicator: "red" });
+				if (!selected.size) {
+					frappe.show_alert({ message: __("Seleccione pelo menos um vigilante."), indicator: "orange" }, 3);
 					return;
 				}
+				const tipo  = values.tipo_de_ausencia || "Falta";
+				const accao = values.proxima_accao || "Sem Ação";
+				let added = 0;
 
-				const row             = frm.add_child("tabela_ausencia");
-				row.vigilante         = vdata.vigilante;
-				row.nome_do_vigilante = vdata.nome_completo;
-				row.mecanografico     = vdata.mecanografico;
-				row.posto             = vdata.posto;
-				row.regime            = vdata.regime;
-				row.turno             = vdata.turno;
-				row.periodo           = vdata.periodo;
-				row.delegacao         = vdata.delegacao;
-				row.tipo_de_ausencia  = values.tipo_de_ausencia;
-				row.proxima_accao     = values.proxima_accao || "Sem Ação";
-				// n_de_faltas comes from the API (regime × turno lookup), not hardcoded
-				row.n_de_faltas       = vdata.n_de_faltas ?? 1;
+				selected.forEach(vname => {
+					const vdata = (_escala_cache || []).find(v => v.vigilante === vname);
+					if (!vdata) return;
+					const row             = frm.add_child("tabela_ausencia");
+					row.vigilante         = vdata.vigilante;
+					row.nome_do_vigilante = vdata.nome_completo;
+					row.mecanografico     = vdata.mecanografico;
+					row.posto             = vdata.posto;
+					row.regime            = vdata.regime;
+					row.turno             = vdata.turno;
+					row.periodo           = vdata.periodo;
+					row.delegacao         = vdata.delegacao;
+					row.tipo_de_ausencia  = tipo;
+					row.proxima_accao     = accao;
+					row.n_de_faltas       = vdata.n_de_faltas ?? 1;
+					added++;
+				});
 
 				frm.refresh_field("tabela_ausencia");
 				_atualizar_resumo(frm);
+				frappe.show_alert({ message: __("{0} ausência(s) adicionada(s).", [added]), indicator: "green" }, 4);
 
-				frappe.show_alert({
-					message: `${vdata.nome_completo} — ${values.tipo_de_ausencia}`,
-					indicator: "green",
-				}, 3);
-
-				// Reset only the vigilante field; keep tipo/accao for rapid entry
-				_quick_dialog.set_value("vigilante", "");
-				_quick_dialog.get_field("vigilante").set_focus();
-
-				// Update the badge counts
-				const novo_adicionados = new Set((frm.doc.tabela_ausencia || []).map(r => r.vigilante));
-				const novo_disponiveis = (_escala_cache || []).filter(v => !novo_adicionados.has(v.vigilante));
-				_quick_dialog.fields[0].wrapper.querySelector(".sigos-dialog-info").innerHTML = `
-					<span class="badge badge-pill badge-light">${total_escala} na escala</span>
-					<span class="badge badge-pill badge-warning">${novo_disponiveis.length} disponíveis</span>
-					<span class="badge badge-pill badge-danger">${novo_adicionados.size} já registado(s)</span>`;
+				selected.clear();
+				_render_roster(_quick_dialog, "");   // refresh — added ones become "registado"
 			},
 			secondary_action_label: __("Fechar"),
-			secondary_action() {
-				_quick_dialog.hide();
-				_quick_dialog = null;
-			},
+			secondary_action() { _quick_dialog.hide(); _quick_dialog = null; },
 		});
 
 		_quick_dialog.show();
-		_quick_dialog.get_field("vigilante").set_focus();
+
+		// Search re-renders the roster live
+		_quick_dialog.fields_dict.pesquisa.$input?.on("input", function () {
+			_render_roster(_quick_dialog, this.value || "", selected);
+		});
+
+		_render_roster(_quick_dialog, "", selected);
+
+		// Stash selection so _render_roster can reach it on re-render
+		_quick_dialog._selected = selected;
 	};
 
 	// Use cache if available for this header combination
@@ -214,6 +194,87 @@ function _abrir_quick_add(frm) {
 			frappe.hide_progress();
 			frappe.show_alert({ message: __("Erro ao carregar a escala."), indicator: "red" });
 		},
+	});
+}
+
+// ─── Interactive roster inside the quick-add dialog ───────────────────────────
+function _render_roster(dialog, filtro, selected) {
+	if (!dialog) return;
+	selected = selected || dialog._selected || new Set();
+	dialog._selected = selected;
+
+	const frm = cur_frm;
+	const ja = new Set((frm.doc.tabela_ausencia || []).map(r => r.vigilante));
+	const roster = (_escala_cache || []);
+
+	const q = (filtro || "").trim().toLowerCase();
+	const lista = q
+		? roster.filter(v =>
+			(v.nome_completo || "").toLowerCase().includes(q) ||
+			(v.mecanografico || "").toLowerCase().includes(q) ||
+			(v.posto || "").toLowerCase().includes(q))
+		: roster;
+
+	const disp = roster.filter(v => !ja.has(v.vigilante)).length;
+
+	const cards = lista.map(v => {
+		const registado = ja.has(v.vigilante);
+		const sel = selected.has(v.vigilante);
+		const meta = [v.mecanografico, v.posto, v.turno].filter(Boolean).join(" · ");
+		return `
+			<div class="aus-card ${registado ? "aus-card-done" : ""} ${sel ? "aus-card-sel" : ""}"
+				 data-vig="${registado ? "" : v.vigilante}">
+				<div class="aus-check">${registado ? "✓" : (sel ? "☑" : "☐")}</div>
+				<div class="aus-info">
+					<div class="aus-name">${frappe.utils.escape_html(v.nome_completo || v.vigilante)}</div>
+					<div class="aus-meta">${frappe.utils.escape_html(meta)}</div>
+				</div>
+				${registado ? `<span class="aus-badge-done">${__("registado")}</span>` : ""}
+			</div>`;
+	}).join("");
+
+	const html = `
+		<div class="aus-roster-head">
+			<div class="aus-counts">
+				<span class="aus-pill aus-pill-total">${roster.length} ${__("na escala")}</span>
+				<span class="aus-pill aus-pill-disp">${disp} ${__("disponíveis")}</span>
+				<span class="aus-pill aus-pill-done">${ja.size} ${__("registado(s)")}</span>
+				<span class="aus-pill aus-pill-sel" data-sel-count>${selected.size} ${__("seleccionado(s)")}</span>
+			</div>
+			<div class="aus-bulk">
+				<button class="aus-mini-btn" data-action="all">${__("Seleccionar todos")}</button>
+				<button class="aus-mini-btn" data-action="none">${__("Limpar")}</button>
+			</div>
+		</div>
+		<div class="aus-roster">${cards || `<div class="aus-empty">${__("Nenhum vigilante corresponde à pesquisa.")}</div>`}</div>`;
+
+	const $w = dialog.fields_dict.roster.$wrapper;
+	$w.html(html);
+
+	const refreshCount = () => {
+		$w.find("[data-sel-count]").text(`${selected.size} ${__("seleccionado(s)")}`);
+		const $btn = dialog.$wrapper.find(".btn-primary");
+		$btn.text(selected.size ? __("Adicionar Seleccionados ({0})", [selected.size]) : __("Adicionar Seleccionados"));
+	};
+	refreshCount();
+
+	// Card toggle
+	$w.find(".aus-card[data-vig]").on("click", function () {
+		const vig = $(this).attr("data-vig");
+		if (!vig) return;
+		if (selected.has(vig)) { selected.delete(vig); $(this).removeClass("aus-card-sel"); $(this).find(".aus-check").text("☐"); }
+		else                   { selected.add(vig);    $(this).addClass("aus-card-sel");    $(this).find(".aus-check").text("☑"); }
+		refreshCount();
+	});
+
+	// Bulk select / clear (respects current filter)
+	$w.find('[data-action="all"]').on("click", () => {
+		lista.forEach(v => { if (!ja.has(v.vigilante)) selected.add(v.vigilante); });
+		_render_roster(dialog, filtro, selected);
+	});
+	$w.find('[data-action="none"]').on("click", () => {
+		selected.clear();
+		_render_roster(dialog, filtro, selected);
 	});
 }
 
