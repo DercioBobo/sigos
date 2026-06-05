@@ -15,6 +15,9 @@ def after_migrate():
 	# Turno may not exist when this doctype is first synced — leaving app=NULL.
 	# Orphan detection then deletes it every migrate. We restore it immediately after.
 	_fix_tab_vigilante_do_posto()
+	# Idempotent — creates any custom fields newly added to custom_fields.json
+	# without disturbing existing ones.
+	_load_custom_fields()
 
 
 def _fix_tab_vigilante_do_posto():
