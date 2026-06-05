@@ -8,6 +8,7 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "naming_series",
   "tipo",
   "estado",
   "col_break_1",
@@ -31,6 +32,14 @@
   "termo_de_responsabilidade"
  ],
  "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Série",
+   "options": "DED-.####",
+   "reqd": 1,
+   "set_only_once": 1
+  },
   {
    "fieldname": "tipo",
    "fieldtype": "Select",

@@ -8,6 +8,7 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "naming_series",
   "data",
   "delegacao",
   "sec_colaborador",
@@ -25,6 +26,14 @@
   "detalhes"
  ],
  "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Série",
+   "options": "REP-.####",
+   "reqd": 1,
+   "set_only_once": 1
+  },
   {
    "fieldname": "data",
    "fieldtype": "Date",

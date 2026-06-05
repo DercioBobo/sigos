@@ -8,6 +8,7 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "naming_series",
   "funcionario",
   "tipo_de_subsidios",
   "col_break_1",
@@ -23,6 +24,14 @@
   "data_de_fim"
  ],
  "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Série",
+   "options": "PROV-.####",
+   "reqd": 1,
+   "set_only_once": 1
+  },
   {
    "fieldname": "funcionario",
    "fieldtype": "Link",

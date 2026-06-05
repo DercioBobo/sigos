@@ -8,6 +8,7 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "naming_series",
   "data",
   "delegacao",
   "sec_vig",
@@ -20,6 +21,14 @@
   "motivo"
  ],
  "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Série",
+   "options": "TC-.####",
+   "reqd": 1,
+   "set_only_once": 1
+  },
   {
    "fieldname": "data",
    "fieldtype": "Date",
