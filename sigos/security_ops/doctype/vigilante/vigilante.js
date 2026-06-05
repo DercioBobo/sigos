@@ -84,25 +84,59 @@ frappe.ui.form.on("Vigilante", {
 	},
 });
 
-// ─── "Próximo" tab navigation (only while creating) ──────────────────────────
+// ─── Wizard footer: Anterior / Próximo / Guardar at the bottom of the form ────
 function _setup_proximo_btn(frm) {
+	// Remove any prior footer to avoid duplicates on re-render
+	frm.$wrapper.find(".sigos-wizard-nav").remove();
 	if (!frm.is_new()) return;
 
-	const btn = frm.add_custom_button(__("Próximo →"), () => {
-		const $tabs = _form_tab_links(frm);
-		if ($tabs.length < 2) return;
+	const $footer = $(`
+		<div class="sigos-wizard-nav">
+			<button class="sigos-wz-btn sigos-wz-prev">‹ ${__("Anterior")}</button>
+			<div class="sigos-wz-steps"></div>
+			<button class="sigos-wz-btn sigos-wz-next"></button>
+		</div>`);
 
-		const activeIdx = Math.max(0, $tabs.index($tabs.filter(".active")));
-		if (activeIdx >= $tabs.length - 1) {
-			frm.save();                       // last tab → save
-		} else {
-			$tabs.eq(activeIdx + 1).trigger("click");
-			frappe.utils.scroll_to(0);
-		}
+	// Sits at the bottom of the form body, below the tab content
+	(frm.layout?.wrapper ? $(frm.layout.wrapper) : frm.$wrapper.find(".form-layout")).append($footer);
+
+	const tabs = () => _form_tab_links(frm);
+	const activeIdx = () => { const $t = tabs(); return Math.max(0, $t.index($t.filter(".active"))); };
+
+	const update = () => {
+		const $t = tabs();
+		if ($t.length < 2) { $footer.hide(); return; }
+		$footer.show();
+		const idx = activeIdx();
+		const last = idx >= $t.length - 1;
+
+		$footer.find(".sigos-wz-prev").prop("disabled", idx === 0);
+		$footer.find(".sigos-wz-next")
+			.text(last ? __("Guardar") + " ✓" : __("Próximo") + " ›")
+			.toggleClass("is-save", last);
+
+		const dots = $t.map((i) =>
+			`<span class="sigos-wz-dot ${i === idx ? "active" : ""} ${i < idx ? "done" : ""}"></span>`
+		).get().join("");
+		$footer.find(".sigos-wz-steps").html(
+			`${dots}<span class="sigos-wz-label">${$t.eq(idx).text().trim()}</span>`
+		);
+	};
+
+	$footer.find(".sigos-wz-prev").on("click", () => {
+		const $t = tabs(), idx = activeIdx();
+		if (idx > 0) { $t.eq(idx - 1).trigger("click"); frappe.utils.scroll_to(0); }
+	});
+	$footer.find(".sigos-wz-next").on("click", () => {
+		const $t = tabs(), idx = activeIdx();
+		if (idx >= $t.length - 1) { frm.save(); }
+		else { $t.eq(idx + 1).trigger("click"); frappe.utils.scroll_to(0); }
 	});
 
-	// Make it stand out as the primary forward action
-	btn.removeClass("btn-default").addClass("btn-primary");
+	// Keep footer in sync when the user clicks tabs directly
+	tabs().off("click.sigoswz").on("click.sigoswz", () => setTimeout(update, 60));
+
+	update();
 }
 
 function _form_tab_links(frm) {
