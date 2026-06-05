@@ -23,7 +23,7 @@ class Rotatividade(Document):
 		self._validar_regra_3meses()
 
 	def on_submit(self):
-		if self.workflow_state != "Aprovado":
+		if (self.get("workflow_state") or "Aprovado") != "Aprovado":
 			return
 
 		# 1. Update original vigilante posto

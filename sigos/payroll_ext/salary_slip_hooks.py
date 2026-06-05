@@ -24,6 +24,19 @@ from frappe.utils import getdate, add_days, date_diff
 from sigos.utils import calcular_faltas_vigilante
 
 
+def _aprovado_filter(doctype):
+	"""
+	Return {"workflow_state": "Aprovado"} only if the doctype actually has that
+	field (i.e. a Workflow has been attached). Workflows are created manually,
+	so before one exists the column is absent — filtering on it would raise
+	'Unknown column'. A submitted (docstatus=1) doc without a workflow counts
+	as approved.
+	"""
+	if frappe.get_meta(doctype).has_field("workflow_state"):
+		return {"workflow_state": "Aprovado"}
+	return {}
+
+
 # ─── before_insert ─────────────────────────────────────────────────────────────
 
 def before_insert(doc, method):
@@ -205,15 +218,16 @@ def _add_reclamacao(doc):
 	try:
 		componente = frappe.db.get_single_value("SIGOS Settings", "componente_retroativo") or "Retroativo"
 
+		filters = {
+			"funcionario": doc.employee,
+			"data_de_inicio": ["<=", doc.end_date],
+			"data_de_fim": [">=", doc.start_date],
+			"docstatus": 1,
+		}
+		filters.update(_aprovado_filter("Reclamacao De Salario"))
 		reclamacoes = frappe.get_all(
 			"Reclamacao De Salario",
-			filters=[
-				["funcionario", "=", doc.employee],
-				["data_de_inicio", "<=", doc.end_date],
-				["data_de_fim", ">=", doc.start_date],
-				["docstatus", "=", 1],
-				["workflow_state", "=", "Aprovado"],
-			],
+			filters=filters,
 			fields=["valor_a_reclamar", "name"],
 		)
 
@@ -271,14 +285,15 @@ def _compute_justificadas(doc):
 		return
 
 	try:
+		filters = {
+			"funcionario": doc.employee,
+			"docstatus": 1,
+			"data_do_justificativo": ["between", [inicio, fim]],
+		}
+		filters.update(_aprovado_filter("Justificacao De Faltas"))
 		justificacoes = frappe.get_all(
 			"Justificacao De Faltas",
-			filters={
-				"funcionario": doc.employee,
-				"docstatus": 1,
-				"workflow_state": "Aprovado",
-				"data_do_justificativo": ["between", [inicio, fim]],
-			},
+			filters=filters,
 			fields=["numero"],
 		)
 		doc.custom_faltas_justificadas = sum(j.get("numero") or 0 for j in justificacoes)

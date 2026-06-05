@@ -6,7 +6,7 @@ from frappe.model.document import Document
 class RepreensaoDisciplinar(Document):
 
 	def on_update(self):
-		if self.workflow_state != "Aprovado":
+		if (self.get("workflow_state") or "Aprovado") != "Aprovado":
 			return
 
 		self._verificar_criar_processo_disciplinar()

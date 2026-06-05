@@ -6,7 +6,7 @@ from frappe.model.document import Document
 class TrocaDeRegime(Document):
 
 	def on_submit(self):
-		if self.workflow_state != "Aprovado":
+		if (self.get("workflow_state") or "Aprovado") != "Aprovado":
 			return
 		if not self.vigilante:
 			return
