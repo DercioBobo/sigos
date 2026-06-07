@@ -4,13 +4,13 @@ from frappe.model.document import Document
 from frappe.utils import getdate, today
 
 # Statuses that require an active Employee record
-_REQUER_EMPLOYEE = frozenset({"Pre-Adimissão", "Ativo", "Inactivo", "Demitido"})
+_REQUER_EMPLOYEE = frozenset({"Pre-Adimissão", "Activo", "Inactivo", "Demitido"})
 
 # Canonical Vigilante → Employee status map (single source of truth, shared with sync.py)
 VIGILANTE_TO_EMP_STATUS = {
 	"Pre-Adimissão RH": "Active",
 	"Pre-Adimissão":    "Active",
-	"Ativo":            "Active",
+	"Activo":            "Active",
 	"Inactivo":         "Suspended",
 	"Demitido":         "Left",
 }
@@ -41,15 +41,15 @@ class Vigilante(Document):
 	def _auto_activar_com_posto(self):
 		"""
 		When a posto is assigned to an admitted vigilante (already has a Funcionário),
-		promote them to Ativo automatically. This keeps posto occupation counters
-		correct — occupation counts only Ativo vigilantes.
+		promote them to Activo automatically. This keeps posto occupation counters
+		correct — occupation counts only Activo vigilantes.
 		"""
 		if (
 			self.status == "Pre-Adimissão"
 			and self.posto_de_vigilancia
 			and self.funcionario
 		):
-			self.status = "Ativo"
+			self.status = "Activo"
 
 	# ─── Validation ────────────────────────────────────────────────────────────
 
@@ -132,15 +132,15 @@ class Vigilante(Document):
 				)
 
 	def _validar_status_com_posto(self):
-		if self.status == "Ativo" and not self.posto_de_vigilancia:
+		if self.status == "Activo" and not self.posto_de_vigilancia:
 			frappe.throw(
-				_("Um Vigilante com estado <b>Ativo</b> deve ter um Posto de Vigilância atribuído."),
+				_("Um Vigilante com estado <b>Activo</b> deve ter um Posto de Vigilância atribuído."),
 				title=_("Posto Obrigatório"),
 			)
 
 	def _validar_capacidade_posto(self):
 		"""Prevent assigning more vigilantes than the posto's maximum."""
-		if not self.posto_de_vigilancia or self.status != "Ativo":
+		if not self.posto_de_vigilancia or self.status != "Activo":
 			return
 
 		max_vagas = frappe.db.get_value(
@@ -155,7 +155,7 @@ class Vigilante(Document):
 			"Vigilante",
 			{
 				"posto_de_vigilancia": self.posto_de_vigilancia,
-				"status": "Ativo",
+				"status": "Activo",
 				"name": ["!=", self.name or "__new__"],
 			},
 		)
@@ -201,14 +201,14 @@ class Vigilante(Document):
 
 	def _criar_employee_se_necessario(self):
 		"""
-		Auto-create an Employee when RH admits (status → Pre-Adimissão/Ativo).
+		Auto-create an Employee when RH admits (status → Pre-Adimissão/Activo).
 		Runs inside validate() so self.funcionario is set BEFORE the link check.
 		On failure it raises a clear error instead of silently leaving the guard
 		without an Employee (which would trip _validar_link_employee downstream).
 		"""
 		if self.funcionario:
 			return
-		if self.status not in ("Pre-Adimissão", "Ativo"):
+		if self.status not in ("Pre-Adimissão", "Activo"):
 			return
 
 		empresa = self.empresa or frappe.db.get_single_value("SIGOS Settings", "empresa_padrao")

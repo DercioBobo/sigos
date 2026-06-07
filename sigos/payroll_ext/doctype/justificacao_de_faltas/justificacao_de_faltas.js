@@ -2,7 +2,7 @@ frappe.ui.form.on("Justificacao De Faltas", {
 
 	onload(frm) {
 		frm.set_query("vigilante", () => ({
-			filters: { status: "Ativo" }
+			filters: { status: "Activo" }
 		}));
 	},
 

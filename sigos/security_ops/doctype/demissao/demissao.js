@@ -9,7 +9,7 @@ frappe.ui.form.on("Demissao", {
 
 	onload(frm) {
 		frm.set_query("vigilante", () => ({
-			filters: { status: "Ativo" },
+			filters: { status: "Activo" },
 		}));
 	},
 });

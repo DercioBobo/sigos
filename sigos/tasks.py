@@ -17,7 +17,7 @@ def _verificar_postos_temporarios():
 		"Posto De Vigilancia",
 		filters={
 			"tipo_de_posto": "Temporário",
-			"estado": "Ativo",
+			"estado": "Activo",
 			"aviso_expiracao_enviado": 0,
 			"data_fim_prevista": ["<=", today()],
 		},

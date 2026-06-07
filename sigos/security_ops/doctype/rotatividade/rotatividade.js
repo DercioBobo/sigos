@@ -13,11 +13,11 @@ frappe.ui.form.on("Rotatividade", {
 	},
 
 	onload(frm) {
-		// Filter novo_posto by delegacao + estado=Ativo
+		// Filter novo_posto by delegacao + estado=Activo
 		frm.set_query("novo_posto", () => ({
 			filters: {
 				delegacao: frm.doc.delegacao,
-				estado: "Ativo"
+				estado: "Activo"
 			}
 		}));
 
@@ -25,23 +25,23 @@ frappe.ui.form.on("Rotatividade", {
 		frm.set_query("novo_posto_do_reserva", () => ({
 			filters: {
 				delegacao: frm.doc.delegacao,
-				estado: "Ativo"
+				estado: "Activo"
 			}
 		}));
 
-		// Filter vigilante: Ativo, not Administrativo
+		// Filter vigilante: Activo, not Administrativo
 		frm.set_query("vigilante", () => ({
 			filters: [
-				["status", "=", "Ativo"],
+				["status", "=", "Activo"],
 				["categoria", "!=", "Administrativo"]
 			]
 		}));
 
-		// Filter novo_vigilante: same delegacao, Ativo, not Administrativo
+		// Filter novo_vigilante: same delegacao, Activo, not Administrativo
 		frm.set_query("novo_vigilante", () => ({
 			filters: [
 				["delegacao", "=", frm.doc.delegacao],
-				["status", "=", "Ativo"],
+				["status", "=", "Activo"],
 				["categoria", "!=", "Administrativo"]
 			]
 		}));
@@ -51,20 +51,20 @@ frappe.ui.form.on("Rotatividade", {
 		frm.set_query("novo_posto", () => ({
 			filters: {
 				delegacao: frm.doc.delegacao,
-				estado: "Ativo"
+				estado: "Activo"
 			}
 		}));
 		frm.set_query("novo_vigilante", () => ({
 			filters: [
 				["delegacao", "=", frm.doc.delegacao],
-				["status", "=", "Ativo"],
+				["status", "=", "Activo"],
 				["categoria", "!=", "Administrativo"]
 			]
 		}));
 		frm.set_query("novo_posto_do_reserva", () => ({
 			filters: {
 				delegacao: frm.doc.delegacao,
-				estado: "Ativo"
+				estado: "Activo"
 			}
 		}));
 	},

@@ -12,11 +12,11 @@ frappe.ui.form.on("Posto De Vigilancia", {
 		_mostrar_aviso_temporario(frm);
 
 		if (!frm.is_new()) {
-			// Schedule preview — available for any saved posto (Ativo, Inativo, or Arquivado)
+			// Schedule preview — available for any saved posto (Activo, Inactivo, or Arquivado)
 			frm.add_custom_button(__("Ver Escala"), () => _ver_escala_preview(frm), __("Acções"));
 		}
 
-		if (!frm.is_new() && frm.doc.estado === "Ativo") {
+		if (!frm.is_new() && frm.doc.estado === "Activo") {
 			// General assignment: admitted vigilantes without a posto
 			frm.add_custom_button(__("Atribuir Vigilantes"), () => _atribuir_vigilantes(frm), __("Acções"));
 

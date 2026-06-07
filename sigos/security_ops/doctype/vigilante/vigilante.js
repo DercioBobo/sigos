@@ -19,7 +19,7 @@ frappe.ui.form.on("Vigilante", {
 		_setup_proximo_btn(frm);
 
 		// Ver Escala — only for active guards already assigned to a posto
-		if (!frm.is_new() && frm.doc.status === "Ativo" && frm.doc.posto_de_vigilancia) {
+		if (!frm.is_new() && frm.doc.status === "Activo" && frm.doc.posto_de_vigilancia) {
 			frm.add_custom_button(__("Ver Escala"), () => {
 				sigos.show_escala_preview({
 					posto: frm.doc.posto_de_vigilancia,
@@ -85,7 +85,7 @@ frappe.ui.form.on("Vigilante", {
 			}, __("Ações"));
 		}
 
-		// Ops: Pre-Adimissão → Ativo
+		// Ops: Pre-Adimissão → Activo
 		if (frappe.user.has_role("Aprovador Operações") && frm.doc.status === "Pre-Adimissão") {
 			frm.add_custom_button(__("Ativar"), () => {
 				frappe.confirm(
@@ -93,7 +93,7 @@ frappe.ui.form.on("Vigilante", {
 					() => {
 						frappe.call({
 							method: "frappe.client.set_value",
-							args: { doctype: "Vigilante", name: frm.doc.name, fieldname: "status", value: "Ativo" },
+							args: { doctype: "Vigilante", name: frm.doc.name, fieldname: "status", value: "Activo" },
 							callback: () => frm.reload_doc(),
 						});
 					}

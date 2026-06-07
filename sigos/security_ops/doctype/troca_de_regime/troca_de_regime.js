@@ -8,7 +8,7 @@ frappe.ui.form.on("Troca De Regime", {
 
 	onload(frm) {
 		frm.set_query("vigilante", () => ({
-			filters: { status: "Ativo" },
+			filters: { status: "Activo" },
 		}));
 	},
 });

@@ -84,14 +84,14 @@ class PostoDeVigilancia(Document):
 		from sigos.utils import atualizar_ocupacao_posto
 		atualizar_ocupacao_posto(self.name)
 
-	# ─── Estado (Ativo / Inativo) ───────────────────────────────────────────────
+	# ─── Estado (Activo / Inactivo) ───────────────────────────────────────────────
 
 	def _tratar_estado(self, before):
 		if not before or before.estado == self.estado:
 			return
 
-		# Ativo → Inativo: archive active escalas so they stop generating
-		if self.estado == "Inativo":
+		# Activo → Inactivo: archive active escalas so they stop generating
+		if self.estado == "Inactivo":
 			escalas = frappe.get_all(
 				"Escala Do Vigilante",
 				filters={"posto_de_vigilancia": self.name, "estado": "Activo"},
@@ -100,7 +100,7 @@ class PostoDeVigilancia(Document):
 			for e in escalas:
 				frappe.db.set_value("Escala Do Vigilante", e, "estado", "Arquivado", update_modified=False)
 
-			vigs = frappe.db.count("Vigilante", {"posto_de_vigilancia": self.name, "status": "Ativo"})
+			vigs = frappe.db.count("Vigilante", {"posto_de_vigilancia": self.name, "status": "Activo"})
 
 			msg = []
 			if escalas:
@@ -111,8 +111,8 @@ class PostoDeVigilancia(Document):
 			if msg:
 				frappe.msgprint("<br>".join(msg), title=_("Posto Inactivado"), indicator="orange")
 
-		# Inativo → Ativo: just a hint (escalas are not auto-reactivated)
-		elif self.estado == "Ativo":
+		# Inactivo → Activo: just a hint (escalas are not auto-reactivated)
+		elif self.estado == "Activo":
 			arquivadas = frappe.db.count(
 				"Escala Do Vigilante",
 				{"posto_de_vigilancia": self.name, "estado": "Arquivado"},

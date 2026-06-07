@@ -26,7 +26,7 @@ def _vigilantes_com_escala_futura(excluir_escala=None):
 @frappe.whitelist()
 def get_reservas_disponiveis(delegacao=None, excluir_escala=None):
 	"""
-	Return Ativo reserve-pool vigilantes (Categoria pode_ser_substituto = 1) that are
+	Return Activo reserve-pool vigilantes (Categoria pode_ser_substituto = 1) that are
 	NOT already committed to an active escala. Used by the Escala 'Alocar Reservas' dialog.
 	"""
 	cats = frappe.get_all(
@@ -37,7 +37,7 @@ def get_reservas_disponiveis(delegacao=None, excluir_escala=None):
 
 	ocupados = set(_vigilantes_com_escala_futura(excluir_escala=excluir_escala))
 
-	filters = {"status": "Ativo", "categoria": ["in", cats]}
+	filters = {"status": "Activo", "categoria": ["in", cats]}
 	if delegacao:
 		filters["delegacao"] = delegacao
 
@@ -67,7 +67,7 @@ def alocar_reservas(posto, vigilantes, regime=None):
 
 	max_vagas = frappe.db.get_value("Posto De Vigilancia", posto, "numero_de_vagas") or 0
 	if max_vagas:
-		atual = frappe.db.count("Vigilante", {"posto_de_vigilancia": posto, "status": "Ativo"})
+		atual = frappe.db.count("Vigilante", {"posto_de_vigilancia": posto, "status": "Activo"})
 		a_adicionar = sum(
 			1 for v in vigilantes
 			if frappe.db.get_value("Vigilante", v, "posto_de_vigilancia") != posto
@@ -119,7 +119,7 @@ def get_substitutos_disponiveis(doctype, txt, searchfield, start, page_len, filt
 		f"""
 		SELECT v.name, v.nome_completo, v.categoria
 		FROM `tabVigilante` v
-		WHERE v.status    = 'Ativo'
+		WHERE v.status    = 'Activo'
 		  AND v.categoria IN %(cats)s
 		  AND (v.name LIKE %(txt)s OR v.nome_completo LIKE %(txt)s)
 		  {delegacao_sql}
@@ -169,7 +169,7 @@ def get_substitutos_para_wizard(doctype, txt, searchfield, start, page_len, filt
 		f"""
 		SELECT v.name, v.nome_completo, v.categoria
 		FROM `tabVigilante` v
-		WHERE v.status    = 'Ativo'
+		WHERE v.status    = 'Activo'
 		  AND v.categoria IN %(cats)s
 		  AND (v.name LIKE %(txt)s OR v.nome_completo LIKE %(txt)s)
 		  {not_in}
@@ -270,7 +270,7 @@ def get_vigilantes_sem_escala_activa_query(doctype, txt, searchfield, start, pag
 		f"""
 		SELECT v.name, v.nome_completo
 		FROM `tabVigilante` v
-		WHERE v.status = 'Ativo'
+		WHERE v.status = 'Activo'
 		  AND (v.name LIKE %(txt)s OR v.nome_completo LIKE %(txt)s)
 		  {not_in}
 		ORDER BY v.nome_completo
@@ -295,7 +295,7 @@ def get_vigilantes_sem_escala_activa(escala_name, delegacao=None):
 	ocupados = _vigilantes_com_escala_futura(excluir_escala=escala_name)
 
 	filters = [
-		["status", "=", "Ativo"],
+		["status", "=", "Activo"],
 	]
 	if ocupados:
 		filters.append(["name", "not in", ocupados])
@@ -726,13 +726,13 @@ def get_ausencias(from_date=None, to_date=None, delegacao=None, periodo=None, li
 @frappe.whitelist()
 def get_vigilantes_sem_posto(delegacao=None):
 	"""
-	Return admitted vigilantes (Pre-Adimissao or Ativo) that:
+	Return admitted vigilantes (Pre-Adimissao or Activo) that:
 	  - have no posto assigned
 	  - have a linked Employee (funcionario is set)
 	Used by the Atribuir Vigilantes dialog on Posto De Vigilancia.
 	"""
 	filters = {
-		"status":              ["in", ["Pre-Adimissão", "Ativo"]],
+		"status":              ["in", ["Pre-Adimissão", "Activo"]],
 		"posto_de_vigilancia": ["is", "not set"],
 		"funcionario":         ["is", "set"],
 	}
@@ -763,9 +763,9 @@ def atribuir_vigilantes_ao_posto(posto, vigilantes, regime=None):
 
 	posto_doc = frappe.get_doc("Posto De Vigilancia", posto)
 
-	if posto_doc.estado != "Ativo":
+	if posto_doc.estado != "Activo":
 		frappe.throw(
-			_("O posto <b>{0}</b> deve estar <b>Ativo</b> para receber vigilantes.").format(posto),
+			_("O posto <b>{0}</b> deve estar <b>Activo</b> para receber vigilantes.").format(posto),
 			title=_("Posto Inactivo"),
 		)
 
@@ -773,7 +773,7 @@ def atribuir_vigilantes_ao_posto(posto, vigilantes, regime=None):
 	if max_vagas:
 		atual = frappe.db.count(
 			"Vigilante",
-			{"posto_de_vigilancia": posto, "status": ["in", ["Pre-Adimissão", "Ativo"]]},
+			{"posto_de_vigilancia": posto, "status": ["in", ["Pre-Adimissão", "Activo"]]},
 		)
 		livres = max_vagas - atual
 		if len(vigilantes) > livres:

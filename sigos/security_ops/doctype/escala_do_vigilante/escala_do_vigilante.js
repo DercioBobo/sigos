@@ -8,7 +8,7 @@ frappe.ui.form.on("Escala Do Vigilante", {
 	},
 
 	onload(frm) {
-		frm.set_query("posto_de_vigilancia", () => ({ filters: { estado: "Ativo" } }));
+		frm.set_query("posto_de_vigilancia", () => ({ filters: { estado: "Activo" } }));
 	},
 
 	posto_de_vigilancia(frm) {
@@ -117,7 +117,7 @@ function _sincronizar_vigilantes(frm) {
 				["posto_de_vigilancia", "=", frm.doc.posto_de_vigilancia],
 				["regime_do_vigilante", "=", frm.doc.regime_do_vigilante],
 				["categoria", "!=", "Administrativo"],
-				["status", "=", "Ativo"],
+				["status", "=", "Activo"],
 			],
 			fields: ["name", "nome_completo"],
 			limit_page_length: 0,

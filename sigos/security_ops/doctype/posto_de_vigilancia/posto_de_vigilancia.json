@@ -59,8 +59,8 @@
    "fieldname": "estado",
    "fieldtype": "Select",
    "label": "Estado",
-   "options": "Ativo\nInativo",
-   "default": "Ativo",
+   "options": "Activo\nInactivo",
+   "default": "Activo",
    "in_list_view": 1,
    "in_standard_filter": 1
   },
@@ -274,11 +274,11 @@
  "states": [
   {
    "color": "Green",
-   "title": "Ativo"
+   "title": "Activo"
   },
   {
    "color": "Gray",
-   "title": "Inativo"
+   "title": "Inactivo"
   }
  ],
  "title_field": "nome_do_posto",

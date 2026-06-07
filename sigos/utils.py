@@ -84,7 +84,7 @@ def atualizar_ocupacao_posto(posto_name: str):
 
 		atual = frappe.db.count(
 			"Vigilante",
-			{"posto_de_vigilancia": posto_name, "status": "Ativo"},
+			{"posto_de_vigilancia": posto_name, "status": "Activo"},
 		)
 
 		if max_vagas == 0:

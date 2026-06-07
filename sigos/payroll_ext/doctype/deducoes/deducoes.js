@@ -31,7 +31,7 @@ async function _ded_verificar_emprestimo_ativo(frm) {
 	if (result.message && result.message.length > 0) {
 		const ativo = result.message[0];
 		frappe.msgprint({
-			title: __("Empréstimo Ativo Encontrado"),
+			title: __("Empréstimo Activo Encontrado"),
 			message: __(
 				`Este funcionário já possui um empréstimo em andamento.<br><br>` +
 				`<b>Dedução:</b> ${ativo.name}<br>` +
