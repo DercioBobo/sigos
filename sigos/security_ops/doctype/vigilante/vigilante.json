@@ -466,5 +466,7 @@
  ],
  "title_field": "nome_completo",
  "track_changes": 1,
- "app": "sigos"
+ "app": "sigos",
+ "show_title_field_in_link": 1,
+ "search_fields": "nome_completo,mecanografico"
 }
