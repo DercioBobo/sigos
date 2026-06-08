@@ -116,6 +116,13 @@ def vigilante_to_employee(doc, method=None):
 			if _copy(doc, emp, vig_f, emp_f):
 				changed = True
 
+		# HRMS requires relieving_date whenever Employee status is Left — guarantee it
+		# before saving (status may have been set Left by an earlier direct DB write).
+		if emp.status == "Left" and not emp.get("relieving_date"):
+			from frappe.utils import today
+			emp.relieving_date = today()
+			changed = True
+
 		if changed:
 			emp.save(ignore_permissions=True)
 

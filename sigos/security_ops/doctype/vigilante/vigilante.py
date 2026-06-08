@@ -52,7 +52,12 @@ class Vigilante(Document):
 
 		old_posto, old_regime = before.posto_de_vigilancia, before.regime_do_vigilante
 		new_posto, new_regime = self.posto_de_vigilancia, self.regime_do_vigilante
-		if (old_posto, old_regime) == (new_posto, new_regime):
+
+		# Trigger on posto/regime change OR on activeness change (e.g. demissão:
+		# status leaves Activo with same posto, so they must be pulled from the escala).
+		posto_regime_mudou = (old_posto, old_regime) != (new_posto, new_regime)
+		activo_mudou = (before.status == "Activo") != (self.status == "Activo")
+		if not (posto_regime_mudou or activo_mudou):
 			return
 
 		# Only place the guard into a new escala if they are active and assigned.
@@ -108,6 +113,8 @@ class Vigilante(Document):
 			return  # new doc — initial regime is fine
 		if before.regime_do_vigilante == self.regime_do_vigilante:
 			return  # unchanged
+		if self.status != "Activo":
+			return  # only active scheduled guards are protected (demissão/inactive may clear regime)
 		if self.flags.get("via_troca_regime"):
 			return  # the Troca De Regime flow set this — allow
 
