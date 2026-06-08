@@ -28,6 +28,13 @@ frappe.ui.form.on("Vigilante", {
 				});
 			}, __("Acções"));
 		}
+
+		// Rotacionar — launch the wizard pre-filled with this guard
+		if (!frm.is_new() && frm.doc.status === "Activo") {
+			frm.add_custom_button(__("Rotacionar"), () => {
+				sigos.rotatividade_wizard({ vigilante: frm.doc.name });
+			}, __("Acções"));
+		}
 	},
 
 	// ─── Field events ──────────────────────────────────────────────────────────
