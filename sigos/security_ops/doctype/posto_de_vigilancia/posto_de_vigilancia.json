@@ -27,6 +27,7 @@
   "sec_contrato",
   "cliente",
   "project",
+  "posto_interno",
   "col_pv_3",
   "delegacao",
   "sec_loc",
@@ -158,17 +159,20 @@
   {
    "fieldname": "cliente",
    "fieldtype": "Link",
-   "label": "Cliente",
+   "label": "Cliente (do Contrato)",
    "options": "Customer",
-   "reqd": 1,
    "in_list_view": 1,
-   "in_standard_filter": 1
+   "in_standard_filter": 1,
+   "read_only": 1,
+   "fetch_from": "project.customer"
   },
   {
    "fieldname": "project",
    "fieldtype": "Link",
    "label": "Contrato (Projecto)",
-   "options": "Project"
+   "options": "Project",
+   "mandatory_depends_on": "eval:!doc.posto_interno",
+   "in_standard_filter": 1
   },
   {
    "fieldname": "col_pv_3",
@@ -199,6 +203,13 @@
    "fieldtype": "Data",
    "label": "Coordenadas GPS",
    "description": "Latitude, Longitude"
+  },
+  {
+   "fieldname": "posto_interno",
+   "fieldtype": "Check",
+   "label": "Posto Interno (sem contrato)",
+   "default": "0",
+   "description": "Posto da própria empresa — sem cliente/contrato, não é facturado."
   }
  ],
  "links": [

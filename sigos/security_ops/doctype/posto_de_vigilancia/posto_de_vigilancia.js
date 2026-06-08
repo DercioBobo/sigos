@@ -1,10 +1,8 @@
 frappe.ui.form.on("Posto De Vigilancia", {
 
 	onload(frm) {
-		frm.set_query("cliente", () => ({ filters: { disabled: 0 } }));
-		frm.set_query("project", () => ({
-			filters: { customer: frm.doc.cliente, is_active: "Yes" },
-		}));
+		// Project (contract) is the driver; Cliente is derived from project.customer.
+		frm.set_query("project", () => ({ filters: { is_active: "Yes" } }));
 	},
 
 	refresh(frm) {
@@ -43,11 +41,9 @@ frappe.ui.form.on("Posto De Vigilancia", {
 		_mostrar_indicador(frm);
 	},
 
-	cliente(frm) {
-		frm.set_value("project", "");
-		frm.set_query("project", () => ({
-			filters: { customer: frm.doc.cliente, is_active: "Yes" },
-		}));
+	posto_interno(frm) {
+		// Internal posts carry no contract — clear the project (customer follows).
+		if (frm.doc.posto_interno) frm.set_value("project", "");
 	},
 });
 
