@@ -1,6 +1,16 @@
-// SIGOS – global client utilities
+// SIGOS - global client utilities
 
 frappe.provide("sigos");
+
+// Load the Barlow Semi Condensed display font once (robust alternative to a CSS @import).
+(function () {
+	if (document.getElementById("sigos-font")) return;
+	const l = document.createElement("link");
+	l.id = "sigos-font";
+	l.rel = "stylesheet";
+	l.href = "https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&display=swap";
+	document.head.appendChild(l);
+})();
 
 sigos.get_settings = function () {
 	return frappe.xcall("frappe.client.get", {

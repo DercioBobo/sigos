@@ -1,0 +1,7 @@
+# Force LF + UTF-8 for source assets so the Windows->Linux round-trip never
+# introduces CRLF or encoding corruption (which previously mangled the built CSS).
+*.css   text eol=lf
+*.js    text eol=lf
+*.py    text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf

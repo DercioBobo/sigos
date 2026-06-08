@@ -1,5 +1,6 @@
 /* SIGOS - global styles */
-@import url('https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&display=swap');
+/* Barlow Semi Condensed font is loaded via a JS-injected <link> in sigos.js
+   (an @import of an external URL here can make the CSS bundler choke). */
 
 :root {
 	/* Condensed display face for schedule numerals/headers - industrial register */
