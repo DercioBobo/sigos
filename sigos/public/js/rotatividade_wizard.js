@@ -1,266 +1,343 @@
-// SIGOS — Rotatividade wizard (operational command console)
+// SIGOS — Rotatividade wizard (operational command console, v2)
 frappe.provide("sigos");
 
 sigos.rotatividade_wizard = function (prefill = {}) {
-	const state = {
-		stepIdx: 0,
-		op: null,
-		flags: {},
-		estado: null,        // current state of the selected guard
+	const S = {
+		step: 0, dir: 1,
+		operacoes: [], op: null, flags: {},
+		vig: null,
+		novo_posto: null, novo_regime: null, nova_categoria: null,
+		motivo: "", motiv_demi: "", uniforme: "", motivo_3meses: "",
+		sub: null,
 	};
-
-	const MOTIVO_DEMI = "\nFim de Contrato\nAbandono\nJusta Causa\nAcordo Mútuo\nOutro";
+	const controls = {};
 
 	const d = new frappe.ui.Dialog({
 		title: __("Rotatividade"),
 		size: "large",
-		fields: [
-			{ fieldname: "wz_head", fieldtype: "HTML" },
-
-			// ── Step 1: Operação + Vigilante ──
-			{
-				fieldname: "operacao", fieldtype: "Link", options: "Operacao De Rotatividade",
-				label: __("Operação"), reqd: 1, get_query: () => ({ filters: { activo: 1 } }),
-			},
-			{ fieldname: "cb1", fieldtype: "Column Break" },
-			{
-				fieldname: "vigilante", fieldtype: "Link", options: "Vigilante",
-				label: __("Vigilante"), reqd: 1, get_query: () => ({ filters: { status: "Activo" } }),
-			},
-			{ fieldname: "estado_card", fieldtype: "HTML" },
-
-			// ── Step 2: Mudanças ──
-			{ fieldname: "novo_posto", fieldtype: "Link", options: "Posto De Vigilancia", label: __("Novo Posto") },
-			{ fieldname: "cb2", fieldtype: "Column Break" },
-			{ fieldname: "novo_regime", fieldtype: "Link", options: "Regime", label: __("Novo Regime") },
-			{ fieldname: "nova_categoria", fieldtype: "Link", options: "Categoria Vigilante", label: __("Nova Categoria") },
-			{ fieldname: "motivo", fieldtype: "Select", label: __("Motivo"),
-			  options: "\nTransferência\nReserva\nDemissão\nDisciplinar\nOutro" },
-			{ fieldname: "motiv_demi", fieldtype: "Select", label: __("Motivo de Demissão"), options: MOTIVO_DEMI },
-			{ fieldname: "uniforme", fieldtype: "Select", label: __("Uniforme"), options: "\nEntregue\nNão Entregue" },
-			{ fieldname: "motivo_3meses", fieldtype: "Small Text", label: __("Justificação (antes do mínimo de dias)") },
-
-			// ── Step 3: Substituto ──
-			{
-				fieldname: "novo_vigilante", fieldtype: "Link", options: "Vigilante", label: __("Vigilante Substituto"),
-				get_query: () => ({
-					query: "sigos.api.get_substitutos_disponiveis",
-					filters: { delegacao: state.estado?.delegacao || "", excluir: d.get_value("vigilante") || "" },
-				}),
-			},
-			{ fieldname: "sub_card", fieldtype: "HTML" },
-
-			// ── Step 4: Preview ──
-			{ fieldname: "preview", fieldtype: "HTML" },
-		],
+		fields: [{ fieldname: "body", fieldtype: "HTML" }],
 		primary_action_label: __("Próximo →"),
 		primary_action: () => _advance(),
 	});
+	d.$wrapper.addClass("sigos-rotw sigos-rotw2");
+	const $body = () => d.fields_dict.body.$wrapper;
 
-	d.$wrapper.addClass("sigos-rotw");
-
-	// Steps definition (step 3 is conditional on requer_substituto)
-	const STEPS = [
-		{ key: "ident", label: __("Operação & Vigilante"), fields: ["operacao", "vigilante"] },
-		{ key: "mudancas", label: __("Mudanças"), fields: [] },     // computed per op
-		{ key: "substituto", label: __("Substituto"), fields: ["novo_vigilante"] },
-		{ key: "preview", label: __("Confirmação"), fields: [] },
-	];
-
-	const ALL_STEP2 = ["novo_posto", "novo_regime", "nova_categoria", "motivo", "motiv_demi", "uniforme", "motivo_3meses"];
-	const ALL_FIELDS = ["operacao", "vigilante", "estado_card", ...ALL_STEP2, "novo_vigilante", "sub_card", "preview"];
-
-	function _activeSteps() {
-		// Skip the substituto step when the operation doesn't require one
-		return STEPS.filter((s) => s.key !== "substituto" || state.flags.requer_substituto);
+	const STEP_LABELS = {
+		ident: __("Operação & Vigilante"), mudancas: __("Mudanças"),
+		substituto: __("Substituto"), preview: __("Confirmação"),
+	};
+	function _steps() {
+		return ["ident", "mudancas", "substituto", "preview"]
+			.filter((s) => s !== "substituto" || S.flags.requer_substituto);
 	}
 
-	function _step2Fields() {
-		const f = [];
-		if (state.flags.muda_posto) f.push("novo_posto");
-		if (state.flags.muda_regime) f.push("novo_regime");
-		if (state.flags.muda_categoria) f.push("nova_categoria");
-		f.push("motivo");
-		if (state.flags.demite || d.get_value("motivo") === "Demissão") { f.push("motiv_demi", "uniforme"); }
-		f.push("motivo_3meses");
-		return f;
-	}
+	// ── boot: load operations ──
+	frappe.call({
+		method: "frappe.client.get_list",
+		args: {
+			doctype: "Operacao De Rotatividade",
+			filters: { activo: 1 },
+			fields: ["name", "abreviatura", "operacao", "muda_posto", "muda_regime",
+				"muda_categoria", "requer_substituto", "demite", "descricao"],
+			order_by: "abreviatura", limit_page_length: 0,
+		},
+		callback: (r) => { S.operacoes = r.message || []; _render(); },
+	});
+	d.show();
 
-	// ── Operation flags load ──
-	d.fields_dict.operacao.df.onchange = () => {
-		const op = d.get_value("operacao");
-		if (!op) { state.op = null; state.flags = {}; return; }
-		frappe.db.get_doc("Operacao De Rotatividade", op).then((doc) => {
-			state.op = doc;
-			state.flags = {
-				muda_posto: !!doc.muda_posto, muda_regime: !!doc.muda_regime,
-				muda_categoria: !!doc.muda_categoria, demite: !!doc.demite,
-				requer_substituto: !!doc.requer_substituto,
-			};
-			_renderHead();
-		});
-	};
-
-	d.fields_dict.vigilante.df.onchange = () => {
-		const v = d.get_value("vigilante");
-		if (!v) { state.estado = null; _renderEstadoCard(); return; }
-		frappe.db.get_doc("Vigilante", v).then((doc) => {
-			state.estado = {
-				nome: doc.nome_completo, posto: doc.posto_de_vigilancia, regime: doc.regime_do_vigilante,
-				categoria: doc.categoria, delegacao: doc.delegacao, mecanografico: doc.mecanografico,
-				status: doc.status,
-			};
-			_renderEstadoCard();
-		});
-	};
-
-	d.fields_dict.motivo.df.onchange = () => _render();
-
-	// ── Navigation ──
+	// ── navigation ──
 	function _advance() {
-		const steps = _activeSteps();
-		const cur = steps[state.stepIdx];
-
-		if (!_validateStep(cur)) return;
-
-		if (state.stepIdx >= steps.length - 1) { _confirm(); return; }
-		state.stepIdx += 1;
-		_render();
+		const steps = _steps();
+		const key = steps[S.step];
+		if (!_validate(key)) return;
+		if (S.step >= steps.length - 1) { _confirm(); return; }
+		S.dir = 1; S.step += 1; _render();
 	}
-
 	function _back() {
-		if (state.stepIdx === 0) { d.hide(); return; }
-		state.stepIdx -= 1;
-		_render();
+		if (S.step === 0) { d.hide(); return; }
+		S.dir = -1; S.step -= 1; _render();
 	}
-
-	function _validateStep(step) {
-		if (step.key === "ident") {
-			if (!d.get_value("operacao") || !d.get_value("vigilante")) {
-				frappe.show_alert({ message: __("Escolha a operação e o vigilante."), indicator: "orange" }, 3);
-				return false;
-			}
+	function _validate(key) {
+		if (key === "ident") {
+			if (!S.op) { _toast(__("Escolha uma operação.")); return false; }
+			if (!S.vig) { _toast(__("Escolha um vigilante.")); return false; }
 		}
-		if (step.key === "mudancas") {
-			for (const f of _step2Fields()) {
-				const req = (f === "novo_posto" && state.flags.muda_posto) ||
-					(f === "novo_regime" && state.flags.muda_regime) ||
-					(f === "nova_categoria" && state.flags.muda_categoria);
-				if (req && !d.get_value(f)) {
-					frappe.show_alert({ message: __("Preencha os campos da mudança."), indicator: "orange" }, 3);
-					return false;
-				}
-			}
+		if (key === "mudancas") {
+			if (S.flags.muda_posto && !S.novo_posto) { _toast(__("Indique o novo posto.")); return false; }
+			if (S.flags.muda_regime && !S.novo_regime) { _toast(__("Indique o novo regime.")); return false; }
+			if (S.flags.muda_categoria && !S.nova_categoria) { _toast(__("Indique a nova categoria.")); return false; }
 		}
 		return true;
 	}
+	function _toast(m) { frappe.show_alert({ message: m, indicator: "orange" }, 3); }
 
-	// ── Rendering ──
+	// ── render ──
 	function _render() {
-		const steps = _activeSteps();
-		const cur = steps[state.stepIdx];
-
-		// hide everything, then reveal the current step's fields
-		ALL_FIELDS.forEach((f) => d.set_df_property(f, "hidden", 1));
-
-		if (cur.key === "ident") {
-			["operacao", "vigilante", "estado_card"].forEach((f) => d.set_df_property(f, "hidden", 0));
-			_renderEstadoCard();
-		} else if (cur.key === "mudancas") {
-			_step2Fields().forEach((f) => d.set_df_property(f, "hidden", 0));
-		} else if (cur.key === "substituto") {
-			["novo_vigilante", "sub_card"].forEach((f) => d.set_df_property(f, "hidden", 0));
-		} else if (cur.key === "preview") {
-			d.set_df_property("preview", "hidden", 0);
-			_renderPreview();
-		}
-
-		_renderHead();
-		_renderFooter(steps);
-	}
-
-	function _renderHead() {
-		const steps = _activeSteps();
-		const nodes = steps.map((s, i) => {
-			const st = i < state.stepIdx ? "done" : (i === state.stepIdx ? "active" : "todo");
-			return `<div class="rotw-node ${st}">
-				<span class="rotw-dot">${i < state.stepIdx ? "✓" : i + 1}</span>
-				<span class="rotw-nlabel">${s.label}</span>
-			</div>`;
+		const steps = _steps();
+		const key = steps[S.step];
+		const stepper = steps.map((s, i) => {
+			const st = i < S.step ? "done" : (i === S.step ? "active" : "todo");
+			return `<div class="rotw-node ${st}"><span class="rotw-dot">${i < S.step ? "✓" : i + 1}</span>
+				<span class="rotw-nlabel">${STEP_LABELS[s]}</span></div>`;
 		}).join('<span class="rotw-conn"></span>');
 
-		const opName = state.op ? `${state.op.abreviatura} · ${state.op.operacao}` : __("Selecione a operação");
-		d.fields_dict.wz_head.$wrapper.html(`
+		const opName = S.op ? `${S.op.abreviatura} · ${S.op.operacao}` : __("Nova Rotatividade");
+
+		let content = "";
+		if (key === "ident") content = _stepIdent();
+		else if (key === "mudancas") content = _stepMudancas();
+		else if (key === "substituto") content = _stepSubstituto();
+		else if (key === "preview") content = `<div id="rotw-prev"></div>`;
+
+		$body().html(`
 			<div class="rotw-head">
 				<div class="rotw-op">${frappe.utils.escape_html(opName)}</div>
-				<div class="rotw-stepper">${nodes}</div>
-			</div>`);
+				<div class="rotw-stepper">${stepper}</div>
+			</div>
+			<div class="rotw-step rotw-slide-${S.dir > 0 ? "next" : "prev"}">${content}</div>`);
+
+		// post-mount wiring per step
+		if (key === "ident") _wireIdent();
+		else if (key === "mudancas") _wireMudancas();
+		else if (key === "substituto") _wireSubstituto();
+		else if (key === "preview") _renderPreview();
+
+		_footer(steps);
 	}
 
-	function _renderFooter(steps) {
-		const last = state.stepIdx >= steps.length - 1;
+	function _footer(steps) {
+		const last = S.step >= steps.length - 1;
 		const $btn = d.get_primary_btn();
 		$btn.html(last ? `${__("Confirmar Rotatividade")} ✓` : `${__("Próximo")} →`);
 		$btn.toggleClass("rotw-confirm", last);
-
-		// back button (injected once)
+		$btn.prop("disabled", false);
 		let $back = d.$wrapper.find(".rotw-back");
-		if (!$back.length) {
-			$back = $(`<button class="btn rotw-back"></button>`);
-			$btn.before($back);
-			$back.on("click", () => _back());
-		}
-		$back.html(state.stepIdx === 0 ? __("Cancelar") : `← ${__("Anterior")}`);
+		if (!$back.length) { $back = $(`<button class="btn rotw-back"></button>`); $btn.before($back); $back.on("click", _back); }
+		$back.html(S.step === 0 ? __("Cancelar") : `← ${__("Anterior")}`);
 	}
 
-	function _renderEstadoCard() {
-		const e = state.estado;
-		const $w = d.fields_dict.estado_card.$wrapper;
-		if (!e) { $w.html(""); return; }
-		$w.html(`
-			<div class="rotw-state">
-				<div class="rotw-state-title">${__("Situação Actual")}</div>
-				<div class="rotw-state-grid">
-					${_stateCell(__("Posto"), e.posto)}
-					${_stateCell(__("Regime"), e.regime)}
-					${_stateCell(__("Categoria"), e.categoria)}
-					${_stateCell(__("Delegação"), e.delegacao)}
+	// ════════ STEP 1 — Operação + Vigilante ════════
+	function _stepIdent() {
+		return `
+			<div class="rotw-sec-num">1 · ${__("Que operação?")}</div>
+			<div class="rotw2-cards">${_opCards()}</div>
+			<div class="rotw-sec-num" style="margin-top:18px">2 · ${__("Qual vigilante?")}</div>
+			<div class="rotw2-search">
+				<span class="rotw2-search-ic">🔍</span>
+				<input type="text" class="rotw2-search-in" id="rotw-vsearch"
+					placeholder="${__("Procurar por nome ou mecanográfico…")}" autocomplete="off">
+			</div>
+			<div class="rotw2-results" id="rotw-vresults"></div>
+			<div id="rotw-vchosen">${S.vig ? _guardChosen(S.vig) : ""}</div>`;
+	}
+	function _opCards() {
+		if (!S.operacoes.length) return `<div class="rotw-none">${__("Sem operações configuradas.")}</div>`;
+		return S.operacoes.map((o) => {
+			const p = [];
+			if (o.muda_posto) p.push(`<span class="rotw2-pic" title="${__("Muda posto")}">📍 ${__("Posto")}</span>`);
+			if (o.muda_regime) p.push(`<span class="rotw2-pic" title="${__("Muda regime")}">🕘 ${__("Regime")}</span>`);
+			if (o.muda_categoria) p.push(`<span class="rotw2-pic" title="${__("Muda categoria")}">🏷️ ${__("Categoria")}</span>`);
+			if (o.requer_substituto) p.push(`<span class="rotw2-pic" title="${__("Substituto")}">⇄ ${__("Substituto")}</span>`);
+			if (o.demite) p.push(`<span class="rotw2-pic rotw2-pic-dem" title="${__("Demissão")}">⚑ ${__("Demite")}</span>`);
+			const sel = S.op && S.op.name === o.name ? "sel" : "";
+			return `<div class="rotw2-card ${sel}" data-op="${o.name}">
+				<div class="rotw2-card-top">
+					<span class="rotw2-abrev">${frappe.utils.escape_html(o.abreviatura)}</span>
+					${sel ? '<span class="rotw2-check">✓</span>' : ""}
 				</div>
-			</div>`);
+				<div class="rotw2-card-name">${frappe.utils.escape_html(o.operacao)}</div>
+				<div class="rotw2-card-picto">${p.join("") || `<span class="rotw2-noop">${__("sem alterações directas")}</span>`}</div>
+			</div>`;
+		}).join("");
 	}
-	function _stateCell(label, val) {
-		return `<div class="rotw-scell"><span class="rotw-slabel">${label}</span>
-			<span class="rotw-sval">${val ? frappe.utils.escape_html(val) : "—"}</span></div>`;
+	function _wireIdent() {
+		$body().find(".rotw2-card").on("click", function () {
+			const name = $(this).attr("data-op");
+			S.op = S.operacoes.find((o) => o.name === name);
+			S.flags = {
+				muda_posto: !!S.op.muda_posto, muda_regime: !!S.op.muda_regime,
+				muda_categoria: !!S.op.muda_categoria, requer_substituto: !!S.op.requer_substituto,
+				demite: !!S.op.demite,
+			};
+			$body().find(".rotw2-card").removeClass("sel").find(".rotw2-check").remove();
+			$(this).addClass("sel").find(".rotw2-card-top").append('<span class="rotw2-check">✓</span>');
+			$body().find(".rotw-op").text(`${S.op.abreviatura} · ${S.op.operacao}`);
+		});
+
+		const $in = $body().find("#rotw-vsearch");
+		const $res = $body().find("#rotw-vresults");
+		let t = null;
+		$in.on("input", function () {
+			const txt = this.value;
+			clearTimeout(t);
+			t = setTimeout(() => _searchGuards(txt, $res, 0, (v) => _chooseGuard(v)), 220);
+		});
+		if (S.vig) $in.val(S.vig.nome_completo || S.vig.name);
+	}
+	function _chooseGuard(v) {
+		S.vig = v;
+		$body().find("#rotw-vresults").html("");
+		$body().find("#rotw-vchosen").html(_guardChosen(v));
+		$body().find("#rotw-vsearch").val(v.nome_completo || v.name);
 	}
 
+	// ════════ STEP 2 — Mudanças ════════
+	function _stepMudancas() {
+		const rows = [];
+		if (S.flags.muda_posto) rows.push(_changeRow("Posto", S.vig.posto, "novo_posto"));
+		if (S.flags.muda_regime) rows.push(_changeRow("Regime", S.vig.regime, "novo_regime"));
+		if (S.flags.muda_categoria) rows.push(_changeRow("Categoria", S.vig.categoria, "nova_categoria"));
+		const demite = S.flags.demite || S.motivo === "Demissão";
+
+		return `
+			<div class="rotw-sec-num">${__("O que muda para")} <b>${frappe.utils.escape_html(S.vig.nome_completo || S.vig.name)}</b></div>
+			<div class="rotw2-changes">${rows.join("") || `<div class="rotw-none">${__("Esta operação não altera posto, regime ou categoria directamente.")}</div>`}</div>
+			<div class="rotw2-field"><label>${__("Motivo")}</label><div id="ctrl-motivo"></div></div>
+			<div id="rotw-demfields" style="${demite ? "" : "display:none"}">
+				<div class="rotw2-field"><label>${__("Motivo de Demissão")}</label><div id="ctrl-motiv_demi"></div></div>
+				<div class="rotw2-field"><label>${__("Uniforme")}</label><div id="ctrl-uniforme"></div></div>
+			</div>
+			<div class="rotw2-field"><label>${__("Justificação (se antes do mínimo de dias)")}</label><div id="ctrl-motivo_3meses"></div></div>`;
+	}
+	function _changeRow(label, from, fieldname) {
+		return `<div class="rotw2-change-row">
+			<div class="rotw2-cr-label">${label}</div>
+			<div class="rotw2-cr-from">${from ? frappe.utils.escape_html(from) : "—"}</div>
+			<div class="rotw2-cr-arrow">→</div>
+			<div class="rotw2-cr-to" id="ctrl-${fieldname}"></div>
+		</div>`;
+	}
+	function _wireMudancas() {
+		if (S.flags.muda_posto) _mountLink("novo_posto", "Posto De Vigilancia",
+			() => ({ filters: { delegacao: S.vig.delegacao, estado: "Activo" } }));
+		if (S.flags.muda_regime) _mountLink("novo_regime", "Regime", null);
+		if (S.flags.muda_categoria) _mountLink("nova_categoria", "Categoria Vigilante", null);
+
+		_mountSelect("motivo", "\nTransferência\nReserva\nDemissão\nDisciplinar\nOutro", () => {
+			const demite = S.flags.demite || S.motivo === "Demissão";
+			$body().find("#rotw-demfields").toggle(!!demite);
+		});
+		_mountSelect("motiv_demi", "\nFim de Contrato\nAbandono\nJusta Causa\nAcordo Mútuo\nOutro");
+		_mountSelect("uniforme", "\nEntregue\nNão Entregue");
+		_mountSmallText("motivo_3meses");
+	}
+
+	// ════════ STEP 3 — Substituto ════════
+	function _stepSubstituto() {
+		return `
+			<div class="rotw-sec-num">${__("Quem assume o posto deixado vago?")}</div>
+			<div class="rotw2-hint">${__("Posto a cobrir")}: <b>${frappe.utils.escape_html(S.vig.posto || "—")}</b> · ${__("apenas reservas elegíveis")}</div>
+			<div class="rotw2-search">
+				<span class="rotw2-search-ic">🔍</span>
+				<input type="text" class="rotw2-search-in" id="rotw-ssearch" placeholder="${__("Procurar substituto…")}" autocomplete="off">
+			</div>
+			<div class="rotw2-results" id="rotw-sresults"></div>
+			<div id="rotw-schosen">${S.sub ? _guardChosen(S.sub, true) : ""}</div>
+			<div class="rotw2-skip">${__("Opcional — pode avançar sem substituto.")}</div>`;
+	}
+	function _wireSubstituto() {
+		const $in = $body().find("#rotw-ssearch");
+		const $res = $body().find("#rotw-sresults");
+		let t = null;
+		$in.on("input", function () {
+			const txt = this.value; clearTimeout(t);
+			t = setTimeout(() => _searchGuards(txt, $res, 1, (v) => {
+				S.sub = v;
+				$res.html(""); $body().find("#rotw-schosen").html(_guardChosen(v, true));
+				$in.val(v.nome_completo || v.name);
+			}), 220);
+		});
+		if (S.sub) $in.val(S.sub.nome_completo || S.sub.name);
+	}
+
+	// ── shared: guard search + result rows + chosen card ──
+	function _searchGuards(txt, $res, soSub, onPick) {
+		frappe.call({
+			method: "sigos.api.search_vigilantes_rich",
+			args: { txt, delegacao: S.vig ? S.vig.delegacao : null,
+				excluir: S.vig ? S.vig.name : null, so_substitutos: soSub },
+			callback: (r) => {
+				const list = r.message || [];
+				if (!list.length) { $res.html(`<div class="rotw2-nores">${__("Nenhum vigilante encontrado.")}</div>`); return; }
+				$res.html(list.map((v) => _guardRow(v)).join(""));
+				$res.find(".rotw2-grow").on("click", function () {
+					onPick(list.find((x) => x.name === $(this).attr("data-v")));
+				});
+			},
+		});
+	}
+	function _initials(name) {
+		const p = (name || "?").trim().split(/\s+/);
+		return ((p[0]?.[0] || "") + (p.length > 1 ? p[p.length - 1][0] : "")).toUpperCase();
+	}
+	function _guardRow(v) {
+		const meta = [v.posto, v.regime, v.categoria].filter(Boolean).join(" · ");
+		return `<div class="rotw2-grow" data-v="${v.name}">
+			<span class="rotw2-av">${_initials(v.nome_completo)}</span>
+			<span class="rotw2-ginfo"><span class="rotw2-gname">${frappe.utils.escape_html(v.nome_completo || v.name)}</span>
+			<span class="rotw2-gmeta">${frappe.utils.escape_html(meta || v.name)}</span></span>
+		</div>`;
+	}
+	function _guardChosen(v, isSub) {
+		const meta = [v.posto, v.regime, v.categoria].filter(Boolean).join(" · ");
+		return `<div class="rotw2-chosen ${isSub ? "sub" : ""}">
+			<span class="rotw2-av big">${_initials(v.nome_completo)}</span>
+			<span class="rotw2-ginfo">
+				<span class="rotw2-gname">${frappe.utils.escape_html(v.nome_completo || v.name)}</span>
+				<span class="rotw2-gmeta">${v.mecanografico ? frappe.utils.escape_html(v.mecanografico) + " · " : ""}${frappe.utils.escape_html(meta || "")}</span>
+			</span>
+			<span class="rotw2-chosen-tag">${isSub ? __("Substituto") : __("Seleccionado")}</span>
+		</div>`;
+	}
+
+	// ── control mounting ──
+	function _mountLink(fieldname, options, get_query) {
+		const ctrl = frappe.ui.form.make_control({
+			df: { fieldtype: "Link", options, fieldname, placeholder: __("Seleccionar…"), get_query,
+				onchange: () => { S[fieldname] = ctrl.get_value(); } },
+			parent: $body().find(`#ctrl-${fieldname}`), render_input: true,
+		});
+		if (S[fieldname]) ctrl.set_value(S[fieldname]);
+		controls[fieldname] = ctrl;
+	}
+	function _mountSelect(fieldname, options, onchange) {
+		const ctrl = frappe.ui.form.make_control({
+			df: { fieldtype: "Select", options, fieldname,
+				onchange: () => { S[fieldname] = ctrl.get_value(); onchange && onchange(); } },
+			parent: $body().find(`#ctrl-${fieldname}`), render_input: true,
+		});
+		if (S[fieldname]) ctrl.set_value(S[fieldname]);
+		controls[fieldname] = ctrl;
+	}
+	function _mountSmallText(fieldname) {
+		const ctrl = frappe.ui.form.make_control({
+			df: { fieldtype: "Small Text", fieldname, onchange: () => { S[fieldname] = ctrl.get_value(); } },
+			parent: $body().find(`#ctrl-${fieldname}`), render_input: true,
+		});
+		if (S[fieldname]) ctrl.set_value(S[fieldname]);
+		controls[fieldname] = ctrl;
+	}
+
+	// ════════ STEP 4 — Preview ════════
 	function _renderPreview() {
-		const $w = d.fields_dict.preview.$wrapper;
-		$w.html(`<div class="rotw-prev-loading">${__("A calcular efeitos...")}</div>`);
-
+		const $w = $body().find("#rotw-prev");
+		$w.html(`<div class="rotw-prev-loading">${__("A calcular efeitos…")}</div>`);
 		frappe.call({
 			method: "sigos.api.preview_rotatividade",
 			args: {
-				vigilante: d.get_value("vigilante"),
-				abreviatura_op: d.get_value("operacao"),
-				novo_posto: d.get_value("novo_posto"),
-				novo_regime: d.get_value("novo_regime"),
-				nova_categoria: d.get_value("nova_categoria"),
-				novo_vigilante: d.get_value("novo_vigilante"),
-				motivo: d.get_value("motivo"),
-				motivo_3meses: d.get_value("motivo_3meses"),
+				vigilante: S.vig.name, abreviatura_op: S.op.name,
+				novo_posto: S.novo_posto, novo_regime: S.novo_regime, nova_categoria: S.nova_categoria,
+				novo_vigilante: S.sub ? S.sub.name : null, motivo: S.motivo, motivo_3meses: S.motivo_3meses,
 			},
 			callback: (r) => $w.html(_previewHtml(r.message || {})),
 		});
 	}
-
 	function _previewHtml(p) {
 		const chips = (p.mudancas || []).map((m) => `
-			<div class="rotw-change">
-				<span class="rotw-cfield">${frappe.utils.escape_html(m.campo)}</span>
+			<div class="rotw-change"><span class="rotw-cfield">${frappe.utils.escape_html(m.campo)}</span>
 				<span class="rotw-cflow"><span class="rotw-cfrom">${frappe.utils.escape_html(m.de || "—")}</span>
-				<span class="rotw-carrow">→</span>
-				<span class="rotw-cto">${frappe.utils.escape_html(m.para || "—")}</span></span>
-			</div>`).join("") || `<div class="rotw-none">${__("Sem alterações directas ao vigilante.")}</div>`;
+				<span class="rotw-carrow">→</span><span class="rotw-cto">${frappe.utils.escape_html(m.para || "—")}</span></span></div>`
+		).join("") || `<div class="rotw-none">${__("Sem alterações directas ao vigilante.")}</div>`;
 
 		let escala = "";
 		if (p.escala) {
@@ -268,95 +345,59 @@ sigos.rotatividade_wizard = function (prefill = {}) {
 			const entra = p.escala.entra
 				? `<span class="rotw-esc-in">${p.escala.entra}${p.escala.entra_criada ? ` <em>(${__("será criada")})</em>` : ""}</span>`
 				: (p.demite ? `<span class="rotw-none-inline">${__("removido de serviço")}</span>` : `<span class="rotw-none-inline">—</span>`);
-			escala = `<div class="rotw-block">
-				<div class="rotw-block-h">${__("Escala")}</div>
-				<div class="rotw-esc-flow">${__("Sai de")} ${sai} <span class="rotw-carrow">→</span> ${__("Entra em")} ${entra}</div>
-			</div>`;
+			escala = `<div class="rotw-block"><div class="rotw-block-h">${__("Escala")}</div>
+				<div class="rotw-esc-flow">${__("Sai de")} ${sai} <span class="rotw-carrow">→</span> ${__("Entra em")} ${entra}</div></div>`;
 		}
-
 		const occ = (p.ocupacao || []).map((o) => {
 			const up = o.para > o.de, dn = o.para < o.de;
-			return `<div class="rotw-occ">
-				<span class="rotw-occ-posto">${frappe.utils.escape_html(o.posto)}</span>
+			return `<div class="rotw-occ"><span class="rotw-occ-posto">${frappe.utils.escape_html(o.posto)}</span>
 				<span class="rotw-occ-num">${o.de} <span class="rotw-carrow">→</span>
-				<b class="${up ? "occ-up" : dn ? "occ-dn" : ""}">${o.para}</b></span>
-			</div>`;
+				<b class="${up ? "occ-up" : dn ? "occ-dn" : ""}">${o.para}</b></span></div>`;
 		}).join("");
-		const occBlock = occ ? `<div class="rotw-block"><div class="rotw-block-h">${__("Ocupação")}</div>${occ}</div>` : "";
-
-		const sub = p.substituto ? `<div class="rotw-block">
-			<div class="rotw-block-h">${__("Substituto")}</div>
-			<div class="rotw-sub">${frappe.utils.escape_html(p.substituto.nome)} ${__("assume")}
-				<b>${frappe.utils.escape_html(p.substituto.assume_posto || "—")}</b></div>
-		</div>` : "";
-
+		const occB = occ ? `<div class="rotw-block"><div class="rotw-block-h">${__("Ocupação")}</div>${occ}</div>` : "";
+		const sub = p.substituto ? `<div class="rotw-block"><div class="rotw-block-h">${__("Substituto")}</div>
+			<div class="rotw-sub">${frappe.utils.escape_html(p.substituto.nome)} ${__("assume")} <b>${frappe.utils.escape_html(p.substituto.assume_posto || "—")}</b></div></div>` : "";
 		const dem = p.demite ? `<div class="rotw-warn rotw-warn-dem">⚑ ${__("Demissão automática será criada.")}</div>` : "";
 		const warns = (p.avisos || []).map((w) => `<div class="rotw-warn">⚠️ ${frappe.utils.escape_html(w)}</div>`).join("");
 
-		return `
-			<div class="rotw-preview">
-				<div class="rotw-prev-head">
-					<div class="rotw-prev-vig">${frappe.utils.escape_html(p.nome || "")}</div>
-					<div class="rotw-prev-op">${frappe.utils.escape_html(p.operacao || "")}</div>
-				</div>
-				<div class="rotw-block"><div class="rotw-block-h">${__("Alterações")}</div>${chips}</div>
-				${escala}${occBlock}${sub}
-				${dem}${warns}
-			</div>`;
+		return `<div class="rotw-preview">
+			<div class="rotw-prev-head"><div class="rotw-prev-vig">${frappe.utils.escape_html(p.nome || "")}</div>
+				<div class="rotw-prev-op">${frappe.utils.escape_html(p.operacao || "")}</div></div>
+			<div class="rotw-block"><div class="rotw-block-h">${__("Alterações")}</div>${chips}</div>
+			${escala}${occB}${sub}${dem}${warns}</div>`;
 	}
 
-	// ── Confirm: assemble + submit the Rotatividade doc ──
+	// ── confirm ──
 	function _confirm() {
 		const doc = {
-			doctype: "Rotatividade",
-			data: frappe.datetime.get_today(),
-			vigilante: d.get_value("vigilante"),
-			abreviatura_op: d.get_value("operacao"),
-			delegacao: state.estado?.delegacao,
-			mecanografico: state.estado?.mecanografico,
-			regime: state.estado?.regime,
-			categoria_vigilante: state.estado?.categoria,
-			novo_posto: d.get_value("novo_posto"),
-			novo_regime: d.get_value("novo_regime"),
-			nova_categoria: d.get_value("nova_categoria"),
-			novo_vigilante: d.get_value("novo_vigilante"),
-			alocado_ao_posto: state.estado?.posto,
-			alocar_vigilante_substituto: d.get_value("novo_vigilante") ? "Sim" : "Não",
-			motivo: d.get_value("motivo"),
-			motiv_demi: d.get_value("motiv_demi"),
-			uniforme: d.get_value("uniforme"),
-			motivo_3meses: d.get_value("motivo_3meses"),
+			doctype: "Rotatividade", data: frappe.datetime.get_today(),
+			vigilante: S.vig.name, abreviatura_op: S.op.name,
+			delegacao: S.vig.delegacao, mecanografico: S.vig.mecanografico,
+			regime: S.vig.regime, categoria_vigilante: S.vig.categoria,
+			novo_posto: S.novo_posto, novo_regime: S.novo_regime, nova_categoria: S.nova_categoria,
+			novo_vigilante: S.sub ? S.sub.name : null, alocado_ao_posto: S.vig.posto,
+			alocar_vigilante_substituto: S.sub ? "Sim" : "Não",
+			motivo: S.motivo, motiv_demi: S.motiv_demi, uniforme: S.uniforme, motivo_3meses: S.motivo_3meses,
 		};
-
 		d.get_primary_btn().prop("disabled", true);
 		frappe.call({
-			method: "frappe.client.insert",
-			args: { doc },
-			freeze: true,
-			freeze_message: __("A criar rotatividade..."),
-			callback: (r) => {
-				const name = r.message.name;
-				// submit it (engine runs in on_submit)
-				frappe.call({
-					method: "frappe.client.submit",
-					args: { doc: r.message },
-					freeze: true, freeze_message: __("A aplicar..."),
-					callback: () => {
-						d.hide();
-						frappe.show_alert({ message: __("Rotatividade {0} aplicada.", [name]), indicator: "green" }, 5);
-						frappe.set_route("Form", "Rotatividade", name);
-					},
-					error: () => { d.get_primary_btn().prop("disabled", false); frappe.set_route("Form", "Rotatividade", name); },
-				});
-			},
+			method: "frappe.client.insert", args: { doc }, freeze: true, freeze_message: __("A criar…"),
+			callback: (r) => frappe.call({
+				method: "frappe.client.submit", args: { doc: r.message }, freeze: true, freeze_message: __("A aplicar…"),
+				callback: () => { d.hide(); frappe.show_alert({ message: __("Rotatividade {0} aplicada.", [r.message.name]), indicator: "green" }, 5); frappe.set_route("Form", "Rotatividade", r.message.name); },
+				error: () => frappe.set_route("Form", "Rotatividade", r.message.name),
+			}),
 			error: () => d.get_primary_btn().prop("disabled", false),
 		});
 	}
 
-	// ── Boot ──
-	d.show();
-	state.stepIdx = 0;
-	_render();
-
-	if (prefill.vigilante) d.set_value("vigilante", prefill.vigilante);
+	// prefill guard
+	if (prefill.vigilante) {
+		frappe.db.get_doc("Vigilante", prefill.vigilante).then((v) => {
+			S.vig = { name: v.name, nome_completo: v.nome_completo, posto: v.posto_de_vigilancia,
+				regime: v.regime_do_vigilante, categoria: v.categoria, delegacao: v.delegacao,
+				mecanografico: v.mecanografico };
+			if (_steps()[S.step] === "ident") _render();
+		});
+	}
 };

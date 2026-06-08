@@ -1023,3 +1023,29 @@ def preview_rotatividade(vigilante, abreviatura_op=None, novo_posto=None, novo_r
 			out["avisos"].append("Vigilante ainda não completou {0} dias desde a admissão — exige justificação.".format(dias_min))
 
 	return out
+
+
+@frappe.whitelist()
+def search_vigilantes_rich(txt="", status="Activo", delegacao=None, excluir=None, so_substitutos=0):
+	"""Rich vigilante search for the Rotatividade wizard pickers — returns name + current posto/regime/categoria."""
+	cond = ["v.status = %(status)s"]
+	params = {"status": status, "txt": "%" + (txt or "") + "%"}
+	if delegacao:
+		cond.append("v.delegacao = %(delegacao)s"); params["delegacao"] = delegacao
+	if excluir:
+		cond.append("v.name != %(excluir)s"); params["excluir"] = excluir
+	if int(so_substitutos or 0):
+		cats = frappe.get_all("Categoria Vigilante", filters={"pode_ser_substituto": 1}, pluck="name")
+		if not cats:
+			return []
+		params["cats"] = tuple(cats); cond.append("v.categoria IN %(cats)s")
+	where = " AND ".join(cond)
+	return frappe.db.sql(f"""
+		SELECT v.name, v.nome_completo, v.mecanografico, v.posto_de_vigilancia AS posto,
+		       v.regime_do_vigilante AS regime, v.categoria, v.delegacao
+		FROM `tabVigilante` v
+		WHERE {where}
+		  AND (v.name LIKE %(txt)s OR v.nome_completo LIKE %(txt)s OR v.mecanografico LIKE %(txt)s)
+		ORDER BY v.nome_completo
+		LIMIT 25
+	""", params, as_dict=True)
