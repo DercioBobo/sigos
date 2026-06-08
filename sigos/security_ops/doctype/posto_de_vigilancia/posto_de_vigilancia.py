@@ -106,8 +106,9 @@ class PostoDeVigilancia(Document):
 			if escalas:
 				msg.append(_("{0} escala(s) arquivada(s) — deixam de gerar.").format(len(escalas)))
 			if vigs:
-				msg.append(_("{0} vigilante(s) continuam atribuídos a este posto e precisam de ser "
-				             "transferidos ou demitidos.").format(vigs))
+				msg.append(_("{0} vigilante(s) continuam atribuídos a este posto. Use o botão "
+				             "<b>Acções → Enviar Vigilantes para Reserva</b> para os colocar "
+				             "disponíveis, ou transfira/demita conforme necessário.").format(vigs))
 			if msg:
 				frappe.msgprint("<br>".join(msg), title=_("Posto Inactivado"), indicator="orange")
 

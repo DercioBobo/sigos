@@ -1083,3 +1083,34 @@ def get_regime_rate(project, regime):
 	if rate:
 		return rate
 	return frappe.db.get_value("Project", project, "custom_valor_do_contrato") or 0
+
+
+@frappe.whitelist()
+def enviar_posto_para_reserva(posto, motivo):
+	"""
+	Bench every Activo guard at a (closing) posto: creates + submits a RES rotatividade
+	per guard (status -> Reserva, posto cleared, escala removed), with a shared reason.
+	"""
+	from frappe.utils import today
+	if not (motivo or "").strip():
+		frappe.throw(_("Indique o motivo para enviar os vigilantes para reserva."))
+	if not frappe.db.exists("Operacao De Rotatividade", "RES"):
+		frappe.throw(_("Operação RES (Enviar para Reserva) não encontrada."))
+
+	guards = frappe.get_all("Vigilante", filters={"posto_de_vigilancia": posto, "status": "Activo"}, pluck="name")
+	criados = []
+	for g in guards:
+		v = frappe.db.get_value("Vigilante", g,
+			["mecanografico", "delegacao", "regime_do_vigilante", "categoria"], as_dict=True)
+		rot = frappe.get_doc({
+			"doctype": "Rotatividade", "data": today(),
+			"vigilante": g, "abreviatura_op": "RES", "antigo_posto": posto,
+			"mecanografico": v.mecanografico, "delegacao": v.delegacao,
+			"regime": v.regime_do_vigilante, "categoria_vigilante": v.categoria,
+			"motivo": "Reserva", "motivo_rotatividade": motivo,
+		})
+		rot.insert(ignore_permissions=True)
+		rot.submit()
+		criados.append(rot.name)
+
+	return {"benched": len(criados), "rotatividades": criados}

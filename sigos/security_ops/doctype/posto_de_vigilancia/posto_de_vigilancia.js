@@ -24,6 +24,11 @@ frappe.ui.form.on("Posto De Vigilancia", {
 			}
 		}
 
+		// Close-down helper: bench this posto's whole team to Reserva in one action.
+		if (!frm.is_new() && (frm.doc.ocupacao_atual || 0) > 0) {
+			frm.add_custom_button(__("Enviar Vigilantes para Reserva"), () => _enviar_reserva(frm), __("Acções"));
+		}
+
 		if (!frm.is_new() && frm.doc.tipo_de_posto === "Temporário") {
 			frm.add_custom_button(__("Tornar Permanente"), () => {
 				frappe.confirm(
@@ -46,6 +51,49 @@ frappe.ui.form.on("Posto De Vigilancia", {
 		if (frm.doc.posto_interno) frm.set_value("project", "");
 	},
 });
+
+// ─── Bench the posto's whole team to Reserva (posto closing) ──────────────────
+function _enviar_reserva(frm) {
+	frappe.call({
+		method: "frappe.client.get_list",
+		args: {
+			doctype: "Vigilante",
+			filters: { posto_de_vigilancia: frm.doc.name, status: "Activo" },
+			fields: ["name", "nome_completo"], limit_page_length: 0,
+		},
+		callback(r) {
+			const guards = r.message || [];
+			if (!guards.length) {
+				frappe.msgprint(__("Não há vigilantes activos neste posto."));
+				return;
+			}
+			const lista = guards.map(g => `<li>${frappe.utils.escape_html(g.nome_completo || g.name)}</li>`).join("");
+			const d = new frappe.ui.Dialog({
+				title: __("Enviar para Reserva — {0}", [frm.doc.nome_do_posto || frm.doc.name]),
+				fields: [
+					{ fieldtype: "HTML", options:
+						`<div style="margin-bottom:10px">${__("Os seguintes <b>{0}</b> vigilante(s) sairão do posto e ficarão em <b>Reserva</b> (disponíveis, não demitidos):", [guards.length])}
+						<ul style="margin-top:6px">${lista}</ul></div>` },
+					{ fieldname: "motivo", fieldtype: "Small Text", label: __("Motivo (ex: encerramento do posto)"), reqd: 1 },
+				],
+				primary_action_label: __("Enviar para Reserva"),
+				primary_action(v) {
+					frappe.call({
+						method: "sigos.api.enviar_posto_para_reserva",
+						args: { posto: frm.doc.name, motivo: v.motivo },
+						freeze: true, freeze_message: __("A enviar para reserva..."),
+						callback(res) {
+							d.hide();
+							frappe.show_alert({ message: __("{0} vigilante(s) enviado(s) para Reserva.", [res.message?.benched || 0]), indicator: "green" }, 6);
+							frm.reload_doc();
+						},
+					});
+				},
+			});
+			d.show();
+		},
+	});
+}
 
 // ─── 7-day Escala preview modal (shared renderer in sigos.js) ─────────────────
 function _ver_escala_preview(frm) {

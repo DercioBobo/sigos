@@ -153,6 +153,10 @@ class Rotatividade(Document):
 		"""Guard must have spent N days at the post before rotating, unless motivo_3meses is filled."""
 		if not self.vigilante:
 			return
+		# Involuntary moves (demissão / posto closed → reserva) aren't churn — exempt.
+		op = self._get_operacao()
+		if op and (op.demite or op.get("enviar_reserva")):
+			return
 
 		dias_minimos = (
 			frappe.db.get_single_value("SIGOS Settings", "dias_minimos_rotatividade") or 90
