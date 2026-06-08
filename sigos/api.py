@@ -951,6 +951,18 @@ def preview_rotatividade(vigilante, abreviatura_op=None, novo_posto=None, novo_r
 	# ── Changes ──
 	if new_posto != cur_posto:
 		out["mudancas"].append({"campo": "Posto", "de": _nome_posto(cur_posto), "para": _nome_posto(new_posto)})
+		# Contract (project) + customer follow the posto — flag cross-contract moves
+		old_proj = frappe.db.get_value("Posto De Vigilancia", cur_posto, "project") if cur_posto else None
+		new_proj = frappe.db.get_value("Posto De Vigilancia", new_posto, "project") if new_posto else None
+		if old_proj != new_proj:
+			old_cust = frappe.db.get_value("Project", old_proj, "customer") if old_proj else None
+			new_cust = frappe.db.get_value("Project", new_proj, "customer") if new_proj else None
+			out["mudancas"].append({"campo": "Contrato", "de": old_proj or "—", "para": new_proj or "—"})
+			if old_cust != new_cust:
+				out["mudancas"].append({"campo": "Cliente", "de": old_cust or "—", "para": new_cust or "—"})
+			out["avisos"].append(
+				"Transferência entre contratos ({0} → {1}) — exige justificação.".format(old_proj or "—", new_proj or "—")
+			)
 	if new_regime != cur_regime:
 		out["mudancas"].append({"campo": "Regime", "de": cur_regime, "para": new_regime})
 	if demite:

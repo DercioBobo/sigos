@@ -9,10 +9,12 @@ class Rotatividade(Document):
 	def validate(self):
 		self._validar_regra_3meses()
 		self._validar_substituto_categoria()
+		self._validar_transferencia_contrato()
 
 	def before_submit(self):
 		self._validar_regra_3meses()
 		self._validar_substituto_categoria()
+		self._validar_transferencia_contrato()
 
 	def on_submit(self):
 		if (self.get("workflow_state") or "Aprovado") != "Aprovado":
@@ -29,6 +31,11 @@ class Rotatividade(Document):
 
 		if op and op.muda_posto:
 			vig.posto_de_vigilancia = self.novo_posto
+			# Contract (project) + customer FOLLOW the posto — derived, not independent.
+			novo_proj = frappe.db.get_value("Posto De Vigilancia", self.novo_posto, "project")
+			vig.projecto = novo_proj
+			vig.cliente = frappe.db.get_value("Project", novo_proj, "customer") if novo_proj else None
+			vig.nome_do_projecto = frappe.db.get_value("Project", novo_proj, "project_name") if novo_proj else None
 		if op and op.muda_regime and self.novo_regime:
 			vig.regime_do_vigilante = self.novo_regime
 			vig.flags.via_troca_regime = True
@@ -96,6 +103,25 @@ class Rotatividade(Document):
 			)
 
 	# ─── Validation helpers ────────────────────────────────────────────────────
+
+	def _validar_transferencia_contrato(self):
+		"""
+		Moving a guard to a posto under a DIFFERENT contract (project) is a
+		cross-client transfer — require an explicit justification (Motivo).
+		"""
+		op = self._get_operacao()
+		if not (op and op.muda_posto and self.novo_posto):
+			return
+		old_posto = self.antigo_posto or frappe.db.get_value("Vigilante", self.vigilante, "posto_de_vigilancia")
+		old_proj = frappe.db.get_value("Posto De Vigilancia", old_posto, "project") if old_posto else None
+		new_proj = frappe.db.get_value("Posto De Vigilancia", self.novo_posto, "project")
+		if old_proj and new_proj and old_proj != new_proj and not (self.motivo_rotatividade or "").strip():
+			frappe.throw(
+				_("Está a transferir o vigilante para um posto de <b>outro contrato</b> "
+				  "(<b>{0}</b> → <b>{1}</b>). Justifique a transferência no campo "
+				  "<b>Motivo de Continuar com a Rotatividade</b>.").format(old_proj, new_proj),
+				title=_("Transferência Entre Contratos"),
+			)
 
 	def _validar_substituto_categoria(self):
 		"""
