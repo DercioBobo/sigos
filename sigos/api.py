@@ -906,3 +906,120 @@ def get_escala_preview_posto(posto, dias=7):
 		})
 
 	return result
+
+
+@frappe.whitelist()
+def preview_rotatividade(vigilante, abreviatura_op=None, novo_posto=None, novo_regime=None,
+                         nova_categoria=None, novo_vigilante=None, motivo=None, data=None,
+                         motivo_3meses=None):
+	"""
+	Dry-run a Rotatividade: compute every cascade WITHOUT saving anything, so the
+	wizard can show what will happen before commit. Shares the operation-flag and
+	escala-pair logic with the on_submit executor, so preview and execution agree.
+	"""
+	from sigos.security_ops.doctype.escala_do_vigilante.escala_do_vigilante import _escala_do_par
+
+	out = {
+		"vigilante": vigilante, "nome": None, "operacao": None,
+		"mudancas": [], "escala": None, "ocupacao": [], "substituto": None,
+		"demite": False, "avisos": [],
+	}
+	if not vigilante:
+		return out
+
+	vig = frappe.get_doc("Vigilante", vigilante)
+	out["nome"] = vig.nome_completo or vigilante
+
+	op = None
+	if abreviatura_op and frappe.db.exists("Operacao De Rotatividade", abreviatura_op):
+		op = frappe.get_doc("Operacao De Rotatividade", abreviatura_op)
+		out["operacao"] = op.operacao
+
+	cur_posto, cur_regime, cur_categoria = vig.posto_de_vigilancia, vig.regime_do_vigilante, vig.categoria
+	new_posto, new_regime, new_categoria = cur_posto, cur_regime, cur_categoria
+	if op and op.muda_posto and novo_posto:
+		new_posto = novo_posto
+	if op and op.muda_regime and novo_regime:
+		new_regime = novo_regime
+	if op and op.muda_categoria and nova_categoria:
+		new_categoria = nova_categoria
+
+	demite = bool(op and op.demite) or motivo == "Demissão"
+	out["demite"] = demite
+
+	def _nome_posto(p):
+		return frappe.db.get_value("Posto De Vigilancia", p, "nome_do_posto") or p if p else None
+
+	# ── Changes ──
+	if new_posto != cur_posto:
+		out["mudancas"].append({"campo": "Posto", "de": _nome_posto(cur_posto), "para": _nome_posto(new_posto)})
+	if new_regime != cur_regime:
+		out["mudancas"].append({"campo": "Regime", "de": cur_regime, "para": new_regime})
+	if new_categoria != cur_categoria:
+		out["mudancas"].append({"campo": "Categoria", "de": cur_categoria, "para": new_categoria})
+	if demite:
+		out["mudancas"].append({"campo": "Estado", "de": vig.status, "para": "Demitido"})
+
+	# ── Escala migration ──
+	old_pair = (cur_posto, cur_regime)
+	dest_posto, dest_regime = (None, None) if demite else (new_posto, new_regime)
+	if old_pair != (dest_posto, dest_regime):
+		sai = _escala_do_par(cur_posto, cur_regime)
+		if sai and not frappe.db.exists("Tab Vigilante Do Posto", {"parent": sai, "vigilante": vigilante}):
+			sai = None
+		entra, entra_criada = None, False
+		if dest_posto and dest_regime:
+			entra = _escala_do_par(dest_posto, dest_regime)
+			entra_criada = entra is None
+		out["escala"] = {"sai": sai, "entra": entra, "entra_criada": entra_criada}
+
+	# ── Occupation deltas ──
+	deltas = {}
+	def _d(p, n):
+		if p:
+			deltas[p] = deltas.get(p, 0) + n
+	if demite or new_posto != cur_posto:
+		_d(cur_posto, -1)
+	if not demite and new_posto != cur_posto:
+		_d(new_posto, +1)
+	if op and op.requer_substituto and novo_vigilante and cur_posto:
+		sub_cur = frappe.db.get_value("Vigilante", novo_vigilante, "posto_de_vigilancia")
+		_d(sub_cur, -1)
+		_d(cur_posto, +1)
+	for p, dlt in deltas.items():
+		if dlt == 0:
+			continue
+		atual = frappe.db.count("Vigilante", {"posto_de_vigilancia": p, "status": "Activo"})
+		out["ocupacao"].append({"posto": _nome_posto(p), "de": atual, "para": atual + dlt})
+
+	# ── Substituto ──
+	if op and op.requer_substituto and novo_vigilante and cur_posto:
+		out["substituto"] = {
+			"vigilante": novo_vigilante,
+			"nome": frappe.db.get_value("Vigilante", novo_vigilante, "nome_completo") or novo_vigilante,
+			"assume_posto": _nome_posto(cur_posto),
+		}
+
+	# ── Warnings ──
+	if new_posto and new_posto != cur_posto:
+		max_vagas = frappe.db.get_value("Posto De Vigilancia", new_posto, "numero_de_vagas") or 0
+		if max_vagas:
+			atual = frappe.db.count("Vigilante", {"posto_de_vigilancia": new_posto, "status": "Activo"})
+			if atual >= max_vagas:
+				out["avisos"].append("O posto de destino já está no limite ({0}/{1}).".format(atual, max_vagas))
+	if op and op.requer_substituto and novo_vigilante:
+		cat_vig = vig.categoria
+		cat_sub = frappe.db.get_value("Vigilante", novo_vigilante, "categoria")
+		if cat_vig and cat_sub and cat_vig != cat_sub:
+			pode = (frappe.db.get_value("Categoria Vigilante", cat_sub, "pode_ser_substituto")
+			        or frappe.db.get_value("Categoria Vigilante", cat_vig, "pode_ser_substituto"))
+			if not pode:
+				out["avisos"].append("Categorias diferentes ({0} vs {1}) e nenhuma autorizada para substituição.".format(cat_vig, cat_sub))
+	dias_min = frappe.db.get_single_value("SIGOS Settings", "dias_minimos_rotatividade") or 90
+	base = frappe.db.get_value("Vigilante", vigilante, "data_admissao")
+	if base and not motivo_3meses:
+		from frappe.utils import date_diff, today as _today
+		if date_diff(_today(), base) < dias_min:
+			out["avisos"].append("Vigilante ainda não completou {0} dias desde a admissão — exige justificação.".format(dias_min))
+
+	return out
