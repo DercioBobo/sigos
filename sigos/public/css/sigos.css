@@ -1,8 +1,8 @@
-/* SIGOS – global styles */
+/* SIGOS - global styles */
 @import url('https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&display=swap');
 
 :root {
-	/* Condensed display face for schedule numerals/headers — industrial register */
+	/* Condensed display face for schedule numerals/headers - industrial register */
 	--sigos-display: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
 }
 
@@ -12,7 +12,7 @@
 	font-feature-settings: "tnum" 1;
 }
 
-/* ── Form chrome — scoped to SIGOS doctypes ────────────────────────────── */
+/* -- Form chrome - scoped to SIGOS doctypes ------------------------------ */
 body[data-route*="Vigilante"] .frappe-section,
 body[data-route*="Posto"] .frappe-section,
 body[data-route*="Rotatividade"] .frappe-section,
@@ -59,7 +59,7 @@ body[data-route*="SIGOS-Settings"] .section-head {
 	border-bottom: 1px solid #e4e8ec;
 }
 
-/* ── Tab bar refinements ────────────────────────────────────────────────── */
+/* -- Tab bar refinements -------------------------------------------------- */
 .form-tabs-list {
 	border-bottom: 2px solid #e4e8ec;
 	margin-bottom: 4px;
@@ -86,10 +86,10 @@ body[data-route*="SIGOS-Settings"] .section-head {
 	background: transparent;
 }
 
-/* ── Mandatory field asterisk color ────────────────────────────────────── */
+/* -- Mandatory field asterisk color -------------------------------------- */
 .reqd-asterisk { color: #e05c5c !important; }
 
-/* ── Read-only field style ──────────────────────────────────────────────── */
+/* -- Read-only field style ------------------------------------------------ */
 .read-only .like-disabled-input,
 .read-only .form-control[disabled] {
 	background: #f8f9fb !important;
@@ -110,7 +110,7 @@ body[data-route*="SIGOS-Settings"] .section-head {
 .indicator.inactivo     { --indicator-color: #aaa; }
 .indicator.pre-adimissao { --indicator-color: var(--sigos-accent); }
 
-/* ── Posto occupation badge ─────────────────────────────────────────────── */
+/* -- Posto occupation badge ----------------------------------------------- */
 .sigos-posto-badge {
 	display: inline-flex;
 	align-items: center;
@@ -154,14 +154,14 @@ body[data-route*="SIGOS-Settings"] .section-head {
 	font-size: .85em;
 }
 
-/* ════════════════════════════════════════════════════════════════════════
-   Rotatividade wizard — operational command console
-   ════════════════════════════════════════════════════════════════════════ */
+/* ------------------------------------------------------------------------
+   Rotatividade wizard - operational command console
+   ------------------------------------------------------------------------ */
 .sigos-rotw .modal-dialog { max-width: 720px; }
 .sigos-rotw .modal-header { border-bottom: none; padding-bottom: 0; }
 .sigos-rotw .modal-body { padding-top: 8px; }
 
-/* ── Header: operation name + stepper rail ── */
+/* -- Header: operation name + stepper rail -- */
 .rotw-head {
 	background: linear-gradient(135deg, #1a3a5c 0%, #11283f 100%);
 	margin: -4px -16px 18px;
@@ -200,7 +200,7 @@ body[data-route*="SIGOS-Settings"] .section-head {
 .rotw-node.todo .rotw-nlabel { display: none; }
 .rotw-conn { flex: 1; height: 2px; background: rgba(255,255,255,.18); border-radius: 2px; min-width: 12px; }
 
-/* ── Current-state card ── */
+/* -- Current-state card -- */
 .rotw-state {
 	margin-top: 14px; border: 1px solid #e4e8ec; border-radius: 12px; overflow: hidden;
 	background: linear-gradient(180deg, #fbfcfd, #f4f6f8);
@@ -216,7 +216,7 @@ body[data-route*="SIGOS-Settings"] .section-head {
 .rotw-slabel { font-size: .68em; text-transform: uppercase; letter-spacing: .04em; color: #9aa2aa; font-weight: 600; }
 .rotw-sval { font-size: .95em; font-weight: 600; color: #2c3e50; }
 
-/* ── Preview (flight-plan briefing) ── */
+/* -- Preview (flight-plan briefing) -- */
 .rotw-prev-loading { text-align: center; color: #888; padding: 40px; font-size: .9em; }
 .rotw-preview { animation: sigos-fade-up .3s ease both; }
 .rotw-prev-head {
@@ -268,7 +268,7 @@ body[data-route*="SIGOS-Settings"] .section-head {
 .rotw-warn-dem { background: #fdecef; border-color: #f5b5bb; color: #b02a37; }
 .rotw-none, .rotw-none-inline { color: #9aa2aa; font-size: .88em; font-style: italic; }
 
-/* ── Footer buttons ── */
+/* -- Footer buttons -- */
 .sigos-rotw .modal-footer { border-top: 1px solid #eef1f4; }
 .sigos-rotw .rotw-back {
 	border: 1px solid #d0d7de; background: #fff; color: #6c757d;
@@ -281,7 +281,7 @@ body[data-route*="SIGOS-Settings"] .section-head {
 	box-shadow: 0 2px 8px rgba(31,138,85,.3);
 }
 
-/* ════ Rotatividade wizard v2 — designed steps ════ */
+/* ---- Rotatividade wizard v2 - designed steps ---- */
 .sigos-rotw2 .modal-dialog { max-width: 760px; }
 .rotw-step { animation: rotw-slide-in .28s cubic-bezier(.2,.7,.3,1) both; }
 .rotw-slide-next { --rotw-x: 22px; }
@@ -367,7 +367,7 @@ body[data-route*="SIGOS-Settings"] .section-head {
 }
 .rotw2-chosen.sub .rotw2-chosen-tag { background: rgba(31,138,85,.15); color: #1f8a55; }
 
-/* change rows (de → para) */
+/* change rows (de  para) */
 .rotw2-changes { margin-bottom: 10px; }
 .rotw2-change-row {
 	display: grid; grid-template-columns: 90px 1fr auto 1.4fr; align-items: center; gap: 10px;
@@ -383,7 +383,7 @@ body[data-route*="SIGOS-Settings"] .section-head {
 .sigos-rotw2 .frappe-control { margin: 0 !important; }
 .sigos-rotw2 .control-label { display: none; }
 
-/* ── Vigilante wizard footer (Anterior / Próximo / Guardar) ─────────────── */
+/* -- Vigilante wizard footer (Anterior / Proximo / Guardar) --------------- */
 .sigos-wizard-nav {
 	display: flex;
 	align-items: center;
@@ -438,7 +438,7 @@ body[data-route*="SIGOS-Settings"] .section-head {
 	color: #8a949e;
 }
 
-/* ── Ausencias roster picker ────────────────────────────────────────────── */
+/* -- Ausencias roster picker ---------------------------------------------- */
 .aus-roster-head {
 	display: flex;
 	align-items: center;
@@ -469,7 +469,7 @@ body[data-route*="SIGOS-Settings"] .section-head {
 }
 .aus-mini-btn:hover { background: #f0f3f6; border-color: #adb5bd; }
 
-/* Selection hero bar — the operational payload (how many you're about to add) */
+/* Selection hero bar - the operational payload (how many you're about to add) */
 .aus-selbar {
 	margin-top: 12px; padding: 10px 16px;
 	border-radius: 10px;
@@ -551,7 +551,7 @@ body[data-route*="SIGOS-Settings"] .section-head {
 }
 .aus-empty { grid-column: 1 / -1; text-align: center; color: #999; padding: 24px; font-size: .9em; }
 
-/* ── Escala toolbar (range toggle) ──────────────────────────────────────── */
+/* -- Escala toolbar (range toggle) ---------------------------------------- */
 .esc-toolbar {
 	display: flex;
 	align-items: center;
@@ -588,7 +588,7 @@ body[data-route*="SIGOS-Settings"] .section-head {
 .esc-showing { font-size: .82em; color: #888; }
 .esc-showing b { color: var(--sigos-primary, #1a3a5c); }
 
-/* ── Escala WEEKLY board ────────────────────────────────────────────────── */
+/* -- Escala WEEKLY board -------------------------------------------------- */
 .esc-week-nav {
 	display: flex;
 	align-items: center;
@@ -664,7 +664,7 @@ body[data-route*="SIGOS-Settings"] .section-head {
 	line-height: 1.2; letter-spacing: .01em;
 }
 
-/* Staggered row entrance — one orchestrated reveal on render */
+/* Staggered row entrance - one orchestrated reveal on render */
 .esc-wk-row { animation: sigos-fade-up .34s cubic-bezier(.2,.7,.3,1) both; }
 @keyframes sigos-fade-up {
 	from { opacity: 0; transform: translateY(6px); }
@@ -729,13 +729,13 @@ body[data-route*="SIGOS-Settings"] .section-head {
 	50%      { background: #f8c9ce; }
 }
 
-/* ── Escala empty state ─────────────────────────────────────────────────── */
+/* -- Escala empty state --------------------------------------------------- */
 .esc-empty-state { text-align: center; padding: 48px 24px; }
 .esc-empty-icon { font-size: 2.5em; margin-bottom: 10px; opacity: .8; }
 .esc-empty-title { font-size: 1.05em; font-weight: 600; color: #333; margin-bottom: 6px; }
 .esc-empty-sub { color: #888; font-size: .9em; max-width: 460px; margin: 0 auto; }
 
-/* ── Cobertura explainer ────────────────────────────────────────────────── */
+/* -- Cobertura explainer -------------------------------------------------- */
 .esc-cobertura-help {
 	display: flex;
 	align-items: center;
@@ -756,7 +756,7 @@ body[data-route*="SIGOS-Settings"] .section-head {
 	width: 20px; height: 20px; border-radius: 50%; font-weight: 700; font-size: .9em;
 }
 
-/* ── Escala horizontal grid ─────────────────────────────────────────────── */
+/* -- Escala horizontal grid ----------------------------------------------- */
 .esc-grid-wrap {
 	overflow-x: auto;
 	border: 1px solid var(--border-color, #d1d8dd);
@@ -824,7 +824,7 @@ thead .esc-name-col { z-index: 3; }
 .esc-empty { background: #fff; cursor: default; }
 .esc-pastcell { opacity: .55; }
 
-/* Period chips — gradient + bright top edge gives a physical, button-like depth */
+/* Period chips - gradient + bright top edge gives a physical, button-like depth */
 .cell-manha { background: linear-gradient(180deg, #62a2e2 0%, #4a90d9 52%, #3a7ec5 100%); }
 .cell-noite { background: linear-gradient(180deg, #3b5074 0%, #2c3e57 52%, #212f44 100%); }
 .cell-tarde { background: linear-gradient(180deg, #f2b13c 0%, #e8a020 52%, #d18f12 100%); }
@@ -832,7 +832,7 @@ thead .esc-name-col { z-index: 3; }
 
 .esc-override { box-shadow: inset 0 0 0 2px #e05c5c; }
 
-/* coverage row — compact view (also a hero, scaled down) */
+/* coverage row - compact view (also a hero, scaled down) */
 .esc-cov-row td { border-bottom: 2px solid #d6dce2; background: #fafbfc; }
 .esc-cov-row .esc-name-col {
 	font-family: var(--sigos-display);
@@ -862,7 +862,7 @@ thead .esc-name-col { z-index: 3; }
 }
 .esc-override-lg { background: #fff; color: #e05c5c; box-shadow: inset 0 0 0 2px #e05c5c; }
 
-/* ── Vigilante form — role-coloured tabs ────────────────────────────────── */
+/* -- Vigilante form - role-coloured tabs ---------------------------------- */
 .sigos-tab-ops,
 .sigos-tab-ops.active {
 	color: #1565C0 !important;
@@ -889,7 +889,7 @@ thead .esc-name-col { z-index: 3; }
 	background: rgba(191, 54, 12, 0.06) !important;
 }
 
-/* ── Danger buttons (limpar, remover) ───────────────────────────────────── */
+/* -- Danger buttons (limpar, remover) ------------------------------------- */
 /* Danger buttons (limpar, remover) */
 .btn-sigos-danger {
 	background-color: var(--sigos-danger) !important;
