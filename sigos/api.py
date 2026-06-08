@@ -1050,3 +1050,18 @@ def search_vigilantes_rich(txt="", status="Activo", delegacao=None, excluir=None
 		ORDER BY v.nome_completo
 		LIMIT 25
 	""", params, as_dict=True)
+
+
+@frappe.whitelist()
+def get_regime_rate(project, regime):
+	"""
+	Monthly billed rate per vigilante for a regime under a contract (Project).
+	Reads the project's per-regime tariff table; falls back to the project's
+	default valor (custom_valor_do_contrato) when the regime has no specific rate.
+	"""
+	if not project:
+		return 0
+	rate = frappe.db.get_value("Project Regime Rate", {"parent": project, "regime": regime}, "valor")
+	if rate:
+		return rate
+	return frappe.db.get_value("Project", project, "custom_valor_do_contrato") or 0

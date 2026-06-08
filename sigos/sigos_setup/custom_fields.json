@@ -414,8 +414,20 @@
   "module": "SIGOS Setup",
   "fieldname": "custom_valor_do_contrato",
   "fieldtype": "Currency",
-  "label": "Valor do Contrato (por Vigilante)",
+  "label": "Valor por Vigilante (predefinido)",
+  "description": "Preço usado quando um regime não tem tarifa específica na tabela abaixo.",
   "insert_after": "project_type"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Project",
+  "module": "SIGOS Setup",
+  "fieldname": "custom_regime_rates",
+  "fieldtype": "Table",
+  "options": "Project Regime Rate",
+  "label": "Tarifas por Regime",
+  "description": "Preço mensal por vigilante para cada regime, neste contrato.",
+  "insert_after": "custom_valor_do_contrato"
  },
  {
   "doctype": "Custom Field",
@@ -425,6 +437,6 @@
   "fieldtype": "Table",
   "options": "Project Subsidio Item",
   "label": "Subsídios do Projecto",
-  "insert_after": "custom_valor_do_contrato"
+  "insert_after": "custom_regime_rates"
  }
 ]
