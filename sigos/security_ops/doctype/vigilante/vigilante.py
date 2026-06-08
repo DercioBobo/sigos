@@ -35,6 +35,36 @@ class Vigilante(Document):
 
 	def on_update(self):
 		self._atualizar_ocupacao_postos()
+		self._migrar_escala_se_mudou()
+
+	# ─── Keystone: escala follows the guard ──────────────────────────────────────
+
+	def _migrar_escala_se_mudou(self):
+		"""
+		When the guard's posto OR regime changes, migrate them between escalas.
+		Universal — fires for Rotatividade, Troca De Regime, Atribuir, manual edits.
+		A guard is only ADDED to the new escala when Activo with a posto+regime;
+		otherwise (demitido / inactivo / no posto) they are just removed from the old.
+		"""
+		before = self.get_doc_before_save()
+		if not before:
+			return
+
+		old_posto, old_regime = before.posto_de_vigilancia, before.regime_do_vigilante
+		new_posto, new_regime = self.posto_de_vigilancia, self.regime_do_vigilante
+		if (old_posto, old_regime) == (new_posto, new_regime):
+			return
+
+		# Only place the guard into a new escala if they are active and assigned.
+		if self.status == "Activo" and new_posto and new_regime:
+			destino = (new_posto, new_regime)
+		else:
+			destino = (None, None)
+
+		from sigos.security_ops.doctype.escala_do_vigilante.escala_do_vigilante import (
+			migrar_escala_vigilante,
+		)
+		migrar_escala_vigilante(self.name, old_posto, old_regime, destino[0], destino[1])
 
 	# ─── Auto-activation ─────────────────────────────────────────────────────────
 

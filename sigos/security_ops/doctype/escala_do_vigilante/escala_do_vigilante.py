@@ -256,3 +256,91 @@ def get_escalas_com_vigilante(vigilante: str) -> list:
 		{"vig": vigilante, "hoje": hoje},
 		as_dict=True,
 	)
+
+
+# ─── KEYSTONE: escala follows the guard ───────────────────────────────────────
+# A single engine that moves a guard between (posto, regime) escalas. Triggered by
+# the Vigilante controller whenever posto OR regime changes — so Rotatividade,
+# Troca De Regime, Atribuir Vigilantes and manual edits all migrate the escala the
+# same correct way. The escala doesn't care WHY the guard moved, only the pair.
+
+def _escala_do_par(posto, regime):
+	"""Active/Rascunho escala for a (posto, regime) pair, or None."""
+	if not (posto and regime):
+		return None
+	return frappe.db.get_value(
+		"Escala Do Vigilante",
+		{"posto_de_vigilancia": posto, "regime_do_vigilante": regime, "estado": ["!=", "Arquivado"]},
+		"name",
+	)
+
+
+def _turno_inicial_livre(esc, regime):
+	"""Pick a free working turno to preserve coverage; fall back to the first working turno."""
+	from sigos.utils import get_regime_turno_sequence
+	seq = get_regime_turno_sequence(regime)
+	working = [t["turno"] for t in seq if not t.get("e_folga")]
+	if not working:
+		return None
+	usados = {g.turno_inicial for g in esc.tab_vigilante_do_posto if g.turno_inicial}
+	livres = [t for t in working if t not in usados]
+	return livres[0] if livres else working[0]
+
+
+def _remover_vigilante_da_escala(vigilante, posto, regime):
+	nome = _escala_do_par(posto, regime)
+	if not nome:
+		return None
+	esc = frappe.get_doc("Escala Do Vigilante", nome)
+	antes = len(esc.tab_vigilante_do_posto)
+	esc.set("tab_vigilante_do_posto", [
+		g for g in esc.tab_vigilante_do_posto if g.vigilante != vigilante
+	])
+	if len(esc.tab_vigilante_do_posto) == antes:
+		return None  # guard wasn't in it
+	esc.save(ignore_permissions=True)  # reconcile drops their future rows; auto-archives if empty
+	return nome
+
+
+def _adicionar_vigilante_a_escala(vigilante, posto, regime):
+	nome = _escala_do_par(posto, regime)
+	criada = False
+	if nome:
+		esc = frappe.get_doc("Escala Do Vigilante", nome)
+	else:
+		esc = frappe.new_doc("Escala Do Vigilante")
+		esc.posto_de_vigilancia = posto
+		esc.regime_do_vigilante = regime
+		esc.data_de_inicio = nowdate()
+		esc.estado = "Activo"
+		cliente = frappe.db.get_value("Posto De Vigilancia", posto, "cliente")
+		if cliente:
+			esc.cliente = cliente
+		criada = True
+
+	if not any(g.vigilante == vigilante for g in esc.tab_vigilante_do_posto):
+		esc.append("tab_vigilante_do_posto", {
+			"vigilante": vigilante,
+			"turno_inicial": _turno_inicial_livre(esc, regime),
+		})
+	esc.save(ignore_permissions=True)  # reconcile generates their rows
+	return esc.name, criada
+
+
+def migrar_escala_vigilante(vigilante, old_posto, old_regime, new_posto, new_regime):
+	"""
+	Move a guard from the (old_posto, old_regime) escala to the (new_posto, new_regime)
+	escala. Pass new_posto/new_regime as None to only remove (e.g. demissão / inactive).
+	Returns {removido_de, adicionado_a, criada} or None when nothing changed.
+	"""
+	if (old_posto, old_regime) == (new_posto, new_regime):
+		return None
+
+	removido = _remover_vigilante_da_escala(vigilante, old_posto, old_regime)
+	adicionado, criada = (None, False)
+	if new_posto and new_regime:
+		adicionado, criada = _adicionar_vigilante_a_escala(vigilante, new_posto, new_regime)
+
+	if not (removido or adicionado):
+		return None
+	return {"removido_de": removido, "adicionado_a": adicionado, "criada": criada}
