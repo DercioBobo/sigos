@@ -22,11 +22,13 @@
   "regime",
   "tab_rot_op",
   "sec_operacao",
+  "situacao_card",
   "abreviatura_op",
   "motivo",
   "nova_categoria",
   "col_rot_2",
   "novo_posto",
+  "novo_regime",
   "sec_substituto",
   "alocar_vigilante_substituto",
   "novo_vigilante",
@@ -277,6 +279,17 @@
    "fieldname": "evidencia",
    "fieldtype": "Attach",
    "label": "Evidência"
+  },
+  {
+   "fieldname": "novo_regime",
+   "fieldtype": "Link",
+   "label": "Novo Regime",
+   "options": "Regime"
+  },
+  {
+   "fieldname": "situacao_card",
+   "fieldtype": "HTML",
+   "label": "Situação Actual"
   }
  ],
  "is_submittable": 1,
