@@ -37,7 +37,7 @@ sigos.rotatividade_wizard = function (prefill = {}) {
 			{ fieldname: "motivo", fieldtype: "Select", label: __("Motivo"),
 			  options: "\nTransferência\nReserva\nDemissão\nDisciplinar\nOutro" },
 			{ fieldname: "motiv_demi", fieldtype: "Select", label: __("Motivo de Demissão"), options: MOTIVO_DEMI },
-			{ fieldname: "uniforme", fieldtype: "Select", label: __("Uniforme Entregue"), options: "\nSim\nNão" },
+			{ fieldname: "uniforme", fieldtype: "Select", label: __("Uniforme"), options: "\nEntregue\nNão Entregue" },
 			{ fieldname: "motivo_3meses", fieldtype: "Small Text", label: __("Justificação (antes do mínimo de dias)") },
 
 			// ── Step 3: Substituto ──
