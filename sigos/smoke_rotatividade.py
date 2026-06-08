@@ -158,12 +158,22 @@ def _teardown():
 # ─── the test ─────────────────────────────────────────────────────────────────
 
 def run():
+	import traceback
 	frappe.flags.in_test = True
-	_cleanup_previous()
+	try:
+		_cleanup_previous()
+	except Exception as e:
+		_ok("setup: cleanup previous run", False, str(e))
 	try:
 		_run_scenarios()
+	except Exception:
+		frappe.db.rollback()
+		_ok("scenarios completed without error", False, traceback.format_exc().splitlines()[-1])
 	finally:
-		_teardown()
+		try:
+			_teardown()
+		except Exception as e:
+			print("teardown error:", e)
 		_report()
 
 
