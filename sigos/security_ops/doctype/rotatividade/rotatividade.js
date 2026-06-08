@@ -1,128 +1,94 @@
+// The Rotatividade form IS the wizard (Option A).
+//  - new / draft (docstatus 0)  -> inline wizard rendered into the canvas
+//  - submitted   (docstatus 1)  -> read-only summary card
+// Native fields are hidden in both modes; the canvas is the whole experience.
+
 frappe.ui.form.on("Rotatividade", {
-
-	onload(frm) {
-		_set_queries(frm);
-	},
-
 	refresh(frm) {
-		_apply_operacao(frm);
-		_render_situacao(frm);
-
-		// A friendly nudge towards the wizard for new docs
-		if (frm.is_new()) {
-			frm.add_custom_button(__("Abrir Assistente"), () => _launch_wizard(frm.doc.vigilante)).addClass("btn-primary");
+		if (typeof sigos.build_rotatividade_wizard !== "function") {
+			// asset not loaded yet — show a hint instead of a broken form
+			frm.fields_dict.wizard_canvas.$wrapper.html(
+				`<div style="padding:24px;color:#888">${__("A carregar assistente… actualize a página (Ctrl+Shift+R).")}</div>`);
+			return;
 		}
-	},
-
-	delegacao(frm) { _set_queries(frm); },
-
-	abreviatura_op(frm) { _apply_operacao(frm); },
-
-	motivo(frm) { _apply_operacao(frm); },
-
-	vigilante(frm) {
-		if (!frm.doc.vigilante) { _render_situacao(frm); return; }
-		frappe.db.get_doc("Vigilante", frm.doc.vigilante).then((v) => {
-			frm.set_value("antigo_posto", v.posto_de_vigilancia);
-			frm.set_value("regime", v.regime_do_vigilante);
-			frm.set_value("categoria_vigilante", v.categoria);
-			frm.set_value("mecanografico", v.mecanografico);
-			if (!frm.doc.delegacao) frm.set_value("delegacao", v.delegacao);
-			frm._estado = {
-				posto: v.posto_de_vigilancia, regime: v.regime_do_vigilante,
-				categoria: v.categoria, delegacao: v.delegacao, status: v.status,
-			};
-			_render_situacao(frm);
-		});
-	},
-
-	novo_vigilante(frm) {
-		frm.set_value("alocado_ao_posto", frm.doc.antigo_posto);
+		_hide_native(frm);
+		if (frm.doc.docstatus === 1) _summary_mode(frm);
+		else _wizard_mode(frm);
 	},
 });
 
-// ─── Launch wizard (defensive against stale asset cache) ──────────────────────
-function _launch_wizard(vigilante) {
-	if (typeof sigos.rotatividade_wizard !== "function") {
-		frappe.msgprint({
-			title: __("Assistente não carregado"),
-			message: __("Os recursos do assistente ainda não foram carregados. Actualize a página (Ctrl+Shift+R)."),
-			indicator: "orange",
-		});
-		return;
-	}
-	sigos.rotatividade_wizard({ vigilante: vigilante || undefined });
-}
-
-// ─── Apply the selected operation's flags to field visibility ─────────────────
-function _apply_operacao(frm) {
-	const op = frm.doc.abreviatura_op;
-	if (!op) { _toggle(frm, {}); return; }
-
-	frappe.db.get_doc("Operacao De Rotatividade", op).then((o) => {
-		const demite = !!o.demite || frm.doc.motivo === "Demissão";
-		_toggle(frm, {
-			muda_posto: !!o.muda_posto,
-			muda_regime: !!o.muda_regime,
-			muda_categoria: !!o.muda_categoria,
-			requer_substituto: !!o.requer_substituto,
-			demite,
-		});
+// ─── hide the native field area, keep only the canvas ─────────────────────────
+function _hide_native(frm) {
+	frm.$wrapper.addClass("rotw-form-mode");
+	(frm.fields || []).forEach((f) => {
+		if (f.df.fieldname !== "wizard_canvas") frm.set_df_property(f.df.fieldname, "hidden", 1);
 	});
 }
 
-function _toggle(frm, f) {
-	// posto / regime / categoria changes
-	frm.toggle_display("novo_posto", !!f.muda_posto);
-	frm.toggle_reqd("novo_posto", !!f.muda_posto);
-	frm.toggle_display("novo_regime", !!f.muda_regime);
-	frm.toggle_reqd("novo_regime", !!f.muda_regime);
-	frm.toggle_display("nova_categoria", !!f.muda_categoria);
-	frm.toggle_reqd("nova_categoria", !!f.muda_categoria);
+// ─── wizard mode (new / draft) ────────────────────────────────────────────────
+function _wizard_mode(frm) {
+	const $canvas = frm.fields_dict.wizard_canvas.$wrapper;
+	if (frm._rotw_mounted) return;          // mount once; keep wizard state across refreshes
+	frm._rotw_mounted = true;
 
-	// substituto section
-	const sub = !!f.requer_substituto;
-	["sec_substituto", "alocar_vigilante_substituto", "novo_vigilante", "alocado_ao_posto",
-		"cliente_novo_posto", "categoria_vigilante_a_alocar"].forEach((fn) => frm.toggle_display(fn, sub));
+	$canvas.addClass("sigos-rotw2");
+	const $inner = $('<div class="rotw-inline"></div>').appendTo($canvas.empty());
 
-	// demissão section
-	const dem = !!f.demite;
-	["sec_demissao", "motiv_demi", "uniforme"].forEach((fn) => frm.toggle_display(fn, dem));
+	sigos.build_rotatividade_wizard({
+		$mount: $inner,
+		prefill: frm.doc.vigilante ? { vigilante: frm.doc.vigilante } : {},
+		cancelLabel: __("Recomeçar"),
+		onCancel: () => { frm._rotw_mounted = false; _wizard_mode(frm); },   // reset fresh
+		onConfirm: (docData) => {
+			Object.entries(docData).forEach(([k, v]) => {
+				if (k !== "doctype" && v != null) frm.doc[k] = v;
+			});
+			frm.dirty();
+			return frm.save("Submit").then(() => {
+				frappe.show_alert({ message: __("Rotatividade aplicada."), indicator: "green" }, 5);
+			});
+		},
+	});
 }
 
-// ─── Situação actual card (matches the wizard) ────────────────────────────────
-function _render_situacao(frm) {
-	const w = frm.fields_dict.situacao_card?.$wrapper;
-	if (!w) return;
-	const e = frm._estado;
-	if (!frm.doc.vigilante || !e) { w.html(""); return; }
+// ─── summary mode (submitted) ─────────────────────────────────────────────────
+function _summary_mode(frm) {
+	const d = frm.doc;
+	const cell = (label, from, to) => `
+		<div class="rotw-change">
+			<span class="rotw-cfield">${label}</span>
+			<span class="rotw-cflow">
+				<span class="rotw-cfrom">${frappe.utils.escape_html(from || "—")}</span>
+				<span class="rotw-carrow">→</span>
+				<span class="rotw-cto">${frappe.utils.escape_html(to || "—")}</span>
+			</span>
+		</div>`;
 
-	const cell = (label, val) => `<div class="rotw-scell">
-		<span class="rotw-slabel">${label}</span>
-		<span class="rotw-sval">${val ? frappe.utils.escape_html(val) : "—"}</span></div>`;
+	const rows = [];
+	if (d.novo_posto) rows.push(cell(__("Posto"), d.antigo_posto, d.novo_posto));
+	if (d.novo_regime) rows.push(cell(__("Regime"), d.regime, d.novo_regime));
+	if (d.nova_categoria) rows.push(cell(__("Categoria"), d.categoria_vigilante, d.nova_categoria));
+	if (d.motivo === "Demissão") rows.push(cell(__("Estado"), __("Activo"), __("Demitido")));
 
-	w.html(`
-		<div class="rotw-state" style="margin-top:4px">
-			<div class="rotw-state-title">${__("Situação Actual")} — ${frappe.utils.escape_html(frm.doc.vigilante)}</div>
-			<div class="rotw-state-grid">
-				${cell(__("Posto"), e.posto)}
-				${cell(__("Regime"), e.regime)}
-				${cell(__("Categoria"), e.categoria)}
-				${cell(__("Delegação"), e.delegacao)}
+	const sub = d.novo_vigilante ? `<div class="rotw-block"><div class="rotw-block-h">${__("Substituto")}</div>
+		<div class="rotw-sub">${frappe.utils.escape_html(d.novo_vigilante)} ${__("assumiu")}
+		<b>${frappe.utils.escape_html(d.alocado_ao_posto || "—")}</b></div></div>` : "";
+
+	const html = `
+		<div class="rotw-summary">
+			<div class="rotw-head">
+				<div class="rotw-op">${frappe.utils.escape_html((d.abreviatura_op || "") + " · " + (d.vigilante || ""))}</div>
+				<div class="rotw-stepper"><div class="rotw-node done"><span class="rotw-dot">✓</span>
+					<span class="rotw-nlabel">${__("Aplicada em")} ${frappe.datetime.str_to_user(d.data) || ""}</span></div></div>
 			</div>
-		</div>`);
-}
+			<div class="rotw-preview">
+				<div class="rotw-block"><div class="rotw-block-h">${__("Alterações")}</div>
+					${rows.join("") || `<div class="rotw-none">${__("Sem alterações directas ao vigilante.")}</div>`}</div>
+				${sub}
+				${d.motivo ? `<div class="rotw-block"><div class="rotw-block-h">${__("Motivo")}</div>
+					<div class="rotw-sub">${frappe.utils.escape_html(d.motivo)}${d.motiv_demi ? " · " + frappe.utils.escape_html(d.motiv_demi) : ""}</div></div>` : ""}
+			</div>
+		</div>`;
 
-// ─── Link queries ─────────────────────────────────────────────────────────────
-function _set_queries(frm) {
-	frm.set_query("vigilante", () => ({
-		filters: [["status", "=", "Activo"], ["categoria", "!=", "Administrativo"]],
-	}));
-	frm.set_query("novo_posto", () => ({
-		filters: { delegacao: frm.doc.delegacao, estado: "Activo" },
-	}));
-	frm.set_query("novo_vigilante", () => ({
-		query: "sigos.api.get_substitutos_disponiveis",
-		filters: { delegacao: frm.doc.delegacao || "", excluir: frm.doc.vigilante || "" },
-	}));
+	frm.fields_dict.wizard_canvas.$wrapper.addClass("sigos-rotw2").html(html);
 }

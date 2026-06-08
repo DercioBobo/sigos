@@ -110,6 +110,18 @@ frappe.provide("sigos");
 .sigos-rotw2 .rotw2-cr-to .control-input, .sigos-rotw2 .rotw2-field .control-input { margin: 0; }
 .sigos-rotw2 .frappe-control { margin: 0 !important; }
 .sigos-rotw2 .control-label { display: none; }
+.rotw-footer { display: flex; align-items: center; gap: 10px; margin-top: 18px; padding-top: 14px; border-top: 1px solid #eef1f4; }
+.rotw-foot-btn { padding: 9px 22px; border-radius: 8px; font-weight: 600; font-size: .95em; cursor: pointer; transition: all .14s cubic-bezier(.2,.7,.3,1); border: 1px solid #d0d7de; font-family: var(--sigos-display, system-ui); }
+.rotw-back { background: #fff; color: #6c757d; margin-right: auto; }
+.rotw-back:hover { background: #f0f3f6; }
+.rotw-next { background: linear-gradient(180deg,#234a73,#1a3a5c); border-color: #1a3a5c; color: #fff; box-shadow: 0 2px 8px rgba(26,58,92,.22); }
+.rotw-next:hover { box-shadow: 0 4px 12px rgba(26,58,92,.3); transform: translateY(-1px); }
+.rotw-next.rotw-confirm { background: linear-gradient(180deg,#2fa56a,#1f8a55); border-color: #1f8a55; box-shadow: 0 2px 8px rgba(31,138,85,.28); }
+.rotw-next:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+/* inline (form) mode: hide the native field area, show only the wizard canvas */
+.rotw-form-mode .form-tabs-list, .rotw-form-mode .std-row-buttons { display: none !important; }
+.rotw-inline { max-width: 820px; margin: 0 auto; }
+.rotw-summary { max-width: 720px; margin: 8px auto 0; }
 `;
 	const s = document.createElement("style");
 	s.id = "sigos-rotw-css";
@@ -117,7 +129,10 @@ frappe.provide("sigos");
 	document.head.appendChild(s);
 })();
 
-sigos.rotatividade_wizard = function (prefill = {}) {
+// ════════ Engine: renders the wizard into any container ($mount) ════════
+// opts: { $mount, prefill, onConfirm(docData)->Promise, onCancel, cancelLabel }
+sigos.build_rotatividade_wizard = function (opts) {
+	const $mount = opts.$mount;
 	const S = {
 		step: 0, dir: 1,
 		operacoes: [], op: null, flags: {},
@@ -127,16 +142,7 @@ sigos.rotatividade_wizard = function (prefill = {}) {
 		sub: null,
 	};
 	const controls = {};
-
-	const d = new frappe.ui.Dialog({
-		title: __("Rotatividade"),
-		size: "large",
-		fields: [{ fieldname: "body", fieldtype: "HTML" }],
-		primary_action_label: __("Próximo →"),
-		primary_action: () => _advance(),
-	});
-	d.$wrapper.addClass("sigos-rotw sigos-rotw2");
-	const $body = () => d.fields_dict.body.$wrapper;
+	const $body = () => $mount;
 
 	const STEP_LABELS = {
 		ident: __("Operação & Vigilante"), mudancas: __("Mudanças"),
@@ -159,7 +165,6 @@ sigos.rotatividade_wizard = function (prefill = {}) {
 		},
 		callback: (r) => { S.operacoes = r.message || []; _render(); },
 	});
-	d.show();
 
 	// ── navigation ──
 	function _advance() {
@@ -170,7 +175,7 @@ sigos.rotatividade_wizard = function (prefill = {}) {
 		S.dir = 1; S.step += 1; _render();
 	}
 	function _back() {
-		if (S.step === 0) { d.hide(); return; }
+		if (S.step === 0) { if (opts.onCancel) opts.onCancel(); return; }
 		S.dir = -1; S.step -= 1; _render();
 	}
 	function _validate(key) {
@@ -205,31 +210,29 @@ sigos.rotatividade_wizard = function (prefill = {}) {
 		else if (key === "substituto") content = _stepSubstituto();
 		else if (key === "preview") content = `<div id="rotw-prev"></div>`;
 
+		const last = S.step >= steps.length - 1;
+		const backLabel = S.step === 0 ? (opts.cancelLabel || __("Cancelar")) : `← ${__("Anterior")}`;
+		const nextLabel = last ? `${__("Confirmar Rotatividade")} ✓` : `${__("Próximo")} →`;
+
 		$body().html(`
 			<div class="rotw-head">
 				<div class="rotw-op">${frappe.utils.escape_html(opName)}</div>
 				<div class="rotw-stepper">${stepper}</div>
 			</div>
-			<div class="rotw-step rotw-slide-${S.dir > 0 ? "next" : "prev"}">${content}</div>`);
+			<div class="rotw-step rotw-slide-${S.dir > 0 ? "next" : "prev"}">${content}</div>
+			<div class="rotw-footer">
+				<button class="rotw-foot-btn rotw-back">${backLabel}</button>
+				<button class="rotw-foot-btn rotw-next ${last ? "rotw-confirm" : ""}">${nextLabel}</button>
+			</div>`);
+
+		$body().find(".rotw-back").on("click", _back);
+		$body().find(".rotw-next").on("click", _advance);
 
 		// post-mount wiring per step
 		if (key === "ident") _wireIdent();
 		else if (key === "mudancas") _wireMudancas();
 		else if (key === "substituto") _wireSubstituto();
 		else if (key === "preview") _renderPreview();
-
-		_footer(steps);
-	}
-
-	function _footer(steps) {
-		const last = S.step >= steps.length - 1;
-		const $btn = d.get_primary_btn();
-		$btn.html(last ? `${__("Confirmar Rotatividade")} ✓` : `${__("Próximo")} →`);
-		$btn.toggleClass("rotw-confirm", last);
-		$btn.prop("disabled", false);
-		let $back = d.$wrapper.find(".rotw-back");
-		if (!$back.length) { $back = $(`<button class="btn rotw-back"></button>`); $btn.before($back); $back.on("click", _back); }
-		$back.html(S.step === 0 ? __("Cancelar") : `← ${__("Anterior")}`);
 	}
 
 	// ════════ STEP 1 — Operação + Vigilante ════════
@@ -483,9 +486,9 @@ sigos.rotatividade_wizard = function (prefill = {}) {
 			${escala}${occB}${sub}${dem}${warns}</div>`;
 	}
 
-	// ── confirm ──
+	// ── confirm: hand the assembled doc to the caller's persistence ──
 	function _confirm() {
-		const doc = {
+		const docData = {
 			doctype: "Rotatividade", data: frappe.datetime.get_today(),
 			vigilante: S.vig.name, abreviatura_op: S.op.name,
 			delegacao: S.vig.delegacao, mecanografico: S.vig.mecanografico,
@@ -495,19 +498,13 @@ sigos.rotatividade_wizard = function (prefill = {}) {
 			alocar_vigilante_substituto: S.sub ? "Sim" : "Não",
 			motivo: S.motivo, motiv_demi: S.motiv_demi, uniforme: S.uniforme, motivo_3meses: S.motivo_3meses,
 		};
-		d.get_primary_btn().prop("disabled", true);
-		frappe.call({
-			method: "frappe.client.insert", args: { doc }, freeze: true, freeze_message: __("A criar…"),
-			callback: (r) => frappe.call({
-				method: "frappe.client.submit", args: { doc: r.message }, freeze: true, freeze_message: __("A aplicar…"),
-				callback: () => { d.hide(); frappe.show_alert({ message: __("Rotatividade {0} aplicada.", [r.message.name]), indicator: "green" }, 5); frappe.set_route("Form", "Rotatividade", r.message.name); },
-				error: () => frappe.set_route("Form", "Rotatividade", r.message.name),
-			}),
-			error: () => d.get_primary_btn().prop("disabled", false),
-		});
+		const $next = $body().find(".rotw-next");
+		$next.prop("disabled", true);
+		Promise.resolve(opts.onConfirm && opts.onConfirm(docData)).catch(() => $next.prop("disabled", false));
 	}
 
-	// prefill guard
+	// ── prefill guard ──
+	const prefill = opts.prefill || {};
 	if (prefill.vigilante) {
 		frappe.db.get_doc("Vigilante", prefill.vigilante).then((v) => {
 			S.vig = { name: v.name, nome_completo: v.nome_completo, posto: v.posto_de_vigilancia,
@@ -516,4 +513,39 @@ sigos.rotatividade_wizard = function (prefill = {}) {
 			if (_steps()[S.step] === "ident") _render();
 		});
 	}
+};
+
+// ════════ Thin modal wrapper (list button / Rotacionar) ════════
+sigos.rotatividade_wizard = function (prefill = {}) {
+	const d = new frappe.ui.Dialog({
+		title: __("Rotatividade"),
+		size: "large",
+		fields: [{ fieldname: "body", fieldtype: "HTML" }],
+	});
+	d.$wrapper.addClass("sigos-rotw sigos-rotw2");
+	d.$wrapper.find(".modal-footer").hide();   // engine renders its own footer
+	d.show();
+
+	sigos.build_rotatividade_wizard({
+		$mount: d.fields_dict.body.$wrapper,
+		prefill,
+		cancelLabel: __("Cancelar"),
+		onCancel: () => d.hide(),
+		onConfirm: (doc) => new Promise((resolve, reject) => {
+			frappe.call({
+				method: "frappe.client.insert", args: { doc }, freeze: true, freeze_message: __("A criar…"),
+				callback: (r) => frappe.call({
+					method: "frappe.client.submit", args: { doc: r.message }, freeze: true, freeze_message: __("A aplicar…"),
+					callback: () => {
+						d.hide();
+						frappe.show_alert({ message: __("Rotatividade {0} aplicada.", [r.message.name]), indicator: "green" }, 5);
+						frappe.set_route("Form", "Rotatividade", r.message.name);
+						resolve();
+					},
+					error: () => { frappe.set_route("Form", "Rotatividade", r.message.name); reject(); },
+				}),
+				error: reject,
+			});
+		}),
+	});
 };

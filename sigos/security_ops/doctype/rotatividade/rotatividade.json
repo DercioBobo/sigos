@@ -9,6 +9,7 @@
  "engine": "InnoDB",
  "field_order": [
   "naming_series",
+  "wizard_canvas",
   "tab_rot_id",
   "data",
   "delegacao",
@@ -290,6 +291,11 @@
    "fieldname": "situacao_card",
    "fieldtype": "HTML",
    "label": "Situação Actual"
+  },
+  {
+   "fieldname": "wizard_canvas",
+   "fieldtype": "HTML",
+   "label": "Assistente"
   }
  ],
  "is_submittable": 1,
