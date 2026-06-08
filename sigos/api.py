@@ -992,12 +992,15 @@ def preview_rotatividade(vigilante, abreviatura_op=None, novo_posto=None, novo_r
 		atual = frappe.db.count("Vigilante", {"posto_de_vigilancia": p, "status": "Activo"})
 		out["ocupacao"].append({"posto": _nome_posto(p), "de": atual, "para": atual + dlt})
 
-	# ── Substituto ──
+	# ── Substituto (takes on the original guard's categoria) ──
 	if op and op.requer_substituto and novo_vigilante and cur_posto:
+		sub_cat = frappe.db.get_value("Vigilante", novo_vigilante, "categoria")
 		out["substituto"] = {
 			"vigilante": novo_vigilante,
 			"nome": frappe.db.get_value("Vigilante", novo_vigilante, "nome_completo") or novo_vigilante,
 			"assume_posto": _nome_posto(cur_posto),
+			"categoria_de": sub_cat,
+			"categoria_para": cur_categoria if (cur_categoria and sub_cat != cur_categoria) else None,
 		}
 
 	# ── Warnings ──

@@ -509,8 +509,13 @@ sigos.build_rotatividade_wizard = function (opts) {
 				<b class="${up ? "occ-up" : dn ? "occ-dn" : ""}">${o.para}</b></span></div>`;
 		}).join("");
 		const occB = occ ? `<div class="rotw-block"><div class="rotw-block-h">${__("Ocupação")}</div>${occ}</div>` : "";
+		const subCat = (p.substituto && p.substituto.categoria_para)
+			? `<div class="rotw-sub" style="margin-top:6px">${__("Categoria")}:
+				<span class="rotw-cfrom">${frappe.utils.escape_html(p.substituto.categoria_de || "—")}</span>
+				<span class="rotw-carrow">→</span>
+				<b class="rotw-cto">${frappe.utils.escape_html(p.substituto.categoria_para)}</b></div>` : "";
 		const sub = p.substituto ? `<div class="rotw-block"><div class="rotw-block-h">${__("Substituto")}</div>
-			<div class="rotw-sub">${frappe.utils.escape_html(p.substituto.nome)} ${__("assume")} <b>${frappe.utils.escape_html(p.substituto.assume_posto || "—")}</b></div></div>` : "";
+			<div class="rotw-sub">${frappe.utils.escape_html(p.substituto.nome)} ${__("assume")} <b>${frappe.utils.escape_html(p.substituto.assume_posto || "—")}</b></div>${subCat}</div>` : "";
 		const dem = p.demite ? `<div class="rotw-warn rotw-warn-dem">⚑ ${__("Demissão automática será criada.")}</div>` : "";
 		const warns = (p.avisos || []).map((w) => `<div class="rotw-warn">⚠️ ${frappe.utils.escape_html(w)}</div>`).join("");
 

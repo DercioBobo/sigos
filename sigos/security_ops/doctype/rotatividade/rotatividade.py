@@ -4,22 +4,12 @@ from frappe.model.document import Document
 from frappe.utils import date_diff, today, getdate
 
 
-def _categoria_pode_substituir(categoria_nome: str) -> bool:
-	if not categoria_nome:
-		return False
-	return bool(
-		frappe.db.get_value("Categoria Vigilante", categoria_nome, "pode_ser_substituto")
-	)
-
-
 class Rotatividade(Document):
 
 	def validate(self):
-		self._validar_categoria()
 		self._validar_regra_3meses()
 
 	def before_submit(self):
-		self._validar_categoria()
 		self._validar_regra_3meses()
 
 	def on_submit(self):
@@ -50,10 +40,13 @@ class Rotatividade(Document):
 
 		vig.save(ignore_permissions=True)
 
-		# 2. Substituto assumes the vacated posto (also cascades through the keystone)
+		# 2. Substituto assumes the vacated posto, taking ON the original guard's
+		#    categoria (the role's category) — a substituto always matches the old.
 		if op and op.requer_substituto and self.novo_vigilante and posto_vago:
 			sub = frappe.get_doc("Vigilante", self.novo_vigilante)
 			sub.posto_de_vigilancia = posto_vago
+			if self.categoria_vigilante and sub.categoria != self.categoria_vigilante:
+				sub.categoria = self.categoria_vigilante
 			sub.save(ignore_permissions=True)
 
 		# 3. Create the Demissão record
@@ -102,36 +95,9 @@ class Rotatividade(Document):
 			)
 
 	# ─── Validation helpers ────────────────────────────────────────────────────
-
-	def _validar_categoria(self):
-		"""
-		Categories must match unless one party has pode_ser_substituto = 1
-		(configured on Categoria Vigilante — e.g. Reserva guards cover any category).
-		"""
-		if not (self.categoria_vigilante and self.categoria_vigilante_a_alocar):
-			return
-		# Only relevant when a substituto is actually involved
-		if not self.novo_vigilante:
-			return
-		if self.categoria_vigilante == self.categoria_vigilante_a_alocar:
-			return
-
-		if _categoria_pode_substituir(self.categoria_vigilante):
-			return
-		if _categoria_pode_substituir(self.categoria_vigilante_a_alocar):
-			return
-
-		frappe.throw(
-			_("A Categoria do Vigilante <b>{0}</b> é <b>{1}</b>, mas a do Substituto "
-			  "<b>{2}</b> é <b>{3}</b>. As categorias devem ser iguais, ou um dos "
-			  "vigilantes deve ter uma categoria autorizada para substituição.").format(
-				self.vigilante,
-				self.categoria_vigilante,
-				self.novo_vigilante,
-				self.categoria_vigilante_a_alocar,
-			),
-			title=_("Categorias Incompatíveis"),
-		)
+	# NOTE: categoria matching is no longer a throw — the substituto's categoria is
+	# automatically set to the original guard's categoria in on_submit (a substituto
+	# always takes on the role's category).
 
 	def _validar_regra_3meses(self):
 		"""Guard must have spent N days at the post before rotating, unless motivo_3meses is filled."""
