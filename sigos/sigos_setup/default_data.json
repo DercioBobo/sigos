@@ -266,8 +266,8 @@
  },
  {
   "doctype": "Operacao De Rotatividade",
-  "abreviatura": "DRE",
-  "operacao": "Destacar da Reserva",
+  "abreviatura": "APR",
+  "operacao": "Atribuir Posto aos Reservas",
   "activo": 1,
   "bloqueada": 1,
   "muda_posto": 1,
@@ -276,6 +276,6 @@
   "enviar_reserva": 0,
   "de_reserva": 1,
   "requer_substituto": 0,
-  "descricao": "Destaca um vigilante em Reserva para um posto, definindo o regime. O vigilante volta a Activo."
+  "descricao": "Selecciona um vigilante em Reserva e atribui-lhe um posto e regime. O vigilante volta a Activo."
  }
 ]

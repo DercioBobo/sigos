@@ -290,7 +290,7 @@ sigos.build_rotatividade_wizard = function (opts) {
 			if (o.muda_regime) p.push(`<span class="rotw2-pic" title="${__("Muda regime")}">🕘 ${__("Regime")}</span>`);
 			if (o.requer_substituto) p.push(`<span class="rotw2-pic" title="${__("Substituto")}">⇄ ${__("Substituto")}</span>`);
 			if (o.enviar_reserva) p.push(`<span class="rotw2-pic" title="${__("Enviar p/ Reserva")}">🪑 ${__("→ Reserva")}</span>`);
-			if (o.de_reserva) p.push(`<span class="rotw2-pic" title="${__("Destacar da Reserva")}">🎯 ${__("da Reserva")}</span>`);
+			if (o.de_reserva) p.push(`<span class="rotw2-pic" title="${__("Atribuir Posto aos Reservas")}">🎯 ${__("da Reserva")}</span>`);
 			if (o.demite) p.push(`<span class="rotw2-pic rotw2-pic-dem" title="${__("Demissão")}">⚑ ${__("Demite")}</span>`);
 			const sel = S.op && S.op.name === o.name ? "sel" : "";
 			return `<div class="rotw2-card ${sel}" data-op="${o.name}">
