@@ -726,13 +726,14 @@ def get_ausencias(from_date=None, to_date=None, delegacao=None, periodo=None, li
 @frappe.whitelist()
 def get_vigilantes_sem_posto(delegacao=None):
 	"""
-	Return admitted vigilantes (Pre-Adimissao or Activo) that:
+	Return assignable vigilantes (admitted, active without posto, or in Reserva) that:
 	  - have no posto assigned
 	  - have a linked Employee (funcionario is set)
+	Reserva guards are the prime candidates here — the reserve pool is what you deploy.
 	Used by the Atribuir Vigilantes dialog on Posto De Vigilancia.
 	"""
 	filters = {
-		"status":              ["in", ["Pre-Adimissão", "Activo"]],
+		"status":              ["in", ["Pre-Adimissão", "Activo", "Reserva"]],
 		"posto_de_vigilancia": ["is", "not set"],
 		"funcionario":         ["is", "set"],
 	}
@@ -1061,7 +1062,7 @@ def search_vigilantes_rich(txt="", status="Activo", delegacao=None, excluir=None
 	where = " AND ".join(cond)
 	return frappe.db.sql(f"""
 		SELECT v.name, v.nome_completo, v.mecanografico, v.posto_de_vigilancia AS posto,
-		       v.regime_do_vigilante AS regime, v.categoria, v.delegacao
+		       v.regime_do_vigilante AS regime, v.categoria, v.delegacao, v.status
 		FROM `tabVigilante` v
 		WHERE {where}
 		  AND (v.name LIKE %(txt)s OR v.nome_completo LIKE %(txt)s OR v.mecanografico LIKE %(txt)s)

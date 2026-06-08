@@ -263,5 +263,19 @@
   "enviar_reserva": 1,
   "requer_substituto": 0,
   "descricao": "Posto fechado — o vigilante sai do posto e fica em Reserva (disponível para redestacamento)."
+ },
+ {
+  "doctype": "Operacao De Rotatividade",
+  "abreviatura": "DRE",
+  "operacao": "Destacar da Reserva",
+  "activo": 1,
+  "bloqueada": 1,
+  "muda_posto": 1,
+  "muda_regime": 1,
+  "demite": 0,
+  "enviar_reserva": 0,
+  "de_reserva": 1,
+  "requer_substituto": 0,
+  "descricao": "Destaca um vigilante em Reserva para um posto, definindo o regime. O vigilante volta a Activo."
  }
 ]

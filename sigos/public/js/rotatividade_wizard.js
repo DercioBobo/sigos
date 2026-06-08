@@ -167,7 +167,7 @@ sigos.build_rotatividade_wizard = function (opts) {
 			doctype: "Operacao De Rotatividade",
 			filters: { activo: 1 },
 			fields: ["name", "abreviatura", "operacao", "muda_posto", "muda_regime",
-				"requer_substituto", "demite", "enviar_reserva", "descricao"],
+				"requer_substituto", "demite", "enviar_reserva", "de_reserva", "descricao"],
 			order_by: "abreviatura", limit_page_length: 0,
 		},
 		callback: (r) => { S.operacoes = r.message || []; _render(); },
@@ -264,10 +264,16 @@ sigos.build_rotatividade_wizard = function (opts) {
 
 	// ════════ STEP 1 — Operação + Vigilante ════════
 	function _stepIdent() {
+		const poolLabel = S.flags.de_reserva
+			? `2 · ${__("Qual vigilante (do banco de reserva)?")}`
+			: `2 · ${__("Qual vigilante?")}`;
+		const poolHint = S.flags.de_reserva
+			? `<div class="rotw2-hint">🎯 ${__("Apenas vigilantes em <b>Reserva</b> — serão destacados para um posto.")}</div>` : "";
 		return `
 			<div class="rotw-sec-num">1 · ${__("Que operação?")}</div>
 			<div class="rotw2-cards">${_opCards()}</div>
-			<div class="rotw-sec-num" style="margin-top:18px">2 · ${__("Qual vigilante?")}</div>
+			<div class="rotw-sec-num" style="margin-top:18px">${poolLabel}</div>
+			${poolHint}
 			<div class="rotw2-search">
 				<span class="rotw2-search-ic">🔍</span>
 				<input type="text" class="rotw2-search-in" id="rotw-vsearch"
@@ -283,7 +289,8 @@ sigos.build_rotatividade_wizard = function (opts) {
 			if (o.muda_posto) p.push(`<span class="rotw2-pic" title="${__("Muda posto")}">📍 ${__("Posto")}</span>`);
 			if (o.muda_regime) p.push(`<span class="rotw2-pic" title="${__("Muda regime")}">🕘 ${__("Regime")}</span>`);
 			if (o.requer_substituto) p.push(`<span class="rotw2-pic" title="${__("Substituto")}">⇄ ${__("Substituto")}</span>`);
-			if (o.enviar_reserva) p.push(`<span class="rotw2-pic" title="${__("Reserva")}">🪑 ${__("Reserva")}</span>`);
+			if (o.enviar_reserva) p.push(`<span class="rotw2-pic" title="${__("Enviar p/ Reserva")}">🪑 ${__("→ Reserva")}</span>`);
+			if (o.de_reserva) p.push(`<span class="rotw2-pic" title="${__("Destacar da Reserva")}">🎯 ${__("da Reserva")}</span>`);
 			if (o.demite) p.push(`<span class="rotw2-pic rotw2-pic-dem" title="${__("Demissão")}">⚑ ${__("Demite")}</span>`);
 			const sel = S.op && S.op.name === o.name ? "sel" : "";
 			return `<div class="rotw2-card ${sel}" data-op="${o.name}">
@@ -304,7 +311,10 @@ sigos.build_rotatividade_wizard = function (opts) {
 				muda_posto: !!S.op.muda_posto, muda_regime: !!S.op.muda_regime,
 				requer_substituto: !!S.op.requer_substituto,
 				demite: !!S.op.demite, enviar_reserva: !!S.op.enviar_reserva,
+				de_reserva: !!S.op.de_reserva,
 			};
+			// Sourcing from the reserve pool? clear any previously-picked Activo guard
+			if (S.flags.de_reserva && S.vig && S.vig.status !== "Reserva") S.vig = null;
 			$body().find(".rotw2-card").removeClass("sel").find(".rotw2-check").remove();
 			$(this).addClass("sel").find(".rotw2-card-top").append('<span class="rotw2-check">✓</span>');
 			$body().find(".rotw-op").text(`${S.op.abreviatura} · ${S.op.operacao}`);
@@ -402,10 +412,12 @@ sigos.build_rotatividade_wizard = function (opts) {
 
 	// ── shared: guard search + result rows + chosen card ──
 	function _searchGuards(txt, $res, soSub, onPick) {
+		// Main guard comes from the reserve pool for a "Destacar da Reserva" op; else Activo.
+		const status = soSub ? "Activo" : (S.flags.de_reserva ? "Reserva" : "Activo");
 		frappe.call({
 			method: "sigos.api.search_vigilantes_rich",
-			args: { txt, delegacao: S.vig ? S.vig.delegacao : null,
-				excluir: S.vig ? S.vig.name : null, so_substitutos: soSub },
+			args: { txt, status, delegacao: (soSub && S.vig) ? S.vig.delegacao : null,
+				excluir: soSub && S.vig ? S.vig.name : null, so_substitutos: soSub },
 			callback: (r) => {
 				const list = r.message || [];
 				if (!list.length) { $res.html(`<div class="rotw2-nores">${__("Nenhum vigilante encontrado.")}</div>`); return; }
