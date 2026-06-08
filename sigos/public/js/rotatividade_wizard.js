@@ -167,7 +167,7 @@ sigos.build_rotatividade_wizard = function (opts) {
 			doctype: "Operacao De Rotatividade",
 			filters: { activo: 1 },
 			fields: ["name", "abreviatura", "operacao", "muda_posto", "muda_regime",
-				"requer_substituto", "demite", "descricao"],
+				"requer_substituto", "demite", "enviar_reserva", "descricao"],
 			order_by: "abreviatura", limit_page_length: 0,
 		},
 		callback: (r) => { S.operacoes = r.message || []; _render(); },
@@ -283,6 +283,7 @@ sigos.build_rotatividade_wizard = function (opts) {
 			if (o.muda_posto) p.push(`<span class="rotw2-pic" title="${__("Muda posto")}">📍 ${__("Posto")}</span>`);
 			if (o.muda_regime) p.push(`<span class="rotw2-pic" title="${__("Muda regime")}">🕘 ${__("Regime")}</span>`);
 			if (o.requer_substituto) p.push(`<span class="rotw2-pic" title="${__("Substituto")}">⇄ ${__("Substituto")}</span>`);
+			if (o.enviar_reserva) p.push(`<span class="rotw2-pic" title="${__("Reserva")}">🪑 ${__("Reserva")}</span>`);
 			if (o.demite) p.push(`<span class="rotw2-pic rotw2-pic-dem" title="${__("Demissão")}">⚑ ${__("Demite")}</span>`);
 			const sel = S.op && S.op.name === o.name ? "sel" : "";
 			return `<div class="rotw2-card ${sel}" data-op="${o.name}">
@@ -302,7 +303,7 @@ sigos.build_rotatividade_wizard = function (opts) {
 			S.flags = {
 				muda_posto: !!S.op.muda_posto, muda_regime: !!S.op.muda_regime,
 				requer_substituto: !!S.op.requer_substituto,
-				demite: !!S.op.demite,
+				demite: !!S.op.demite, enviar_reserva: !!S.op.enviar_reserva,
 			};
 			$body().find(".rotw2-card").removeClass("sel").find(".rotw2-check").remove();
 			$(this).addClass("sel").find(".rotw2-card-top").append('<span class="rotw2-check">✓</span>');
@@ -333,9 +334,15 @@ sigos.build_rotatividade_wizard = function (opts) {
 		if (S.flags.muda_regime) rows.push(_changeRow("Regime", S.vig.regime, "novo_regime"));
 		const demite = S.flags.demite || S.motivo === "Demissão";
 
+		const reservaNote = S.flags.enviar_reserva
+			? `<div class="rotw-sub" style="background:#fff8e6;border:1px solid #ffe08a;color:#8a6d1a;margin-bottom:10px">🪑 ${__(
+				"O vigilante sai do posto <b>{0}</b> e fica em <b>Reserva</b> (disponível, não demitido).",
+				[frappe.utils.escape_html(S.vig.posto || "—")])}</div>` : "";
+
 		return `
 			<div class="rotw-sec-num">${__("O que muda para")} <b>${frappe.utils.escape_html(S.vig.nome_completo || S.vig.name)}</b></div>
-			<div class="rotw2-changes">${rows.join("") || `<div class="rotw-none">${__("Esta operação não altera posto ou regime directamente.")}</div>`}</div>
+			${reservaNote}
+			<div class="rotw2-changes">${rows.join("") || (S.flags.enviar_reserva ? "" : `<div class="rotw-none">${__("Esta operação não altera posto ou regime directamente.")}</div>`)}</div>
 			<div class="rotw2-field"><label>${__("Motivo")}</label><div id="ctrl-motivo"></div></div>
 			<div id="rotw-demfields" style="${demite ? "" : "display:none"}">
 				<div class="rotw2-field"><label>${__("Motivo de Demissão")}</label><div id="ctrl-motiv_demi"></div></div>

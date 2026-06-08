@@ -46,6 +46,13 @@ class Rotatividade(Document):
 		demite = bool(op and op.demite) or self.motivo == "Demissão"
 		if demite:
 			vig.status = "Demitido"
+		# Enviar para Reserva: posto closed — bench the guard (employed, no posto, no escala)
+		elif op and op.enviar_reserva:
+			vig.status = "Reserva"
+			vig.posto_de_vigilancia = None
+			vig.projecto = None
+			vig.cliente = None
+			vig.nome_do_projecto = None
 
 		vig.save(ignore_permissions=True)
 

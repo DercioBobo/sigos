@@ -4,13 +4,15 @@ from frappe.model.document import Document
 from frappe.utils import getdate, today
 
 # Statuses that require an active Employee record
-_REQUER_EMPLOYEE = frozenset({"Pre-Adimissão", "Activo", "Inactivo", "Demitido"})
+_REQUER_EMPLOYEE = frozenset({"Pre-Adimissão", "Activo", "Reserva", "Inactivo", "Demitido"})
 
 # Canonical Vigilante → Employee status map (single source of truth, shared with sync.py)
+# "Reserva" = benched/available (posto closed) — still employed, so Employee stays Active.
 VIGILANTE_TO_EMP_STATUS = {
 	"Pre-Adimissão RH": "Active",
 	"Pre-Adimissão":    "Active",
 	"Activo":            "Active",
+	"Reserva":          "Active",
 	"Inactivo":         "Suspended",
 	"Demitido":         "Left",
 }
@@ -75,12 +77,12 @@ class Vigilante(Document):
 
 	def _auto_activar_com_posto(self):
 		"""
-		When a posto is assigned to an admitted vigilante (already has a Funcionário),
-		promote them to Activo automatically. This keeps posto occupation counters
-		correct — occupation counts only Activo vigilantes.
+		Assigning a posto to an admitted OR reserve guard (with a Funcionário) promotes
+		them to Activo automatically — this is how a Reserva guard is re-deployed.
+		Keeps occupation counters correct (only Activo guards are counted).
 		"""
 		if (
-			self.status == "Pre-Adimissão"
+			self.status in ("Pre-Adimissão", "Reserva")
 			and self.posto_de_vigilancia
 			and self.funcionario
 		):

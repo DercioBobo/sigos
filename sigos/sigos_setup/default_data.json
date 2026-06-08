@@ -250,5 +250,18 @@
   "demite": 1,
   "requer_substituto": 1,
   "descricao": "Remove o vigilante e cria a Demissão automaticamente; um substituto pode assumir o posto."
+ },
+ {
+  "doctype": "Operacao De Rotatividade",
+  "abreviatura": "RES",
+  "operacao": "Enviar para Reserva",
+  "activo": 1,
+  "bloqueada": 1,
+  "muda_posto": 0,
+  "muda_regime": 0,
+  "demite": 0,
+  "enviar_reserva": 1,
+  "requer_substituto": 0,
+  "descricao": "Posto fechado — o vigilante sai do posto e fica em Reserva (disponível para redestacamento)."
  }
 ]

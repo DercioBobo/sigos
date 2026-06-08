@@ -943,6 +943,7 @@ def preview_rotatividade(vigilante, abreviatura_op=None, novo_posto=None, novo_r
 		new_regime = novo_regime
 
 	demite = bool(op and op.demite) or motivo == "Demissão"
+	reserva = bool(op and op.get("enviar_reserva")) and not demite
 	out["demite"] = demite
 
 	def _nome_posto(p):
@@ -967,10 +968,15 @@ def preview_rotatividade(vigilante, abreviatura_op=None, novo_posto=None, novo_r
 		out["mudancas"].append({"campo": "Regime", "de": cur_regime, "para": new_regime})
 	if demite:
 		out["mudancas"].append({"campo": "Estado", "de": vig.status, "para": "Demitido"})
+	elif reserva:
+		out["mudancas"].append({"campo": "Estado", "de": vig.status, "para": "Reserva"})
+		if cur_posto:
+			out["mudancas"].append({"campo": "Posto", "de": _nome_posto(cur_posto), "para": "— (sai do posto)"})
 
 	# ── Escala migration ──
 	old_pair = (cur_posto, cur_regime)
-	dest_posto, dest_regime = (None, None) if demite else (new_posto, new_regime)
+	# demissão and reserva both pull the guard out of any escala (no destination)
+	dest_posto, dest_regime = (None, None) if (demite or reserva) else (new_posto, new_regime)
 	if old_pair != (dest_posto, dest_regime):
 		sai = _escala_do_par(cur_posto, cur_regime)
 		if sai and not frappe.db.exists("Tab Vigilante Do Posto", {"parent": sai, "vigilante": vigilante}):

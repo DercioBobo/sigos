@@ -183,7 +183,7 @@
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Estado",
-   "options": "Pre-Adimissão RH\nPre-Adimissão\nActivo\nInactivo\nDemitido",
+   "options": "Pre-Adimissão RH\nPre-Adimissão\nActivo\nReserva\nInactivo\nDemitido",
    "default": "Pre-Adimissão RH",
    "reqd": 1,
    "in_list_view": 1,
