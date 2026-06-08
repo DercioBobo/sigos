@@ -32,6 +32,10 @@ frappe.ui.form.on("Vigilante", {
 		// Rotacionar — launch the wizard pre-filled with this guard
 		if (!frm.is_new() && frm.doc.status === "Activo") {
 			frm.add_custom_button(__("Rotacionar"), () => {
+				if (typeof sigos.rotatividade_wizard !== "function") {
+					frappe.msgprint(__("Actualize a página (Ctrl+Shift+R) para carregar o assistente."));
+					return;
+				}
 				sigos.rotatividade_wizard({ vigilante: frm.doc.name });
 			}, __("Acções"));
 		}

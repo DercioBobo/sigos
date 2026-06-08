@@ -10,9 +10,7 @@ frappe.ui.form.on("Rotatividade", {
 
 		// A friendly nudge towards the wizard for new docs
 		if (frm.is_new()) {
-			frm.add_custom_button(__("Abrir Assistente"), () => {
-				sigos.rotatividade_wizard({ vigilante: frm.doc.vigilante || undefined });
-			}).addClass("btn-primary");
+			frm.add_custom_button(__("Abrir Assistente"), () => _launch_wizard(frm.doc.vigilante)).addClass("btn-primary");
 		}
 	},
 
@@ -42,6 +40,19 @@ frappe.ui.form.on("Rotatividade", {
 		frm.set_value("alocado_ao_posto", frm.doc.antigo_posto);
 	},
 });
+
+// ─── Launch wizard (defensive against stale asset cache) ──────────────────────
+function _launch_wizard(vigilante) {
+	if (typeof sigos.rotatividade_wizard !== "function") {
+		frappe.msgprint({
+			title: __("Assistente não carregado"),
+			message: __("Os recursos do assistente ainda não foram carregados. Actualize a página (Ctrl+Shift+R)."),
+			indicator: "orange",
+		});
+		return;
+	}
+	sigos.rotatividade_wizard({ vigilante: vigilante || undefined });
+}
 
 // ─── Apply the selected operation's flags to field visibility ─────────────────
 function _apply_operacao(frm) {
