@@ -62,6 +62,12 @@ class Rotatividade(Document):
 		if op and op.requer_substituto and self.novo_vigilante and posto_vago:
 			sub = frappe.get_doc("Vigilante", self.novo_vigilante)
 			sub.posto_de_vigilancia = posto_vago
+			# Whoever takes the posto assumes that posto's regime (the vacated slot).
+			# This is a deployment, not an arbitrary regime change, so we bypass the
+			# regime guard. self.regime is the slot's regime (the substituted guard's).
+			if self.regime and sub.regime_do_vigilante != self.regime:
+				sub.regime_do_vigilante = self.regime
+				sub.flags.via_troca_regime = True
 			sub.save(ignore_permissions=True)
 
 		# 3. Create the Demissão record
@@ -76,6 +82,19 @@ class Rotatividade(Document):
 			alert=True,
 		)
 
+	def on_cancel(self):
+		# Cancelling does NOT reverse an applied rotatividade — the guard stays moved /
+		# benched / demitted. To undo, the operator creates a NEW rotatividade with the
+		# inverse operation. We block the silent cancel and hand them a pre-filled link.
+		nova = "/app/rotatividade/new?vigilante=" + (self.vigilante or "")
+		frappe.throw(
+			_("Cancelar <b>não reverte</b> uma rotatividade já aplicada — o vigilante "
+			  "permanece no estado actual ({0}). Para reverter, crie a operação inversa: "
+			  "<a href='{1}'>Nova Rotatividade (inversa)</a>.").format(
+				self.vigilante or "-", nova),
+			title=_("Cancelamento Não Reverte"),
+		)
+
 	# ─── Operation lookup ────────────────────────────────────────────────────────
 
 	def _get_operacao(self):
@@ -87,12 +106,13 @@ class Rotatividade(Document):
 			return None
 
 	def _criar_demissao(self):
-		if frappe.db.exists("Demissao", {"vigilante": self.vigilante, "data_de_demissao": self.data}):
+		data_dem = self.data_de_demissao or self.data
+		if frappe.db.exists("Demissao", {"vigilante": self.vigilante, "data_de_demissao": data_dem}):
 			return
 		try:
 			dem = frappe.get_doc({
 				"doctype": "Demissao",
-				"data_de_demissao": self.data_de_demissao or self.data,
+				"data_de_demissao": data_dem,
 				"vigilante": self.vigilante,
 				"mecanografico": self.mecanografico,
 				"delegacao": self.delegacao,

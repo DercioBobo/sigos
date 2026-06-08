@@ -158,8 +158,13 @@ class Vigilante(Document):
 		if expected:
 			current = frappe.db.get_value("Employee", self.funcionario, "status")
 			if current != expected:
+				updates = {"status": expected}
+				# Reactivating a previously-Left employee (readmissão): clear the stale
+				# leaving date too, so HR/payroll stop treating them as gone.
+				if expected == "Active" and current == "Left":
+					updates["relieving_date"] = None
 				frappe.db.set_value(
-					"Employee", self.funcionario, "status", expected, update_modified=False
+					"Employee", self.funcionario, updates, update_modified=False
 				)
 				frappe.msgprint(
 					_("Estado do Funcionário <b>{0}</b> actualizado de <b>{1}</b> para <b>{2}</b> "

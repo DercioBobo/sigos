@@ -3,6 +3,7 @@
 let _escala_cache = null;
 let _escala_cache_key = null;
 let _quick_dialog = null;
+let _atraso_estado = null;   // null = unknown/na, "ok" = on time, "tardia" = late
 
 // ─── Main form events ─────────────────────────────────────────────────────────
 frappe.ui.form.on("Ausencias", {
@@ -12,15 +13,19 @@ frappe.ui.form.on("Ausencias", {
 	},
 
 	refresh(frm) {
+		// The native button + old summary are superseded by the command deck.
+		frm.set_df_property("btn_adicionar_ausencia", "hidden", 1);
+		frm.set_df_property("resumo_ausencias", "hidden", 1);
+
 		_aplicar_permissoes(frm);
 		_verificar_horario(frm);
-		_atualizar_resumo(frm);
+		_render_deck(frm);
 		_setup_substituto_query(frm);
 	},
 
-	data(frm)           { _invalidar_cache(); _verificar_horario(frm); },
-	periodo(frm)        { _invalidar_cache(); _verificar_horario(frm); },
-	grupo_delegados(frm){ _invalidar_cache(); },
+	data(frm)           { _invalidar_cache(); _verificar_horario(frm); _render_deck(frm); },
+	periodo(frm)        { _invalidar_cache(); _verificar_horario(frm); _render_deck(frm); },
+	grupo_delegados(frm){ _invalidar_cache(); _render_deck(frm); },
 
 	btn_adicionar_ausencia(frm) {
 		if (!frm.doc.data || !frm.doc.periodo) {
@@ -286,6 +291,7 @@ function _verificar_horario(frm) {
 	const limites = { "Manhã": "09:30:00", "Noite": "18:30:00" };
 	const limite  = limites[frm.doc.periodo];
 	if (!limite) {
+		_atraso_estado = null;
 		_limpar_alerta(frm);
 		return;
 	}
@@ -297,15 +303,18 @@ function _verificar_horario(frm) {
 		const agora = new Date().toLocaleTimeString("pt-PT", { hour12: false });
 
 		if (agora > hora_limite) {
+			_atraso_estado = "tardia";
 			_mostrar_alerta_atraso(frm, agora, hora_limite);
 			frm.set_df_property("motivo_atraso", "reqd", 1);
 			frm.set_df_property("motivo_atraso", "read_only", 0);
 			// Expand the section so it's visible
 			frm.set_df_property("sec_atraso", "collapsible_open", 1);
 		} else {
+			_atraso_estado = "ok";
 			_limpar_alerta(frm);
 			frm.set_df_property("motivo_atraso", "reqd", 0);
 		}
+		_render_deck(frm);
 	});
 }
 
@@ -328,6 +337,7 @@ function _limpar_alerta(frm) {
 
 // ─── Live summary ─────────────────────────────────────────────────────────────
 function _atualizar_resumo(frm) {
+	_render_deck(frm);   // the command deck carries the live stats now
 	const rows = frm.doc.tabela_ausencia || [];
 	if (!rows.length) {
 		frm.fields_dict.resumo_ausencias?.$wrapper.html("");
@@ -370,6 +380,155 @@ function _atualizar_resumo(frm) {
 			</div>
 		</div>`;
 	frm.fields_dict.resumo_ausencias?.$wrapper.html(html);
+}
+
+// ─── Command deck (the premium hero at the top of the form) ───────────────────
+function _render_deck(frm) {
+	_inject_deck_css();
+	const w = frm.fields_dict.deck_ausencias?.$wrapper;
+	if (!w) return;
+
+	const rows   = frm.doc.tabela_ausencia || [];
+	const ausentes = rows.length;
+	const faltas   = rows.reduce((s, r) => s + (r.n_de_faltas || 0), 0);
+	const subs     = rows.filter(r => r.proxima_accao === "Substituto").length;
+	const dobras   = rows.filter(r => r.proxima_accao === "Dobra de Turno").length;
+	const adiant   = rows.filter(r => r.proxima_accao === "Adiantamento de Turno").length;
+
+	const locked    = frm.doc.workflow_state === "Pendente De Aprovação";
+	const submitted = frm.doc.docstatus === 1;
+	const ready     = !!(frm.doc.data && frm.doc.periodo);
+	const editable  = !submitted && !locked && ready;
+
+	const dataStr = frm.doc.data ? frappe.datetime.str_to_user(frm.doc.data) : __("sem data");
+	const ctx = [dataStr, frm.doc.periodo || __("sem período"),
+		frm.doc.grupo_delegados || __("todos os grupos")].join("  ·  ");
+
+	let chip;
+	if (submitted)                     chip = `<span class="ausd-chip ausd-chip-ok">${__("Submetida")}</span>`;
+	else if (locked)                   chip = `<span class="ausd-chip ausd-chip-lock">${__("Pendente de Aprovação")}</span>`;
+	else if (!ready)                   chip = `<span class="ausd-chip ausd-chip-wait">${__("Defina data e período")}</span>`;
+	else if (_atraso_estado === "tardia") chip = `<span class="ausd-chip ausd-chip-late">${__("Submissão tardia")}</span>`;
+	else                               chip = `<span class="ausd-chip ausd-chip-ok">${__("Dentro do horário")}</span>`;
+
+	const tile = (n, label, cls) =>
+		`<div class="ausd-tile ${cls || ""}"><span class="n">${n}</span><span class="lbl">${label}</span></div>`;
+
+	const tiles = [
+		tile(ausentes, __("ausentes"), "t-aus"),
+		tile(faltas,   __("faltas"),   "t-falta"),
+		subs   ? tile(subs,   __("substitutos"), "t-sub") : "",
+		dobras ? tile(dobras, __("dobras"),      "t-dob") : "",
+		adiant ? tile(adiant, __("adiantam."),   "t-adi") : "",
+	].join("");
+
+	const ctaDisabled = editable ? "" : "disabled";
+	const warn = (_atraso_estado === "tardia" && editable)
+		? `<div class="ausd-warn">${__("Submissão fora do horário — preencha o <b>Motivo do Atraso</b> antes de gravar.")}</div>`
+		: "";
+
+	w.html(`
+		<div id="sigos-aus-deck" class="${locked ? "is-locked" : ""}">
+			<div class="ausd-top">
+				<div class="ausd-head">
+					<div class="ausd-title">${__("Folha de Ausências")}</div>
+					<div class="ausd-context">${frappe.utils.escape_html(ctx)}</div>
+				</div>
+				${chip}
+			</div>
+			<div class="ausd-actions">
+				<button type="button" class="ausd-cta" ${ctaDisabled}>
+					<span class="ausd-cta-plus">+</span> ${__("Registar Ausências")}
+				</button>
+				<span class="ausd-hint">${ausentes
+					? __("{0} vigilante(s) na folha", [ausentes])
+					: __("Comece por adicionar os vigilantes ausentes")}</span>
+			</div>
+			${ausentes ? `<div class="ausd-tiles">${tiles}</div>` : ""}
+			${warn}
+		</div>`);
+
+	w.find(".ausd-cta").on("click", () => {
+		if (!ready) {
+			frappe.show_alert({ message: __("Preencha Data e Período primeiro."), indicator: "orange" });
+			return;
+		}
+		if (!editable) return;
+		_abrir_quick_add(frm);
+	});
+}
+
+function _inject_deck_css() {
+	if (document.getElementById("sigos-aus-deck-css")) return;
+	const css = `
+#sigos-aus-deck {
+	position: sticky; top: 8px; z-index: 6;
+	margin: 0 0 14px; padding: 16px 18px;
+	border-radius: 14px; color: #fff;
+	background: linear-gradient(135deg, #234a73 0%, #1a3a5c 60%, #14304c 100%);
+	box-shadow: 0 8px 24px rgba(20,48,76,.28), inset 0 1px 0 rgba(255,255,255,.08);
+	border: 1px solid rgba(255,255,255,.06);
+}
+#sigos-aus-deck.is-locked { filter: saturate(.7); }
+.ausd-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.ausd-title {
+	font-family: var(--sigos-display, system-ui); font-weight: 700;
+	font-size: 1.18em; letter-spacing: .03em; text-transform: uppercase; line-height: 1;
+}
+.ausd-context { margin-top: 5px; font-size: .82em; color: rgba(255,255,255,.72); font-variant-numeric: tabular-nums; }
+.ausd-chip {
+	flex: none; padding: 5px 11px; border-radius: 999px; white-space: nowrap;
+	font-size: .72em; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+	border: 1px solid transparent;
+}
+.ausd-chip-ok   { background: rgba(47,165,106,.18); color: #8fe6b8; border-color: rgba(47,165,106,.4); }
+.ausd-chip-late { background: rgba(224,92,92,.2);  color: #ffb4b4; border-color: rgba(224,92,92,.5); }
+.ausd-chip-wait { background: rgba(255,255,255,.1); color: rgba(255,255,255,.75); }
+.ausd-chip-lock { background: rgba(232,160,32,.2); color: #f4cd84; border-color: rgba(232,160,32,.45); }
+.ausd-actions { display: flex; align-items: center; gap: 14px; margin-top: 14px; flex-wrap: wrap; }
+.ausd-cta {
+	display: inline-flex; align-items: center; gap: 8px;
+	padding: 11px 22px; border: none; border-radius: 10px; cursor: pointer;
+	font-family: var(--sigos-display, system-ui); font-weight: 700; font-size: 1.02em;
+	letter-spacing: .02em; color: #1a3a5c;
+	background: linear-gradient(180deg, #f2b542 0%, #e8a020 100%);
+	box-shadow: 0 4px 14px rgba(232,160,32,.4), inset 0 1px 0 rgba(255,255,255,.4);
+	transition: transform .12s ease, box-shadow .12s ease, filter .12s ease;
+}
+.ausd-cta:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(232,160,32,.5); }
+.ausd-cta:active { transform: translateY(0); }
+.ausd-cta[disabled] {
+	cursor: not-allowed; color: rgba(255,255,255,.45);
+	background: rgba(255,255,255,.1); box-shadow: none; filter: none;
+}
+.ausd-cta-plus { font-size: 1.25em; line-height: 0; font-weight: 400; }
+.ausd-hint { font-size: .82em; color: rgba(255,255,255,.7); }
+.ausd-tiles { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.ausd-tile {
+	min-width: 84px; padding: 10px 14px; border-radius: 10px;
+	background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.1);
+	display: flex; flex-direction: column; gap: 2px;
+}
+.ausd-tile .n {
+	font-family: var(--sigos-display, system-ui); font-weight: 700; font-size: 1.7em;
+	line-height: 1; font-variant-numeric: tabular-nums;
+}
+.ausd-tile .lbl { font-size: .68em; text-transform: uppercase; letter-spacing: .05em; color: rgba(255,255,255,.65); }
+.ausd-tile.t-aus   .n { color: #ff9d9d; }
+.ausd-tile.t-falta .n { color: #fff; }
+.ausd-tile.t-sub   .n { color: #8fd0ff; }
+.ausd-tile.t-dob   .n { color: #f4cd84; }
+.ausd-tile.t-adi   .n { color: #c6b6ff; }
+.ausd-warn {
+	margin-top: 14px; padding: 9px 13px; border-radius: 9px; font-size: .82em; font-weight: 600;
+	background: rgba(224,92,92,.16); border: 1px solid rgba(224,92,92,.4); color: #ffd0d0;
+}
+.ausd-warn b { color: #fff; }
+`;
+	const s = document.createElement("style");
+	s.id = "sigos-aus-deck-css";
+	s.textContent = css;
+	document.head.appendChild(s);
 }
 
 // ─── Permissions / read-only state ───────────────────────────────────────────

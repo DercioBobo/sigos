@@ -24,9 +24,16 @@ frappe.ui.form.on("Posto De Vigilancia", {
 			}
 		}
 
-		// Close-down helper: bench this posto's whole team to Reserva in one action.
+		// Close-down helper: bench this posto's whole team to Reserva in one action
+		// (keeps the posto open — e.g. a temporary lull).
 		if (!frm.is_new() && (frm.doc.ocupacao_atual || 0) > 0) {
 			frm.add_custom_button(__("Enviar Vigilantes para Reserva"), () => _enviar_reserva(frm), __("Acções"));
+		}
+
+		// Full teardown: bench the team + archive escalas + inactivate, in one guided step.
+		if (!frm.is_new() && frm.doc.estado === "Activo") {
+			frm.add_custom_button(__("Encerrar Posto"), () => _encerrar_posto(frm), __("Acções"))
+				.removeClass("btn-default").addClass("btn-danger");
 		}
 
 		if (!frm.is_new() && frm.doc.tipo_de_posto === "Temporário") {
@@ -91,6 +98,63 @@ function _enviar_reserva(frm) {
 				},
 			});
 			d.show();
+		},
+	});
+}
+
+// ─── Full teardown: bench team + archive escalas + inactivate ─────────────────
+function _encerrar_posto(frm) {
+	frappe.call({
+		method: "frappe.client.get_list",
+		args: {
+			doctype: "Vigilante",
+			filters: { posto_de_vigilancia: frm.doc.name, status: "Activo" },
+			fields: ["name", "nome_completo"], limit_page_length: 0,
+		},
+		callback(r) {
+			const guards = r.message || [];
+			const lista = guards.length
+				? `<ul style="margin:6px 0 0">${guards.map(g => `<li>${frappe.utils.escape_html(g.nome_completo || g.name)}</li>`).join("")}</ul>`
+				: `<div style="color:#888;margin-top:4px">${__("Nenhum vigilante activo neste posto.")}</div>`;
+
+			const d = new frappe.ui.Dialog({
+				title: __("Encerrar Posto — {0}", [frm.doc.nome_do_posto || frm.doc.name]),
+				fields: [
+					{ fieldtype: "HTML", options:
+						`<div style="margin-bottom:10px">
+							<div>${__("Encerrar este posto irá:")}</div>
+							<ul style="margin:6px 0">
+								<li>${__("Enviar <b>{0}</b> vigilante(s) para <b>Reserva</b> (disponíveis, não demitidos)", [guards.length])}</li>
+								<li>${__("Arquivar as escalas activas (deixam de gerar)")}</li>
+								<li>${__("Inactivar o posto")}</li>
+							</ul>
+							${lista}
+						</div>` },
+					{ fieldname: "motivo", fieldtype: "Small Text", reqd: 1,
+						label: __("Motivo do encerramento (ex: fim do posto temporário)") },
+				],
+				primary_action_label: __("Encerrar Posto"),
+				primary_action(v) {
+					frappe.call({
+						method: "sigos.api.encerrar_posto",
+						args: { posto: frm.doc.name, motivo: v.motivo },
+						freeze: true, freeze_message: __("A encerrar o posto..."),
+						callback(res) {
+							d.hide();
+							const m = res.message || {};
+							frappe.show_alert({
+								message: __("Posto encerrado: {0} para Reserva, {1} escala(s) arquivada(s).",
+									[m.benched || 0, m.arquivadas || 0]),
+								indicator: "green",
+							}, 7);
+							frm.reload_doc();
+						},
+					});
+				},
+			});
+			// Mark the confirm button as destructive
+			d.show();
+			d.get_primary_btn().removeClass("btn-primary").addClass("btn-danger");
 		},
 	});
 }

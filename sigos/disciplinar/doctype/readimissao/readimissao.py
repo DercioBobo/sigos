@@ -12,35 +12,36 @@ class Readimissao(Document):
 		if not self.vigilante:
 			return
 
-		try:
-			vigilante_doc = frappe.get_doc("Vigilante", self.vigilante)
-			if vigilante_doc.status != "Demitido":
-				frappe.throw(
-					_("O vigilante {0} não está com status Demitido. Readmissão não é possível.").format(
-						self.vigilante
-					)
-				)
-
-			# Clear operational fields
-			vigilante_doc.posto_de_vigilancia = None
-			vigilante_doc.projecto = None
-			vigilante_doc.nome_do_projecto = None
-			vigilante_doc.cliente = None
-			vigilante_doc.categoria = None
-			vigilante_doc.regime_do_vigilante = None
-			vigilante_doc.tipo_de_vigilante = None
-			vigilante_doc.data_admissao = None
-			vigilante_doc.status = "Pre-Adimissão"
-			vigilante_doc.save(ignore_permissions=True)
-
-			frappe.msgprint(
-				_("Vigilante {0} foi Pre-Admitido com sucesso.").format(self.vigilante),
-				alert=True
+		vig = frappe.get_doc("Vigilante", self.vigilante)
+		if vig.status != "Demitido":
+			frappe.throw(
+				_("O vigilante {0} não está com estado <b>Demitido</b>. Readmissão não é possível.").format(
+					self.vigilante
+				),
+				title=_("Readmissão Inválida"),
 			)
-		except frappe.ValidationError:
-			raise
-		except Exception as e:
-			frappe.log_error(
-				f"Readimissao {self.name}: erro ao readmitir vigilante {self.vigilante}: {e}",
-				"SIGOS Readimissao"
-			)
+
+		# Send the guard back to the START of the onboarding pipeline. RH will re-admit
+		# with a FRESH admission date and the SAME Employee is reactivated at that point
+		# (Active + relieving_date cleared). We keep funcionario so history is preserved.
+		# ignore_sync: don't reactivate the Employee yet — they're only re-admitted once
+		# RH completes the admission (status -> Pre-Adimissão). Until then it stays Left.
+		vig.posto_de_vigilancia = None
+		vig.projecto = None
+		vig.nome_do_projecto = None
+		vig.cliente = None
+		vig.categoria = None
+		vig.regime_do_vigilante = None
+		vig.tipo_de_vigilante = None
+		vig.data_admissao = None
+		vig.status = "Pre-Adimissão RH"
+		vig.flags.ignore_sync = True
+		vig.save(ignore_permissions=True)
+
+		frappe.msgprint(
+			_("Vigilante <b>{0}</b> readmitido — agora em <b>Pre-Adimissão RH</b>. "
+			  "Conclua a admissão (RH) com uma nova <b>Data de Admissão</b> para o reactivar.").format(
+				self.vigilante),
+			indicator="green",
+			alert=True,
+		)

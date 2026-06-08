@@ -1,7 +1,12 @@
-// The Rotatividade form IS the wizard (Option A).
-//  - new / draft (docstatus 0)  -> inline wizard rendered into the canvas
-//  - submitted   (docstatus 1)  -> read-only summary card
-// Native fields are hidden in both modes; the canvas is the whole experience.
+// The Rotatividade form IS the wizard (Option A), and it is WORKFLOW-AWARE.
+//   - new / Rascunho (editable)        -> inline wizard rendered into the canvas
+//   - Pendente / Rejeitado (locked)    -> read-only summary; native workflow buttons drive it
+//   - submitted / Aprovado (applied)   -> read-only summary + "Reverter"
+// Native fields are hidden in every mode; the canvas is the whole experience.
+//
+// Confirmar behaviour adapts automatically:
+//   - workflow attached  -> save Rascunho draft + fire the 1st transition (send for approval)
+//   - no workflow        -> save + submit (applies immediately, gated server-side anyway)
 
 frappe.ui.form.on("Rotatividade", {
 	refresh(frm) {
@@ -12,10 +17,31 @@ frappe.ui.form.on("Rotatividade", {
 			return;
 		}
 		_hide_native(frm);
-		if (frm.doc.docstatus === 1) _summary_mode(frm);
-		else _wizard_mode(frm);
+
+		const mode = _mode(frm);
+		if (mode === "wizard") {
+			_wizard_mode(frm);
+		} else {
+			frm._rotw_mounted = false;     // if it ever returns to Rascunho, remount fresh
+			_summary_mode(frm, mode);      // "applied" | "pending"
+		}
 	},
 });
+
+// ─── mode resolution (workflow-aware) ─────────────────────────────────────────
+function _has_workflow(frm) {
+	// The workflow_state field only exists once a Workflow governs the doctype.
+	return !!frm.fields_dict.workflow_state;
+}
+
+function _mode(frm) {
+	if (frm.doc.docstatus === 1) return "applied";           // Aprovado + submitted
+	if (_has_workflow(frm)) {
+		const st = frm.doc.workflow_state;
+		if (st && st !== "Rascunho") return "pending";       // out for approval / decided
+	}
+	return "wizard";                                          // new / Rascunho / no workflow
+}
 
 // ─── hide the native field area, keep only the canvas ─────────────────────────
 function _hide_native(frm) {
@@ -25,7 +51,7 @@ function _hide_native(frm) {
 	});
 }
 
-// ─── wizard mode (new / draft) ────────────────────────────────────────────────
+// ─── wizard mode (new / Rascunho) ─────────────────────────────────────────────
 function _wizard_mode(frm) {
 	const $canvas = frm.fields_dict.wizard_canvas.$wrapper;
 	if (frm._rotw_mounted) return;          // mount once; keep wizard state across refreshes
@@ -44,6 +70,14 @@ function _wizard_mode(frm) {
 				if (k !== "doctype" && v != null) frm.doc[k] = v;
 			});
 			frm.dirty();
+
+			if (_has_workflow(frm)) {
+				// Save the Rascunho draft, then send it up for approval in one go.
+				// The server gate (on_submit: workflow_state == "Aprovado") guarantees the
+				// rotatividade only takes effect once the approver signs off.
+				return frm.save().then(() => _enviar_para_aprovacao(frm));
+			}
+			// No workflow: apply immediately (direct submit).
 			return frm.save("Submit").then(() => {
 				frappe.show_alert({ message: __("Rotatividade aplicada."), indicator: "green" }, 5);
 			});
@@ -51,9 +85,35 @@ function _wizard_mode(frm) {
 	});
 }
 
-// ─── summary mode (submitted) ─────────────────────────────────────────────────
-function _summary_mode(frm) {
+// Fire the first workflow transition from Rascunho (e.g. "Submeter para Aprovação").
+function _enviar_para_aprovacao(frm) {
+	return frappe.xcall("frappe.model.workflow.get_transitions", { doc: frm.doc })
+		.then((transitions) => {
+			if (!transitions || !transitions.length) {
+				frappe.show_alert({
+					message: __("Guardado como Rascunho. Use o botão do fluxo para submeter para aprovação."),
+					indicator: "blue",
+				}, 7);
+				frm.refresh();
+				return;
+			}
+			const action = transitions[0].action;   // first transition = submit for approval
+			return frappe.xcall("frappe.model.workflow.apply_workflow", { doc: frm.doc, action })
+				.then((doc) => {
+					frappe.model.sync(doc);
+					frm.refresh();
+					frappe.show_alert({
+						message: __("Enviado para aprovação ({0}).", [doc.workflow_state || action]),
+						indicator: "green",
+					}, 6);
+				});
+		});
+}
+
+// ─── summary mode (pending approval OR applied) ───────────────────────────────
+function _summary_mode(frm, mode) {
 	const d = frm.doc;
+	const applied = mode === "applied";
 	const cell = (label, from, to) => `
 		<div class="rotw-change">
 			<span class="rotw-cfield">${label}</span>
@@ -73,15 +133,23 @@ function _summary_mode(frm) {
 		<div class="rotw-sub">${frappe.utils.escape_html(d.novo_vigilante)} ${__("assumiu")}
 		<b>${frappe.utils.escape_html(d.alocado_ao_posto || "—")}</b></div></div>` : "";
 
+	// Header badge reflects the state: applied vs. out for approval (with the workflow state).
+	const nodeClass = applied ? "done" : "pending";
+	const dot = applied ? "✓" : "⏳";
+	const stateLabel = applied
+		? `${__("Aplicada em")} ${frappe.datetime.str_to_user(d.data) || ""}`
+		: (d.workflow_state || __("Pendente de Aprovação"));
+
 	const html = `
 		<div class="rotw-summary">
 			<div class="rotw-head">
 				<div class="rotw-op">${frappe.utils.escape_html((d.abreviatura_op || "") + " · " + (d.vigilante || ""))}</div>
-				<div class="rotw-stepper"><div class="rotw-node done"><span class="rotw-dot">✓</span>
-					<span class="rotw-nlabel">${__("Aplicada em")} ${frappe.datetime.str_to_user(d.data) || ""}</span></div></div>
+				<div class="rotw-stepper"><div class="rotw-node ${nodeClass}"><span class="rotw-dot">${dot}</span>
+					<span class="rotw-nlabel">${frappe.utils.escape_html(stateLabel)}</span></div></div>
 			</div>
+			${applied ? "" : `<div class="rotw-pending-note">${__("Esta rotatividade aguarda aprovação — só será aplicada ao vigilante depois de aprovada.")}</div>`}
 			<div class="rotw-preview">
-				<div class="rotw-block"><div class="rotw-block-h">${__("Alterações")}</div>
+				<div class="rotw-block"><div class="rotw-block-h">${applied ? __("Alterações") : __("Alterações Propostas")}</div>
 					${rows.join("") || `<div class="rotw-none">${__("Sem alterações directas ao vigilante.")}</div>`}</div>
 				${sub}
 				${d.motivo ? `<div class="rotw-block"><div class="rotw-block-h">${__("Motivo")}</div>
@@ -92,4 +160,12 @@ function _summary_mode(frm) {
 		</div>`;
 
 	frm.fields_dict.wizard_canvas.$wrapper.addClass("sigos-rotw2").html(html);
+
+	// Reverter only makes sense once the rotatividade has actually been applied.
+	if (applied) {
+		frm.add_custom_button(__("Reverter (Nova Rotatividade)"), () => {
+			frappe.route_options = { vigilante: d.vigilante };
+			frappe.new_doc("Rotatividade");
+		});
+	}
 }

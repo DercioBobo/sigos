@@ -9,6 +9,7 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "deck_ausencias",
   "naming_series",
   "data",
   "periodo",
@@ -25,6 +26,11 @@
   "tabela_ausencia"
  ],
  "fields": [
+  {
+   "fieldname": "deck_ausencias",
+   "fieldtype": "HTML",
+   "label": "Folha de Ausências"
+  },
   {
    "fieldname": "naming_series",
    "fieldtype": "Select",

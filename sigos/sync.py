@@ -116,11 +116,16 @@ def vigilante_to_employee(doc, method=None):
 			if _copy(doc, emp, vig_f, emp_f):
 				changed = True
 
-		# HRMS requires relieving_date whenever Employee status is Left — guarantee it
-		# before saving (status may have been set Left by an earlier direct DB write).
+		# Keep relieving_date coherent with the Employee status:
+		#  - Left  -> HRMS requires one; fill with today if a direct DB write left it empty
+		#  - Active -> a working employee must NOT carry a leaving date (readmissão); clear it,
+		#    otherwise HR/payroll keep treating them as having left on that date.
 		if emp.status == "Left" and not emp.get("relieving_date"):
 			from frappe.utils import today
 			emp.relieving_date = today()
+			changed = True
+		elif emp.status == "Active" and emp.get("relieving_date"):
+			emp.relieving_date = None
 			changed = True
 
 		if changed:

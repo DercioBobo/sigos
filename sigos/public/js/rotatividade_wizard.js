@@ -15,7 +15,9 @@ frappe.provide("sigos");
 .rotw-op { font-family: var(--sigos-display, system-ui); font-size: 1.15em; font-weight: 700; letter-spacing: .02em; margin-bottom: 14px; position: relative; }
 .rotw-stepper { display: flex; align-items: center; gap: 6px; }
 .rotw-node { display: flex; align-items: center; gap: 8px; opacity: .5; transition: opacity .25s; }
-.rotw-node.active, .rotw-node.done { opacity: 1; }
+.rotw-node.active, .rotw-node.done, .rotw-node.pending { opacity: 1; }
+.rotw-node.pending .rotw-dot { background: #e8a020; border-color: #e8a020; color: #1a3a5c; }
+.rotw-pending-note { max-width: 720px; margin: 10px auto 0; padding: 9px 14px; border-radius: 10px; background: #fff7e8; border: 1px solid #f0d9a8; color: #8a5a12; font-size: .85em; font-weight: 600; }
 .rotw-dot { width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-family: var(--sigos-display, system-ui); font-weight: 700; font-size: .9em; background: rgba(255,255,255,.15); color: #fff; border: 1.5px solid rgba(255,255,255,.3); transition: all .25s; }
 .rotw-node.active .rotw-dot { background: #e8a020; border-color: #e8a020; color: #1a3a5c; box-shadow: 0 0 0 4px rgba(232,160,32,.25); }
 .rotw-node.done .rotw-dot { background: #2fa56a; border-color: #2fa56a; }

@@ -1048,25 +1048,34 @@ def preview_rotatividade(vigilante, abreviatura_op=None, novo_posto=None, novo_r
 @frappe.whitelist()
 def search_vigilantes_rich(txt="", status="Activo", delegacao=None, excluir=None, so_substitutos=0):
 	"""Rich vigilante search for the Rotatividade wizard pickers — returns name + current posto/regime/categoria."""
-	cond = ["v.status = %(status)s"]
-	params = {"status": status, "txt": "%" + (txt or "") + "%"}
-	if delegacao:
-		cond.append("v.delegacao = %(delegacao)s"); params["delegacao"] = delegacao
-	if excluir:
-		cond.append("v.name != %(excluir)s"); params["excluir"] = excluir
-	if int(so_substitutos or 0):
+	cond = []
+	params = {"txt": "%" + (txt or "") + "%"}
+	substituto = int(so_substitutos or 0)
+	if substituto:
+		# A substituto is reserve-eligible by categoria and AVAILABLE to deploy — that
+		# means a benched guard (status Reserva, the ideal pick) OR a floating reserve-
+		# categoria guard (status Activo). We never pull a fixed guard from their posto.
 		cats = frappe.get_all("Categoria Vigilante", filters={"pode_ser_substituto": 1}, pluck="name")
 		if not cats:
 			return []
 		params["cats"] = tuple(cats); cond.append("v.categoria IN %(cats)s")
+		cond.append("v.status IN ('Reserva', 'Activo')")
+	else:
+		cond.append("v.status = %(status)s"); params["status"] = status
+	if delegacao:
+		cond.append("v.delegacao = %(delegacao)s"); params["delegacao"] = delegacao
+	if excluir:
+		cond.append("v.name != %(excluir)s"); params["excluir"] = excluir
 	where = " AND ".join(cond)
+	# For substitutos, surface benched guards (Reserva) first — they free no posto.
+	order = "FIELD(v.status, 'Reserva') DESC, v.nome_completo" if substituto else "v.nome_completo"
 	return frappe.db.sql(f"""
 		SELECT v.name, v.nome_completo, v.mecanografico, v.posto_de_vigilancia AS posto,
 		       v.regime_do_vigilante AS regime, v.categoria, v.delegacao, v.status
 		FROM `tabVigilante` v
 		WHERE {where}
 		  AND (v.name LIKE %(txt)s OR v.nome_completo LIKE %(txt)s OR v.mecanografico LIKE %(txt)s)
-		ORDER BY v.nome_completo
+		ORDER BY {order}
 		LIMIT 25
 	""", params, as_dict=True)
 
@@ -1115,3 +1124,35 @@ def enviar_posto_para_reserva(posto, motivo):
 		criados.append(rot.name)
 
 	return {"benched": len(criados), "rotatividades": criados}
+
+
+@frappe.whitelist()
+def encerrar_posto(posto, motivo):
+	"""
+	Dismantle a posto in one guided action: bench the whole active team to Reserva
+	(RES rotatividade per guard) AND inactivate the posto (which archives its escalas).
+	Avoids the limbo of an Inactivo posto still holding Activo guards with no schedule.
+	"""
+	if not (motivo or "").strip():
+		frappe.throw(_("Indique o motivo do encerramento do posto."))
+	if not frappe.db.exists("Posto De Vigilancia", posto):
+		frappe.throw(_("Posto <b>{0}</b> não encontrado.").format(posto))
+
+	# 1. Bench every Activo guard -> Reserva (each RES rotatividade also drops them
+	#    from their escala via the keystone). Safe with an empty team (benched = 0).
+	resultado = enviar_posto_para_reserva(posto, motivo)
+
+	# 2. Inactivate the posto — _tratar_estado archives any remaining active escalas.
+	doc = frappe.get_doc("Posto De Vigilancia", posto)
+	if doc.estado != "Inactivo":
+		doc.estado = "Inactivo"
+		doc.save(ignore_permissions=True)
+
+	arquivadas = frappe.db.count(
+		"Escala Do Vigilante", {"posto_de_vigilancia": posto, "estado": "Arquivado"}
+	)
+	return {
+		"benched": resultado["benched"],
+		"rotatividades": resultado["rotatividades"],
+		"arquivadas": arquivadas,
+	}
