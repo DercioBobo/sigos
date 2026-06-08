@@ -1,34 +1,133 @@
 [
- {"doctype": "Categoria Vigilante", "nome": "Vigilante Normal", "pode_ser_substituto": 0, "bloqueada": 0},
- {"doctype": "Categoria Vigilante", "nome": "Vigilante Armado", "pode_ser_substituto": 0, "bloqueada": 0},
- {"doctype": "Categoria Vigilante", "nome": "Reserva",          "pode_ser_substituto": 1, "bloqueada": 1, "descricao": "Vigilantes de reserva autorizados a cobrir ausências"},
- {"doctype": "Categoria Vigilante", "nome": "Administrativo",   "pode_ser_substituto": 0, "bloqueada": 1, "descricao": "Pessoal administrativo — não escalado em postos"},
- {"doctype": "Categoria Vigilante", "nome": "Supervisor",       "pode_ser_substituto": 0, "bloqueada": 0},
-
- {"doctype": "Turno", "turno_nome": "1a Manhã",  "periodo": "Manhã", "e_folga": 0},
- {"doctype": "Turno", "turno_nome": "2a Manhã",  "periodo": "Manhã", "e_folga": 0},
- {"doctype": "Turno", "turno_nome": "1a Noite",  "periodo": "Noite", "e_folga": 0},
- {"doctype": "Turno", "turno_nome": "2a Noite",  "periodo": "Noite", "e_folga": 0},
- {"doctype": "Turno", "turno_nome": "1a Folga",  "periodo": "",      "e_folga": 1},
- {"doctype": "Turno", "turno_nome": "2a Folga",  "periodo": "",      "e_folga": 1},
- {"doctype": "Turno", "turno_nome": "Normal",    "periodo": "Manhã", "e_folga": 0},
- {"doctype": "Turno", "turno_nome": "Manhã",     "periodo": "Manhã", "e_folga": 0},
- {"doctype": "Turno", "turno_nome": "Tarde",     "periodo": "Tarde", "e_folga": 0},
- {"doctype": "Turno", "turno_nome": "24",        "periodo": "",      "e_folga": 0, "descricao": "Turno de 24 horas"},
- {"doctype": "Turno", "turno_nome": "Folga",     "periodo": "",      "e_folga": 1},
-
+ {
+  "doctype": "Categoria Vigilante",
+  "nome": "Vigilante Normal",
+  "pode_ser_substituto": 0,
+  "bloqueada": 0
+ },
+ {
+  "doctype": "Categoria Vigilante",
+  "nome": "Vigilante Armado",
+  "pode_ser_substituto": 0,
+  "bloqueada": 0
+ },
+ {
+  "doctype": "Categoria Vigilante",
+  "nome": "Reserva",
+  "pode_ser_substituto": 1,
+  "bloqueada": 1,
+  "descricao": "Vigilantes de reserva autorizados a cobrir ausências"
+ },
+ {
+  "doctype": "Categoria Vigilante",
+  "nome": "Administrativo",
+  "pode_ser_substituto": 0,
+  "bloqueada": 1,
+  "descricao": "Pessoal administrativo — não escalado em postos"
+ },
+ {
+  "doctype": "Categoria Vigilante",
+  "nome": "Supervisor",
+  "pode_ser_substituto": 0,
+  "bloqueada": 0
+ },
+ {
+  "doctype": "Turno",
+  "turno_nome": "1a Manhã",
+  "periodo": "Manhã",
+  "e_folga": 0
+ },
+ {
+  "doctype": "Turno",
+  "turno_nome": "2a Manhã",
+  "periodo": "Manhã",
+  "e_folga": 0
+ },
+ {
+  "doctype": "Turno",
+  "turno_nome": "1a Noite",
+  "periodo": "Noite",
+  "e_folga": 0
+ },
+ {
+  "doctype": "Turno",
+  "turno_nome": "2a Noite",
+  "periodo": "Noite",
+  "e_folga": 0
+ },
+ {
+  "doctype": "Turno",
+  "turno_nome": "1a Folga",
+  "periodo": "",
+  "e_folga": 1
+ },
+ {
+  "doctype": "Turno",
+  "turno_nome": "2a Folga",
+  "periodo": "",
+  "e_folga": 1
+ },
+ {
+  "doctype": "Turno",
+  "turno_nome": "Normal",
+  "periodo": "Manhã",
+  "e_folga": 0
+ },
+ {
+  "doctype": "Turno",
+  "turno_nome": "Manhã",
+  "periodo": "Manhã",
+  "e_folga": 0
+ },
+ {
+  "doctype": "Turno",
+  "turno_nome": "Tarde",
+  "periodo": "Tarde",
+  "e_folga": 0
+ },
+ {
+  "doctype": "Turno",
+  "turno_nome": "24",
+  "periodo": "",
+  "e_folga": 0,
+  "descricao": "Turno de 24 horas"
+ },
+ {
+  "doctype": "Turno",
+  "turno_nome": "Folga",
+  "periodo": "",
+  "e_folga": 1
+ },
  {
   "doctype": "Regime",
   "nome": "H24",
   "descricao": "24 horas — ciclo de 6 dias (4 trabalho + 2 folga)",
   "tipo_ciclo": "Rotativo",
   "turnos": [
-   {"turno": "1a Manhã", "n_de_faltas": 3},
-   {"turno": "2a Manhã", "n_de_faltas": 1},
-   {"turno": "1a Noite", "n_de_faltas": 1},
-   {"turno": "2a Noite", "n_de_faltas": 3},
-   {"turno": "1a Folga", "n_de_faltas": 0},
-   {"turno": "2a Folga", "n_de_faltas": 0}
+   {
+    "turno": "1a Manhã",
+    "n_de_faltas": 3
+   },
+   {
+    "turno": "2a Manhã",
+    "n_de_faltas": 1
+   },
+   {
+    "turno": "1a Noite",
+    "n_de_faltas": 1
+   },
+   {
+    "turno": "2a Noite",
+    "n_de_faltas": 3
+   },
+   {
+    "turno": "1a Folga",
+    "n_de_faltas": 0
+   },
+   {
+    "turno": "2a Folga",
+    "n_de_faltas": 0
+   }
   ]
  },
  {
@@ -37,10 +136,22 @@
   "descricao": "Turno Diurno Nocturno — ciclo de 4 dias (2 noite + 2 folga)",
   "tipo_ciclo": "Rotativo",
   "turnos": [
-   {"turno": "1a Noite", "n_de_faltas": 3},
-   {"turno": "2a Noite", "n_de_faltas": 3},
-   {"turno": "1a Folga", "n_de_faltas": 0},
-   {"turno": "2a Folga", "n_de_faltas": 0}
+   {
+    "turno": "1a Noite",
+    "n_de_faltas": 3
+   },
+   {
+    "turno": "2a Noite",
+    "n_de_faltas": 3
+   },
+   {
+    "turno": "1a Folga",
+    "n_de_faltas": 0
+   },
+   {
+    "turno": "2a Folga",
+    "n_de_faltas": 0
+   }
   ]
  },
  {
@@ -49,7 +160,10 @@
   "descricao": "Turno Diurno — dias úteis, turno único",
   "tipo_ciclo": "Dias Úteis",
   "turnos": [
-   {"turno": "Normal", "n_de_faltas": 1}
+   {
+    "turno": "Normal",
+    "n_de_faltas": 1
+   }
   ]
  },
  {
@@ -59,8 +173,14 @@
   "tipo_ciclo": "Dias Úteis Alternado",
   "dias_por_grupo": 5,
   "turnos": [
-   {"turno": "Manhã", "n_de_faltas": 1},
-   {"turno": "Tarde", "n_de_faltas": 1}
+   {
+    "turno": "Manhã",
+    "n_de_faltas": 1
+   },
+   {
+    "turno": "Tarde",
+    "n_de_faltas": 1
+   }
   ]
  },
  {
@@ -69,14 +189,66 @@
   "descricao": "Turno de 24 horas — ciclo de 3 dias (1 trabalho + 2 folga)",
   "tipo_ciclo": "Rotativo",
   "turnos": [
-   {"turno": "24",       "n_de_faltas": 4},
-   {"turno": "1a Folga", "n_de_faltas": 0},
-   {"turno": "2a Folga", "n_de_faltas": 0}
+   {
+    "turno": "24",
+    "n_de_faltas": 4
+   },
+   {
+    "turno": "1a Folga",
+    "n_de_faltas": 0
+   },
+   {
+    "turno": "2a Folga",
+    "n_de_faltas": 0
+   }
   ]
  },
-
- {"doctype": "Operacao De Rotatividade", "abreviatura": "RVP", "operacao": "Remover Vigilante de um Posto", "activo": 1, "bloqueada": 1, "muda_posto": 0, "muda_regime": 0, "muda_categoria": 0, "demite": 0, "requer_substituto": 1, "descricao": "Retira o vigilante do posto. Um substituto pode assumir o posto deixado vago."},
- {"doctype": "Operacao De Rotatividade", "abreviatura": "APV", "operacao": "Alterar Posto do Vigilante", "activo": 1, "bloqueada": 1, "muda_posto": 1, "muda_regime": 0, "muda_categoria": 0, "demite": 0, "requer_substituto": 1, "descricao": "Move o vigilante para um novo posto; o substituto assume o posto anterior (troca)."},
- {"doctype": "Operacao De Rotatividade", "abreviatura": "TPV", "operacao": "Transferência de Vigilante", "activo": 1, "bloqueada": 0, "muda_posto": 1, "muda_regime": 1, "muda_categoria": 0, "demite": 0, "requer_substituto": 0, "descricao": "Transfere o vigilante para outro posto, podendo mudar o regime. A escala é migrada automaticamente."},
- {"doctype": "Operacao De Rotatividade", "abreviatura": "DEM", "operacao": "Demissão via Rotatividade", "activo": 1, "bloqueada": 0, "muda_posto": 0, "muda_regime": 0, "muda_categoria": 0, "demite": 1, "requer_substituto": 1, "descricao": "Remove o vigilante e cria a Demissão automaticamente; um substituto pode assumir o posto."}
+ {
+  "doctype": "Operacao De Rotatividade",
+  "abreviatura": "RVP",
+  "operacao": "Remover Vigilante de um Posto",
+  "activo": 1,
+  "bloqueada": 1,
+  "muda_posto": 0,
+  "muda_regime": 0,
+  "demite": 0,
+  "requer_substituto": 1,
+  "descricao": "Retira o vigilante do posto. Um substituto pode assumir o posto deixado vago."
+ },
+ {
+  "doctype": "Operacao De Rotatividade",
+  "abreviatura": "APV",
+  "operacao": "Alterar Posto do Vigilante",
+  "activo": 1,
+  "bloqueada": 1,
+  "muda_posto": 1,
+  "muda_regime": 0,
+  "demite": 0,
+  "requer_substituto": 1,
+  "descricao": "Move o vigilante para um novo posto; o substituto assume o posto anterior (troca)."
+ },
+ {
+  "doctype": "Operacao De Rotatividade",
+  "abreviatura": "TPV",
+  "operacao": "Transferência de Vigilante",
+  "activo": 1,
+  "bloqueada": 0,
+  "muda_posto": 1,
+  "muda_regime": 1,
+  "demite": 0,
+  "requer_substituto": 0,
+  "descricao": "Transfere o vigilante para outro posto, podendo mudar o regime. A escala é migrada automaticamente."
+ },
+ {
+  "doctype": "Operacao De Rotatividade",
+  "abreviatura": "DEM",
+  "operacao": "Demissão via Rotatividade",
+  "activo": 1,
+  "bloqueada": 0,
+  "muda_posto": 0,
+  "muda_regime": 0,
+  "demite": 1,
+  "requer_substituto": 1,
+  "descricao": "Remove o vigilante e cria a Demissão automaticamente; um substituto pode assumir o posto."
+ }
 ]

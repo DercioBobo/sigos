@@ -936,13 +936,11 @@ def preview_rotatividade(vigilante, abreviatura_op=None, novo_posto=None, novo_r
 		out["operacao"] = op.operacao
 
 	cur_posto, cur_regime, cur_categoria = vig.posto_de_vigilancia, vig.regime_do_vigilante, vig.categoria
-	new_posto, new_regime, new_categoria = cur_posto, cur_regime, cur_categoria
+	new_posto, new_regime = cur_posto, cur_regime
 	if op and op.muda_posto and novo_posto:
 		new_posto = novo_posto
 	if op and op.muda_regime and novo_regime:
 		new_regime = novo_regime
-	if op and op.muda_categoria and nova_categoria:
-		new_categoria = nova_categoria
 
 	demite = bool(op and op.demite) or motivo == "Demissão"
 	out["demite"] = demite
@@ -955,8 +953,6 @@ def preview_rotatividade(vigilante, abreviatura_op=None, novo_posto=None, novo_r
 		out["mudancas"].append({"campo": "Posto", "de": _nome_posto(cur_posto), "para": _nome_posto(new_posto)})
 	if new_regime != cur_regime:
 		out["mudancas"].append({"campo": "Regime", "de": cur_regime, "para": new_regime})
-	if new_categoria != cur_categoria:
-		out["mudancas"].append({"campo": "Categoria", "de": cur_categoria, "para": new_categoria})
 	if demite:
 		out["mudancas"].append({"campo": "Estado", "de": vig.status, "para": "Demitido"})
 

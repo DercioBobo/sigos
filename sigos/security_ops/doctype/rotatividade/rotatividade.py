@@ -32,8 +32,8 @@ class Rotatividade(Document):
 		if op and op.muda_regime and self.novo_regime:
 			vig.regime_do_vigilante = self.novo_regime
 			vig.flags.via_troca_regime = True
-		if op and op.muda_categoria and self.nova_categoria:
-			vig.categoria = self.nova_categoria
+		# Categoria is intentionally NOT changed here — it has no escala impact and
+		# must go through its own Troca De Categoria (with its own approval workflow).
 
 		# Demissão takes the guard out of service (status drives escala removal too)
 		demite = bool(op and op.demite) or self.motivo == "Demissão"

@@ -141,7 +141,7 @@ sigos.build_rotatividade_wizard = function (opts) {
 		step: 0, dir: 1,
 		operacoes: [], op: null, flags: {},
 		vig: null,
-		novo_posto: null, novo_regime: null, nova_categoria: null,
+		novo_posto: null, novo_regime: null,
 		motivo: "", motiv_demi: "", uniforme: "", motivo_3meses: "",
 		data: frappe.datetime.get_today(),
 		data_de_demissao: frappe.datetime.get_today(),
@@ -167,7 +167,7 @@ sigos.build_rotatividade_wizard = function (opts) {
 			doctype: "Operacao De Rotatividade",
 			filters: { activo: 1 },
 			fields: ["name", "abreviatura", "operacao", "muda_posto", "muda_regime",
-				"muda_categoria", "requer_substituto", "demite", "descricao"],
+				"requer_substituto", "demite", "descricao"],
 			order_by: "abreviatura", limit_page_length: 0,
 		},
 		callback: (r) => { S.operacoes = r.message || []; _render(); },
@@ -193,7 +193,6 @@ sigos.build_rotatividade_wizard = function (opts) {
 		if (key === "mudancas") {
 			if (S.flags.muda_posto && !S.novo_posto) { _toast(__("Indique o novo posto.")); return false; }
 			if (S.flags.muda_regime && !S.novo_regime) { _toast(__("Indique o novo regime.")); return false; }
-			if (S.flags.muda_categoria && !S.nova_categoria) { _toast(__("Indique a nova categoria.")); return false; }
 		}
 		if (key === "substituto") {
 			if (S.sub && S.vig.categoria && S.sub.categoria && S.sub.categoria !== S.vig.categoria) {
@@ -283,7 +282,6 @@ sigos.build_rotatividade_wizard = function (opts) {
 			const p = [];
 			if (o.muda_posto) p.push(`<span class="rotw2-pic" title="${__("Muda posto")}">📍 ${__("Posto")}</span>`);
 			if (o.muda_regime) p.push(`<span class="rotw2-pic" title="${__("Muda regime")}">🕘 ${__("Regime")}</span>`);
-			if (o.muda_categoria) p.push(`<span class="rotw2-pic" title="${__("Muda categoria")}">🏷️ ${__("Categoria")}</span>`);
 			if (o.requer_substituto) p.push(`<span class="rotw2-pic" title="${__("Substituto")}">⇄ ${__("Substituto")}</span>`);
 			if (o.demite) p.push(`<span class="rotw2-pic rotw2-pic-dem" title="${__("Demissão")}">⚑ ${__("Demite")}</span>`);
 			const sel = S.op && S.op.name === o.name ? "sel" : "";
@@ -303,7 +301,7 @@ sigos.build_rotatividade_wizard = function (opts) {
 			S.op = S.operacoes.find((o) => o.name === name);
 			S.flags = {
 				muda_posto: !!S.op.muda_posto, muda_regime: !!S.op.muda_regime,
-				muda_categoria: !!S.op.muda_categoria, requer_substituto: !!S.op.requer_substituto,
+				requer_substituto: !!S.op.requer_substituto,
 				demite: !!S.op.demite,
 			};
 			$body().find(".rotw2-card").removeClass("sel").find(".rotw2-check").remove();
@@ -333,12 +331,11 @@ sigos.build_rotatividade_wizard = function (opts) {
 		const rows = [];
 		if (S.flags.muda_posto) rows.push(_changeRow("Posto", S.vig.posto, "novo_posto"));
 		if (S.flags.muda_regime) rows.push(_changeRow("Regime", S.vig.regime, "novo_regime"));
-		if (S.flags.muda_categoria) rows.push(_changeRow("Categoria", S.vig.categoria, "nova_categoria"));
 		const demite = S.flags.demite || S.motivo === "Demissão";
 
 		return `
 			<div class="rotw-sec-num">${__("O que muda para")} <b>${frappe.utils.escape_html(S.vig.nome_completo || S.vig.name)}</b></div>
-			<div class="rotw2-changes">${rows.join("") || `<div class="rotw-none">${__("Esta operação não altera posto, regime ou categoria directamente.")}</div>`}</div>
+			<div class="rotw2-changes">${rows.join("") || `<div class="rotw-none">${__("Esta operação não altera posto ou regime directamente.")}</div>`}</div>
 			<div class="rotw2-field"><label>${__("Motivo")}</label><div id="ctrl-motivo"></div></div>
 			<div id="rotw-demfields" style="${demite ? "" : "display:none"}">
 				<div class="rotw2-field"><label>${__("Motivo de Demissão")}</label><div id="ctrl-motiv_demi"></div></div>
@@ -358,7 +355,6 @@ sigos.build_rotatividade_wizard = function (opts) {
 		if (S.flags.muda_posto) _mountLink("novo_posto", "Posto De Vigilancia",
 			() => ({ filters: { delegacao: S.vig.delegacao, estado: "Activo" } }));
 		if (S.flags.muda_regime) _mountLink("novo_regime", "Regime", null);
-		if (S.flags.muda_categoria) _mountLink("nova_categoria", "Categoria Vigilante", null);
 
 		_mountSelect("motivo", "\nTransferência\nReserva\nDemissão\nDisciplinar\nOutro", () => {
 			const demite = S.flags.demite || S.motivo === "Demissão";
@@ -477,7 +473,7 @@ sigos.build_rotatividade_wizard = function (opts) {
 			method: "sigos.api.preview_rotatividade",
 			args: {
 				vigilante: S.vig.name, abreviatura_op: S.op.name,
-				novo_posto: S.novo_posto, novo_regime: S.novo_regime, nova_categoria: S.nova_categoria,
+				novo_posto: S.novo_posto, novo_regime: S.novo_regime,
 				novo_vigilante: S.sub ? S.sub.name : null, motivo: S.motivo, motivo_3meses: S.motivo_3meses,
 			},
 			callback: (r) => $w.html(_previewHtml(r.message || {})),
@@ -538,7 +534,7 @@ sigos.build_rotatividade_wizard = function (opts) {
 			vigilante: S.vig.name, abreviatura_op: S.op.name,
 			delegacao: S.vig.delegacao, mecanografico: S.vig.mecanografico,
 			regime: S.vig.regime, categoria_vigilante: S.vig.categoria,
-			novo_posto: S.novo_posto, novo_regime: S.novo_regime, nova_categoria: S.nova_categoria,
+			novo_posto: S.novo_posto, novo_regime: S.novo_regime,
 			novo_vigilante: S.sub ? S.sub.name : null, alocado_ao_posto: S.vig.posto,
 			alocar_vigilante_substituto: S.sub ? "Sim" : "Não",
 			motivo: S.motivo, motiv_demi: S.motiv_demi, uniforme: S.uniforme, motivo_3meses: S.motivo_3meses,

@@ -67,7 +67,6 @@ function _summary_mode(frm) {
 	const rows = [];
 	if (d.novo_posto) rows.push(cell(__("Posto"), d.antigo_posto, d.novo_posto));
 	if (d.novo_regime) rows.push(cell(__("Regime"), d.regime, d.novo_regime));
-	if (d.nova_categoria) rows.push(cell(__("Categoria"), d.categoria_vigilante, d.nova_categoria));
 	if (d.motivo === "Demissão") rows.push(cell(__("Estado"), __("Activo"), __("Demitido")));
 
 	const sub = d.novo_vigilante ? `<div class="rotw-block"><div class="rotw-block-h">${__("Substituto")}</div>
