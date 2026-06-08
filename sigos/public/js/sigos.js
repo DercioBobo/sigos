@@ -30,6 +30,18 @@ sigos.danger_btn = function (frm, fieldname) {
 	if (btn) btn.addClass("btn-sigos-danger");
 };
 
+// Name a contract (Project) after its customer — "Access Bank 01" — instead of PROJ-####.
+frappe.ui.form.on("Project", {
+	customer(frm) {
+		if (!frm.is_new() || !frm.doc.customer || (frm.doc.project_name || "").trim()) return;
+		frappe.call({
+			method: "sigos.contract_naming.next_contract_name",
+			args: { customer: frm.doc.customer },
+			callback: (r) => { if (r.message) frm.set_value("project_name", r.message); },
+		});
+	},
+});
+
 // ─── Shared 7-day Escala preview modal (used by Posto and Vigilante) ──────────
 // opts: { posto, titulo, dias=7, destacar (vigilante name to highlight), allow_create }
 sigos.show_escala_preview = function (opts) {

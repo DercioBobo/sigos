@@ -7,6 +7,7 @@ def after_install():
 	_load_custom_fields()
 	_load_default_data()
 	_fix_tab_vigilante_do_posto()
+	_set_project_naming()
 
 
 def after_migrate():
@@ -18,6 +19,7 @@ def after_migrate():
 	# Idempotent — creates any custom fields newly added to custom_fields.json
 	# without disturbing existing ones.
 	_load_custom_fields()
+	_set_project_naming()
 
 
 def _fix_tab_vigilante_do_posto():
@@ -25,6 +27,26 @@ def _fix_tab_vigilante_do_posto():
 		frappe.reload_doc("security_ops", "doctype", "tab_vigilante_do_posto", force=True)
 	except Exception as e:
 		frappe.log_error(f"SIGOS: reload Tab Vigilante Do Posto failed: {e}", "SIGOS Install")
+
+
+def _set_project_naming():
+	"""
+	Name the contract (Project) after the customer ('Access Bank 01') instead of
+	PROJ-####. autoname=field:project_name makes the doc name = project_name (which
+	contract_naming auto-fills), and links show it. Idempotent (make_property_setter upserts).
+	"""
+	try:
+		frappe.make_property_setter({
+			"doctype": "Project", "doctype_or_field": "DocType",
+			"property": "autoname", "value": "field:project_name", "property_type": "Data",
+		})
+		frappe.make_property_setter({
+			"doctype": "Project", "doctype_or_field": "DocType",
+			"property": "show_title_field_in_link", "value": "1", "property_type": "Check",
+		})
+		frappe.db.commit()
+	except Exception as e:
+		frappe.log_error(f"SIGOS: set Project naming failed: {e}", "SIGOS Install")
 
 
 def _load_custom_fields():

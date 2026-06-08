@@ -78,6 +78,9 @@ doc_events = {
 	"Employee": {
 		"on_update": "sigos.sync.employee_to_vigilante",
 	},
+	"Project": {
+		"before_insert": "sigos.contract_naming.project_before_insert",
+	},
 	"Salary Slip": {
 		"before_insert": "sigos.payroll_ext.salary_slip_hooks.before_insert",
 		"before_validate": "sigos.payroll_ext.salary_slip_hooks.before_validate",
