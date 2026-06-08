@@ -73,5 +73,10 @@
    {"turno": "1a Folga", "n_de_faltas": 0},
    {"turno": "2a Folga", "n_de_faltas": 0}
   ]
- }
+ },
+
+ {"doctype": "Operacao De Rotatividade", "abreviatura": "RVP", "operacao": "Remover Vigilante de um Posto", "activo": 1, "bloqueada": 1, "muda_posto": 0, "muda_regime": 0, "muda_categoria": 0, "demite": 0, "requer_substituto": 1, "descricao": "Retira o vigilante do posto. Um substituto pode assumir o posto deixado vago."},
+ {"doctype": "Operacao De Rotatividade", "abreviatura": "APV", "operacao": "Alterar Posto do Vigilante", "activo": 1, "bloqueada": 1, "muda_posto": 1, "muda_regime": 0, "muda_categoria": 0, "demite": 0, "requer_substituto": 1, "descricao": "Move o vigilante para um novo posto; o substituto assume o posto anterior (troca)."},
+ {"doctype": "Operacao De Rotatividade", "abreviatura": "TPV", "operacao": "Transferência de Vigilante", "activo": 1, "bloqueada": 0, "muda_posto": 1, "muda_regime": 1, "muda_categoria": 0, "demite": 0, "requer_substituto": 0, "descricao": "Transfere o vigilante para outro posto, podendo mudar o regime. A escala é migrada automaticamente."},
+ {"doctype": "Operacao De Rotatividade", "abreviatura": "DEM", "operacao": "Demissão via Rotatividade", "activo": 1, "bloqueada": 0, "muda_posto": 0, "muda_regime": 0, "muda_categoria": 0, "demite": 1, "requer_substituto": 1, "descricao": "Remove o vigilante e cria a Demissão automaticamente; um substituto pode assumir o posto."}
 ]

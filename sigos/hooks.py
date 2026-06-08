@@ -37,6 +37,10 @@ fixtures = [
 		]]],
 	},
 	{
+		"dt": "Operacao De Rotatividade",
+		"filters": [["abreviatura", "in", ["RVP", "APV", "TPV", "DEM"]]],
+	},
+	{
 		"dt": "Turno",
 		"filters": [["turno_nome", "in", [
 			"1a Manhã", "2a Manhã", "1a Noite", "2a Noite",

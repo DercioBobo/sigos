@@ -25,77 +25,81 @@ class Rotatividade(Document):
 	def on_submit(self):
 		if (self.get("workflow_state") or "Aprovado") != "Aprovado":
 			return
+		if not self.vigilante:
+			return
 
-		# 1. Update original vigilante posto
-		if self.vigilante:
-			try:
-				vigilante_doc = frappe.get_doc("Vigilante", self.vigilante)
-				vigilante_doc.posto_de_vigilancia = self.novo_posto
-				vigilante_doc.save(ignore_permissions=True)
-			except Exception as e:
-				frappe.log_error(
-					f"Rotatividade {self.name}: erro ao atualizar posto do vigilante {self.vigilante}: {e}",
-					"SIGOS Rotatividade"
-				)
+		op = self._get_operacao()
 
-		# 2. APV — swap: set novo_vigilante to antigo_posto
-		if self.abreviatura_op == "APV" and self.novo_vigilante:
-			try:
-				novo_doc = frappe.get_doc("Vigilante", self.novo_vigilante)
-				novo_doc.posto_de_vigilancia = self.alocado_ao_posto
-				novo_doc.categoria = "Vigilante Normal"
-				novo_doc.save(ignore_permissions=True)
-			except Exception as e:
-				frappe.log_error(
-					f"Rotatividade {self.name}: erro ao atualizar novo vigilante APV {self.novo_vigilante}: {e}",
-					"SIGOS Rotatividade"
-				)
+		# 1. Apply the operation's changes to the main guard. vig.save() cascades:
+		#    occupation recount, Employee sync, and the keystone escala migration.
+		vig = frappe.get_doc("Vigilante", self.vigilante)
+		posto_vago = vig.posto_de_vigilancia   # captured before any change
 
-		# 3. RVP with substituto
-		elif (
-			self.abreviatura_op == "RVP"
-			and self.alocar_vigilante_substituto == "Sim"
-			and self.novo_vigilante
-		):
-			try:
-				novo_doc = frappe.get_doc("Vigilante", self.novo_vigilante)
-				novo_doc.posto_de_vigilancia = self.alocado_ao_posto
-				novo_doc.save(ignore_permissions=True)
-			except Exception as e:
-				frappe.log_error(
-					f"Rotatividade {self.name}: erro ao atualizar substituto RVP {self.novo_vigilante}: {e}",
-					"SIGOS Rotatividade"
-				)
+		if op and op.muda_posto:
+			vig.posto_de_vigilancia = self.novo_posto
+		if op and op.muda_regime and self.novo_regime:
+			vig.regime_do_vigilante = self.novo_regime
+			vig.flags.via_troca_regime = True
+		if op and op.muda_categoria and self.nova_categoria:
+			vig.categoria = self.nova_categoria
 
-		# 4. Create Demissao if motivo == "Demissão"
-		if self.motivo == "Demissão":
-			try:
-				existing = frappe.db.exists(
-					"Demissao",
-					{"vigilante": self.vigilante, "data_de_demissao": self.data}
-				)
-				if not existing:
-					demissao_doc = frappe.get_doc({
-						"doctype": "Demissao",
-						"data_de_demissao": self.data,
-						"vigilante": self.vigilante,
-						"mecanografico": self.mecanografico,
-						"delegacao": self.delegacao,
-						"regime": self.regime,
-						"motivo": self.motiv_demi,
-						"uniforme": self.uniforme,
-					})
-					demissao_doc.insert(ignore_permissions=True)
-					demissao_doc.submit()
-					frappe.msgprint(
-						_("Demissão criada automaticamente para {0}.").format(self.vigilante),
-						alert=True
-					)
-			except Exception as e:
-				frappe.log_error(
-					f"Rotatividade {self.name}: erro ao criar Demissao para {self.vigilante}: {e}",
-					"SIGOS Rotatividade"
-				)
+		# Demissão takes the guard out of service (status drives escala removal too)
+		demite = bool(op and op.demite) or self.motivo == "Demissão"
+		if demite:
+			vig.status = "Demitido"
+
+		vig.save(ignore_permissions=True)
+
+		# 2. Substituto assumes the vacated posto (also cascades through the keystone)
+		if op and op.requer_substituto and self.novo_vigilante and posto_vago:
+			sub = frappe.get_doc("Vigilante", self.novo_vigilante)
+			sub.posto_de_vigilancia = posto_vago
+			sub.save(ignore_permissions=True)
+
+		# 3. Create the Demissão record
+		if demite:
+			self._criar_demissao()
+
+		frappe.msgprint(
+			_("Rotatividade <b>{0}</b> aplicada a <b>{1}</b>.").format(
+				op.operacao if op else self.abreviatura_op, self.vigilante
+			),
+			indicator="green",
+			alert=True,
+		)
+
+	# ─── Operation lookup ────────────────────────────────────────────────────────
+
+	def _get_operacao(self):
+		if not self.abreviatura_op:
+			return None
+		try:
+			return frappe.get_doc("Operacao De Rotatividade", self.abreviatura_op)
+		except frappe.DoesNotExistError:
+			return None
+
+	def _criar_demissao(self):
+		if frappe.db.exists("Demissao", {"vigilante": self.vigilante, "data_de_demissao": self.data}):
+			return
+		try:
+			dem = frappe.get_doc({
+				"doctype": "Demissao",
+				"data_de_demissao": self.data,
+				"vigilante": self.vigilante,
+				"mecanografico": self.mecanografico,
+				"delegacao": self.delegacao,
+				"regime": self.regime,
+				"motivo": self.motiv_demi,
+				"uniforme": self.uniforme,
+			})
+			dem.insert(ignore_permissions=True)
+			dem.submit()
+			frappe.msgprint(_("Demissão criada automaticamente para {0}.").format(self.vigilante), alert=True)
+		except Exception as e:
+			frappe.log_error(
+				f"Rotatividade {self.name}: erro ao criar Demissao para {self.vigilante}: {e}",
+				"SIGOS Rotatividade",
+			)
 
 	# ─── Validation helpers ────────────────────────────────────────────────────
 
@@ -106,8 +110,7 @@ class Rotatividade(Document):
 		"""
 		if not (self.categoria_vigilante and self.categoria_vigilante_a_alocar):
 			return
-		if self.abreviatura_op == "RVP" and self.alocar_vigilante_substituto != "Sim":
-			return
+		# Only relevant when a substituto is actually involved
 		if not self.novo_vigilante:
 			return
 		if self.categoria_vigilante == self.categoria_vigilante_a_alocar:
@@ -139,12 +142,12 @@ class Rotatividade(Document):
 			frappe.db.get_single_value("SIGOS Settings", "dias_minimos_rotatividade") or 90
 		)
 
-		# Last approved rotation for this guard
+		# Last applied rotation for this guard (submitted = applied; workflow-agnostic)
 		ultima = frappe.get_all(
 			"Rotatividade",
 			filters={
 				"vigilante": self.vigilante,
-				"workflow_state": "Aprovado",
+				"docstatus": 1,
 				"name": ["!=", self.name],
 			},
 			fields=["data"],

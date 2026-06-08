@@ -24,6 +24,7 @@
   "sec_operacao",
   "abreviatura_op",
   "motivo",
+  "nova_categoria",
   "col_rot_2",
   "novo_posto",
   "sec_substituto",
@@ -139,9 +140,9 @@
   },
   {
    "fieldname": "abreviatura_op",
-   "fieldtype": "Select",
-   "label": "Abreviatura Op.",
-   "options": "\nAPV\nRVP",
+   "fieldtype": "Link",
+   "label": "Operação",
+   "options": "Operacao De Rotatividade",
    "reqd": 1,
    "in_list_view": 1
   },
@@ -151,6 +152,13 @@
    "label": "Motivo",
    "options": "\nTransferência\nReserva\nDemissão\nDisciplinar\nOutro",
    "in_list_view": 1
+  },
+  {
+   "fieldname": "nova_categoria",
+   "fieldtype": "Link",
+   "label": "Nova Categoria",
+   "options": "Categoria Vigilante",
+   "depends_on": "eval:doc.abreviatura_op"
   },
   {
    "fieldname": "col_rot_2",

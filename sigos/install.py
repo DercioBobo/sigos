@@ -56,9 +56,10 @@ def _load_default_data():
 			continue
 
 		name_field = {
-			"Categoria Vigilante": "nome",
-			"Turno":               "turno_nome",
-			"Regime":              "nome",
+			"Categoria Vigilante":     "nome",
+			"Turno":                   "turno_nome",
+			"Regime":                  "nome",
+			"Operacao De Rotatividade": "abreviatura",
 		}.get(doctype)
 
 		if name_field:
