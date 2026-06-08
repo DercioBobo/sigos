@@ -84,7 +84,7 @@ class Rotatividade(Document):
 		try:
 			dem = frappe.get_doc({
 				"doctype": "Demissao",
-				"data_de_demissao": self.data,
+				"data_de_demissao": self.data_de_demissao or self.data,
 				"vigilante": self.vigilante,
 				"mecanografico": self.mecanografico,
 				"delegacao": self.delegacao,

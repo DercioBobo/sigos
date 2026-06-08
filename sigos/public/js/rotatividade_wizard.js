@@ -122,6 +122,10 @@ frappe.provide("sigos");
 .rotw-form-mode .form-tabs-list, .rotw-form-mode .std-row-buttons { display: none !important; }
 .rotw-inline { max-width: 820px; margin: 0 auto; }
 .rotw-summary { max-width: 720px; margin: 8px auto 0; }
+.rotw2-confirm { margin-top: 16px; padding-top: 14px; border-top: 1px dashed #e0e5ea; }
+.rotw2-confirm-row { display: flex; gap: 16px; flex-wrap: wrap; }
+.rotw2-confirm-row .rotw2-field { flex: 1; min-width: 160px; }
+.rotw2-req::after { content: " *"; color: #e05c5c; font-weight: 700; }
 `;
 	const s = document.createElement("style");
 	s.id = "sigos-rotw-css";
@@ -139,6 +143,9 @@ sigos.build_rotatividade_wizard = function (opts) {
 		vig: null,
 		novo_posto: null, novo_regime: null, nova_categoria: null,
 		motivo: "", motiv_demi: "", uniforme: "", motivo_3meses: "",
+		data: frappe.datetime.get_today(),
+		data_de_demissao: frappe.datetime.get_today(),
+		motivo_rotatividade: "",
 		sub: null,
 	};
 	const controls = {};
@@ -188,6 +195,12 @@ sigos.build_rotatividade_wizard = function (opts) {
 			if (S.flags.muda_regime && !S.novo_regime) { _toast(__("Indique o novo regime.")); return false; }
 			if (S.flags.muda_categoria && !S.nova_categoria) { _toast(__("Indique a nova categoria.")); return false; }
 		}
+		if (key === "preview") {
+			if (!S.motivo_rotatividade || !S.motivo_rotatividade.trim()) {
+				_toast(__("Indique o motivo para continuar com a rotatividade."));
+				return false;
+			}
+		}
 		return true;
 	}
 	function _toast(m) { frappe.show_alert({ message: m, indicator: "orange" }, 3); }
@@ -208,7 +221,16 @@ sigos.build_rotatividade_wizard = function (opts) {
 		if (key === "ident") content = _stepIdent();
 		else if (key === "mudancas") content = _stepMudancas();
 		else if (key === "substituto") content = _stepSubstituto();
-		else if (key === "preview") content = `<div id="rotw-prev"></div>`;
+		else if (key === "preview") content = `
+			<div id="rotw-prev"></div>
+			<div class="rotw2-confirm">
+				<div class="rotw2-confirm-row">
+					<div class="rotw2-field"><label>${__("Data da Rotatividade")}</label><div id="ctrl-data"></div></div>
+					${(S.flags.demite || S.motivo === "Demissão")
+						? `<div class="rotw2-field"><label>${__("Data de Demissão")}</label><div id="ctrl-data_de_demissao"></div></div>` : ""}
+				</div>
+				<div class="rotw2-field"><label class="rotw2-req">${__("Motivo de Continuar com a Rotatividade")}</label><div id="ctrl-motivo_rotatividade"></div></div>
+			</div>`;
 
 		const last = S.step >= steps.length - 1;
 		const backLabel = S.step === 0 ? (opts.cancelLabel || __("Cancelar")) : `← ${__("Anterior")}`;
@@ -437,7 +459,7 @@ sigos.build_rotatividade_wizard = function (opts) {
 		controls[fieldname] = ctrl;
 	}
 
-	// ════════ STEP 4 — Preview ════════
+	// ════════ STEP 4 — Preview + confirm fields ════════
 	function _renderPreview() {
 		const $w = $body().find("#rotw-prev");
 		$w.html(`<div class="rotw-prev-loading">${__("A calcular efeitos…")}</div>`);
@@ -450,6 +472,19 @@ sigos.build_rotatividade_wizard = function (opts) {
 			},
 			callback: (r) => $w.html(_previewHtml(r.message || {})),
 		});
+
+		// confirm fields: date(s) + mandatory justification
+		_mountDate("data");
+		if (S.flags.demite || S.motivo === "Demissão") _mountDate("data_de_demissao");
+		_mountSmallText("motivo_rotatividade");
+	}
+	function _mountDate(fieldname) {
+		const ctrl = frappe.ui.form.make_control({
+			df: { fieldtype: "Date", fieldname, onchange: () => { S[fieldname] = ctrl.get_value(); } },
+			parent: $body().find(`#ctrl-${fieldname}`), render_input: true,
+		});
+		ctrl.set_value(S[fieldname] || frappe.datetime.get_today());
+		controls[fieldname] = ctrl;
 	}
 	function _previewHtml(p) {
 		const chips = (p.mudancas || []).map((m) => `
@@ -489,7 +524,7 @@ sigos.build_rotatividade_wizard = function (opts) {
 	// ── confirm: hand the assembled doc to the caller's persistence ──
 	function _confirm() {
 		const docData = {
-			doctype: "Rotatividade", data: frappe.datetime.get_today(),
+			doctype: "Rotatividade", data: S.data || frappe.datetime.get_today(),
 			vigilante: S.vig.name, abreviatura_op: S.op.name,
 			delegacao: S.vig.delegacao, mecanografico: S.vig.mecanografico,
 			regime: S.vig.regime, categoria_vigilante: S.vig.categoria,
@@ -497,6 +532,7 @@ sigos.build_rotatividade_wizard = function (opts) {
 			novo_vigilante: S.sub ? S.sub.name : null, alocado_ao_posto: S.vig.posto,
 			alocar_vigilante_substituto: S.sub ? "Sim" : "Não",
 			motivo: S.motivo, motiv_demi: S.motiv_demi, uniforme: S.uniforme, motivo_3meses: S.motivo_3meses,
+			data_de_demissao: S.data_de_demissao, motivo_rotatividade: S.motivo_rotatividade,
 		};
 		const $next = $body().find(".rotw-next");
 		$next.prop("disabled", true);

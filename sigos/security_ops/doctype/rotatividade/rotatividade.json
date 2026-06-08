@@ -43,6 +43,7 @@
   "sec_justificativas",
   "motivo_3meses",
   "motivo_rotatividade",
+  "data_de_demissao",
   "sec_demissao",
   "motiv_demi",
   "uniforme",
@@ -250,8 +251,9 @@
   {
    "fieldname": "motivo_rotatividade",
    "fieldtype": "Small Text",
-   "label": "Motivo de Rotatividade",
-   "read_only": 1
+   "label": "Motivo de Continuar com a Rotatividade",
+   "read_only": 1,
+   "reqd": 1
   },
   {
    "fieldname": "sec_demissao",
@@ -296,6 +298,12 @@
    "fieldname": "wizard_canvas",
    "fieldtype": "HTML",
    "label": "Assistente"
+  },
+  {
+   "fieldname": "data_de_demissao",
+   "fieldtype": "Date",
+   "label": "Data de Demissão",
+   "default": "Today"
   }
  ],
  "is_submittable": 1,
