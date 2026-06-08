@@ -195,6 +195,12 @@ sigos.build_rotatividade_wizard = function (opts) {
 			if (S.flags.muda_regime && !S.novo_regime) { _toast(__("Indique o novo regime.")); return false; }
 			if (S.flags.muda_categoria && !S.nova_categoria) { _toast(__("Indique a nova categoria.")); return false; }
 		}
+		if (key === "substituto") {
+			if (S.sub && S.vig.categoria && S.sub.categoria && S.sub.categoria !== S.vig.categoria) {
+				_toast(__("O substituto tem categoria diferente. Faça primeiro uma Troca De Categoria."));
+				return false;
+			}
+		}
 		if (key === "preview") {
 			if (!S.motivo_rotatividade || !S.motivo_rotatividade.trim()) {
 				_toast(__("Indique o motivo para continuar com a rotatividade."));
@@ -421,6 +427,10 @@ sigos.build_rotatividade_wizard = function (opts) {
 	}
 	function _guardChosen(v, isSub) {
 		const meta = [v.posto, v.regime, v.categoria].filter(Boolean).join(" · ");
+		const mismatch = isSub && S.vig && S.vig.categoria && v.categoria && v.categoria !== S.vig.categoria;
+		const warn = mismatch ? `<div class="rotw-warn" style="margin-top:8px">⚠️ ${__(
+			"Categoria <b>{0}</b> não corresponde à vaga (<b>{1}</b>). Faça primeiro uma <b>Troca De Categoria</b> antes de usar este substituto.",
+			[frappe.utils.escape_html(v.categoria), frappe.utils.escape_html(S.vig.categoria)])}</div>` : "";
 		return `<div class="rotw2-chosen ${isSub ? "sub" : ""}">
 			<span class="rotw2-av big">${_initials(v.nome_completo)}</span>
 			<span class="rotw2-ginfo">
@@ -428,7 +438,7 @@ sigos.build_rotatividade_wizard = function (opts) {
 				<span class="rotw2-gmeta">${v.mecanografico ? frappe.utils.escape_html(v.mecanografico) + " · " : ""}${frappe.utils.escape_html(meta || "")}</span>
 			</span>
 			<span class="rotw2-chosen-tag">${isSub ? __("Substituto") : __("Seleccionado")}</span>
-		</div>`;
+		</div>${warn}`;
 	}
 
 	// ── control mounting ──
@@ -509,13 +519,8 @@ sigos.build_rotatividade_wizard = function (opts) {
 				<b class="${up ? "occ-up" : dn ? "occ-dn" : ""}">${o.para}</b></span></div>`;
 		}).join("");
 		const occB = occ ? `<div class="rotw-block"><div class="rotw-block-h">${__("Ocupação")}</div>${occ}</div>` : "";
-		const subCat = (p.substituto && p.substituto.categoria_para)
-			? `<div class="rotw-sub" style="margin-top:6px">${__("Categoria")}:
-				<span class="rotw-cfrom">${frappe.utils.escape_html(p.substituto.categoria_de || "—")}</span>
-				<span class="rotw-carrow">→</span>
-				<b class="rotw-cto">${frappe.utils.escape_html(p.substituto.categoria_para)}</b></div>` : "";
 		const sub = p.substituto ? `<div class="rotw-block"><div class="rotw-block-h">${__("Substituto")}</div>
-			<div class="rotw-sub">${frappe.utils.escape_html(p.substituto.nome)} ${__("assume")} <b>${frappe.utils.escape_html(p.substituto.assume_posto || "—")}</b></div>${subCat}</div>` : "";
+			<div class="rotw-sub">${frappe.utils.escape_html(p.substituto.nome)} ${__("assume")} <b>${frappe.utils.escape_html(p.substituto.assume_posto || "—")}</b></div></div>` : "";
 		const dem = p.demite ? `<div class="rotw-warn rotw-warn-dem">⚑ ${__("Demissão automática será criada.")}</div>` : "";
 		const warns = (p.avisos || []).map((w) => `<div class="rotw-warn">⚠️ ${frappe.utils.escape_html(w)}</div>`).join("");
 

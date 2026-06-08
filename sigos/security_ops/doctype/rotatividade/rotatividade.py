@@ -8,9 +8,11 @@ class Rotatividade(Document):
 
 	def validate(self):
 		self._validar_regra_3meses()
+		self._validar_substituto_categoria()
 
 	def before_submit(self):
 		self._validar_regra_3meses()
+		self._validar_substituto_categoria()
 
 	def on_submit(self):
 		if (self.get("workflow_state") or "Aprovado") != "Aprovado":
@@ -40,13 +42,12 @@ class Rotatividade(Document):
 
 		vig.save(ignore_permissions=True)
 
-		# 2. Substituto assumes the vacated posto, taking ON the original guard's
-		#    categoria (the role's category) — a substituto always matches the old.
+		# 2. Substituto assumes the vacated posto. Its categoria must ALREADY match the
+		#    original guard's (enforced in validate) — we never change it silently, so
+		#    categoria changes stay gated by their own Troca De Categoria workflow.
 		if op and op.requer_substituto and self.novo_vigilante and posto_vago:
 			sub = frappe.get_doc("Vigilante", self.novo_vigilante)
 			sub.posto_de_vigilancia = posto_vago
-			if self.categoria_vigilante and sub.categoria != self.categoria_vigilante:
-				sub.categoria = self.categoria_vigilante
 			sub.save(ignore_permissions=True)
 
 		# 3. Create the Demissão record
@@ -95,9 +96,25 @@ class Rotatividade(Document):
 			)
 
 	# ─── Validation helpers ────────────────────────────────────────────────────
-	# NOTE: categoria matching is no longer a throw — the substituto's categoria is
-	# automatically set to the original guard's categoria in on_submit (a substituto
-	# always takes on the role's category).
+
+	def _validar_substituto_categoria(self):
+		"""
+		A substituto must ALREADY have the same categoria as the guard being replaced.
+		We never auto-change it — categoria changes must go through Troca De Categoria
+		(which carries its own approval workflow). Block and tell the user to fix it first.
+		"""
+		if not self.novo_vigilante:
+			return
+		sub_cat = frappe.db.get_value("Vigilante", self.novo_vigilante, "categoria")
+		if self.categoria_vigilante and sub_cat and sub_cat != self.categoria_vigilante:
+			frappe.throw(
+				_("O substituto <b>{0}</b> tem categoria <b>{1}</b>, mas a vaga exige "
+				  "<b>{2}</b> (a categoria do vigilante substituído). Altere primeiro a "
+				  "categoria do substituto através de uma <b>Troca De Categoria</b> e só "
+				  "depois o use nesta rotatividade.").format(
+					self.novo_vigilante, sub_cat, self.categoria_vigilante),
+				title=_("Categoria do Substituto Incompatível"),
+			)
 
 	def _validar_regra_3meses(self):
 		"""Guard must have spent N days at the post before rotating, unless motivo_3meses is filled."""
