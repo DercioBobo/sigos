@@ -213,7 +213,8 @@
   "muda_regime": 0,
   "demite": 0,
   "requer_substituto": 1,
-  "descricao": "Retira o vigilante do posto. Um substituto pode assumir o posto deixado vago."
+  "descricao": "Retira o vigilante do posto (fica em Reserva); um substituto assume o posto.",
+  "enviar_reserva": 1
  },
  {
   "doctype": "Operacao De Rotatividade",
