@@ -268,13 +268,13 @@ function _append_card(frm, w, row, formEditable) {
 					<span class="ausb-name">${frappe.utils.escape_html(row.nome_do_vigilante || row.vigilante)}</span>
 					<span class="ausb-meta">${frappe.utils.escape_html(meta)}</span>
 				</div>
+				<div class="ausb-inline">
+					<label class="ausb-f"><span>${__("Tipo")}</span>
+						<select class="ausb-sel" data-f="tipo_de_ausencia" ${dis}>${tipoOpts}</select></label>
+					<label class="ausb-f"><span>${__("Acção")}</span>
+						<select class="ausb-sel" data-f="proxima_accao" ${dis}>${accaoOpts}</select></label>
+				</div>
 				${formEditable ? `<button type="button" class="ausb-remove" title="${__("Remover")}">×</button>` : ""}
-			</div>
-			<div class="ausb-controls">
-				<label class="ausb-f"><span>${__("Tipo")}</span>
-					<select class="ausb-sel" data-f="tipo_de_ausencia" ${dis}>${tipoOpts}</select></label>
-				<label class="ausb-f"><span>${__("Próxima Acção")}</span>
-					<select class="ausb-sel" data-f="proxima_accao" ${dis}>${accaoOpts}</select></label>
 			</div>
 			<div class="ausb-picker" data-picker></div>
 		</div>`).appendTo(w.find("[data-aus-cards]"));
@@ -477,8 +477,8 @@ function _inject_css() {
 .ausd-chip-late { background: rgba(224,92,92,.2);  color: #ffb4b4; border-color: rgba(224,92,92,.5); }
 .ausd-chip-wait { background: rgba(255,255,255,.1); color: rgba(255,255,255,.75); }
 .ausd-chip-lock { background: rgba(232,160,32,.2); color: #f4cd84; border-color: rgba(232,160,32,.45); }
-.ausd-controls { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
-.ausd-field { display: flex; flex-direction: column; gap: 4px; }
+.ausd-controls { display: flex; flex-direction: row; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
+.ausd-field { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 150px; }
 .ausd-field > label { font-size: .7em; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: rgba(255,255,255,.65); margin: 0; }
 #sigos-aus-deck .frappe-control { margin: 0 !important; }
 #sigos-aus-deck .control-label, #sigos-aus-deck .help-box { display: none !important; }
@@ -506,13 +506,14 @@ function _inject_css() {
 .ausb-cards { margin-top: 14px; display: flex; flex-direction: column; gap: 10px; }
 .ausb-empty { margin-top: 14px; color: rgba(255,255,255,.6); font-style: italic; font-size: .86em; }
 .ausb-card { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12); border-left: 3px solid #e05c5c; border-radius: 10px; padding: 11px 13px; }
-.ausb-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.ausb-card-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.ausb-guard { flex: 1 1 170px; min-width: 0; }
 .ausb-name { font-weight: 700; font-size: 1.0em; }
-.ausb-meta { display: block; font-size: .78em; color: rgba(255,255,255,.6); margin-top: 2px; }
+.ausb-meta { display: block; font-size: .78em; color: rgba(255,255,255,.6); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ausb-remove { background: rgba(255,255,255,.1); border: none; color: #ffb4b4; width: 24px; height: 24px; border-radius: 6px; font-size: 1.1em; line-height: 1; cursor: pointer; flex: none; }
 .ausb-remove:hover { background: rgba(224,92,92,.3); }
-.ausb-controls { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
-.ausb-f { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 140px; margin: 0; }
+.ausb-inline { display: flex; gap: 8px; flex: 0 0 auto; }
+.ausb-f { display: flex; flex-direction: column; gap: 3px; min-width: 128px; margin: 0; }
 .ausb-f > span { font-size: .68em; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: rgba(255,255,255,.6); }
 .ausb-sel { height: 32px; border-radius: 8px; border: 1px solid rgba(255,255,255,.25); background: rgba(255,255,255,.96); color: #1a3a5c; font-weight: 600; padding: 0 8px; }
 .ausb-picker:not(:empty) { margin-top: 10px; }
