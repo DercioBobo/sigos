@@ -9,13 +9,23 @@ let _atraso_estado = null;   // null = unknown/na, "ok" = on time, "tardia" = la
 frappe.ui.form.on("Ausencias", {
 
 	onload(frm) {
+		// Convenience: pre-pick the período from the current time (Manhã until 11:59,
+		// Noite from 12:00). Only on a fresh doc, and the user can still change it.
+		if (frm.is_new() && !frm.doc.periodo) {
+			frm.set_value("periodo", _periodo_automatico());
+		}
 		_setup_substituto_query(frm);
 	},
 
 	refresh(frm) {
-		// The native button + old summary are superseded by the command deck.
-		frm.set_df_property("btn_adicionar_ausencia", "hidden", 1);
-		frm.set_df_property("resumo_ausencias", "hidden", 1);
+		// The native button + old summary are superseded by the command deck, and the
+		// header fields (data/período/grupo) are now mounted as controls inside the deck.
+		["btn_adicionar_ausencia", "resumo_ausencias",
+		 "data", "periodo", "grupo_delegados", "col_break_1"]
+			.forEach(f => frm.set_df_property(f, "hidden", 1));
+
+		// Hide the late-submission group up front; _verificar_horario reveals it only if late.
+		_toggle_atraso(frm, !!frm.doc.motivo_atraso);
 
 		_aplicar_permissoes(frm);
 		_verificar_horario(frm);
@@ -293,6 +303,8 @@ function _verificar_horario(frm) {
 	if (!limite) {
 		_atraso_estado = null;
 		_limpar_alerta(frm);
+		frm.set_df_property("motivo_atraso", "reqd", 0);
+		_toggle_atraso(frm, !!frm.doc.motivo_atraso);   // only if a reason is already on record
 		return;
 	}
 
@@ -307,15 +319,22 @@ function _verificar_horario(frm) {
 			_mostrar_alerta_atraso(frm, agora, hora_limite);
 			frm.set_df_property("motivo_atraso", "reqd", 1);
 			frm.set_df_property("motivo_atraso", "read_only", 0);
-			// Expand the section so it's visible
-			frm.set_df_property("sec_atraso", "collapsible_open", 1);
+			_toggle_atraso(frm, true);   // late: reveal the section
 		} else {
 			_atraso_estado = "ok";
 			_limpar_alerta(frm);
 			frm.set_df_property("motivo_atraso", "reqd", 0);
+			// On time: hide unless a reason was already recorded (e.g. editing an old doc)
+			_toggle_atraso(frm, !!frm.doc.motivo_atraso);
 		}
 		_render_deck(frm);
 	});
+}
+
+// Show/hide the whole "Submissão Tardia" group — it should only appear when late.
+function _toggle_atraso(frm, mostrar) {
+	["sec_atraso", "alerta_atraso", "motivo_atraso", "col_break_atraso", "hora_submissao_tardia"]
+		.forEach(f => frm.set_df_property(f, "hidden", mostrar ? 0 : 1));
 }
 
 function _mostrar_alerta_atraso(frm, agora, limite) {
@@ -383,37 +402,112 @@ function _atualizar_resumo(frm) {
 }
 
 // ─── Command deck (the premium hero at the top of the form) ───────────────────
+// Built as a STABLE shell (controls mounted once) + a DYNAMIC region (stats/chip
+// re-rendered on every change) so editing the mounted controls never loses focus.
 function _render_deck(frm) {
 	_inject_deck_css();
 	const w = frm.fields_dict.deck_ausencias?.$wrapper;
 	if (!w) return;
 
-	const rows   = frm.doc.tabela_ausencia || [];
+	const formEditable = frm.doc.docstatus !== 1 && frm.doc.workflow_state !== "Pendente De Aprovação";
+
+	// (Re)build the shell only when missing, when editability flips (submit/lock),
+	// or when the form switched to a different document (controls must re-sync).
+	const $deck = w.find("#sigos-aus-deck");
+	const docKey = frm.doc.name || "new";
+	if (!$deck.length
+		|| $deck.attr("data-editable") !== String(formEditable)
+		|| $deck.attr("data-doc") !== docKey) {
+		_build_deck_shell(frm, w, formEditable);
+	}
+	_update_deck(frm, w, formEditable);
+}
+
+function _build_deck_shell(frm, w, formEditable) {
+	w.html(`
+		<div id="sigos-aus-deck" data-editable="${formEditable}" data-doc="${frm.doc.name || "new"}">
+			<div class="ausd-top">
+				<div class="ausd-head"><div class="ausd-title">${__("Folha de Ausências")}</div></div>
+				<span data-ausd-chip></span>
+			</div>
+			<div class="ausd-controls">
+				<div class="ausd-field"><label>${__("Data")}</label><div id="ausd-ctrl-data"></div></div>
+				<div class="ausd-field"><label>${__("Período")}</label><div id="ausd-ctrl-periodo"></div></div>
+				<div class="ausd-field"><label>${__("Grupo De Delegados")}</label><div id="ausd-ctrl-grupo"></div></div>
+			</div>
+			<div class="ausd-actions">
+				<button type="button" class="ausd-cta">
+					<span class="ausd-cta-plus">+</span> ${__("Registar Ausências")}
+				</button>
+				<span class="ausd-hint" data-ausd-hint></span>
+			</div>
+			<div data-ausd-stats></div>
+		</div>`);
+
+	const ro = formEditable ? 0 : 1;
+
+	// Two-way bound controls: control change -> frm.set_value (fires the field handlers
+	// which invalidate the escala cache, re-check the late rule and refresh the deck).
+	const c_data = frappe.ui.form.make_control({
+		df: { fieldtype: "Date", fieldname: "data", read_only: ro,
+			onchange: () => { const v = c_data.get_value(); if (v !== frm.doc.data) frm.set_value("data", v); } },
+		parent: w.find("#ausd-ctrl-data"), render_input: true,
+	});
+	c_data.set_value(frm.doc.data || frappe.datetime.get_today());
+
+	const c_periodo = frappe.ui.form.make_control({
+		df: { fieldtype: "Select", fieldname: "periodo", options: "\nManhã\nNoite", read_only: ro,
+			onchange: () => { const v = c_periodo.get_value(); if (v !== frm.doc.periodo) frm.set_value("periodo", v); } },
+		parent: w.find("#ausd-ctrl-periodo"), render_input: true,
+	});
+	c_periodo.set_value(frm.doc.periodo || "");
+
+	const c_grupo = frappe.ui.form.make_control({
+		df: { fieldtype: "Link", fieldname: "grupo_delegados", options: "Grupo De Delegados",
+			placeholder: __("Todos os grupos"), read_only: ro,
+			onchange: () => {
+				const v = c_grupo.get_value();
+				if ((v || "") !== (frm.doc.grupo_delegados || "")) frm.set_value("grupo_delegados", v || null);
+			} },
+		parent: w.find("#ausd-ctrl-grupo"), render_input: true,
+	});
+	if (frm.doc.grupo_delegados) c_grupo.set_value(frm.doc.grupo_delegados);
+
+	frm._ausd_controls = { data: c_data, periodo: c_periodo, grupo: c_grupo };
+
+	// CTA bound once; it reads live form state at click time.
+	w.find(".ausd-cta").on("click", () => {
+		if (!frm.doc.data || !frm.doc.periodo) {
+			frappe.show_alert({ message: __("Preencha Data e Período primeiro."), indicator: "orange" });
+			return;
+		}
+		if (frm.doc.docstatus === 1 || frm.doc.workflow_state === "Pendente De Aprovação") return;
+		_abrir_quick_add(frm);
+	});
+}
+
+function _update_deck(frm, w, formEditable) {
+	const rows     = frm.doc.tabela_ausencia || [];
 	const ausentes = rows.length;
 	const faltas   = rows.reduce((s, r) => s + (r.n_de_faltas || 0), 0);
 	const subs     = rows.filter(r => r.proxima_accao === "Substituto").length;
 	const dobras   = rows.filter(r => r.proxima_accao === "Dobra de Turno").length;
 	const adiant   = rows.filter(r => r.proxima_accao === "Adiantamento de Turno").length;
 
-	const locked    = frm.doc.workflow_state === "Pendente De Aprovação";
 	const submitted = frm.doc.docstatus === 1;
+	const locked    = frm.doc.workflow_state === "Pendente De Aprovação";
 	const ready     = !!(frm.doc.data && frm.doc.periodo);
-	const editable  = !submitted && !locked && ready;
-
-	const dataStr = frm.doc.data ? frappe.datetime.str_to_user(frm.doc.data) : __("sem data");
-	const ctx = [dataStr, frm.doc.periodo || __("sem período"),
-		frm.doc.grupo_delegados || __("todos os grupos")].join("  ·  ");
+	const ctaReady  = formEditable && ready;
 
 	let chip;
-	if (submitted)                     chip = `<span class="ausd-chip ausd-chip-ok">${__("Submetida")}</span>`;
-	else if (locked)                   chip = `<span class="ausd-chip ausd-chip-lock">${__("Pendente de Aprovação")}</span>`;
-	else if (!ready)                   chip = `<span class="ausd-chip ausd-chip-wait">${__("Defina data e período")}</span>`;
+	if (submitted)                        chip = `<span class="ausd-chip ausd-chip-ok">${__("Submetida")}</span>`;
+	else if (locked)                      chip = `<span class="ausd-chip ausd-chip-lock">${__("Pendente de Aprovação")}</span>`;
+	else if (!ready)                      chip = `<span class="ausd-chip ausd-chip-wait">${__("Defina data e período")}</span>`;
 	else if (_atraso_estado === "tardia") chip = `<span class="ausd-chip ausd-chip-late">${__("Submissão tardia")}</span>`;
-	else                               chip = `<span class="ausd-chip ausd-chip-ok">${__("Dentro do horário")}</span>`;
+	else                                  chip = `<span class="ausd-chip ausd-chip-ok">${__("Dentro do horário")}</span>`;
 
 	const tile = (n, label, cls) =>
 		`<div class="ausd-tile ${cls || ""}"><span class="n">${n}</span><span class="lbl">${label}</span></div>`;
-
 	const tiles = [
 		tile(ausentes, __("ausentes"), "t-aus"),
 		tile(faltas,   __("faltas"),   "t-falta"),
@@ -421,41 +515,16 @@ function _render_deck(frm) {
 		dobras ? tile(dobras, __("dobras"),      "t-dob") : "",
 		adiant ? tile(adiant, __("adiantam."),   "t-adi") : "",
 	].join("");
-
-	const ctaDisabled = editable ? "" : "disabled";
-	const warn = (_atraso_estado === "tardia" && editable)
+	const warn = (_atraso_estado === "tardia" && formEditable)
 		? `<div class="ausd-warn">${__("Submissão fora do horário — preencha o <b>Motivo do Atraso</b> antes de gravar.")}</div>`
 		: "";
 
-	w.html(`
-		<div id="sigos-aus-deck" class="${locked ? "is-locked" : ""}">
-			<div class="ausd-top">
-				<div class="ausd-head">
-					<div class="ausd-title">${__("Folha de Ausências")}</div>
-					<div class="ausd-context">${frappe.utils.escape_html(ctx)}</div>
-				</div>
-				${chip}
-			</div>
-			<div class="ausd-actions">
-				<button type="button" class="ausd-cta" ${ctaDisabled}>
-					<span class="ausd-cta-plus">+</span> ${__("Registar Ausências")}
-				</button>
-				<span class="ausd-hint">${ausentes
-					? __("{0} vigilante(s) na folha", [ausentes])
-					: __("Comece por adicionar os vigilantes ausentes")}</span>
-			</div>
-			${ausentes ? `<div class="ausd-tiles">${tiles}</div>` : ""}
-			${warn}
-		</div>`);
-
-	w.find(".ausd-cta").on("click", () => {
-		if (!ready) {
-			frappe.show_alert({ message: __("Preencha Data e Período primeiro."), indicator: "orange" });
-			return;
-		}
-		if (!editable) return;
-		_abrir_quick_add(frm);
-	});
+	w.find("[data-ausd-chip]").html(chip);
+	w.find(".ausd-cta").prop("disabled", !ctaReady);
+	w.find("[data-ausd-hint]").text(ausentes
+		? __("{0} vigilante(s) na folha", [ausentes])
+		: __("Comece por adicionar os vigilantes ausentes"));
+	w.find("[data-ausd-stats]").html((ausentes ? `<div class="ausd-tiles">${tiles}</div>` : "") + warn);
 }
 
 function _inject_deck_css() {
@@ -476,6 +545,23 @@ function _inject_deck_css() {
 	font-size: 1.18em; letter-spacing: .03em; text-transform: uppercase; line-height: 1;
 }
 .ausd-context { margin-top: 5px; font-size: .82em; color: rgba(255,255,255,.72); font-variant-numeric: tabular-nums; }
+.ausd-controls { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+.ausd-field { display: flex; flex-direction: column; gap: 4px; }
+.ausd-field > label {
+	font-size: .7em; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+	color: rgba(255,255,255,.65); margin: 0;
+}
+#sigos-aus-deck .frappe-control { margin: 0 !important; }
+#sigos-aus-deck .control-label, #sigos-aus-deck .help-box { display: none !important; }
+#sigos-aus-deck .control-input input,
+#sigos-aus-deck .control-input select,
+#sigos-aus-deck .control-input .input-with-feedback {
+	background: rgba(255,255,255,.96); border: 1px solid rgba(255,255,255,.25);
+	border-radius: 8px; color: #1a3a5c; font-weight: 600; height: 32px;
+}
+#sigos-aus-deck .control-value, #sigos-aus-deck .like-disabled-input {
+	color: #fff; background: rgba(255,255,255,.08); border-radius: 8px; border-color: rgba(255,255,255,.15);
+}
 .ausd-chip {
 	flex: none; padding: 5px 11px; border-radius: 999px; white-space: nowrap;
 	font-size: .72em; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
@@ -561,6 +647,11 @@ function _setup_substituto_query(frm) {
 function _invalidar_cache() {
 	_escala_cache     = null;
 	_escala_cache_key = null;
+}
+
+// Manhã until 11:59, Noite from 12:00 onward.
+function _periodo_automatico() {
+	return new Date().getHours() < 12 ? "Manhã" : "Noite";
 }
 
 function _check_duplicate(frm, cdt, cdn, field, msg) {
