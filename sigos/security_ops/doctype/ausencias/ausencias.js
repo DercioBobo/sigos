@@ -320,7 +320,8 @@ function _mount_picker(frm, w, row, $card, accao, formEditable) {
 			placeholder: __("Escolher vigilante…"), read_only: formEditable ? 0 : 1,
 			get_query: () => {
 				if (field === "vigilante_substituto")
-					return { query: "sigos.api.get_substitutos_disponiveis", filters: { delegacao: row.delegacao || "", excluir: row.vigilante || "" } };
+					// any reserva / from any posto / any delegação
+					return { query: "sigos.api.get_substitutos_disponiveis", filters: { excluir: row.vigilante || "" } };
 				if (field === "vigilante_a_dobrar")
 					// only guards SCHEDULED at this posto on this day can double up
 					return { query: "sigos.api.get_escalados_no_posto_dia", filters: { posto: row.posto || "", data: frm.doc.data, excluir: row.vigilante || "" } };
@@ -445,7 +446,7 @@ function _aplicar_permissoes(frm) {
 function _setup_substituto_query(frm) {
 	frm.set_query("vigilante_substituto", "tabela_ausencia", function (doc, cdt, cdn) {
 		const row = locals[cdt][cdn];
-		return { query: "sigos.api.get_substitutos_disponiveis", filters: { delegacao: row.delegacao || "", excluir: row.vigilante || "" } };
+		return { query: "sigos.api.get_substitutos_disponiveis", filters: { excluir: row.vigilante || "" } };
 	});
 }
 

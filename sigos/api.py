@@ -94,15 +94,15 @@ def alocar_reservas(posto, vigilantes, regime=None):
 @frappe.whitelist()
 def get_substitutos_disponiveis(doctype, txt, searchfield, start, page_len, filters):
 	"""
-	Frappe link search for vigilante_substituto.
-	Only returns Vigilantes whose Categoria Vigilante has pode_ser_substituto = 1.
+	Frappe link search for vigilante_substituto. Eligible = Categoria with
+	pode_ser_substituto = 1, status Activo OR Reserva (a benched reserve is the ideal
+	pick), from ANY delegação/posto. Reserves are surfaced first.
 	"""
 	import json
 	if isinstance(filters, str):
 		filters = json.loads(filters)
 
-	delegacao = filters.get("delegacao") or ""
-	excluir   = filters.get("excluir")   or ""
+	excluir = filters.get("excluir") or ""
 
 	cats = frappe.get_all(
 		"Categoria Vigilante",
@@ -112,28 +112,25 @@ def get_substitutos_disponiveis(doctype, txt, searchfield, start, page_len, filt
 	if not cats:
 		return []
 
-	delegacao_sql = "AND v.delegacao = %(delegacao)s" if delegacao else ""
-	excluir_sql   = "AND v.name != %(excluir)s"       if excluir   else ""
+	excluir_sql = "AND v.name != %(excluir)s" if excluir else ""
 
 	return frappe.db.sql(
 		f"""
-		SELECT v.name, v.nome_completo, v.categoria
+		SELECT v.name, v.nome_completo, v.categoria, v.status
 		FROM `tabVigilante` v
-		WHERE v.status    = 'Activo'
+		WHERE v.status IN ('Activo', 'Reserva')
 		  AND v.categoria IN %(cats)s
 		  AND (v.name LIKE %(txt)s OR v.nome_completo LIKE %(txt)s)
-		  {delegacao_sql}
 		  {excluir_sql}
-		ORDER BY v.nome_completo
+		ORDER BY FIELD(v.status, 'Reserva') DESC, v.nome_completo
 		LIMIT %(start)s, %(page_len)s
 		""",
 		{
-			"cats":      tuple(cats),
-			"txt":       f"%{txt}%",
-			"delegacao": delegacao,
-			"excluir":   excluir,
-			"start":     start,
-			"page_len":  page_len,
+			"cats":     tuple(cats),
+			"txt":      f"%{txt}%",
+			"excluir":  excluir,
+			"start":    start,
+			"page_len": page_len,
 		},
 	)
 
