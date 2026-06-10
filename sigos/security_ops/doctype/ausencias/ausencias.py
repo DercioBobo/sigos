@@ -2,7 +2,7 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 from frappe.utils import now_datetime
-from sigos.utils import calcular_n_faltas
+from sigos.utils import calcular_n_faltas_efetivo
 
 
 class Ausencias(Document):
@@ -17,6 +17,15 @@ class Ausencias(Document):
 	def before_save(self):
 		self._validar_vigilante_em_outro_doc()
 		self._verificar_hora_limite()
+
+	def on_submit(self):
+		# This absence may make the guard's NEXT working shift qualify for de-dup —
+		# recompute its stored n_de_faltas if that shift is already recorded.
+		self._recalcular_turno_seguinte()
+
+	def on_cancel(self):
+		# Cancelling removes this absence — the next shift may no longer de-dup.
+		self._recalcular_turno_seguinte()
 
 	# ─── Validation ────────────────────────────────────────────────────────────
 
@@ -156,6 +165,48 @@ class Ausencias(Document):
 	# ─── Computed fields ───────────────────────────────────────────────────────
 
 	def _calcular_n_faltas_todas_linhas(self):
-		"""Recompute n_de_faltas for every row based on regime+turno."""
+		"""
+		Stamp the EFFECTIVE n_de_faltas per row: base (Regime Turno Item) with the
+		escala-aware de-dup — if the guard's previous working shift was also a submitted
+		absence, this one counts 1. Cross-document, so it reads the other absences.
+		"""
 		for row in self.tabela_ausencia or []:
-			row.n_de_faltas = calcular_n_faltas(row.regime, row.turno)
+			row.n_de_faltas = calcular_n_faltas_efetivo(
+				row.vigilante, row.regime, row.turno, self.data
+			)
+
+	def _recalcular_turno_seguinte(self):
+		"""
+		Keep the chain consistent when absences are entered/cancelled out of order:
+		for each guard here, find their NEXT working shift; if it already has a submitted
+		absence, recompute its stored n_de_faltas (it may now de-dup to 1, or revert).
+		"""
+		from sigos.utils import (
+			_turno_seguinte_de_trabalho, calcular_n_faltas_efetivo, _regime_deduz_consecutivas,
+		)
+
+		for row in self.tabela_ausencia or []:
+			if not row.vigilante:
+				continue
+			# Only regimes that opt into the de-dup can affect their next shift's count.
+			if not _regime_deduz_consecutivas(row.regime):
+				continue
+			prox = _turno_seguinte_de_trabalho(row.vigilante, row.regime, self.data)
+			if not prox:
+				continue
+			seg = frappe.db.sql(
+				"""
+				SELECT ta.name, ta.regime, ta.turno, ta.n_de_faltas
+				FROM `tabTabela Ausencia` ta
+				JOIN `tabAusencias` a ON a.name = ta.parent
+				WHERE a.docstatus = 1 AND ta.vigilante = %(v)s AND a.data = %(d)s
+				LIMIT 1
+				""",
+				{"v": row.vigilante, "d": prox},
+				as_dict=True,
+			)
+			if not seg:
+				continue
+			novo = calcular_n_faltas_efetivo(row.vigilante, seg[0].regime, seg[0].turno, prox)
+			if novo != (seg[0].n_de_faltas or 0):
+				frappe.db.set_value("Tabela Ausencia", seg[0].name, "n_de_faltas", novo, update_modified=False)

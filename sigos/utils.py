@@ -48,27 +48,172 @@ def get_regime_turno_sequence(regime_nome: str) -> list:
 	return regime.get_turno_sequence()
 
 
+def _folga_turnos(regime_nome: str) -> set:
+	"""Turno names that are folgas (days off) for a regime — from Regime Turno Item."""
+	regime = _get_regime(regime_nome)
+	if not regime:
+		return set()
+	return {r.turno for r in regime.turnos if r.e_folga}
+
+
+def _regime_deduz_consecutivas(regime_nome: str) -> bool:
+	"""Whether this regime applies the consecutive-falta de-dup (opt-in, per regime)."""
+	regime = _get_regime(regime_nome)
+	return bool(regime and regime.get("faltas_consecutivas_contam_um"))
+
+
+def _turno_anterior_de_trabalho(vigilante: str, regime_nome: str, data):
+	"""
+	Date of the guard's previous WORKING escala shift strictly before `data`
+	(folga days are skipped). Read from the actual generated escala, so it honours
+	the real rotation/overrides. Returns a date or None.
+	"""
+	folgas = _folga_turnos(regime_nome)
+	params = {"vig": vigilante, "data": getdate(data)}
+	cond = ""
+	if folgas:
+		cond = "AND te.turno NOT IN %(folgas)s"
+		params["folgas"] = tuple(folgas)
+	prev = frappe.db.sql(
+		f"""
+		SELECT te.data
+		FROM `tabTabela De Escala De Vigilante` te
+		WHERE te.vigilante = %(vig)s AND te.data < %(data)s {cond}
+		ORDER BY te.data DESC
+		LIMIT 1
+		""",
+		params,
+	)
+	return getdate(prev[0][0]) if prev else None
+
+
+def calcular_faltas_detalhado(vigilante: str, start_date, end_date) -> list:
+	"""
+	Per-absence faltas for a guard, escala-aware, with a running cumulative.
+
+	- Base weight = Regime Turno Item.n_de_faltas for the (regime, turno).
+	- DE-DUP: a missed shift whose immediately preceding WORKING escala shift was ALSO
+	  missed counts 1 — the folgas in between were already paid for by that previous
+	  shift's weight (so 2a Noite=3 then the next 1a Manhã=1, not 3).
+	- Cumulative is summed only within [start, end]; absences before start are still
+	  read so the de-dup can see across the month boundary.
+
+	Single source of truth for the Cumulativo de Faltas report AND payroll.
+	"""
+	if not vigilante:
+		return []
+	start, end = getdate(start_date), getdate(end_date)
+
+	absences = frappe.db.sql(
+		"""
+		SELECT a.name AS ausencia, a.data AS data, ta.turno, ta.regime, ta.posto,
+		       ta.nome_do_vigilante, ta.tipo_de_ausencia, ta.n_de_faltas
+		FROM `tabTabela Ausencia` ta
+		JOIN `tabAusencias` a ON a.name = ta.parent
+		WHERE a.docstatus = 1 AND ta.vigilante = %(vig)s AND a.data <= %(end)s
+		ORDER BY a.data ASC, a.name ASC
+		""",
+		{"vig": vigilante, "end": end},
+		as_dict=True,
+	)
+	if not absences:
+		return []
+
+	absence_dates = {getdate(a.data) for a in absences}
+	rows = []
+	cumul = 0
+	for a in absences:
+		d = getdate(a.data)
+		# Always derive the BASE from the regime — never from the stored n_de_faltas,
+		# which is itself the de-dup'd value (else we'd de-dup twice).
+		base = calcular_n_faltas(a.regime, a.turno)
+		dedup = False
+		if _regime_deduz_consecutivas(a.regime):
+			anterior = _turno_anterior_de_trabalho(vigilante, a.regime, d)
+			dedup = anterior is not None and anterior in absence_dates
+		efetivo = 1 if dedup else int(base or 1)
+		if start <= d <= end:
+			cumul += efetivo
+			rows.append({
+				"vigilante": vigilante,
+				"nome_do_vigilante": a.nome_do_vigilante,
+				"regime": a.regime,
+				"posto": a.posto,
+				"turno": a.turno,
+				"tipo_de_ausencia": a.tipo_de_ausencia,
+				"n_de_faltas": efetivo,
+				"cumulativo_de_faltas": cumul,
+				"data": d,
+				"ausencia": a.ausencia,
+			})
+	return rows
+
+
 def calcular_faltas_vigilante(vigilante: str, start_date, end_date) -> int:
 	"""
-	Sum n_de_faltas for a vigilante across all submitted Ausencias in [start_date, end_date].
-	Reads the stored n_de_faltas from Tabela Ausencia (already validated by ausencias.py).
+	Total faltas for a guard in [start, end] — escala-aware (consecutive missed shifts
+	don't double-count the folgas). Same source as the Cumulativo de Faltas report, so
+	the salary slip and the report always agree.
 	"""
 	if not vigilante:
 		return 0
+	return sum(r["n_de_faltas"] for r in calcular_faltas_detalhado(vigilante, start_date, end_date))
 
-	result = frappe.db.sql(
-		"""
-		SELECT COALESCE(SUM(ta.n_de_faltas), 0) AS total
-		FROM `tabTabela Ausencia` ta
+
+def _existe_falta(vigilante: str, data, excluir_ausencia: str = None) -> bool:
+	"""True if a SUBMITTED absence exists for the guard on `data`."""
+	cond = ""
+	params = {"v": vigilante, "d": getdate(data)}
+	if excluir_ausencia:
+		cond = "AND a.name != %(excl)s"
+		params["excl"] = excluir_ausencia
+	return bool(frappe.db.sql(
+		f"""
+		SELECT 1 FROM `tabTabela Ausencia` ta
 		JOIN `tabAusencias` a ON a.name = ta.parent
-		WHERE a.docstatus = 1
-		  AND ta.vigilante = %(vigilante)s
-		  AND a.data BETWEEN %(start)s AND %(end)s
+		WHERE a.docstatus = 1 AND ta.vigilante = %(v)s AND a.data = %(d)s {cond}
+		LIMIT 1
 		""",
-		{"vigilante": vigilante, "start": getdate(start_date), "end": getdate(end_date)},
-		as_dict=True,
+		params,
+	))
+
+
+def _turno_seguinte_de_trabalho(vigilante: str, regime_nome: str, data):
+	"""Date of the guard's NEXT working escala shift strictly after `data` (folgas skipped)."""
+	folgas = _folga_turnos(regime_nome)
+	params = {"vig": vigilante, "data": getdate(data)}
+	cond = ""
+	if folgas:
+		cond = "AND te.turno NOT IN %(folgas)s"
+		params["folgas"] = tuple(folgas)
+	nxt = frappe.db.sql(
+		f"""
+		SELECT te.data
+		FROM `tabTabela De Escala De Vigilante` te
+		WHERE te.vigilante = %(vig)s AND te.data > %(data)s {cond}
+		ORDER BY te.data ASC
+		LIMIT 1
+		""",
+		params,
 	)
-	return int(result[0].total) if result else 0
+	return getdate(nxt[0][0]) if nxt else None
+
+
+def calcular_n_faltas_efetivo(vigilante: str, regime_nome: str, turno: str, data) -> int:
+	"""
+	The effective n_de_faltas for ONE missed shift — what gets stored on Tabela Ausencia.
+	Base = Regime Turno Item weight; reduced to 1 if the guard's previous WORKING escala
+	shift was ALSO a submitted absence (the folgas were already paid for there).
+	"""
+	base = calcular_n_faltas(regime_nome, turno)
+	if not (vigilante and data):
+		return base
+	if not _regime_deduz_consecutivas(regime_nome):
+		return base
+	anterior = _turno_anterior_de_trabalho(vigilante, regime_nome, data)
+	if anterior and _existe_falta(vigilante, anterior):
+		return 1
+	return base
 
 
 def atualizar_ocupacao_posto(posto_name: str):

@@ -13,6 +13,7 @@
   "col_break_1",
   "tipo_ciclo",
   "dias_por_grupo",
+  "faltas_consecutivas_contam_um",
   "sec_turnos",
   "turnos"
  ],
@@ -51,6 +52,13 @@
    "default": "5",
    "depends_on": "eval: doc.tipo_ciclo === 'Dias Úteis Alternado'",
    "description": "Número de dias úteis consecutivos antes de trocar para o próximo turno (ex: 5 = uma semana de trabalho)"
+  },
+  {
+   "fieldname": "faltas_consecutivas_contam_um",
+   "fieldtype": "Check",
+   "label": "Faltas em turnos consecutivos contam 1",
+   "default": "0",
+   "description": "Quando ligado: se o turno de TRABALHO anterior do vigilante também foi falta, esta falta conta 1 (as folgas já foram contadas nesse turno anterior). Ligue em regimes cujo 'Nº Faltas' inclui as folgas seguintes; deixe desligado se cada turno tem um peso próprio."
   },
   {
    "fieldname": "sec_turnos",
