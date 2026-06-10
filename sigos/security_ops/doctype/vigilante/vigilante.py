@@ -181,6 +181,15 @@ class Vigilante(Document):
 				_("Um Vigilante com estado <b>Activo</b> deve ter um Posto de Vigilância atribuído."),
 				title=_("Posto Obrigatório"),
 			)
+		# Regime is required once Activo — it drives the escala (one per posto+regime)
+		# AND the billing tariff (per project+regime). A blank regime would orphan the
+		# guard from both, so we lock it at activation.
+		if self.status == "Activo" and not self.regime_do_vigilante:
+			frappe.throw(
+				_("Um Vigilante com estado <b>Activo</b> deve ter um <b>Regime</b> atribuído — "
+				  "define a escala e a tarifa de facturação."),
+				title=_("Regime Obrigatório"),
+			)
 
 	def _validar_capacidade_posto(self):
 		"""Prevent assigning more vigilantes than the posto's maximum."""

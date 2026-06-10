@@ -8,6 +8,8 @@ def after_install():
 	_load_default_data()
 	_fix_tab_vigilante_do_posto()
 	_set_project_naming()
+	_clean_project_fields()
+	_seccionar_contrato()
 
 
 def after_migrate():
@@ -20,6 +22,31 @@ def after_migrate():
 	# without disturbing existing ones.
 	_load_custom_fields()
 	_set_project_naming()
+	_clean_project_fields()
+	_seccionar_contrato()
+
+
+def _seccionar_contrato():
+	"""
+	Put the SIGOS contract fields (valor, tarifas, subsídios) in their own section.
+	custom_valor_do_contrato may pre-date the custom_sec_sigos break, and
+	_load_custom_fields skips fields that already exist — so re-point it explicitly.
+	The other two already chain after it. Idempotent.
+	"""
+	try:
+		if not frappe.db.exists("Custom Field", {"dt": "Project", "fieldname": "custom_sec_sigos"}):
+			return
+		atual = frappe.db.get_value(
+			"Custom Field", {"dt": "Project", "fieldname": "custom_valor_do_contrato"}, "insert_after"
+		)
+		if atual and atual != "custom_sec_sigos":
+			frappe.db.set_value(
+				"Custom Field", {"dt": "Project", "fieldname": "custom_valor_do_contrato"},
+				"insert_after", "custom_sec_sigos",
+			)
+		frappe.clear_cache(doctype="Project")
+	except Exception as e:
+		frappe.log_error(f"SIGOS: seccionar contrato failed: {e}", "SIGOS Install")
 
 
 def _fix_tab_vigilante_do_posto():
@@ -33,7 +60,9 @@ def _set_project_naming():
 	"""
 	Name the contract (Project) after the customer ('Access Bank 01') instead of
 	PROJ-####. autoname=field:project_name makes the doc name = project_name (which
-	contract_naming auto-fills), and links show it. Idempotent (make_property_setter upserts).
+	contract_naming auto-fills), and links show it. Also lock the premise that every
+	Project IS a client contract: customer is mandatory (Cliente is derived from it
+	everywhere — posto, vigilante, billing). Idempotent (make_property_setter upserts).
 	"""
 	try:
 		frappe.make_property_setter({
@@ -44,9 +73,57 @@ def _set_project_naming():
 			"doctype": "Project", "doctype_or_field": "DocType",
 			"property": "show_title_field_in_link", "value": "1", "property_type": "Check",
 		})
+		# Customer mandatory on every contract.
+		frappe.make_property_setter({
+			"doctype": "Project", "doctype_or_field": "DocField", "fieldname": "customer",
+			"property": "reqd", "value": "1", "property_type": "Check",
+		})
 		frappe.db.commit()
 	except Exception as e:
 		frappe.log_error(f"SIGOS: set Project naming failed: {e}", "SIGOS Install")
+
+
+def _clean_project_fields():
+	"""
+	Hide the standard ERPNext Project fields SIGOS doesn't use — Project is only a
+	client CONTRACT here. We keep project_name, customer, status, is_active, company
+	and the SIGOS custom fields (valor, tarifas, subsídios) visible. Section breaks are
+	hidden too so no empty section headers are left behind. Orphan setters (fields that
+	don't exist on this version) are harmless. Idempotent (make_property_setter upserts).
+	"""
+	ocultar = [
+		# Whole sections to drop — real ERPNext v15 Project Section Break fieldnames.
+		# (We KEEP "customer_details", which holds customer/project_name/status/is_active.)
+		"users_section",     # Users
+		"section_break0",    # Notes
+		"section_break_18",  # Start and End Dates
+		"project_details",   # Costing and Billing
+		"margin",            # Margin
+		"monitor_progress",  # Monitor Progress
+		# Noise leaf-fields inside the kept "Customer Details" section
+		"naming_series", "project_type", "priority", "department",
+		"percent_complete_method", "percent_complete", "project_template",
+		"copied_from", "sales_order",
+		# Belt-and-suspenders: leaves inside the hidden sections above
+		"expected_start_date", "expected_end_date",
+		"actual_start_date", "actual_end_date", "actual_time",
+		"notes", "collect_progress", "frequency", "from_time", "to_time",
+		"first_email", "second_email", "daily_time_to_send", "day_to_send",
+		"weekly_time_to_send", "message", "users", "holiday_list",
+		"cost_center", "estimated_costing", "total_costing_amount",
+		"total_purchase_cost", "total_sales_amount", "total_billable_amount",
+		"total_billed_amount", "gross_margin", "per_gross_margin",
+		"total_consumed_material_cost", "total_expense_claim",
+	]
+	for f in ocultar:
+		try:
+			frappe.make_property_setter({
+				"doctype": "Project", "doctype_or_field": "DocField", "fieldname": f,
+				"property": "hidden", "value": "1", "property_type": "Check",
+			})
+		except Exception as e:
+			frappe.log_error(f"SIGOS: hide Project.{f} failed: {e}", "SIGOS Install")
+	frappe.db.commit()
 
 
 def _load_custom_fields():

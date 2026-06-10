@@ -423,11 +423,20 @@
   "doctype": "Custom Field",
   "dt": "Project",
   "module": "SIGOS Setup",
+  "fieldname": "custom_sec_sigos",
+  "fieldtype": "Section Break",
+  "label": "Tarifas e Subsídios do Contrato",
+  "insert_after": "customer"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Project",
+  "module": "SIGOS Setup",
   "fieldname": "custom_valor_do_contrato",
   "fieldtype": "Currency",
   "label": "Valor por Vigilante (predefinido)",
   "description": "Preço usado quando um regime não tem tarifa específica na tabela abaixo.",
-  "insert_after": "project_type"
+  "insert_after": "custom_sec_sigos"
  },
  {
   "doctype": "Custom Field",

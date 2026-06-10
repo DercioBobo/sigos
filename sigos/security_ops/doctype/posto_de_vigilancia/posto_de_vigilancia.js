@@ -204,9 +204,9 @@ function _atribuir_vigilantes(frm) {
 						options: `<div style="margin-bottom:10px;font-size:.9em">${capacidade_html}</div>`,
 					},
 					{
-						fieldname: "regime", fieldtype: "Link", label: __("Regime (opcional)"),
-						options: "Regime",
-						description: __("Se definido, atribuído a todos os vigilantes seleccionados"),
+						fieldname: "regime", fieldtype: "Link", label: __("Regime"),
+						options: "Regime", reqd: 1,
+						description: __("Atribuído a todos os vigilantes seleccionados — obrigatório (define escala e tarifa)"),
 					},
 					{
 						fieldname: "vigilantes", fieldtype: "MultiSelectPills",
@@ -229,6 +229,10 @@ function _atribuir_vigilantes(frm) {
 						frappe.show_alert({ message: __("Seleccione pelo menos um vigilante."), indicator: "orange" }, 3);
 						return;
 					}
+					if (!vals.regime) {
+						frappe.show_alert({ message: __("Seleccione o Regime — é obrigatório para activar."), indicator: "orange" }, 3);
+						return;
+					}
 					if (livres !== null && escolhidos.length > livres) {
 						frappe.show_alert({
 							message: __("Selecção ({0}) excede as vagas livres ({1}).").format(escolhidos.length, livres),
@@ -239,7 +243,7 @@ function _atribuir_vigilantes(frm) {
 
 					frappe.call({
 						method: "sigos.api.atribuir_vigilantes_ao_posto",
-						args: { posto: frm.doc.name, vigilantes: escolhidos, regime: vals.regime || null },
+						args: { posto: frm.doc.name, vigilantes: escolhidos, regime: vals.regime },
 						freeze: true,
 						freeze_message: __("A atribuir..."),
 						callback(res) {
