@@ -159,6 +159,7 @@ def _load_default_data():
 			"Turno":                   "turno_nome",
 			"Regime":                  "nome",
 			"Operacao De Rotatividade": "abreviatura",
+			"Tipo De Justificacao":    "justificacao",
 		}.get(doctype)
 
 		if name_field:

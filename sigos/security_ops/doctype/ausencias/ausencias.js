@@ -9,7 +9,6 @@ let _escala_cache = null;
 let _escala_cache_key = null;
 let _atraso_estado = null;        // null = n/a, "ok" = on time, "tardia" = late
 
-const TIPOS  = ["Falta", "Atraso", "Saída Antecipada", "Suspensão", "Licença", "Outro"];
 const ACCOES = ["Sem Ação", "Substituto", "Dobra de Turno", "Adiantamento de Turno"];
 const ACCAO_FIELD = {
 	"Substituto":             "vigilante_substituto",
@@ -258,8 +257,7 @@ function _reconcile_cards(frm, w, formEditable) {
 }
 
 function _append_card(frm, w, row, formEditable) {
-	const meta = [row.mecanografico, row.posto, row.regime, row.turno].filter(Boolean).join(" · ");
-	const tipoOpts  = TIPOS.map(t => `<option value="${t}" ${row.tipo_de_ausencia === t ? "selected" : ""}>${t}</option>`).join("");
+	const meta = [row.mecanografico, row.regime, row.turno].filter(Boolean).join(" · ");
 	const accaoOpts = ACCOES.map(a => `<option value="${a}" ${(row.proxima_accao || "Sem Ação") === a ? "selected" : ""}>${a}</option>`).join("");
 	const dis = formEditable ? "" : "disabled";
 
@@ -268,11 +266,10 @@ function _append_card(frm, w, row, formEditable) {
 			<div class="ausb-card-top">
 				<div class="ausb-guard">
 					<span class="ausb-name">${frappe.utils.escape_html(row.nome_do_vigilante || row.vigilante)}</span>
-					<span class="ausb-meta">${frappe.utils.escape_html(meta)}</span>
+					<span class="ausb-meta">${row.posto ? `<span class="ausb-posto">${frappe.utils.escape_html(row.posto)}</span>` : ""}${frappe.utils.escape_html(meta)}</span>
 				</div>
 				<div class="ausb-inline">
-					<label class="ausb-f"><span>${__("Tipo")}</span>
-						<select class="ausb-sel" data-f="tipo_de_ausencia" ${dis}>${tipoOpts}</select></label>
+					<label class="ausb-f"><span>${__("Justificação")}</span><div class="ausb-justif" data-justif></div></label>
 					<label class="ausb-f"><span>${__("Acção")}</span>
 						<select class="ausb-sel" data-f="proxima_accao" ${dis}>${accaoOpts}</select></label>
 				</div>
@@ -281,10 +278,21 @@ function _append_card(frm, w, row, formEditable) {
 			<div class="ausb-picker" data-picker></div>
 		</div>`).appendTo(w.find("[data-aus-cards]"));
 
-	$card.find('[data-f="tipo_de_ausencia"]').on("change", function () {
-		frappe.model.set_value(row.doctype, row.name, "tipo_de_ausencia", this.value);
-		_update_stats(frm, w);
+	// Tipo de Justificação — dynamic Link (manage reasons via the Tipo De Justificacao doctype)
+	const cj = frappe.ui.form.make_control({
+		df: {
+			fieldtype: "Link", fieldname: "tipo_justificacao", options: "Tipo De Justificacao",
+			placeholder: __("Justificação…"), read_only: formEditable ? 0 : 1,
+			get_query: () => ({ filters: { activo: 1 } }),
+			onchange: () => {
+				const v = cj.get_value();
+				if ((v || "") !== (row.tipo_justificacao || "")) frappe.model.set_value(row.doctype, row.name, "tipo_justificacao", v || null);
+			},
+		},
+		parent: $card.find("[data-justif]"), render_input: true,
 	});
+	if (row.tipo_justificacao) cj.set_value(row.tipo_justificacao);
+
 	$card.find('[data-f="proxima_accao"]').on("change", function () {
 		const accao = this.value;
 		// changing the action clears any previously chosen replacement guard
@@ -306,14 +314,19 @@ function _mount_picker(frm, w, row, $card, accao, formEditable) {
 	const $wrap = $(`<div class="ausb-pick"><span class="ausb-pick-arrow">↳</span>
 		<span class="ausb-pick-label">${ACCAO_LABEL[accao]}</span><div class="ausb-pick-ctrl"></div></div>`).appendTo($slot);
 
-	const isSub = field === "vigilante_substituto";
 	const ctrl = frappe.ui.form.make_control({
 		df: {
 			fieldtype: "Link", fieldname: field, options: "Vigilante",
 			placeholder: __("Escolher vigilante…"), read_only: formEditable ? 0 : 1,
-			get_query: () => isSub
-				? { query: "sigos.api.get_substitutos_disponiveis", filters: { delegacao: row.delegacao || "", excluir: row.vigilante || "" } }
-				: { filters: { status: "Activo", name: ["!=", row.vigilante || ""] } },
+			get_query: () => {
+				if (field === "vigilante_substituto")
+					return { query: "sigos.api.get_substitutos_disponiveis", filters: { delegacao: row.delegacao || "", excluir: row.vigilante || "" } };
+				if (field === "vigilante_a_dobrar")
+					// only guards SCHEDULED at this posto on this day can double up
+					return { query: "sigos.api.get_escalados_no_posto_dia", filters: { posto: row.posto || "", data: frm.doc.data, excluir: row.vigilante || "" } };
+				// vigilante_a_adiantar — a guard of the SAME posto brings their shift forward
+				return { filters: { posto_de_vigilancia: row.posto || "", status: "Activo", name: ["!=", row.vigilante || ""] } };
+			},
 			onchange: () => {
 				const v = ctrl.get_value();
 				if ((v || "") !== (row[field] || "")) frappe.model.set_value(row.doctype, row.name, field, v || null);
@@ -512,6 +525,8 @@ function _inject_css() {
 .ausb-guard { flex: 1 1 170px; min-width: 0; }
 .ausb-name { font-weight: 700; font-size: 1.0em; }
 .ausb-meta { display: block; font-size: .78em; color: rgba(255,255,255,.6); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ausb-posto { font-weight: 700; color: #8fd0ff; margin-right: 6px; }
+.ausb-justif { min-width: 150px; }
 .ausb-remove { background: rgba(255,255,255,.1); border: none; color: #ffb4b4; width: 24px; height: 24px; border-radius: 6px; font-size: 1.1em; line-height: 1; cursor: pointer; flex: none; }
 .ausb-remove:hover { background: rgba(224,92,92,.3); }
 .ausb-inline { display: flex; gap: 8px; flex: 0 0 auto; }

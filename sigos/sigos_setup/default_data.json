@@ -278,5 +278,9 @@
   "de_reserva": 1,
   "requer_substituto": 0,
   "descricao": "Selecciona um vigilante em Reserva e atribui-lhe um posto e regime. O vigilante volta a Activo."
- }
+ },
+ { "doctype": "Tipo De Justificacao", "justificacao": "Nojo", "activo": 1 },
+ { "doctype": "Tipo De Justificacao", "justificacao": "Doença", "activo": 1 },
+ { "doctype": "Tipo De Justificacao", "justificacao": "Formação", "activo": 1 },
+ { "doctype": "Tipo De Justificacao", "justificacao": "Abandono de Posto", "activo": 1 }
 ]

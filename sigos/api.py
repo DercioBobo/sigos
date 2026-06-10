@@ -139,6 +139,45 @@ def get_substitutos_disponiveis(doctype, txt, searchfield, start, page_len, filt
 
 
 @frappe.whitelist()
+def get_escalados_no_posto_dia(doctype, txt, searchfield, start, page_len, filters):
+	"""
+	Link search for 'Dobra de Turno': only Vigilantes that were ESCALADOS (scheduled)
+	at the given posto on the given day — they're already on site and can double up.
+	"""
+	import json
+	if isinstance(filters, str):
+		filters = json.loads(filters)
+
+	posto   = filters.get("posto")   or ""
+	data    = filters.get("data")    or ""
+	excluir = filters.get("excluir") or ""
+	if not (posto and data):
+		return []
+
+	excluir_sql = "AND te.vigilante != %(excluir)s" if excluir else ""
+	return frappe.db.sql(
+		f"""
+		SELECT DISTINCT te.vigilante, v.nome_completo, te.turno
+		FROM `tabTabela De Escala De Vigilante` te
+		JOIN `tabVigilante` v ON v.name = te.vigilante
+		WHERE te.posto = %(posto)s AND te.data = %(data)s
+		  AND (te.vigilante LIKE %(txt)s OR v.nome_completo LIKE %(txt)s)
+		  {excluir_sql}
+		ORDER BY v.nome_completo
+		LIMIT %(start)s, %(page_len)s
+		""",
+		{
+			"posto":    posto,
+			"data":     data,
+			"excluir":  excluir,
+			"txt":      f"%{txt}%",
+			"start":    start,
+			"page_len": page_len,
+		},
+	)
+
+
+@frappe.whitelist()
 def get_substitutos_para_wizard(doctype, txt, searchfield, start, page_len, filters):
 	"""
 	Wizard substituto search: pode_ser_substituto = 1 AND not in another active Escala

@@ -15,6 +15,7 @@
   "turno",
   "periodo",
   "tipo_de_ausencia",
+  "tipo_justificacao",
   "n_de_faltas",
   "proxima_accao",
   "vigilante_substituto",
@@ -97,10 +98,17 @@
    "fieldtype": "Select",
    "label": "Tipo",
    "options": "\nFalta\nAtraso\nSaída Antecipada\nSuspensão\nLicença\nOutro",
-   "reqd": 1,
+   "default": "Falta",
+   "reqd": 1
+  },
+  {
+   "fieldname": "tipo_justificacao",
+   "fieldtype": "Link",
+   "label": "Tipo de Justificação",
+   "options": "Tipo De Justificacao",
    "in_list_view": 1,
    "in_grid_view": 1,
-   "columns": 1
+   "columns": 2
   },
   {
    "fieldname": "n_de_faltas",
