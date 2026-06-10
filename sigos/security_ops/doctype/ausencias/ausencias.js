@@ -108,6 +108,13 @@ function _build_shell(frm, w, formEditable) {
 	if (formEditable) {
 		const $inp = w.find("[data-search]");
 		$inp.on("input focus", () => _render_results(frm, w, $inp.val() || ""));
+		// Enter picks the first match (keyboard-only flow).
+		$inp.on("keydown", (e) => {
+			if (e.key === "Enter") {
+				e.preventDefault();
+				w.find("[data-results] .ausb-res").first().trigger("click");
+			}
+		});
 	}
 }
 
@@ -162,6 +169,9 @@ function _render_results(frm, w, filtro) {
 	const $res = w.find("[data-results]");
 	if (!$res.length) return;
 
+	const q = (filtro || "").trim().toLowerCase();
+	if (!q) { $res.empty(); return; }   // search-only: nothing shown until you type
+
 	if (!frm.doc.data || !frm.doc.periodo) {
 		$res.html(`<div class="ausb-res-hint">${__("Defina Data e Período para carregar a escala.")}</div>`);
 		return;
@@ -169,51 +179,41 @@ function _render_results(frm, w, filtro) {
 
 	_ensure_roster(frm).then(roster => {
 		roster = roster || [];
-		const ja = new Set((frm.doc.tabela_ausencia || []).map(r => r.vigilante));
-		const q = (filtro || "").trim().toLowerCase();
-		let addable = roster.filter(v => !ja.has(v.vigilante));
-		if (q) addable = addable.filter(v =>
-			(v.nome_completo || "").toLowerCase().includes(q) ||
-			(v.mecanografico || "").toLowerCase().includes(q) ||
-			(v.posto || "").toLowerCase().includes(q));
-
 		if (!roster.length) {
 			$res.html(`<div class="ausb-res-hint">${__("Sem escala para esta data/período.")}</div>`);
 			return;
 		}
-		if (!addable.length) {
-			$res.html(`<div class="ausb-res-hint">${q ? __("Nenhum resultado.") : __("Todos os vigilantes da escala já estão na folha.")}</div>`);
+		const ja = new Set((frm.doc.tabela_ausencia || []).map(r => r.vigilante));
+		const matches = roster
+			.filter(v => !ja.has(v.vigilante))
+			.filter(v =>
+				(v.nome_completo || "").toLowerCase().includes(q) ||
+				(v.mecanografico || "").toLowerCase().includes(q) ||
+				(v.posto || "").toLowerCase().includes(q))
+			.slice(0, 6);
+
+		if (!matches.length) {
+			$res.html(`<div class="ausb-res-hint">${__("Nenhum vigilante corresponde.")}</div>`);
 			return;
 		}
 
-		const cap = 12;
-		const lista = addable.slice(0, cap);
-		const rows = lista.map(v => {
+		$res.html(matches.map(v => {
 			const meta = [v.mecanografico, v.posto, v.regime, v.turno].filter(Boolean).join(" · ");
 			return `<div class="ausb-res" data-vig="${frappe.utils.escape_html(v.vigilante)}">
 				<span class="ausb-res-plus">+</span>
 				<span class="ausb-res-info"><b>${frappe.utils.escape_html(v.nome_completo || v.vigilante)}</b>
 					<span class="ausb-res-meta">${frappe.utils.escape_html(meta)}</span></span>
 			</div>`;
-		}).join("");
-
-		$res.html(`
-			<div class="ausb-res-head">
-				<span>${__("{0} disponível(eis)", [addable.length])}${addable.length > cap ? " · " + __("mostrando {0}", [cap]) : ""}</span>
-				<button type="button" class="ausb-addall">${__("Adicionar todos ({0})", [addable.length])}</button>
-			</div>
-			${rows}`);
+		}).join(""));
 
 		$res.find(".ausb-res").on("click", function () {
-			const vig = $(this).attr("data-vig");
-			const vd = roster.find(v => v.vigilante === vig);
+			const vd = roster.find(v => v.vigilante === $(this).attr("data-vig"));
 			if (vd) _add_absent(frm, w, vd);
 		});
-		$res.find(".ausb-addall").on("click", () => { addable.forEach(vd => _add_absent(frm, w, vd, true)); _commit_added(frm, w, filtro); });
 	});
 }
 
-function _add_absent(frm, w, vd, bulk) {
+function _add_absent(frm, w, vd) {
 	if ((frm.doc.tabela_ausencia || []).some(r => r.vigilante === vd.vigilante)) return;
 	const row = frm.add_child("tabela_ausencia");
 	row.vigilante         = vd.vigilante;
@@ -227,15 +227,17 @@ function _add_absent(frm, w, vd, bulk) {
 	row.n_de_faltas       = vd.n_de_faltas ?? 1;
 	row.tipo_de_ausencia  = "Falta";
 	row.proxima_accao     = "Sem Ação";
-	if (!bulk) _commit_added(frm, w);
-}
 
-function _commit_added(frm, w, filtro) {
 	frm.dirty();
 	_reconcile_cards(frm, w, true);
 	_update_stats(frm, w);
 	_update_chip(frm, w);
-	_render_results(frm, w, filtro || (w.find("[data-search]").val() || ""));
+
+	// Clear the box and refocus for the next deliberate search.
+	const $inp = w.find("[data-search]");
+	$inp.val("");
+	w.find("[data-results]").empty();
+	$inp.focus();
 }
 
 // ─── Absent cards (reconciled against the child table) ────────────────────────
