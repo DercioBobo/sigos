@@ -1,0 +1,173 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "naming_series:",
+ "creation": "2026-06-10 00:00:00.000000",
+ "doctype": "DocType",
+ "document_type": "Document",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "sec_deck",
+  "deck_faturacao",
+  "sec_filtros",
+  "naming_series",
+  "mes_referencia",
+  "col_filtros",
+  "cliente",
+  "company",
+  "sec_resultado",
+  "linhas",
+  "sec_totais",
+  "total_vigilantes",
+  "col_totais",
+  "total_geral",
+  "sec_faturas",
+  "faturas_geradas"
+ ],
+ "fields": [
+  {
+   "fieldname": "sec_deck",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "deck_faturacao",
+   "fieldtype": "HTML",
+   "label": "Faturação Mensal"
+  },
+  {
+   "fieldname": "sec_filtros",
+   "fieldtype": "Section Break",
+   "label": "Período e Filtros"
+  },
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Série",
+   "options": "FAT-.YYYY.-.####",
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "mes_referencia",
+   "fieldtype": "Date",
+   "label": "Mês de Referência",
+   "reqd": 1,
+   "default": "Today",
+   "description": "A factura é datada no último dia deste mês."
+  },
+  {
+   "fieldname": "col_filtros",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "cliente",
+   "fieldtype": "Link",
+   "label": "Cliente (opcional)",
+   "options": "Customer",
+   "description": "Deixe vazio para facturar todos os clientes com vigilantes activos."
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Empresa",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "sec_resultado",
+   "fieldtype": "Section Break",
+   "label": "Pré-visualização",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "linhas",
+   "fieldtype": "Table",
+   "label": "Linhas",
+   "options": "Faturacao Mensal Linha",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_totais",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "total_vigilantes",
+   "fieldtype": "Int",
+   "label": "Total de Vigilantes",
+   "read_only": 1
+  },
+  {
+   "fieldname": "col_totais",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "total_geral",
+   "fieldtype": "Currency",
+   "label": "Total a Facturar",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_faturas",
+   "fieldtype": "Section Break",
+   "label": "Facturas Geradas"
+  },
+  {
+   "fieldname": "faturas_geradas",
+   "fieldtype": "Small Text",
+   "label": "Facturas (rascunho)",
+   "read_only": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-06-10 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "SIGOS Setup",
+ "name": "Faturacao Mensal",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "SIGOS Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 0,
+   "delete": 0,
+   "email": 0,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Accounts Manager",
+   "share": 0,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "name",
+ "track_changes": 1,
+ "app": "sigos"
+}
