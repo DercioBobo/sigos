@@ -9,7 +9,9 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "sec_deck",
   "deck_ausencias",
+  "sec_cabecalho",
   "naming_series",
   "data",
   "periodo",
@@ -27,9 +29,17 @@
  ],
  "fields": [
   {
+   "fieldname": "sec_deck",
+   "fieldtype": "Section Break"
+  },
+  {
    "fieldname": "deck_ausencias",
    "fieldtype": "HTML",
    "label": "Folha de Ausências"
+  },
+  {
+   "fieldname": "sec_cabecalho",
+   "fieldtype": "Section Break"
   },
   {
    "fieldname": "naming_series",
