@@ -107,7 +107,7 @@ def calcular_faltas_detalhado(vigilante: str, start_date, end_date) -> list:
 	absences = frappe.db.sql(
 		"""
 		SELECT a.name AS ausencia, a.data AS data, ta.turno, ta.regime, ta.posto,
-		       ta.nome_do_vigilante, ta.tipo_de_ausencia, ta.n_de_faltas
+		       ta.nome_do_vigilante, ta.tipo_de_ausencia, ta.tipo_justificacao, ta.n_de_faltas
 		FROM `tabTabela Ausencia` ta
 		JOIN `tabAusencias` a ON a.name = ta.parent
 		WHERE a.docstatus = 1 AND ta.vigilante = %(vig)s AND a.data <= %(end)s
@@ -141,6 +141,7 @@ def calcular_faltas_detalhado(vigilante: str, start_date, end_date) -> list:
 				"posto": a.posto,
 				"turno": a.turno,
 				"tipo_de_ausencia": a.tipo_de_ausencia,
+				"tipo_justificacao": a.tipo_justificacao,
 				"n_de_faltas": efetivo,
 				"cumulativo_de_faltas": cumul,
 				"data": d,

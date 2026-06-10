@@ -43,7 +43,7 @@ def _columns():
 		{"label": _("Regime"), "fieldname": "regime", "fieldtype": "Data", "width": 100},
 		{"label": _("Posto"), "fieldname": "posto", "fieldtype": "Link", "options": "Posto De Vigilancia", "width": 150},
 		{"label": _("Turno"), "fieldname": "turno", "fieldtype": "Data", "width": 110},
-		{"label": _("Tipo de Ausência"), "fieldname": "tipo_de_ausencia", "fieldtype": "Data", "width": 130},
+		{"label": _("Justificação"), "fieldname": "tipo_justificacao", "fieldtype": "Link", "options": "Tipo De Justificacao", "width": 140},
 		{"label": _("Nº de Faltas"), "fieldname": "n_de_faltas", "fieldtype": "Int", "width": 100},
 		{"label": _("Cumulativo de Faltas"), "fieldname": "cumulativo_de_faltas", "fieldtype": "Int", "width": 140},
 		{"label": _("Data"), "fieldname": "data", "fieldtype": "Date", "width": 100},

@@ -4,3 +4,4 @@
 sigos.patches.normalizar_estados
 sigos.patches.rename_operacao_dre
 sigos.patches.fix_rvp_comportamento
+sigos.patches.seed_tipos_justificacao
