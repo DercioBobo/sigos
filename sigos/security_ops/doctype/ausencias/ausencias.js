@@ -10,8 +10,12 @@ let _escala_cache_key = null;
 let _atraso_estado = null;        // null = n/a, "ok" = on time, "tardia" = late
 let _ctx_cache = {};              // "vigilante|data" -> {base, efetivo, dedup, faltas_mes, acum}
 let _ctx_doc = null;              // doc the ctx cache belongs to
+let _atraso_restam = null;        // minutes until the cutoff (null when n/a or already late)
+let _limites_cache = {};          // SIGOS Settings hora_limite_* (fetched once per session)
 
 const ACCOES = ["Sem Ação", "Substituto", "Dobra de Turno", "Adiantamento de Turno"];
+const TIPOS  = ["Falta", "Atraso", "Saída Antecipada", "Suspensão", "Licença", "Outro"];
+const PERIODO_CLASSE = { "Manhã": "per-manha", "Noite": "per-noite", "Tarde": "per-tarde" };
 const ACCAO_FIELD = {
 	"Substituto":             "vigilante_substituto",
 	"Dobra de Turno":         "vigilante_a_dobrar",
@@ -30,16 +34,24 @@ frappe.ui.form.on("Ausencias", {
 
 	refresh(frm) {
 		// The board supersedes the native button, summary AND the child-table grid;
-		// the header fields are mounted as controls inside the deck.
+		// the header fields are mounted as controls inside the deck. The atraso section
+		// is deck-handled too (inline motivo + footer note), so it stays hidden.
 		["btn_adicionar_ausencia", "resumo_ausencias", "tabela_ausencia",
-		 "data", "periodo", "grupo_delegados", "col_break_1"]
+		 "data", "periodo", "grupo_delegados", "col_break_1",
+		 "sec_atraso", "alerta_atraso", "motivo_atraso", "col_break_atraso", "hora_submissao_tardia"]
 			.forEach(f => frm.set_df_property(f, "hidden", 1));
 
-		_toggle_atraso(frm, !!frm.doc.motivo_atraso);
 		_aplicar_permissoes(frm);
 		_verificar_horario(frm);
 		_render_deck(frm);
 		_setup_substituto_query(frm);
+
+		// Live clock: the cutoff can pass while the form sits open — re-check every 30s
+		// so the chip flips to countdown/late and the motivo field appears in time.
+		if (frm._ausd_timer) clearInterval(frm._ausd_timer);
+		if (frm.doc.docstatus === 0) {
+			frm._ausd_timer = setInterval(() => _verificar_horario(frm), 30000);
+		}
 	},
 
 	data(frm)            { _invalidar_cache(); _verificar_horario(frm); _render_deck(frm); _refresh_results(frm); },
@@ -47,8 +59,10 @@ frappe.ui.form.on("Ausencias", {
 	grupo_delegados(frm) { _invalidar_cache(); _render_deck(frm); _refresh_results(frm); },
 
 	before_save(frm) {
-		const agora = new Date().toLocaleTimeString("pt-PT", { hour12: false });
-		frm.set_value("hora_submissao_tardia", agora);
+		// Stamp the hora ONLY on actually-late saves — on-time docs keep it empty.
+		if (_atraso_estado === "tardia") {
+			frm.set_value("hora_submissao_tardia", new Date().toLocaleTimeString("pt-PT", { hour12: false }));
+		}
 	},
 });
 
@@ -68,7 +82,8 @@ function _render_deck(frm) {
 	const w = frm.fields_dict.deck_ausencias?.$wrapper;
 	if (!w) return;
 
-	const formEditable = frm.doc.docstatus !== 1 && frm.doc.workflow_state !== "Pendente De Aprovação";
+	const locked = frm.doc.workflow_state === "Pendente De Aprovação";
+	const formEditable = frm.doc.docstatus !== 1 && !locked;
 	const $deck = w.find("#sigos-aus-deck");
 	const docKey = frm.doc.name || "new";
 	// Falta context can change between documents (submitting one affects the next) —
@@ -76,18 +91,21 @@ function _render_deck(frm) {
 	if (_ctx_doc !== docKey) { _ctx_cache = {}; _ctx_doc = docKey; }
 	if (!$deck.length
 		|| $deck.attr("data-editable") !== String(formEditable)
+		|| $deck.attr("data-locked") !== String(locked)
 		|| $deck.attr("data-doc") !== docKey) {
-		_build_shell(frm, w, formEditable);
+		_build_shell(frm, w, formEditable, locked);
 	}
 	_reconcile_cards(frm, w, formEditable);
 	_fetch_contextos(frm, w);
 	_update_stats(frm, w);
 	_update_chip(frm, w);
+	_update_footer(frm, w);
 }
 
-function _build_shell(frm, w, formEditable) {
+function _build_shell(frm, w, formEditable, locked) {
 	w.html(`
-		<div id="sigos-aus-deck" data-editable="${formEditable}" data-doc="${frm.doc.name || "new"}">
+		<div id="sigos-aus-deck" class="${locked ? "is-locked" : ""}"
+			data-editable="${formEditable}" data-locked="${locked}" data-doc="${frm.doc.name || "new"}">
 			<div class="ausd-top">
 				<div class="ausd-head"><div class="ausd-title">${__("Folha de Ausências")}</div></div>
 				<span data-ausd-chip></span>
@@ -106,6 +124,7 @@ function _build_shell(frm, w, formEditable) {
 			<div class="ausb-cards" data-aus-cards></div>
 			<div class="ausb-empty" data-aus-empty>${__("Toque na pesquisa para ver a escala do dia e marcar os ausentes.")}</div>
 			<div data-ausd-stats></div>
+			<div data-ausd-footer></div>
 		</div>`);
 
 	_mount_header_controls(frm, w, formEditable);
@@ -115,11 +134,26 @@ function _build_shell(frm, w, formEditable) {
 		// Focus with no text shows the FULL day roster grouped by posto (tap-to-add);
 		// typing filters it.
 		$inp.on("input focus", () => _render_results(frm, w, $inp.val() || ""));
-		// Enter picks the first selectable match (keyboard-only flow).
+		// Keyboard flow: arrows move the highlight, Enter adds it, Esc closes.
+		const mover = (dir) => {
+			const $todos = w.find("[data-results] .ausb-res");
+			const $sel = $todos.filter(":not(.is-off)");
+			if (!$sel.length) return;
+			let i = $sel.index($todos.filter(".is-active"));
+			i = i < 0 ? (dir > 0 ? 0 : $sel.length - 1)
+			          : Math.min(Math.max(i + dir, 0), $sel.length - 1);
+			$todos.removeClass("is-active");
+			const alvo = $sel.eq(i).addClass("is-active")[0];
+			if (alvo && alvo.scrollIntoView) alvo.scrollIntoView({ block: "nearest" });
+		};
 		$inp.on("keydown", (e) => {
+			if (e.key === "ArrowDown") { e.preventDefault(); mover(1); }
+			if (e.key === "ArrowUp")   { e.preventDefault(); mover(-1); }
 			if (e.key === "Enter") {
 				e.preventDefault();
-				w.find("[data-results] .ausb-res:not(.is-off)").first().trigger("click");
+				const $alvo = w.find("[data-results] .ausb-res.is-active:not(.is-off)");
+				($alvo.length ? $alvo : w.find("[data-results] .ausb-res:not(.is-off)").first())
+					.first().trigger("click");
 			}
 			if (e.key === "Escape") {
 				$inp.val("");
@@ -236,7 +270,7 @@ function _render_results(frm, w, filtro) {
 			const linhas = items.map(v => {
 				const neste = ja.has(v.vigilante);
 				const outro = !neste && v.ja_registado_em;
-				const meta = [v.mecanografico, v.regime, v.turno].filter(Boolean).join(" · ");
+				const meta = [v.mecanografico, v.regime].filter(Boolean).join(" · ");
 				let tag = "", off = "";
 				if (neste) {
 					off = "is-off";
@@ -246,10 +280,11 @@ function _render_results(frm, w, filtro) {
 					tag = `<span class="ausb-res-tag tag-outro">${__("já em")} ${frappe.utils.escape_html(v.ja_registado_em)}</span>`;
 				}
 				return `<div class="ausb-res ${off}" data-vig="${frappe.utils.escape_html(v.vigilante)}">
-					<span class="ausb-res-plus">${neste ? "✓" : "+"}</span>
+					${_avatar_html(v.nome_completo || v.vigilante)}
 					<span class="ausb-res-info"><b>${frappe.utils.escape_html(v.nome_completo || v.vigilante)}</b>
 						<span class="ausb-res-meta">${frappe.utils.escape_html(meta)}</span></span>
-					${tag}
+					${_turno_chip(v.turno, v.periodo)}
+					${tag || `<span class="ausb-res-plus">+</span>`}
 				</div>`;
 			}).join("");
 
@@ -337,19 +372,25 @@ function _reconcile_cards(frm, w, formEditable) {
 }
 
 function _append_card(frm, w, row, formEditable) {
-	const meta = [row.mecanografico, row.regime, row.turno].filter(Boolean).join(" · ");
+	const meta = [row.mecanografico, row.regime].filter(Boolean).join(" · ");
 	const accaoOpts = ACCOES.map(a => `<option value="${a}" ${(row.proxima_accao || "Sem Ação") === a ? "selected" : ""}>${a}</option>`).join("");
+	const tipoOpts = TIPOS.map(t => `<option value="${t}" ${(row.tipo_de_ausencia || "Falta") === t ? "selected" : ""}>${t}</option>`).join("");
 	const dis = formEditable ? "" : "disabled";
 
 	const $card = $(`
 		<div class="ausb-card" data-cdn="${row.name}">
 			<div class="ausb-card-top">
 				<div class="ausb-guard">
-					<span class="ausb-name">${frappe.utils.escape_html(row.nome_do_vigilante || row.vigilante)}</span>
-					<span class="ausb-meta">${row.posto ? `<span class="ausb-posto">${frappe.utils.escape_html(row.posto)}</span>` : ""}${frappe.utils.escape_html(meta)}</span>
-					<span class="ausb-badges" data-badges></span>
+					${_avatar_html(row.nome_do_vigilante || row.vigilante)}
+					<div class="ausb-guard-txt">
+						<span class="ausb-name">${frappe.utils.escape_html(row.nome_do_vigilante || row.vigilante)}</span>
+						<span class="ausb-meta">${row.posto ? `<span class="ausb-posto">${frappe.utils.escape_html(row.posto)}</span>` : ""}${frappe.utils.escape_html(meta)} ${_turno_chip(row.turno, row.periodo)}</span>
+						<span class="ausb-badges" data-badges></span>
+					</div>
 				</div>
 				<div class="ausb-inline">
+					<label class="ausb-f"><span>${__("Tipo")}</span>
+						<select class="ausb-sel" data-f="tipo_de_ausencia" ${dis}>${tipoOpts}</select></label>
 					<label class="ausb-f"><span>${__("Justificação")}</span><div class="ausb-justif" data-justif></div></label>
 					<label class="ausb-f"><span>${__("Acção")}</span>
 						<select class="ausb-sel" data-f="proxima_accao" ${dis}>${accaoOpts}</select></label>
@@ -373,6 +414,10 @@ function _append_card(frm, w, row, formEditable) {
 		parent: $card.find("[data-justif]"), render_input: true,
 	});
 	if (row.tipo_justificacao) cj.set_value(row.tipo_justificacao);
+
+	$card.find('[data-f="tipo_de_ausencia"]').on("change", function () {
+		frappe.model.set_value(row.doctype, row.name, "tipo_de_ausencia", this.value);
+	});
 
 	$card.find('[data-f="proxima_accao"]').on("change", function () {
 		const accao = this.value;
@@ -512,8 +557,10 @@ function _update_stats(frm, w) {
 		adiant ? tile(adiant, __("adiantam."),   "t-adi") : "",
 	].join("");
 	const warn = (_atraso_estado === "tardia" && frm.doc.docstatus !== 1)
-		? `<div class="ausd-warn">${__("Submissão fora do horário — preencha o <b>Motivo do Atraso</b> antes de gravar.")}</div>` : "";
+		? `<div class="ausd-warn">${__("Submissão fora do horário — preencha o <b>Motivo do Atraso</b> abaixo antes de gravar.")}</div>` : "";
 	w.find("[data-ausd-stats]").html((rows.length ? `<div class="ausd-tiles">${tiles}</div>` : "") + warn);
+	// Every mutation path lands here — keep the footer CTA label (Gravar/Submeter) in step.
+	_update_footer(frm, w);
 }
 
 function _update_chip(frm, w) {
@@ -525,58 +572,140 @@ function _update_chip(frm, w) {
 	else if (locked)                      chip = `<span class="ausd-chip ausd-chip-lock">${__("Pendente de Aprovação")}</span>`;
 	else if (!ready)                      chip = `<span class="ausd-chip ausd-chip-wait">${__("Defina data e período")}</span>`;
 	else if (_atraso_estado === "tardia") chip = `<span class="ausd-chip ausd-chip-late">${__("Submissão tardia")}</span>`;
+	else if (_atraso_estado === "ok" && _atraso_restam != null && _atraso_restam <= 30)
+		chip = `<span class="ausd-chip ausd-chip-soon">${__("Faltam {0} min", [_atraso_restam])}</span>`;
 	else                                  chip = `<span class="ausd-chip ausd-chip-ok">${__("Dentro do horário")}</span>`;
 	w.find("[data-ausd-chip]").html(chip);
 }
 
-// ─── Late-submission rule ─────────────────────────────────────────────────────
+// ─── Deck footer: motivo do atraso inline + finish-in-canvas CTA ──────────────
+function _update_footer(frm, w) {
+	const $f = w.find("[data-ausd-footer]");
+	if (!$f.length) return;
+
+	const locked = frm.doc.workflow_state === "Pendente De Aprovação";
+	const tardia = _atraso_estado === "tardia" && frm.doc.docstatus === 0 && !locked;
+	const sig = `${frm.doc.docstatus}|${locked}|${tardia}`;
+
+	if ($f.attr("data-sig") !== sig) {
+		$f.attr("data-sig", sig).empty();
+
+		if (frm.doc.docstatus !== 0 || locked) {
+			// Read-only: just document the late submission, if there was one.
+			if (frm.doc.motivo_atraso) {
+				$f.html(`<div class="ausd-late-note">${__("Submissão tardia")}${
+					frm.doc.hora_submissao_tardia ? " · " + frappe.utils.escape_html(frm.doc.hora_submissao_tardia) : ""
+				} — ${frappe.utils.escape_html(frm.doc.motivo_atraso)}</div>`);
+			}
+		} else {
+			if (tardia) {
+				const $m = $(`<div class="ausd-motivo"><label>${__("Motivo do Atraso")}</label>
+					<div data-motivo-ctrl></div></div>`).appendTo($f);
+				const cm = frappe.ui.form.make_control({
+					df: { fieldtype: "Small Text", fieldname: "motivo_atraso",
+						placeholder: __("Porque é que o registo está a ser feito fora do horário?"),
+						onchange: () => {
+							const v = cm.get_value();
+							if ((v || "") !== (frm.doc.motivo_atraso || "")) frm.set_value("motivo_atraso", v);
+						} },
+					parent: $m.find("[data-motivo-ctrl]"), render_input: true,
+				});
+				cm.set_value(frm.doc.motivo_atraso || "");
+			}
+			const $row = $(`<div class="ausd-cta-row"><button type="button" class="ausd-cta" data-cta></button></div>`)
+				.appendTo($f);
+			$row.find("[data-cta]").on("click", () => _cta_click(frm));
+		}
+	}
+
+	// Label tracks dirty/clean state on every repaint (no DOM rebuild → no lost focus).
+	const $btn = $f.find("[data-cta]");
+	if ($btn.length) $btn.text(_cta_label(frm));
+}
+
+function _tem_workflow(frm) {
+	return frappe.meta.has_field("Ausencias", "workflow_state");
+}
+
+function _cta_label(frm) {
+	if (frm.is_new() || frm.is_dirty()) return __("Gravar");
+	return _tem_workflow(frm) ? __("Enviar para Aprovação") : __("Submeter");
+}
+
+function _cta_click(frm) {
+	if (frm.is_new() || frm.is_dirty()) { frm.save(); return; }
+	if (frm.doc.docstatus !== 0) return;
+	if (_tem_workflow(frm)) {
+		frappe.xcall("frappe.model.workflow.get_transitions", { doc: frm.doc }).then(ts => {
+			if (!ts || !ts.length) {
+				frappe.show_alert({ message: __("Sem acções de workflow disponíveis para si."), indicator: "orange" }, 5);
+				return;
+			}
+			frappe.xcall("frappe.model.workflow.apply_workflow", { doc: frm.doc, action: ts[0].action })
+				.then(() => frm.reload_doc());
+		});
+	} else {
+		frm.savesubmit();
+	}
+}
+
+// ─── Visual helpers: avatar initials + periodo-coloured turno chip ────────────
+function _avatar_html(nome) {
+	const limpo = (nome || "").trim();
+	const partes = limpo.split(/\s+/).filter(Boolean);
+	const ini = partes.length
+		? ((partes[0][0] || "") + (partes.length > 1 ? partes[partes.length - 1][0] : "")).toUpperCase()
+		: "?";
+	let h = 0;
+	for (let i = 0; i < limpo.length; i++) h = (h * 31 + limpo.charCodeAt(i)) % 360;
+	return `<span class="ausb-ava" style="background:hsl(${h},42%,38%)">${frappe.utils.escape_html(ini)}</span>`;
+}
+
+function _turno_chip(turno, periodo) {
+	if (!turno) return "";
+	return `<span class="ausb-chip ${PERIODO_CLASSE[periodo] || "per-outro"}">${frappe.utils.escape_html(turno)}</span>`;
+}
+
+// ─── Late-submission rule (live — re-run by a 30s timer while the form is open) ─
 function _verificar_horario(frm) {
-	const limites = { "Manhã": "09:30:00", "Noite": "18:30:00" };
-	const limite  = limites[frm.doc.periodo];
-	if (!limite) {
+	const padrao = { "Manhã": "09:30:00", "Noite": "18:30:00" };
+	const limite_padrao = padrao[frm.doc.periodo];
+	if (!limite_padrao) {
 		_atraso_estado = null;
-		_limpar_alerta(frm);
-		frm.set_df_property("motivo_atraso", "reqd", 0);
-		_toggle_atraso(frm, !!frm.doc.motivo_atraso);
+		_atraso_restam = null;
+		_pintar_estado(frm);
 		return;
 	}
 	const key = frm.doc.periodo === "Manhã" ? "hora_limite_manha" : "hora_limite_noite";
-	frappe.db.get_single_value("SIGOS Settings", key).then(val => {
-		const hora_limite = val || limite;
+
+	const aplicar = (hora_limite) => {
 		const agora = new Date().toLocaleTimeString("pt-PT", { hour12: false });
 		if (agora > hora_limite) {
 			_atraso_estado = "tardia";
-			_mostrar_alerta_atraso(frm, agora, hora_limite);
-			frm.set_df_property("motivo_atraso", "reqd", 1);
-			frm.set_df_property("motivo_atraso", "read_only", 0);
-			_toggle_atraso(frm, true);
+			_atraso_restam = null;
 		} else {
 			_atraso_estado = "ok";
-			_limpar_alerta(frm);
-			frm.set_df_property("motivo_atraso", "reqd", 0);
-			_toggle_atraso(frm, !!frm.doc.motivo_atraso);
+			_atraso_restam = Math.max(0, Math.ceil((_segundos(hora_limite) - _segundos(agora)) / 60));
 		}
-		const w = frm.fields_dict.deck_ausencias?.$wrapper;
-		if (w) { _update_stats(frm, w); _update_chip(frm, w); }
+		_pintar_estado(frm);
+	};
+
+	if (_limites_cache[key]) { aplicar(_limites_cache[key]); return; }
+	frappe.db.get_single_value("SIGOS Settings", key).then(val => {
+		_limites_cache[key] = val || limite_padrao;
+		aplicar(_limites_cache[key]);
 	});
 }
 
-function _toggle_atraso(frm, mostrar) {
-	["sec_atraso", "alerta_atraso", "motivo_atraso", "col_break_atraso", "hora_submissao_tardia"]
-		.forEach(f => frm.set_df_property(f, "hidden", mostrar ? 0 : 1));
+function _segundos(hms) {
+	const p = String(hms || "0:0:0").split(":");
+	return (+p[0] || 0) * 3600 + (+p[1] || 0) * 60 + (+p[2] || 0);
 }
 
-function _mostrar_alerta_atraso(frm, agora, limite) {
-	frm.fields_dict.alerta_atraso.$wrapper.html(`
-		<div class="alert alert-warning d-flex align-items-center mb-0" style="border-radius:6px;">
-			<span style="font-size:1.2em;margin-right:8px;">⚠️</span>
-			<div><strong>${__("Submissão fora do horário")}</strong><br>
-				${__("Hora actual")}: <b>${agora}</b> &nbsp;|&nbsp; ${__("Limite")}: <b>${limite}</b><br>
-				<small>${__("O campo Motivo do Atraso é obrigatório.")}</small></div>
-		</div>`);
+function _pintar_estado(frm) {
+	const w = frm.fields_dict.deck_ausencias?.$wrapper;
+	if (w) { _update_stats(frm, w); _update_chip(frm, w); _update_footer(frm, w); }
 }
-
-function _limpar_alerta(frm) { frm.fields_dict.alerta_atraso?.$wrapper.html(""); }
 
 // ─── Permissions ──────────────────────────────────────────────────────────────
 function _aplicar_permissoes(frm) {
@@ -641,6 +770,8 @@ function _inject_css() {
 .ausd-chip-late { background: rgba(224,92,92,.2);  color: #ffb4b4; border-color: rgba(224,92,92,.5); }
 .ausd-chip-wait { background: rgba(255,255,255,.1); color: rgba(255,255,255,.75); }
 .ausd-chip-lock { background: rgba(232,160,32,.2); color: #f4cd84; border-color: rgba(232,160,32,.45); }
+.ausd-chip-soon { background: rgba(232,160,32,.2); color: #f4cd84; border-color: rgba(232,160,32,.45); animation: ausd-soon 2s ease-in-out infinite; }
+@keyframes ausd-soon { 50% { opacity: .55; } }
 .ausd-controls { display: flex; flex-direction: row; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
 .ausd-field { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 150px; }
 .ausd-field > label { font-size: .7em; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: rgba(255,255,255,.65); margin: 0; }
@@ -674,16 +805,18 @@ function _inject_css() {
 .ausb-res-hint { padding: 10px 8px; color: rgba(255,255,255,.6); font-size: .84em; font-style: italic; }
 .ausb-res { display: flex; align-items: center; gap: 9px; padding: 7px 9px; border-radius: 8px; cursor: pointer; }
 .ausb-res:hover { background: rgba(255,255,255,.1); }
-.ausb-res-plus { width: 20px; height: 20px; border-radius: 50%; background: rgba(47,165,106,.85); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; flex: none; }
-.ausb-res-info { display: flex; flex-direction: column; min-width: 0; font-size: .9em; }
+.ausb-res.is-active { background: rgba(255,255,255,.14); outline: 1px solid rgba(255,255,255,.3); }
+.ausb-res-plus { width: 22px; height: 22px; border-radius: 50%; background: rgba(47,165,106,.85); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; flex: none; }
+.ausb-res-info { display: flex; flex-direction: column; min-width: 0; font-size: .9em; flex: 1; }
 .ausb-res-meta { font-size: .82em; color: rgba(255,255,255,.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Absent cards */
 .ausb-cards { margin-top: 14px; display: flex; flex-direction: column; gap: 10px; }
 .ausb-empty { margin-top: 14px; color: rgba(255,255,255,.6); font-style: italic; font-size: .86em; }
-.ausb-card { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12); border-left: 3px solid #e05c5c; border-radius: 10px; padding: 11px 13px; }
+.ausb-card { position: relative; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12); border-left: 3px solid #e05c5c; border-radius: 10px; padding: 11px 13px; }
 .ausb-card-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.ausb-guard { flex: 1 1 170px; min-width: 0; }
+.ausb-guard { flex: 1 1 190px; min-width: 0; display: flex; gap: 10px; align-items: flex-start; }
+.ausb-guard-txt { min-width: 0; flex: 1; }
 .ausb-name { font-weight: 700; font-size: 1.0em; }
 .ausb-meta { display: block; font-size: .78em; color: rgba(255,255,255,.6); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ausb-posto { font-weight: 700; color: #8fd0ff; margin-right: 6px; }
@@ -693,6 +826,16 @@ function _inject_css() {
 .bdg-peso  { background: rgba(224,92,92,.18); color: #ffb4b4; border: 1px solid rgba(224,92,92,.4); }
 .bdg-dedup { background: rgba(47,165,106,.16); color: #8fe6b8; border: 1px solid rgba(47,165,106,.4); }
 .bdg-mes   { background: rgba(255,255,255,.1); color: rgba(255,255,255,.78); border: 1px solid rgba(255,255,255,.16); }
+
+/* Avatar initials + periodo-coloured turno chips (same language as the escala grid) */
+.ausb-ava { width: 30px; height: 30px; border-radius: 50%; flex: none; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: .76em; color: #fff; letter-spacing: .02em; box-shadow: inset 0 -2px 4px rgba(0,0,0,.22), 0 1px 2px rgba(0,0,0,.2); }
+.ausb-res .ausb-ava { width: 28px; height: 28px; }
+.ausb-chip { display: inline-block; vertical-align: middle; padding: 2px 9px; border-radius: 999px; font-size: .86em; font-weight: 700; color: #fff; letter-spacing: .03em; white-space: nowrap; flex: none; box-shadow: inset 0 1px 0 rgba(255,255,255,.18); }
+.ausb-res .ausb-chip { font-size: .72em; }
+.per-manha { background: linear-gradient(180deg, #62a2e2 0%, #3a7ec5 100%); }
+.per-noite { background: linear-gradient(180deg, #3b5074 0%, #212f44 100%); border: 1px solid rgba(255,255,255,.22); }
+.per-tarde { background: linear-gradient(180deg, #e8a020 0%, #c9821a 100%); }
+.per-outro { background: rgba(255,255,255,.16); }
 .ausb-justif { min-width: 150px; }
 .ausb-remove { background: rgba(255,255,255,.1); border: none; color: #ffb4b4; width: 24px; height: 24px; border-radius: 6px; font-size: 1.1em; line-height: 1; cursor: pointer; flex: none; }
 .ausb-remove:hover { background: rgba(224,92,92,.3); }
@@ -717,6 +860,31 @@ function _inject_css() {
 .ausd-tile.t-adi .n { color: #c6b6ff; }
 .ausd-warn { margin-top: 14px; padding: 9px 13px; border-radius: 9px; font-size: .82em; font-weight: 600; background: rgba(224,92,92,.16); border: 1px solid rgba(224,92,92,.4); color: #ffd0d0; }
 .ausd-warn b { color: #fff; }
+
+/* Footer: inline motivo do atraso + finish-in-canvas CTA */
+[data-ausd-footer]:not(:empty) { margin-top: 14px; border-top: 1px solid rgba(255,255,255,.12); padding-top: 12px; }
+.ausd-motivo > label { display: block; font-size: .7em; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #ffd0d0; margin: 0 0 4px; }
+#sigos-aus-deck .control-input textarea { background: rgba(255,255,255,.96); border: 1px solid rgba(255,255,255,.25); border-radius: 8px; color: #1a3a5c; font-weight: 600; min-height: 56px; }
+.ausd-cta-row { display: flex; justify-content: flex-end; margin-top: 10px; }
+.ausd-cta { background: #e8a020; color: #14304c; border: none; border-radius: 9px; padding: 9px 24px; font-weight: 800; font-size: .95em; letter-spacing: .02em; cursor: pointer; box-shadow: 0 3px 10px rgba(0,0,0,.25); }
+.ausd-cta:hover { background: #f2b542; }
+.ausd-late-note { font-size: .84em; font-weight: 600; color: #ffd0d0; background: rgba(224,92,92,.12); border: 1px solid rgba(224,92,92,.3); border-radius: 9px; padding: 8px 12px; }
+
+/* Mobile: deck unsticks, cards stack, tap targets grow */
+@media (max-width: 640px) {
+	#sigos-aus-deck { position: static; padding: 12px 13px; }
+	.ausd-controls { gap: 8px; }
+	.ausd-field { min-width: calc(50% - 8px); }
+	.ausb-results:not(:empty) { max-height: 55vh; }
+	.ausb-res { padding: 11px 9px; }
+	.ausb-card-top { flex-direction: column; align-items: stretch; gap: 9px; }
+	.ausb-guard { padding-right: 30px; }
+	.ausb-inline { width: 100%; }
+	.ausb-f { flex: 1; min-width: 0; }
+	.ausb-remove { position: absolute; top: 9px; right: 9px; }
+	.ausd-tile { flex: 1; min-width: 72px; padding: 8px 10px; }
+	.ausd-cta { width: 100%; padding: 12px; }
+}
 `;
 	const s = document.createElement("style");
 	s.id = "sigos-aus-deck-css";
