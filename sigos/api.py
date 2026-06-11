@@ -97,12 +97,18 @@ def get_substitutos_disponiveis(doctype, txt, searchfield, start, page_len, filt
 	Frappe link search for vigilante_substituto. Eligible = Categoria with
 	pode_ser_substituto = 1, status Activo OR Reserva (a benched reserve is the ideal
 	pick), from ANY delegação/posto. Reserves are surfaced first.
+	When data (+periodo) is passed, guards are EXCLUDED if a submitted Ausencias of
+	that day already marks them absent, or already books them as substituto for the
+	same periodo — no double-booking a reserve across documents.
 	"""
 	import json
 	if isinstance(filters, str):
 		filters = json.loads(filters)
 
-	excluir = filters.get("excluir") or ""
+	excluir     = filters.get("excluir") or ""
+	data        = filters.get("data") or ""
+	periodo     = filters.get("periodo") or ""
+	excluir_doc = filters.get("excluir_doc") or ""
 
 	cats = frappe.get_all(
 		"Categoria Vigilante",
@@ -114,6 +120,18 @@ def get_substitutos_disponiveis(doctype, txt, searchfield, start, page_len, filt
 
 	excluir_sql = "AND v.name != %(excluir)s" if excluir else ""
 
+	ocupado_sql = ""
+	if data:
+		excl_doc_sql = "AND a.name != %(excluir_doc)s" if excluir_doc else ""
+		ocupado_sql = f"""
+		  AND NOT EXISTS (
+			SELECT 1 FROM `tabTabela Ausencia` ta
+			JOIN `tabAusencias` a ON a.name = ta.parent
+			WHERE a.docstatus = 1 AND a.data = %(data)s {excl_doc_sql}
+			  AND (ta.vigilante = v.name
+			       OR (ta.vigilante_substituto = v.name AND a.periodo = %(periodo)s))
+		  )"""
+
 	return frappe.db.sql(
 		f"""
 		SELECT v.name, v.nome_completo, v.categoria, v.status
@@ -122,15 +140,19 @@ def get_substitutos_disponiveis(doctype, txt, searchfield, start, page_len, filt
 		  AND v.categoria IN %(cats)s
 		  AND (v.name LIKE %(txt)s OR v.nome_completo LIKE %(txt)s)
 		  {excluir_sql}
+		  {ocupado_sql}
 		ORDER BY FIELD(v.status, 'Reserva') DESC, v.nome_completo
 		LIMIT %(start)s, %(page_len)s
 		""",
 		{
-			"cats":     tuple(cats),
-			"txt":      f"%{txt}%",
-			"excluir":  excluir,
-			"start":    start,
-			"page_len": page_len,
+			"cats":        tuple(cats),
+			"txt":         f"%{txt}%",
+			"excluir":     excluir,
+			"data":        data,
+			"periodo":     periodo,
+			"excluir_doc": excluir_doc,
+			"start":       start,
+			"page_len":    page_len,
 		},
 	)
 
@@ -514,11 +536,14 @@ def get_turnos_do_regime_query(doctype, txt, searchfield, start, page_len, filte
 
 
 @frappe.whitelist()
-def get_vigilantes_da_escala(data, periodo, grupo_delegados=None):
+def get_vigilantes_da_escala(data, periodo, grupo_delegados=None, excluir_doc=None):
 	"""
 	Return every vigilante expected on shift for data+periodo,
 	enriched with posto, turno, regime, delegacao and nome_completo.
 	Optionally scoped to the delegacoes in grupo_delegados.
+	Each row is annotated with ja_registado_em / ja_registado_estado when the guard
+	already has an absence in ANOTHER doc (draft or submitted) for this data+periodo —
+	the deck greys them out at add-time instead of erroring at save.
 	Used by the Ausencias quick-add dialog and set_query filter.
 	"""
 	base_sql = """
@@ -547,6 +572,7 @@ def get_vigilantes_da_escala(data, periodo, grupo_delegados=None):
 	"""
 	params = {"data": data, "periodo": periodo}
 
+	extra = ""
 	if grupo_delegados:
 		delegacoes = frappe.get_all(
 			"Grupo Delegados Item",
@@ -557,13 +583,82 @@ def get_vigilantes_da_escala(data, periodo, grupo_delegados=None):
 		if delegacoes:
 			# frappe.db.sql supports tuple for IN
 			params["delegacoes"] = tuple(delegacoes)
-			return frappe.db.sql(
-				base_sql.format(extra="AND v.delegacao IN %(delegacoes)s"),
-				params,
-				as_dict=True,
-			)
+			extra = "AND v.delegacao IN %(delegacoes)s"
 
-	return frappe.db.sql(base_sql.format(extra=""), params, as_dict=True)
+	rows = frappe.db.sql(base_sql.format(extra=extra), params, as_dict=True)
+	_marcar_ja_registados(rows, data, periodo, excluir_doc)
+	return rows
+
+
+def _marcar_ja_registados(rows, data, periodo, excluir_doc=None):
+	"""
+	Annotate roster rows whose guard already has an absence registered in another
+	Ausencias doc (any grupo) for the same data+periodo. Submitted wins over draft.
+	"""
+	vigs = [r.vigilante for r in rows if r.get("vigilante")]
+	if not vigs:
+		return
+	params = {"d": data, "p": periodo, "vigs": tuple(vigs)}
+	excl = ""
+	if excluir_doc:
+		excl = "AND a.name != %(excl)s"
+		params["excl"] = excluir_doc
+	conflitos = frappe.db.sql(
+		f"""
+		SELECT ta.vigilante, a.name AS doc, a.docstatus
+		FROM `tabTabela Ausencia` ta
+		JOIN `tabAusencias` a ON a.name = ta.parent
+		WHERE a.docstatus < 2 AND a.data = %(d)s AND a.periodo = %(p)s
+		  AND ta.vigilante IN %(vigs)s {excl}
+		""",
+		params,
+		as_dict=True,
+	)
+	por_vig = {}
+	for c in conflitos:
+		if c.vigilante not in por_vig or c.docstatus > por_vig[c.vigilante].docstatus:
+			por_vig[c.vigilante] = c
+	for r in rows:
+		c = por_vig.get(r.vigilante)
+		if c:
+			r["ja_registado_em"] = c.doc
+			r["ja_registado_estado"] = "Submetido" if c.docstatus == 1 else "Rascunho"
+
+
+@frappe.whitelist()
+def get_contexto_faltas(data, linhas):
+	"""
+	Falta context for the Ausencias deck cards, in one batch call.
+	linhas = JSON list of {vigilante, regime, turno}. Returns a map
+	vigilante -> {base, efetivo, dedup, faltas_mes}:
+	- base    = Regime Turno Item weight for the (regime, turno)
+	- efetivo = weight after the escala-aware consecutive de-dup
+	- faltas_mes = SUBMITTED faltas accumulated this month up to `data`
+	  (same source as the Cumulativo de Faltas report and payroll).
+	"""
+	import json
+	from frappe.utils import getdate
+	from sigos.utils import calcular_n_faltas, calcular_n_faltas_efetivo, calcular_faltas_vigilante
+
+	if isinstance(linhas, str):
+		linhas = json.loads(linhas)
+	d = getdate(data)
+	inicio_mes = d.replace(day=1)
+
+	out = {}
+	for l in linhas or []:
+		vig = l.get("vigilante")
+		if not vig or vig in out:
+			continue
+		base = calcular_n_faltas(l.get("regime"), l.get("turno"))
+		efetivo = calcular_n_faltas_efetivo(vig, l.get("regime"), l.get("turno"), d)
+		out[vig] = {
+			"base": base,
+			"efetivo": efetivo,
+			"dedup": efetivo < base,
+			"faltas_mes": calcular_faltas_vigilante(vig, inicio_mes, d),
+		}
+	return out
 
 
 @frappe.whitelist()

@@ -8,6 +8,8 @@
 let _escala_cache = null;
 let _escala_cache_key = null;
 let _atraso_estado = null;        // null = n/a, "ok" = on time, "tardia" = late
+let _ctx_cache = {};              // "vigilante|data" -> {base, efetivo, dedup, faltas_mes, acum}
+let _ctx_doc = null;              // doc the ctx cache belongs to
 
 const ACCOES = ["Sem Ação", "Substituto", "Dobra de Turno", "Adiantamento de Turno"];
 const ACCAO_FIELD = {
@@ -69,12 +71,16 @@ function _render_deck(frm) {
 	const formEditable = frm.doc.docstatus !== 1 && frm.doc.workflow_state !== "Pendente De Aprovação";
 	const $deck = w.find("#sigos-aus-deck");
 	const docKey = frm.doc.name || "new";
+	// Falta context can change between documents (submitting one affects the next) —
+	// scope the cache to the open doc.
+	if (_ctx_doc !== docKey) { _ctx_cache = {}; _ctx_doc = docKey; }
 	if (!$deck.length
 		|| $deck.attr("data-editable") !== String(formEditable)
 		|| $deck.attr("data-doc") !== docKey) {
 		_build_shell(frm, w, formEditable);
 	}
 	_reconcile_cards(frm, w, formEditable);
+	_fetch_contextos(frm, w);
 	_update_stats(frm, w);
 	_update_chip(frm, w);
 }
@@ -94,11 +100,11 @@ function _build_shell(frm, w, formEditable) {
 			${formEditable ? `
 			<div class="ausb-search">
 				<input type="text" class="ausb-search-input" data-search
-					placeholder="${__("Pesquisar vigilante na escala para marcar ausente…")}" />
+					placeholder="${__("Tocar para ver a escala do dia, ou pesquisar…")}" />
 				<div class="ausb-results" data-results></div>
 			</div>` : ""}
 			<div class="ausb-cards" data-aus-cards></div>
-			<div class="ausb-empty" data-aus-empty>${__("Pesquise um vigilante acima para o marcar como ausente.")}</div>
+			<div class="ausb-empty" data-aus-empty>${__("Toque na pesquisa para ver a escala do dia e marcar os ausentes.")}</div>
 			<div data-ausd-stats></div>
 		</div>`);
 
@@ -106,13 +112,24 @@ function _build_shell(frm, w, formEditable) {
 
 	if (formEditable) {
 		const $inp = w.find("[data-search]");
+		// Focus with no text shows the FULL day roster grouped by posto (tap-to-add);
+		// typing filters it.
 		$inp.on("input focus", () => _render_results(frm, w, $inp.val() || ""));
-		// Enter picks the first match (keyboard-only flow).
+		// Enter picks the first selectable match (keyboard-only flow).
 		$inp.on("keydown", (e) => {
 			if (e.key === "Enter") {
 				e.preventDefault();
-				w.find("[data-results] .ausb-res").first().trigger("click");
+				w.find("[data-results] .ausb-res:not(.is-off)").first().trigger("click");
 			}
+			if (e.key === "Escape") {
+				$inp.val("");
+				w.find("[data-results]").empty();
+				$inp.blur();
+			}
+		});
+		// Click anywhere outside the search closes the roster panel.
+		$(document).off("mousedown.ausdroster").on("mousedown.ausdroster", (e) => {
+			if (!$(e.target).closest(".ausb-search").length) w.find("[data-results]").empty();
 		});
 	}
 }
@@ -148,12 +165,17 @@ function _mount_header_controls(frm, w, formEditable) {
 
 // ─── Search → add absentees ───────────────────────────────────────────────────
 function _ensure_roster(frm) {
-	const key = `${frm.doc.data}|${frm.doc.periodo}|${frm.doc.grupo_delegados || ""}`;
+	const excluir_doc = frm.is_new() ? null : frm.doc.name;
+	const key = `${frm.doc.data}|${frm.doc.periodo}|${frm.doc.grupo_delegados || ""}|${excluir_doc || ""}`;
 	if (_escala_cache && _escala_cache_key === key) return Promise.resolve(_escala_cache);
 	if (!frm.doc.data || !frm.doc.periodo) return Promise.resolve(null);
 	return frappe.call({
 		method: "sigos.api.get_vigilantes_da_escala",
-		args: { data: frm.doc.data, periodo: frm.doc.periodo, grupo_delegados: frm.doc.grupo_delegados || null },
+		args: {
+			data: frm.doc.data, periodo: frm.doc.periodo,
+			grupo_delegados: frm.doc.grupo_delegados || null,
+			excluir_doc: excluir_doc,
+		},
 	}).then(r => { _escala_cache = r.message || []; _escala_cache_key = key; return _escala_cache; });
 }
 
@@ -161,7 +183,11 @@ function _refresh_results(frm) {
 	const w = frm.fields_dict.deck_ausencias?.$wrapper;
 	if (!w) return;
 	const $inp = w.find("[data-search]");
-	if ($inp.length) _render_results(frm, w, $inp.val() || "");
+	if (!$inp.length) return;
+	// Only re-render when the roster panel is already open — never pop it open
+	// as a side effect of changing Data/Período/Grupo.
+	if (!w.find("[data-results]").children().length) return;
+	_render_results(frm, w, $inp.val() || "");
 }
 
 function _render_results(frm, w, filtro) {
@@ -169,7 +195,6 @@ function _render_results(frm, w, filtro) {
 	if (!$res.length) return;
 
 	const q = (filtro || "").trim().toLowerCase();
-	if (!q) { $res.empty(); return; }   // search-only: nothing shown until you type
 
 	if (!frm.doc.data || !frm.doc.periodo) {
 		$res.html(`<div class="ausb-res-hint">${__("Defina Data e Período para carregar a escala.")}</div>`);
@@ -183,37 +208,90 @@ function _render_results(frm, w, filtro) {
 			return;
 		}
 		const ja = new Set((frm.doc.tabela_ausencia || []).map(r => r.vigilante));
-		const matches = roster
-			.filter(v => !ja.has(v.vigilante))
-			.filter(v =>
-				(v.nome_completo || "").toLowerCase().includes(q) ||
-				(v.mecanografico || "").toLowerCase().includes(q) ||
-				(v.posto || "").toLowerCase().includes(q))
-			.slice(0, 6);
+		const match = v => !q
+			|| (v.nome_completo || "").toLowerCase().includes(q)
+			|| (v.mecanografico || "").toLowerCase().includes(q)
+			|| (v.posto || "").toLowerCase().includes(q);
 
-		if (!matches.length) {
+		// Group the roster by posto — the delegado thinks "posto X, who's missing?".
+		const grupos = new Map();
+		roster.forEach(v => {
+			const p = v.posto || __("Sem posto");
+			if (!grupos.has(p)) grupos.set(p, []);
+			grupos.get(p).push(v);
+		});
+
+		let html = "", visiveis = 0;
+		[...grupos.keys()].sort((a, b) => a.localeCompare(b)).forEach(posto => {
+			const todos = grupos.get(posto);
+			const items = todos.filter(match);
+			if (!items.length) return;
+			visiveis += items.length;
+
+			const ausentes = todos.filter(v => ja.has(v.vigilante) || v.ja_registado_em).length;
+			const resumo = ausentes
+				? `${todos.length} ${__("escalados")} · ${ausentes} ${__("ausente(s)")}`
+				: `${todos.length} ${__("escalados")}`;
+
+			const linhas = items.map(v => {
+				const neste = ja.has(v.vigilante);
+				const outro = !neste && v.ja_registado_em;
+				const meta = [v.mecanografico, v.regime, v.turno].filter(Boolean).join(" · ");
+				let tag = "", off = "";
+				if (neste) {
+					off = "is-off";
+					tag = `<span class="ausb-res-tag tag-neste">${__("registado")}</span>`;
+				} else if (outro) {
+					off = "is-off is-outro";
+					tag = `<span class="ausb-res-tag tag-outro">${__("já em")} ${frappe.utils.escape_html(v.ja_registado_em)}</span>`;
+				}
+				return `<div class="ausb-res ${off}" data-vig="${frappe.utils.escape_html(v.vigilante)}">
+					<span class="ausb-res-plus">${neste ? "✓" : "+"}</span>
+					<span class="ausb-res-info"><b>${frappe.utils.escape_html(v.nome_completo || v.vigilante)}</b>
+						<span class="ausb-res-meta">${frappe.utils.escape_html(meta)}</span></span>
+					${tag}
+				</div>`;
+			}).join("");
+
+			html += `<div class="ausb-grp">
+				<div class="ausb-grp-head"><span>${frappe.utils.escape_html(posto)}</span>
+					<span class="ausb-grp-n">${resumo}</span></div>
+				${linhas}
+			</div>`;
+		});
+
+		if (!visiveis) {
 			$res.html(`<div class="ausb-res-hint">${__("Nenhum vigilante corresponde.")}</div>`);
 			return;
 		}
+		$res.html(html);
 
-		$res.html(matches.map(v => {
-			const meta = [v.mecanografico, v.posto, v.regime, v.turno].filter(Boolean).join(" · ");
-			return `<div class="ausb-res" data-vig="${frappe.utils.escape_html(v.vigilante)}">
-				<span class="ausb-res-plus">+</span>
-				<span class="ausb-res-info"><b>${frappe.utils.escape_html(v.nome_completo || v.vigilante)}</b>
-					<span class="ausb-res-meta">${frappe.utils.escape_html(meta)}</span></span>
-			</div>`;
-		}).join(""));
-
-		$res.find(".ausb-res").on("click", function () {
+		$res.find(".ausb-res:not(.is-off)").on("click", function () {
 			const vd = roster.find(v => v.vigilante === $(this).attr("data-vig"));
 			if (vd) _add_absent(frm, w, vd);
+		});
+		// Conflicted guards: explain instead of silently ignoring the tap.
+		$res.find(".ausb-res.is-outro").on("click", function () {
+			const vd = roster.find(v => v.vigilante === $(this).attr("data-vig"));
+			if (!vd) return;
+			frappe.show_alert({
+				message: __("{0} já está registado em {1} ({2}).",
+					[vd.nome_completo || vd.vigilante, vd.ja_registado_em, vd.ja_registado_estado]),
+				indicator: "orange",
+			}, 5);
 		});
 	});
 }
 
 function _add_absent(frm, w, vd) {
 	if ((frm.doc.tabela_ausencia || []).some(r => r.vigilante === vd.vigilante)) return;
+	if (vd.ja_registado_em) {
+		frappe.show_alert({
+			message: __("{0} já está registado em {1}.", [vd.nome_completo || vd.vigilante, vd.ja_registado_em]),
+			indicator: "orange",
+		}, 5);
+		return;
+	}
 	const row = frm.add_child("tabela_ausencia");
 	row.vigilante         = vd.vigilante;
 	row.nome_do_vigilante = vd.nome_completo;
@@ -229,13 +307,15 @@ function _add_absent(frm, w, vd) {
 
 	frm.dirty();
 	_reconcile_cards(frm, w, true);
+	_fetch_contextos(frm, w);
 	_update_stats(frm, w);
 	_update_chip(frm, w);
 
-	// Clear the box and refocus for the next deliberate search.
+	// Clear the filter but KEEP the roster open (now with this guard greyed) —
+	// the tap-tap-tap flow for marking several absentees in a row.
 	const $inp = w.find("[data-search]");
 	$inp.val("");
-	w.find("[data-results]").empty();
+	_render_results(frm, w, "");
 	$inp.focus();
 }
 
@@ -267,6 +347,7 @@ function _append_card(frm, w, row, formEditable) {
 				<div class="ausb-guard">
 					<span class="ausb-name">${frappe.utils.escape_html(row.nome_do_vigilante || row.vigilante)}</span>
 					<span class="ausb-meta">${row.posto ? `<span class="ausb-posto">${frappe.utils.escape_html(row.posto)}</span>` : ""}${frappe.utils.escape_html(meta)}</span>
+					<span class="ausb-badges" data-badges></span>
 				</div>
 				<div class="ausb-inline">
 					<label class="ausb-f"><span>${__("Justificação")}</span><div class="ausb-justif" data-justif></div></label>
@@ -304,6 +385,64 @@ function _append_card(frm, w, row, formEditable) {
 	$card.find(".ausb-remove").on("click", () => _remove_absent(frm, w, row));
 
 	_mount_picker(frm, w, row, $card, row.proxima_accao || "Sem Ação", formEditable);
+	_render_badges(frm, $card, row, _ctx_cache[`${row.vigilante}|${frm.doc.data}`]);
+}
+
+// ─── Falta context badges (weight + month cumulative) ─────────────────────────
+function _render_badges(frm, $card, row, ctx) {
+	const $b = $card.find("[data-badges]");
+	if (!$b.length) return;
+	const n = (ctx ? ctx.efetivo : row.n_de_faltas) ?? 1;
+	const dedup = !!(ctx && ctx.dedup);
+	let html = `<span class="ausb-bdg ${dedup ? "bdg-dedup" : "bdg-peso"}"
+		title="${dedup
+			? __("Turno consecutivo — as folgas já foram contadas na falta anterior")
+			: __("Peso desta falta no regime")}">
+		${__("conta")} <b>${n}</b> ${n === 1 ? __("falta") : __("faltas")}${dedup ? " · " + __("consecutiva") : ""}</span>`;
+	if (ctx && ctx.acum != null) {
+		html += `<span class="ausb-bdg bdg-mes" title="${__("Faltas acumuladas no mês, incluindo esta")}">
+			<b>${ctx.acum}</b> ${__("no mês")}</span>`;
+	}
+	$b.html(html);
+}
+
+function _fetch_contextos(frm, w) {
+	// Batch-fetch effective weight + month cumulative for cards that lack it.
+	if (frm.doc.docstatus === 2 || !frm.doc.data) return;
+	const rows = (frm.doc.tabela_ausencia || []).filter(r => r.vigilante);
+	const render_all = () => rows.forEach(r => {
+		const ctx = _ctx_cache[`${r.vigilante}|${frm.doc.data}`];
+		const $card = w.find(`[data-cdn="${r.name}"]`);
+		if ($card.length && ctx) _render_badges(frm, $card, r, ctx);
+	});
+
+	const pend = rows.filter(r => !_ctx_cache[`${r.vigilante}|${frm.doc.data}`]);
+	if (!pend.length) { render_all(); return; }
+
+	frappe.call({
+		method: "sigos.api.get_contexto_faltas",
+		args: {
+			data: frm.doc.data,
+			linhas: pend.map(r => ({ vigilante: r.vigilante, regime: r.regime, turno: r.turno })),
+		},
+	}).then(r => {
+		const map = r.message || {};
+		Object.entries(map).forEach(([vig, ctx]) => {
+			// faltas_mes counts only SUBMITTED absences — add this one unless we ARE submitted.
+			ctx.acum = (ctx.faltas_mes || 0) + (frm.doc.docstatus === 1 ? 0 : ctx.efetivo);
+			_ctx_cache[`${vig}|${frm.doc.data}`] = ctx;
+		});
+		// Stamp the effective weight on rows not yet saved (server re-stamps at save anyway);
+		// saved rows already hold the save-time effective value — don't dirty the form.
+		pend.forEach(r => {
+			const ctx = map[r.vigilante];
+			if (ctx && r.__islocal && r.n_de_faltas !== ctx.efetivo) {
+				frappe.model.set_value(r.doctype, r.name, "n_de_faltas", ctx.efetivo);
+			}
+		});
+		render_all();
+		_update_stats(frm, w);
+	});
 }
 
 function _mount_picker(frm, w, row, $card, accao, formEditable) {
@@ -320,8 +459,13 @@ function _mount_picker(frm, w, row, $card, accao, formEditable) {
 			placeholder: __("Escolher vigilante…"), read_only: formEditable ? 0 : 1,
 			get_query: () => {
 				if (field === "vigilante_substituto")
-					// any reserva / from any posto / any delegação
-					return { query: "sigos.api.get_substitutos_disponiveis", filters: { excluir: row.vigilante || "" } };
+					// any reserva / from any posto / any delegação — minus guards already
+					// absent or booked as substituto elsewhere this day/período
+					return { query: "sigos.api.get_substitutos_disponiveis", filters: {
+						excluir: row.vigilante || "",
+						data: frm.doc.data || "", periodo: frm.doc.periodo || "",
+						excluir_doc: frm.is_new() ? "" : frm.doc.name,
+					} };
 				if (field === "vigilante_a_dobrar")
 					// only guards SCHEDULED at this posto on this day can double up
 					return { query: "sigos.api.get_escalados_no_posto_dia", filters: { posto: row.posto || "", data: frm.doc.data, excluir: row.vigilante || "" } };
@@ -446,7 +590,11 @@ function _aplicar_permissoes(frm) {
 function _setup_substituto_query(frm) {
 	frm.set_query("vigilante_substituto", "tabela_ausencia", function (doc, cdt, cdn) {
 		const row = locals[cdt][cdn];
-		return { query: "sigos.api.get_substitutos_disponiveis", filters: { excluir: row.vigilante || "" } };
+		return { query: "sigos.api.get_substitutos_disponiveis", filters: {
+			excluir: row.vigilante || "",
+			data: frm.doc.data || "", periodo: frm.doc.periodo || "",
+			excluir_doc: frm.is_new() ? "" : frm.doc.name,
+		} };
 	});
 }
 
@@ -507,7 +655,19 @@ function _inject_css() {
 .ausb-search { margin-top: 16px; position: relative; }
 .ausb-search-input { width: 100%; height: 36px; border-radius: 9px; border: 1px solid rgba(255,255,255,.25); background: rgba(255,255,255,.96); color: #1a3a5c; font-weight: 600; padding: 0 12px; }
 .ausb-search-input::placeholder { color: #97a3b0; font-weight: 500; }
-.ausb-results:not(:empty) { margin-top: 8px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); border-radius: 10px; padding: 6px; max-height: 230px; overflow-y: auto; }
+.ausb-results:not(:empty) { margin-top: 8px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); border-radius: 10px; padding: 6px; max-height: 340px; overflow-y: auto; }
+.ausb-grp { margin: 2px 0 6px; }
+.ausb-grp + .ausb-grp { border-top: 1px solid rgba(255,255,255,.08); padding-top: 4px; }
+.ausb-grp-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 8px 4px; font-size: .72em; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #8fd0ff; }
+.ausb-grp-n { color: rgba(255,255,255,.55); font-weight: 600; text-transform: none; letter-spacing: 0; white-space: nowrap; }
+.ausb-res.is-off { opacity: .55; cursor: default; }
+.ausb-res.is-off:hover { background: transparent; }
+.ausb-res.is-off .ausb-res-plus { background: rgba(255,255,255,.18); }
+.ausb-res.is-outro { cursor: pointer; }
+.ausb-res.is-outro:hover { background: rgba(232,160,32,.08); }
+.ausb-res-tag { flex: none; margin-left: auto; font-size: .66em; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.tag-neste { background: rgba(255,255,255,.12); color: rgba(255,255,255,.7); }
+.tag-outro { background: rgba(232,160,32,.2); color: #f4cd84; border: 1px solid rgba(232,160,32,.4); }
 .ausb-res-head { display: flex; justify-content: space-between; align-items: center; padding: 4px 8px 8px; font-size: .76em; color: rgba(255,255,255,.65); }
 .ausb-addall { background: rgba(232,160,32,.9); color: #1a3a5c; border: none; border-radius: 7px; padding: 4px 10px; font-weight: 700; font-size: .92em; cursor: pointer; }
 .ausb-addall:hover { background: #f2b542; }
@@ -527,6 +687,12 @@ function _inject_css() {
 .ausb-name { font-weight: 700; font-size: 1.0em; }
 .ausb-meta { display: block; font-size: .78em; color: rgba(255,255,255,.6); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ausb-posto { font-weight: 700; color: #8fd0ff; margin-right: 6px; }
+.ausb-badges { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+.ausb-bdg { font-size: .68em; font-weight: 700; padding: 2px 8px; border-radius: 999px; letter-spacing: .03em; white-space: nowrap; }
+.ausb-bdg b { font-variant-numeric: tabular-nums; }
+.bdg-peso  { background: rgba(224,92,92,.18); color: #ffb4b4; border: 1px solid rgba(224,92,92,.4); }
+.bdg-dedup { background: rgba(47,165,106,.16); color: #8fe6b8; border: 1px solid rgba(47,165,106,.4); }
+.bdg-mes   { background: rgba(255,255,255,.1); color: rgba(255,255,255,.78); border: 1px solid rgba(255,255,255,.16); }
 .ausb-justif { min-width: 150px; }
 .ausb-remove { background: rgba(255,255,255,.1); border: none; color: #ffb4b4; width: 24px; height: 24px; border-radius: 6px; font-size: 1.1em; line-height: 1; cursor: pointer; flex: none; }
 .ausb-remove:hover { background: rgba(224,92,92,.3); }

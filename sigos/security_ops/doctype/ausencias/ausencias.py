@@ -104,11 +104,12 @@ class Ausencias(Document):
 		if not vigilantes:
 			return
 
+		# NOTE: deliberately NOT filtered by grupo_delegados — an absence is an absence,
+		# regardless of which grupo's sheet recorded it (same guard, same data+periodo).
 		outros = frappe.get_all(
 			"Ausencias",
 			filters={
 				"data": self.data,
-				"grupo_delegados": self.grupo_delegados,
 				"periodo": self.periodo,
 				"name": ["!=", self.name],
 				"docstatus": 1,
