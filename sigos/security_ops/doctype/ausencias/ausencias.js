@@ -10,11 +10,12 @@ let _escala_cache_key = null;
 let _atraso_estado = null;        // null = n/a, "ok" = on time, "tardia" = late
 let _ctx_cache = {};              // "vigilante|data" -> {base, efetivo, dedup, faltas_mes, acum}
 let _ctx_doc = null;              // doc the ctx cache belongs to
+let _abertos = new Set();         // child-row names currently EXPANDED for editing (per doc)
+let _nomes_cache = {};            // vigilante docname -> nome_completo (compact action summary)
 let _atraso_restam = null;        // minutes until the cutoff (null when n/a or already late)
 let _limites_cache = {};          // SIGOS Settings hora_limite_* (fetched once per session)
 
 const ACCOES = ["Sem Ação", "Substituto", "Dobra de Turno", "Adiantamento de Turno"];
-const TIPOS  = ["Falta", "Atraso", "Saída Antecipada", "Suspensão", "Licença", "Outro"];
 const PERIODO_CLASSE = { "Manhã": "per-manha", "Noite": "per-noite", "Tarde": "per-tarde" };
 const ACCAO_FIELD = {
 	"Substituto":             "vigilante_substituto",
@@ -87,8 +88,8 @@ function _render_deck(frm) {
 	const $deck = w.find("#sigos-aus-deck");
 	const docKey = frm.doc.name || "new";
 	// Falta context can change between documents (submitting one affects the next) —
-	// scope the cache to the open doc.
-	if (_ctx_doc !== docKey) { _ctx_cache = {}; _ctx_doc = docKey; }
+	// scope the cache and the expanded-card state to the open doc.
+	if (_ctx_doc !== docKey) { _ctx_cache = {}; _ctx_doc = docKey; _abertos = new Set(); }
 	if (!$deck.length
 		|| $deck.attr("data-editable") !== String(formEditable)
 		|| $deck.attr("data-locked") !== String(locked)
@@ -170,7 +171,9 @@ function _build_shell(frm, w, formEditable, locked) {
 
 // ─── Header controls (Data / Período / Grupo) — two-way bound ─────────────────
 function _mount_header_controls(frm, w, formEditable) {
-	const ro = formEditable ? 0 : 1;
+	// data/periodo/grupo ARE the doc name — editable only while the doc is new
+	// (server enforces immutability after creation; shell remounts on first save).
+	const ro = (formEditable && frm.is_new()) ? 0 : 1;
 
 	const c_data = frappe.ui.form.make_control({
 		df: { fieldtype: "Date", fieldname: "data", read_only: ro,
@@ -188,7 +191,7 @@ function _mount_header_controls(frm, w, formEditable) {
 
 	const c_grupo = frappe.ui.form.make_control({
 		df: { fieldtype: "Link", fieldname: "grupo_delegados", options: "Grupo De Delegados",
-			placeholder: __("Todos os grupos"), read_only: ro,
+			placeholder: __("Grupo de delegados…"), reqd: 1, read_only: ro,
 			onchange: () => { const v = c_grupo.get_value(); if ((v || "") !== (frm.doc.grupo_delegados || "")) frm.set_value("grupo_delegados", v || null); } },
 		parent: w.find("#ausd-ctrl-grupo"), render_input: true,
 	});
@@ -202,7 +205,9 @@ function _ensure_roster(frm) {
 	const excluir_doc = frm.is_new() ? null : frm.doc.name;
 	const key = `${frm.doc.data}|${frm.doc.periodo}|${frm.doc.grupo_delegados || ""}|${excluir_doc || ""}`;
 	if (_escala_cache && _escala_cache_key === key) return Promise.resolve(_escala_cache);
-	if (!frm.doc.data || !frm.doc.periodo) return Promise.resolve(null);
+	// grupo is mandatory — the roster is ALWAYS scoped to it (a grupo never sees
+	// another grupo's guards, so it can never register or block them).
+	if (!frm.doc.data || !frm.doc.periodo || !frm.doc.grupo_delegados) return Promise.resolve(null);
 	return frappe.call({
 		method: "sigos.api.get_vigilantes_da_escala",
 		args: {
@@ -230,8 +235,8 @@ function _render_results(frm, w, filtro) {
 
 	const q = (filtro || "").trim().toLowerCase();
 
-	if (!frm.doc.data || !frm.doc.periodo) {
-		$res.html(`<div class="ausb-res-hint">${__("Defina Data e Período para carregar a escala.")}</div>`);
+	if (!frm.doc.data || !frm.doc.periodo || !frm.doc.grupo_delegados) {
+		$res.html(`<div class="ausb-res-hint">${__("Defina Data, Período e Grupo De Delegados para carregar a escala.")}</div>`);
 		return;
 	}
 
@@ -341,6 +346,10 @@ function _add_absent(frm, w, vd) {
 	row.proxima_accao     = "Sem Ação";
 
 	frm.dirty();
+	// Accordion: the previous card auto-confirms (it's complete with defaults),
+	// the new guard's card opens for editing.
+	_confirmar_abertos(frm, w, row.name);
+	_abertos.add(row.name);
 	_reconcile_cards(frm, w, true);
 	_fetch_contextos(frm, w);
 	_update_stats(frm, w);
@@ -355,6 +364,9 @@ function _add_absent(frm, w, vd) {
 }
 
 // ─── Absent cards (reconciled against the child table) ────────────────────────
+// Two visual states per row: EXPANDED (being edited — full controls) and COMPACT
+// (confirmed — one readable line, pencil to reopen). Pure client-side presentation;
+// nothing touches the server until Gravar.
 function _reconcile_cards(frm, w, formEditable) {
 	const $cont = w.find("[data-aus-cards]");
 	if (!$cont.length) return;
@@ -363,7 +375,7 @@ function _reconcile_cards(frm, w, formEditable) {
 
 	rows.forEach(r => {
 		have.add(r.name);
-		if (!$cont.find(`[data-cdn="${r.name}"]`).length) _append_card(frm, w, r, formEditable);
+		if (!$cont.find(`[data-cdn="${r.name}"]`).length) _rerender_card(frm, w, r, formEditable);
 	});
 	$cont.find("[data-cdn]").each(function () {
 		if (!have.has($(this).attr("data-cdn"))) $(this).remove();
@@ -371,14 +383,101 @@ function _reconcile_cards(frm, w, formEditable) {
 	w.find("[data-aus-empty]").toggle(rows.length === 0);
 }
 
-function _append_card(frm, w, row, formEditable) {
+function _rerender_card(frm, w, row, formEditable) {
+	const $old = w.find(`[data-aus-cards] [data-cdn="${row.name}"]`);
+	const aberta = formEditable && _abertos.has(row.name);
+	const $novo = aberta ? _card_aberta(frm, w, row) : _card_compacta(frm, w, row, formEditable);
+	if ($old.length) $old.replaceWith($novo);
+	else w.find("[data-aus-cards]").append($novo);
+	_render_badges(frm, $novo, row, _ctx_cache[`${row.vigilante}|${frm.doc.data}`]);
+}
+
+// A card is complete when its action doesn't need a replacement guard, or has one.
+function _card_completa(row) {
+	const campo = ACCAO_FIELD[row.proxima_accao];
+	return !campo || !!row[campo];
+}
+
+function _abrir_card(frm, w, row) {
+	_confirmar_abertos(frm, w, row.name);
+	_abertos.add(row.name);
+	_rerender_card(frm, w, row, true);
+}
+
+function _confirmar_card(frm, w, row) {
+	if (!_card_completa(row)) {
+		const $c = w.find(`[data-aus-cards] [data-cdn="${row.name}"]`);
+		$c.addClass("is-incompleta");
+		$c.find("[data-hint-inc]")
+			.text(__("Falta escolher o vigilante para a acção \"{0}\".", [row.proxima_accao]))
+			.show();
+		return false;
+	}
+	_abertos.delete(row.name);
+	_rerender_card(frm, w, row, true);
+	return true;
+}
+
+// Accordion: collapse every other open card that is complete; incomplete ones stay
+// open and turn amber instead of silently losing data.
+function _confirmar_abertos(frm, w, exceto) {
+	[..._abertos].forEach(cdn => {
+		if (cdn === exceto) return;
+		const row = (frm.doc.tabela_ausencia || []).find(r => r.name === cdn);
+		if (!row) { _abertos.delete(cdn); return; }
+		_confirmar_card(frm, w, row);
+	});
+}
+
+function _nome_vig(v) {
+	if (_nomes_cache[v]) return Promise.resolve(_nomes_cache[v]);
+	return frappe.db.get_value("Vigilante", v, "nome_completo")
+		.then(r => (_nomes_cache[v] = (r && r.message && r.message.nome_completo) || v));
+}
+
+// COMPACT: avatar · name · posto · turno chip · badges · justificação · acção · pencil/×
+function _card_compacta(frm, w, row, formEditable) {
+	const meta = [row.mecanografico, row.regime].filter(Boolean).join(" · ");
+	const accao = row.proxima_accao || "Sem Ação";
+	const campo = ACCAO_FIELD[accao];
+
+	const $el = $(`
+		<div class="ausb-card ausb-card-c ${formEditable ? "" : "is-ro"}" data-cdn="${row.name}">
+			${_avatar_html(row.nome_do_vigilante || row.vigilante)}
+			<div class="ausb-c-info">
+				<span class="ausb-name">${frappe.utils.escape_html(row.nome_do_vigilante || row.vigilante)}</span>
+				<span class="ausb-meta">${row.posto ? `<span class="ausb-posto">${frappe.utils.escape_html(row.posto)}</span>` : ""}${frappe.utils.escape_html(meta)} ${_turno_chip(row.turno, row.periodo)}</span>
+				<span class="ausb-c-extra">
+					<span class="ausb-badges" data-badges></span>
+					${row.tipo_justificacao ? `<span class="ausb-bdg bdg-justif">${frappe.utils.escape_html(row.tipo_justificacao)}</span>` : ""}
+					${campo && row[campo] ? `<span class="ausb-c-accao">&#8627; ${ACCAO_LABEL[accao]}: <b data-accao-nome>${frappe.utils.escape_html(row[campo])}</b></span>` : ""}
+				</span>
+			</div>
+			${formEditable ? `
+				<button type="button" class="ausb-pencil" title="${__("Editar")}">&#9998;</button>
+				<button type="button" class="ausb-remove" title="${__("Remover")}">×</button>` : ""}
+		</div>`);
+
+	if (campo && row[campo]) _nome_vig(row[campo]).then(n => $el.find("[data-accao-nome]").text(n));
+
+	if (formEditable) {
+		// whole row is the edit target; the pencil is the visual cue
+		$el.on("click", (e) => {
+			if ($(e.target).closest(".ausb-remove").length) return;
+			_abrir_card(frm, w, row);
+		});
+		$el.find(".ausb-remove").on("click", (e) => { e.stopPropagation(); _remove_absent(frm, w, row); });
+	}
+	return $el;
+}
+
+// EXPANDED: the full editing card, with a confirm ✓ that collapses it.
+function _card_aberta(frm, w, row) {
 	const meta = [row.mecanografico, row.regime].filter(Boolean).join(" · ");
 	const accaoOpts = ACCOES.map(a => `<option value="${a}" ${(row.proxima_accao || "Sem Ação") === a ? "selected" : ""}>${a}</option>`).join("");
-	const tipoOpts = TIPOS.map(t => `<option value="${t}" ${(row.tipo_de_ausencia || "Falta") === t ? "selected" : ""}>${t}</option>`).join("");
-	const dis = formEditable ? "" : "disabled";
 
 	const $card = $(`
-		<div class="ausb-card" data-cdn="${row.name}">
+		<div class="ausb-card is-aberta" data-cdn="${row.name}">
 			<div class="ausb-card-top">
 				<div class="ausb-guard">
 					${_avatar_html(row.nome_do_vigilante || row.vigilante)}
@@ -389,22 +488,22 @@ function _append_card(frm, w, row, formEditable) {
 					</div>
 				</div>
 				<div class="ausb-inline">
-					<label class="ausb-f"><span>${__("Tipo")}</span>
-						<select class="ausb-sel" data-f="tipo_de_ausencia" ${dis}>${tipoOpts}</select></label>
 					<label class="ausb-f"><span>${__("Justificação")}</span><div class="ausb-justif" data-justif></div></label>
 					<label class="ausb-f"><span>${__("Acção")}</span>
-						<select class="ausb-sel" data-f="proxima_accao" ${dis}>${accaoOpts}</select></label>
+						<select class="ausb-sel" data-f="proxima_accao">${accaoOpts}</select></label>
 				</div>
-				${formEditable ? `<button type="button" class="ausb-remove" title="${__("Remover")}">×</button>` : ""}
+				<button type="button" class="ausb-confirm" title="${__("Confirmar")}">&#10003;</button>
+				<button type="button" class="ausb-remove" title="${__("Remover")}">×</button>
 			</div>
 			<div class="ausb-picker" data-picker></div>
-		</div>`).appendTo(w.find("[data-aus-cards]"));
+			<div class="ausb-hint-inc" data-hint-inc style="display:none"></div>
+		</div>`);
 
 	// Tipo de Justificação — dynamic Link (manage reasons via the Tipo De Justificacao doctype)
 	const cj = frappe.ui.form.make_control({
 		df: {
 			fieldtype: "Link", fieldname: "tipo_justificacao", options: "Tipo De Justificacao",
-			placeholder: __("Justificação…"), read_only: formEditable ? 0 : 1,
+			placeholder: __("Justificação…"),
 			get_query: () => ({ filters: { activo: 1 } }),
 			onchange: () => {
 				const v = cj.get_value();
@@ -415,22 +514,20 @@ function _append_card(frm, w, row, formEditable) {
 	});
 	if (row.tipo_justificacao) cj.set_value(row.tipo_justificacao);
 
-	$card.find('[data-f="tipo_de_ausencia"]').on("change", function () {
-		frappe.model.set_value(row.doctype, row.name, "tipo_de_ausencia", this.value);
-	});
-
 	$card.find('[data-f="proxima_accao"]').on("change", function () {
 		const accao = this.value;
 		// changing the action clears any previously chosen replacement guard
 		PICKER_FIELDS.forEach(f => { if (row[f]) frappe.model.set_value(row.doctype, row.name, f, null); });
 		frappe.model.set_value(row.doctype, row.name, "proxima_accao", accao);
-		_mount_picker(frm, w, row, $card, accao, formEditable);
+		_mount_picker(frm, w, row, $card, accao, true);
+		if (_card_completa(row)) { $card.removeClass("is-incompleta"); $card.find("[data-hint-inc]").hide(); }
 		_update_stats(frm, w);
 	});
+	$card.find(".ausb-confirm").on("click", () => _confirmar_card(frm, w, row));
 	$card.find(".ausb-remove").on("click", () => _remove_absent(frm, w, row));
 
-	_mount_picker(frm, w, row, $card, row.proxima_accao || "Sem Ação", formEditable);
-	_render_badges(frm, $card, row, _ctx_cache[`${row.vigilante}|${frm.doc.data}`]);
+	_mount_picker(frm, w, row, $card, row.proxima_accao || "Sem Ação", true);
+	return $card;
 }
 
 // ─── Falta context badges (weight + month cumulative) ─────────────────────────
@@ -504,10 +601,11 @@ function _mount_picker(frm, w, row, $card, accao, formEditable) {
 			placeholder: __("Escolher vigilante…"), read_only: formEditable ? 0 : 1,
 			get_query: () => {
 				if (field === "vigilante_substituto")
-					// any reserva / from any posto / any delegação — minus guards already
+					// reserves scoped to THIS grupo's delegações — minus guards already
 					// absent or booked as substituto elsewhere this day/período
 					return { query: "sigos.api.get_substitutos_disponiveis", filters: {
 						excluir: row.vigilante || "",
+						grupo_delegados: frm.doc.grupo_delegados || "",
 						data: frm.doc.data || "", periodo: frm.doc.periodo || "",
 						excluir_doc: frm.is_new() ? "" : frm.doc.name,
 					} };
@@ -520,6 +618,7 @@ function _mount_picker(frm, w, row, $card, accao, formEditable) {
 			onchange: () => {
 				const v = ctrl.get_value();
 				if ((v || "") !== (row[field] || "")) frappe.model.set_value(row.doctype, row.name, field, v || null);
+				if (v) { $card.removeClass("is-incompleta"); $card.find("[data-hint-inc]").hide(); }
 			},
 		},
 		parent: $wrap.find(".ausb-pick-ctrl"), render_input: true,
@@ -533,6 +632,7 @@ function _remove_absent(frm, w, row) {
 	if ((frm.doc.tabela_ausencia || []).some(r => r.name === row.name)) {
 		frm.doc.tabela_ausencia = (frm.doc.tabela_ausencia || []).filter(r => r.name !== row.name);
 	}
+	_abertos.delete(row.name);
 	frm.dirty();
 	w.find(`[data-cdn="${row.name}"]`).remove();
 	w.find("[data-aus-empty]").toggle((frm.doc.tabela_ausencia || []).length === 0);
@@ -566,11 +666,11 @@ function _update_stats(frm, w) {
 function _update_chip(frm, w) {
 	const submitted = frm.doc.docstatus === 1;
 	const locked    = frm.doc.workflow_state === "Pendente De Aprovação";
-	const ready     = !!(frm.doc.data && frm.doc.periodo);
+	const ready     = !!(frm.doc.data && frm.doc.periodo && frm.doc.grupo_delegados);
 	let chip;
 	if (submitted)                        chip = `<span class="ausd-chip ausd-chip-ok">${__("Submetida")}</span>`;
 	else if (locked)                      chip = `<span class="ausd-chip ausd-chip-lock">${__("Pendente de Aprovação")}</span>`;
-	else if (!ready)                      chip = `<span class="ausd-chip ausd-chip-wait">${__("Defina data e período")}</span>`;
+	else if (!ready)                      chip = `<span class="ausd-chip ausd-chip-wait">${__("Defina data, período e grupo")}</span>`;
 	else if (_atraso_estado === "tardia") chip = `<span class="ausd-chip ausd-chip-late">${__("Submissão tardia")}</span>`;
 	else if (_atraso_estado === "ok" && _atraso_restam != null && _atraso_restam <= 30)
 		chip = `<span class="ausd-chip ausd-chip-soon">${__("Faltam {0} min", [_atraso_restam])}</span>`;
@@ -679,13 +779,17 @@ function _verificar_horario(frm) {
 	const key = frm.doc.periodo === "Manhã" ? "hora_limite_manha" : "hora_limite_noite";
 
 	const aplicar = (hora_limite) => {
-		const agora = new Date().toLocaleTimeString("pt-PT", { hour12: false });
-		if (agora > hora_limite) {
+		// numeric compare — the setting may arrive as "9:30:00" (timedelta serialized
+		// without leading zero), which breaks string comparison
+		const agora = new Date();
+		const agora_s = agora.getHours() * 3600 + agora.getMinutes() * 60 + agora.getSeconds();
+		const limite_s = _segundos(hora_limite);
+		if (agora_s > limite_s) {
 			_atraso_estado = "tardia";
 			_atraso_restam = null;
 		} else {
 			_atraso_estado = "ok";
-			_atraso_restam = Math.max(0, Math.ceil((_segundos(hora_limite) - _segundos(agora)) / 60));
+			_atraso_restam = Math.max(0, Math.ceil((limite_s - agora_s) / 60));
 		}
 		_pintar_estado(frm);
 	};
@@ -721,6 +825,7 @@ function _setup_substituto_query(frm) {
 		const row = locals[cdt][cdn];
 		return { query: "sigos.api.get_substitutos_disponiveis", filters: {
 			excluir: row.vigilante || "",
+			grupo_delegados: frm.doc.grupo_delegados || "",
 			data: frm.doc.data || "", periodo: frm.doc.periodo || "",
 			excluir_doc: frm.is_new() ? "" : frm.doc.name,
 		} };
@@ -844,6 +949,23 @@ function _inject_css() {
 .ausb-f > span { font-size: .68em; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: rgba(255,255,255,.6); }
 .ausb-sel { height: 32px; border-radius: 8px; border: 1px solid rgba(255,255,255,.25); background: rgba(255,255,255,.96); color: #1a3a5c; font-weight: 600; padding: 0 8px; }
 .ausb-picker:not(:empty) { margin-top: 10px; }
+
+/* Card states: expanded (editing, red edge) / compact (confirmed, green edge) / incomplete (amber) */
+.ausb-card-c { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-left-color: #2fa56a; cursor: pointer; }
+.ausb-card-c:hover { background: rgba(255,255,255,.12); }
+.ausb-card-c.is-ro { cursor: default; }
+.ausb-card-c.is-ro:hover { background: rgba(255,255,255,.08); }
+.ausb-c-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ausb-c-extra:not(:empty) { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 5px; }
+.ausb-card-c .ausb-badges { margin-top: 0; display: inline-flex; }
+.bdg-justif { background: rgba(47,165,106,.16); color: #8fe6b8; border: 1px solid rgba(47,165,106,.4); font-size: .68em; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.ausb-c-accao { font-size: .74em; color: #f4cd84; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ausb-pencil { background: rgba(255,255,255,.1); border: none; color: #8fd0ff; width: 26px; height: 26px; border-radius: 7px; font-size: .95em; line-height: 1; cursor: pointer; flex: none; }
+.ausb-pencil:hover { background: rgba(143,208,255,.25); }
+.ausb-confirm { background: rgba(47,165,106,.85); border: none; color: #fff; width: 26px; height: 26px; border-radius: 7px; font-size: 1em; line-height: 1; cursor: pointer; flex: none; }
+.ausb-confirm:hover { background: #2fa56a; }
+.ausb-card.is-incompleta { border-left-color: #e8a020; box-shadow: 0 0 0 1px rgba(232,160,32,.55); }
+.ausb-hint-inc { margin-top: 8px; font-size: .78em; font-weight: 600; color: #f4cd84; }
 .ausb-pick { display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,.16); border-radius: 8px; padding: 7px 10px; }
 .ausb-pick-arrow { color: #f4cd84; font-weight: 700; }
 .ausb-pick-label { font-size: .76em; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: rgba(255,255,255,.7); white-space: nowrap; }
@@ -878,10 +1000,11 @@ function _inject_css() {
 	.ausb-results:not(:empty) { max-height: 55vh; }
 	.ausb-res { padding: 11px 9px; }
 	.ausb-card-top { flex-direction: column; align-items: stretch; gap: 9px; }
-	.ausb-guard { padding-right: 30px; }
+	.ausb-guard { padding-right: 60px; }
 	.ausb-inline { width: 100%; }
 	.ausb-f { flex: 1; min-width: 0; }
-	.ausb-remove { position: absolute; top: 9px; right: 9px; }
+	.ausb-card.is-aberta .ausb-remove { position: absolute; top: 9px; right: 9px; }
+	.ausb-card.is-aberta .ausb-confirm { position: absolute; top: 9px; right: 41px; }
 	.ausd-tile { flex: 1; min-width: 72px; padding: 8px 10px; }
 	.ausd-cta { width: 100%; padding: 12px; }
 }

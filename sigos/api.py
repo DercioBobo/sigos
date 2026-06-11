@@ -96,7 +96,9 @@ def get_substitutos_disponiveis(doctype, txt, searchfield, start, page_len, filt
 	"""
 	Frappe link search for vigilante_substituto. Eligible = Categoria with
 	pode_ser_substituto = 1, status Activo OR Reserva (a benched reserve is the ideal
-	pick), from ANY delegação/posto. Reserves are surfaced first.
+	pick). Reserves are surfaced first.
+	When grupo_delegados is passed, the pool is scoped to that grupo's delegações —
+	each grupo covers its absences with its own people.
 	When data (+periodo) is passed, guards are EXCLUDED if a submitted Ausencias of
 	that day already marks them absent, or already books them as substituto for the
 	same periodo — no double-booking a reserve across documents.
@@ -109,6 +111,7 @@ def get_substitutos_disponiveis(doctype, txt, searchfield, start, page_len, filt
 	data        = filters.get("data") or ""
 	periodo     = filters.get("periodo") or ""
 	excluir_doc = filters.get("excluir_doc") or ""
+	grupo       = filters.get("grupo_delegados") or ""
 
 	cats = frappe.get_all(
 		"Categoria Vigilante",
@@ -119,6 +122,15 @@ def get_substitutos_disponiveis(doctype, txt, searchfield, start, page_len, filt
 		return []
 
 	excluir_sql = "AND v.name != %(excluir)s" if excluir else ""
+
+	grupo_sql = ""
+	delegs = ()
+	if grupo:
+		delegs = tuple(frappe.get_all(
+			"Grupo Delegados Item", filters={"parent": grupo}, pluck="delegacao",
+		))
+		if delegs:
+			grupo_sql = "AND v.delegacao IN %(delegs)s"
 
 	ocupado_sql = ""
 	if data:
@@ -140,6 +152,7 @@ def get_substitutos_disponiveis(doctype, txt, searchfield, start, page_len, filt
 		  AND v.categoria IN %(cats)s
 		  AND (v.name LIKE %(txt)s OR v.nome_completo LIKE %(txt)s)
 		  {excluir_sql}
+		  {grupo_sql}
 		  {ocupado_sql}
 		ORDER BY FIELD(v.status, 'Reserva') DESC, v.nome_completo
 		LIMIT %(start)s, %(page_len)s
@@ -148,6 +161,7 @@ def get_substitutos_disponiveis(doctype, txt, searchfield, start, page_len, filt
 			"cats":        tuple(cats),
 			"txt":         f"%{txt}%",
 			"excluir":     excluir,
+			"delegs":      delegs,
 			"data":        data,
 			"periodo":     periodo,
 			"excluir_doc": excluir_doc,

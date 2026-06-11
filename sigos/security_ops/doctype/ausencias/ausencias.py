@@ -7,7 +7,21 @@ from sigos.utils import calcular_n_faltas_efetivo
 
 class Ausencias(Document):
 
+	def autoname(self):
+		# One sheet per shift per grupo: "Noite-2026-06-10-Sofala-Chimoio-Tete".
+		# The unique name blocks a duplicate sheet at insert; _validar_unicidade is
+		# the friendlier belt-and-suspenders. (Amended docs are named by Frappe as
+		# <original>-1 before this runs.)
+		if not (self.data and self.periodo and self.grupo_delegados):
+			frappe.throw(
+				_("Defina <b>Data</b>, <b>Período</b> e <b>Grupo De Delegados</b> antes de gravar.")
+			)
+		self.name = f"{self.periodo}-{self.data}-{self.grupo_delegados}"
+
 	def validate(self):
+		self._validar_campos_imutaveis()
+		self._validar_unicidade()
+		self._validar_grupo_delegacao()
 		self._validar_duplicados_na_tabela()
 		self._validar_tipo_ausencia()
 		self._validar_proxima_accao()
@@ -28,6 +42,67 @@ class Ausencias(Document):
 		self._recalcular_turno_seguinte()
 
 	# ─── Validation ────────────────────────────────────────────────────────────
+
+	def _validar_campos_imutaveis(self):
+		"""data/periodo/grupo are the doc's identity (they ARE the name) — locked after
+		creation. A wrong sheet is cancelled and redone, never re-dated."""
+		if self.is_new():
+			return
+		antes = self.get_doc_before_save()
+		if not antes:
+			return
+		for campo, label in (
+			("data", "Data"), ("periodo", "Período"), ("grupo_delegados", "Grupo De Delegados"),
+		):
+			valor_antes = str(antes.get(campo) or "")
+			# fill-once: legacy drafts may have the field empty — allow setting it
+			if valor_antes and str(self.get(campo) or "") != valor_antes:
+				frappe.throw(
+					_("O campo <b>{0}</b> não pode ser alterado depois da criação — "
+					  "cancele esta folha e crie uma nova.").format(label),
+					title=_("Campo Bloqueado"),
+				)
+
+	def _validar_unicidade(self):
+		existe = frappe.db.exists("Ausencias", {
+			"data": self.data,
+			"periodo": self.periodo,
+			"grupo_delegados": self.grupo_delegados,
+			"docstatus": ["<", 2],
+			"name": ["!=", self.name],
+		})
+		if existe:
+			frappe.throw(
+				_("Já existe a folha <b>{0}</b> para este dia, período e grupo.").format(existe),
+				title=_("Folha Duplicada"),
+			)
+
+	def _validar_grupo_delegacao(self):
+		"""Every guard on the sheet must belong to a delegação of the doc's grupo —
+		hard server-side fence so one grupo can never register another grupo's guards
+		(the deck roster is already scoped, this closes the API/manual path)."""
+		if not self.grupo_delegados:
+			return
+		delegacoes = set(frappe.get_all(
+			"Grupo Delegados Item",
+			filters={"parent": self.grupo_delegados},
+			pluck="delegacao",
+		))
+		if not delegacoes:
+			return  # grupo not configured yet — don't lock everyone out
+		for i, row in enumerate(self.tabela_ausencia or [], start=1):
+			if not row.vigilante:
+				continue
+			deleg = frappe.db.get_value("Vigilante", row.vigilante, "delegacao")
+			if deleg not in delegacoes:
+				frappe.throw(
+					_("Linha {0}: o vigilante <b>{1}</b> pertence à delegação <b>{2}</b>, "
+					  "que não faz parte do grupo <b>{3}</b>.").format(
+						i, row.nome_do_vigilante or row.vigilante,
+						deleg or _("sem delegação"), self.grupo_delegados,
+					),
+					title=_("Vigilante Fora do Grupo"),
+				)
 
 	def _validar_duplicados_na_tabela(self):
 		vistos = set()
@@ -145,11 +220,7 @@ class Ausencias(Document):
 				self.hora_submissao_tardia = now_datetime().strftime("%H:%M:%S")
 			return
 
-		limites = {
-			"Manhã": frappe.db.get_single_value("SIGOS Settings", "hora_limite_manha") or "09:30:00",
-			"Noite": frappe.db.get_single_value("SIGOS Settings", "hora_limite_noite") or "18:30:00",
-		}
-		limite_str = limites.get(self.periodo)
+		limite_str = self._hora_limite()
 		if not limite_str:
 			return
 
@@ -162,6 +233,27 @@ class Ausencias(Document):
 				),
 				title=_("Submissão Tardia"),
 			)
+
+	def _hora_limite(self):
+		"""Cutoff for this periodo as an HH:MM:SS string. Time fields come back from
+		the DB as datetime.timedelta — normalize so the string comparison works."""
+		import datetime
+
+		campo = {"Manhã": "hora_limite_manha", "Noite": "hora_limite_noite"}.get(self.periodo)
+		if not campo:
+			return None
+		padrao = {"Manhã": "09:30:00", "Noite": "18:30:00"}[self.periodo]
+		val = frappe.db.get_single_value("SIGOS Settings", campo) or padrao
+		if isinstance(val, datetime.timedelta):
+			total = int(val.total_seconds())
+			return f"{total // 3600:02d}:{(total % 3600) // 60:02d}:{total % 60:02d}"
+		# strings may come without leading zero ("9:30:00") — re-pad for lexicographic compare
+		partes = str(val).split(":")
+		if len(partes) >= 2:
+			h, m = int(partes[0]), int(partes[1])
+			s = int(float(partes[2])) if len(partes) > 2 else 0
+			return f"{h:02d}:{m:02d}:{s:02d}"
+		return str(val)
 
 	# ─── Computed fields ───────────────────────────────────────────────────────
 
