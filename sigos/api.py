@@ -112,6 +112,10 @@ def get_substitutos_disponiveis(doctype, txt, searchfield, start, page_len, filt
 	periodo     = filters.get("periodo") or ""
 	excluir_doc = filters.get("excluir_doc") or ""
 	grupo       = filters.get("grupo_delegados") or ""
+	# excluir_lista: the CURRENT (unsaved) doc's absentees + already-chosen replacements
+	excluir_lista = filters.get("excluir_lista") or []
+	if isinstance(excluir_lista, str):
+		excluir_lista = json.loads(excluir_lista)
 
 	cats = frappe.get_all(
 		"Categoria Vigilante",
@@ -121,7 +125,10 @@ def get_substitutos_disponiveis(doctype, txt, searchfield, start, page_len, filt
 	if not cats:
 		return []
 
-	excluir_sql = "AND v.name != %(excluir)s" if excluir else ""
+	lista = [v for v in excluir_lista if v]
+	if excluir:
+		lista.append(excluir)
+	excluir_sql = "AND v.name NOT IN %(lista)s" if lista else ""
 
 	grupo_sql = ""
 	delegs = ()
@@ -160,7 +167,7 @@ def get_substitutos_disponiveis(doctype, txt, searchfield, start, page_len, filt
 		{
 			"cats":        tuple(cats),
 			"txt":         f"%{txt}%",
-			"excluir":     excluir,
+			"lista":       tuple(lista) or ("",),
 			"delegs":      delegs,
 			"data":        data,
 			"periodo":     periodo,
@@ -176,18 +183,29 @@ def get_escalados_no_posto_dia(doctype, txt, searchfield, start, page_len, filte
 	"""
 	Link search for 'Dobra de Turno': only Vigilantes that were ESCALADOS (scheduled)
 	at the given posto on the given day — they're already on site and can double up.
+	Excludes guards with a SUBMITTED absence on that day, plus everyone in
+	excluir_lista (the current doc's absentees and already-chosen replacements).
 	"""
 	import json
 	if isinstance(filters, str):
 		filters = json.loads(filters)
 
-	posto   = filters.get("posto")   or ""
-	data    = filters.get("data")    or ""
-	excluir = filters.get("excluir") or ""
+	posto       = filters.get("posto")   or ""
+	data        = filters.get("data")    or ""
+	excluir     = filters.get("excluir") or ""
+	excluir_doc = filters.get("excluir_doc") or ""
+	excluir_lista = filters.get("excluir_lista") or []
+	if isinstance(excluir_lista, str):
+		excluir_lista = json.loads(excluir_lista)
 	if not (posto and data):
 		return []
 
-	excluir_sql = "AND te.vigilante != %(excluir)s" if excluir else ""
+	lista = [v for v in excluir_lista if v]
+	if excluir:
+		lista.append(excluir)
+	excluir_sql = "AND te.vigilante NOT IN %(lista)s" if lista else ""
+	excl_doc_sql = "AND ax.name != %(excluir_doc)s" if excluir_doc else ""
+
 	return frappe.db.sql(
 		f"""
 		SELECT DISTINCT te.vigilante, v.nome_completo, te.turno
@@ -196,16 +214,23 @@ def get_escalados_no_posto_dia(doctype, txt, searchfield, start, page_len, filte
 		WHERE te.posto = %(posto)s AND te.data = %(data)s
 		  AND (te.vigilante LIKE %(txt)s OR v.nome_completo LIKE %(txt)s)
 		  {excluir_sql}
+		  AND NOT EXISTS (
+			SELECT 1 FROM `tabTabela Ausencia` tax
+			JOIN `tabAusencias` ax ON ax.name = tax.parent
+			WHERE ax.docstatus = 1 AND ax.data = %(data)s {excl_doc_sql}
+			  AND tax.vigilante = te.vigilante
+		  )
 		ORDER BY v.nome_completo
 		LIMIT %(start)s, %(page_len)s
 		""",
 		{
-			"posto":    posto,
-			"data":     data,
-			"excluir":  excluir,
-			"txt":      f"%{txt}%",
-			"start":    start,
-			"page_len": page_len,
+			"posto":       posto,
+			"data":        data,
+			"lista":       tuple(lista) or ("",),
+			"excluir_doc": excluir_doc,
+			"txt":         f"%{txt}%",
+			"start":       start,
+			"page_len":    page_len,
 		},
 	)
 
@@ -637,6 +662,32 @@ def _marcar_ja_registados(rows, data, periodo, excluir_doc=None):
 		if c:
 			r["ja_registado_em"] = c.doc
 			r["ja_registado_estado"] = "Submetido" if c.docstatus == 1 else "Rascunho"
+
+	# Guards COVERING an absence (substituto/dobra/adiantamento) in a submitted doc
+	# of the same date can't be marked absent — grey them too.
+	cobrindo = frappe.db.sql(
+		f"""
+		SELECT a.name AS doc,
+		       ta.vigilante_substituto, ta.vigilante_a_dobrar, ta.vigilante_a_adiantar
+		FROM `tabTabela Ausencia` ta
+		JOIN `tabAusencias` a ON a.name = ta.parent
+		WHERE a.docstatus = 1 AND a.data = %(d)s {excl}
+		  AND (ta.vigilante_substituto IN %(vigs)s
+		       OR ta.vigilante_a_dobrar IN %(vigs)s
+		       OR ta.vigilante_a_adiantar IN %(vigs)s)
+		""",
+		params,
+		as_dict=True,
+	)
+	cobre_doc = {}
+	for c in cobrindo:
+		for campo in ("vigilante_substituto", "vigilante_a_dobrar", "vigilante_a_adiantar"):
+			if c.get(campo):
+				cobre_doc.setdefault(c.get(campo), c.doc)
+	for r in rows:
+		if not r.get("ja_registado_em") and r.vigilante in cobre_doc:
+			r["ja_registado_em"] = cobre_doc[r.vigilante]
+			r["ja_registado_estado"] = "a cobrir uma ausência"
 
 
 @frappe.whitelist()

@@ -26,6 +26,7 @@ class Ausencias(Document):
 		self._validar_tipo_ausencia()
 		self._validar_proxima_accao()
 		self._validar_categoria_substitutos()
+		self._validar_conflitos_de_substituicao()
 		self._calcular_n_faltas_todas_linhas()
 
 	def before_save(self):
@@ -169,6 +170,78 @@ class Ausencias(Document):
 						", ".join(cats_validas),
 					),
 					title=_("Categoria de Substituto Inválida"),
+				)
+
+	def _validar_conflitos_de_substituicao(self):
+		"""A guard cannot be absent AND covering an absence on the same day.
+		Checks both directions: within this doc, and against SUBMITTED docs of the
+		same date (the pickers filter most of this out, this is the hard fence)."""
+		campos = ("vigilante_substituto", "vigilante_a_dobrar", "vigilante_a_adiantar")
+		rows = self.tabela_ausencia or []
+		ausentes = {r.vigilante for r in rows if r.vigilante}
+		cobrem = {r.get(c) for r in rows for c in campos if r.get(c)}
+
+		# 1) same document, both directions at once
+		conflito = ausentes & cobrem
+		if conflito:
+			frappe.throw(
+				_("O vigilante <b>{0}</b> está simultaneamente marcado como ausente e "
+				  "escolhido para cobrir uma ausência neste documento.").format(
+					", ".join(sorted(conflito))
+				),
+				title=_("Conflito de Substituição"),
+			)
+
+		if not self.data:
+			return
+
+		# 2) replacements chosen here must not be absent (submitted) on this date
+		if cobrem:
+			ocupados = frappe.db.sql(
+				"""
+				SELECT DISTINCT ta.vigilante, a.name AS doc
+				FROM `tabTabela Ausencia` ta
+				JOIN `tabAusencias` a ON a.name = ta.parent
+				WHERE a.docstatus = 1 AND a.data = %(d)s AND a.name != %(eu)s
+				  AND ta.vigilante IN %(cobrem)s
+				""",
+				{"d": self.data, "eu": self.name or "", "cobrem": tuple(cobrem)},
+				as_dict=True,
+			)
+			if ocupados:
+				frappe.throw(
+					_("Não podem cobrir ausências — já estão marcados como AUSENTES neste dia: {0}.").format(
+						", ".join(f"<b>{o.vigilante}</b> ({o.doc})" for o in ocupados)
+					),
+					title=_("Conflito de Substituição"),
+				)
+
+		# 3) guards marked absent here must not be covering an absence elsewhere
+		if ausentes:
+			cobrindo = frappe.db.sql(
+				f"""
+				SELECT a.name AS doc,
+				       ta.vigilante_substituto, ta.vigilante_a_dobrar, ta.vigilante_a_adiantar
+				FROM `tabTabela Ausencia` ta
+				JOIN `tabAusencias` a ON a.name = ta.parent
+				WHERE a.docstatus = 1 AND a.data = %(d)s AND a.name != %(eu)s
+				  AND (ta.vigilante_substituto IN %(aus)s
+				       OR ta.vigilante_a_dobrar IN %(aus)s
+				       OR ta.vigilante_a_adiantar IN %(aus)s)
+				""",
+				{"d": self.data, "eu": self.name or "", "aus": tuple(ausentes)},
+				as_dict=True,
+			)
+			if cobrindo:
+				pares = []
+				for c in cobrindo:
+					for campo in campos:
+						if c.get(campo) in ausentes:
+							pares.append(f"<b>{c.get(campo)}</b> ({c.doc})")
+				frappe.throw(
+					_("Não podem ser marcados como ausentes — já estão a COBRIR uma ausência "
+					  "neste dia: {0}.").format(", ".join(sorted(set(pares)))),
+					title=_("Conflito de Substituição"),
 				)
 
 	def _validar_vigilante_em_outro_doc(self):

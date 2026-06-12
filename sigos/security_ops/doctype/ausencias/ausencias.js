@@ -332,6 +332,16 @@ function _add_absent(frm, w, vd) {
 		}, 5);
 		return;
 	}
+	// Can't be absent while covering someone else's absence on this sheet.
+	const cobre = (frm.doc.tabela_ausencia || []).find(r => PICKER_FIELDS.some(f => r[f] === vd.vigilante));
+	if (cobre) {
+		frappe.show_alert({
+			message: __("{0} já foi escolhido para cobrir a ausência de {1} — remova essa escolha primeiro.",
+				[vd.nome_completo || vd.vigilante, cobre.nome_do_vigilante || cobre.vigilante]),
+			indicator: "orange",
+		}, 6);
+		return;
+	}
 	const row = frm.add_child("tabela_ausencia");
 	row.vigilante         = vd.vigilante;
 	row.nome_do_vigilante = vd.nome_completo;
@@ -589,6 +599,17 @@ function _fetch_contextos(frm, w) {
 	});
 }
 
+// Guards unavailable as replacements for `row`: everyone marked absent in this doc
+// plus replacements already chosen on OTHER rows (one guard covers one absence).
+function _indisponiveis(frm, row) {
+	const out = new Set();
+	(frm.doc.tabela_ausencia || []).forEach(r => {
+		if (r.vigilante) out.add(r.vigilante);
+		if (r.name !== row.name) PICKER_FIELDS.forEach(f => { if (r[f]) out.add(r[f]); });
+	});
+	return [...out];
+}
+
 function _mount_picker(frm, w, row, $card, accao, formEditable) {
 	const $slot = $card.find("[data-picker]").empty();
 	const field = ACCAO_FIELD[accao];
@@ -602,20 +623,31 @@ function _mount_picker(frm, w, row, $card, accao, formEditable) {
 			fieldtype: "Link", fieldname: field, options: "Vigilante",
 			placeholder: __("Escolher vigilante…"), read_only: formEditable ? 0 : 1,
 			get_query: () => {
+				const fora = _indisponiveis(frm, row);
 				if (field === "vigilante_substituto")
 					// reserves scoped to THIS grupo's delegações — minus guards already
-					// absent or booked as substituto elsewhere this day/período
+					// absent or covering, here or elsewhere this day/período
 					return { query: "sigos.api.get_substitutos_disponiveis", filters: {
 						excluir: row.vigilante || "",
+						excluir_lista: JSON.stringify(fora),
 						grupo_delegados: frm.doc.grupo_delegados || "",
 						data: frm.doc.data || "", periodo: frm.doc.periodo || "",
 						excluir_doc: frm.is_new() ? "" : frm.doc.name,
 					} };
 				if (field === "vigilante_a_dobrar")
-					// only guards SCHEDULED at this posto on this day can double up
-					return { query: "sigos.api.get_escalados_no_posto_dia", filters: { posto: row.posto || "", data: frm.doc.data, excluir: row.vigilante || "" } };
+					// only guards SCHEDULED at this posto on this day can double up —
+					// minus this sheet's absentees/replacements and submitted absentees
+					return { query: "sigos.api.get_escalados_no_posto_dia", filters: {
+						posto: row.posto || "", data: frm.doc.data,
+						excluir: row.vigilante || "",
+						excluir_lista: JSON.stringify(fora),
+						excluir_doc: frm.is_new() ? "" : frm.doc.name,
+					} };
 				// vigilante_a_adiantar — a guard of the SAME posto brings their shift forward
-				return { filters: { posto_de_vigilancia: row.posto || "", status: "Activo", name: ["!=", row.vigilante || ""] } };
+				return { filters: {
+					posto_de_vigilancia: row.posto || "", status: "Activo",
+					name: ["not in", [...fora, row.vigilante || ""]],
+				} };
 			},
 			onchange: () => {
 				const v = ctrl.get_value();
@@ -827,6 +859,7 @@ function _setup_substituto_query(frm) {
 		const row = locals[cdt][cdn];
 		return { query: "sigos.api.get_substitutos_disponiveis", filters: {
 			excluir: row.vigilante || "",
+			excluir_lista: JSON.stringify(_indisponiveis(frm, row)),
 			grupo_delegados: frm.doc.grupo_delegados || "",
 			data: frm.doc.data || "", periodo: frm.doc.periodo || "",
 			excluir_doc: frm.is_new() ? "" : frm.doc.name,
