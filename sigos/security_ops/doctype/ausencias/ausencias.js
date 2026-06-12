@@ -387,8 +387,10 @@ function _rerender_card(frm, w, row, formEditable) {
 	const $old = w.find(`[data-aus-cards] [data-cdn="${row.name}"]`);
 	const aberta = formEditable && _abertos.has(row.name);
 	const $novo = aberta ? _card_aberta(frm, w, row) : _card_compacta(frm, w, row, formEditable);
+	// state toggles re-render in place; NEW cards enter at the TOP (newest first —
+	// the card being edited is always the first thing under the search)
 	if ($old.length) $old.replaceWith($novo);
-	else w.find("[data-aus-cards]").append($novo);
+	else w.find("[data-aus-cards]").prepend($novo);
 	_render_badges(frm, $novo, row, _ctx_cache[`${row.vigilante}|${frm.doc.data}`]);
 }
 
@@ -435,24 +437,24 @@ function _nome_vig(v) {
 		.then(r => (_nomes_cache[v] = (r && r.message && r.message.nome_completo) || v));
 }
 
-// COMPACT: avatar · name · posto · turno chip · badges · justificação · acção · pencil/×
+// COMPACT: one thin ledger line — ✓ avatar · name · turno chip · posto/mec · badges · acção · pencil/×
 function _card_compacta(frm, w, row, formEditable) {
-	const meta = [row.mecanografico, row.regime].filter(Boolean).join(" · ");
 	const accao = row.proxima_accao || "Sem Ação";
 	const campo = ACCAO_FIELD[accao];
+	const meta = [row.posto, row.mecanografico].filter(Boolean).join(" · ");
 
 	const $el = $(`
 		<div class="ausb-card ausb-card-c ${formEditable ? "" : "is-ro"}" data-cdn="${row.name}">
+			<span class="ausb-c-check">&#10003;</span>
 			${_avatar_html(row.nome_do_vigilante || row.vigilante)}
-			<div class="ausb-c-info">
-				<span class="ausb-name">${frappe.utils.escape_html(row.nome_do_vigilante || row.vigilante)}</span>
-				<span class="ausb-meta">${row.posto ? `<span class="ausb-posto">${frappe.utils.escape_html(row.posto)}</span>` : ""}${frappe.utils.escape_html(meta)} ${_turno_chip(row.turno, row.periodo)}</span>
-				<span class="ausb-c-extra">
-					<span class="ausb-badges" data-badges></span>
-					${row.tipo_justificacao ? `<span class="ausb-bdg bdg-justif">${frappe.utils.escape_html(row.tipo_justificacao)}</span>` : ""}
-					${campo && row[campo] ? `<span class="ausb-c-accao">&#8627; ${ACCAO_LABEL[accao]}: <b data-accao-nome>${frappe.utils.escape_html(row[campo])}</b></span>` : ""}
-				</span>
-			</div>
+			<span class="ausb-name">${frappe.utils.escape_html(row.nome_do_vigilante || row.vigilante)}</span>
+			${_turno_chip(row.turno, row.periodo)}
+			<span class="ausb-c-meta">${frappe.utils.escape_html(meta)}</span>
+			<span class="ausb-c-extra">
+				<span class="ausb-badges" data-badges></span>
+				${row.tipo_justificacao ? `<span class="ausb-bdg bdg-justif">${frappe.utils.escape_html(row.tipo_justificacao)}</span>` : ""}
+				${campo && row[campo] ? `<span class="ausb-c-accao">&#8627; ${ACCAO_LABEL[accao]}: <b data-accao-nome>${frappe.utils.escape_html(row[campo])}</b></span>` : ""}
+			</span>
 			${formEditable ? `
 				<button type="button" class="ausb-pencil" title="${__("Editar")}">&#9998;</button>
 				<button type="button" class="ausb-remove" title="${__("Remover")}">×</button>` : ""}
@@ -950,18 +952,30 @@ function _inject_css() {
 .ausb-sel { height: 32px; border-radius: 8px; border: 1px solid rgba(255,255,255,.25); background: rgba(255,255,255,.96); color: #1a3a5c; font-weight: 600; padding: 0 8px; }
 .ausb-picker:not(:empty) { margin-top: 10px; }
 
-/* Card states: expanded (editing, red edge) / compact (confirmed, green edge) / incomplete (amber) */
-.ausb-card-c { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-left-color: #2fa56a; cursor: pointer; }
-.ausb-card-c:hover { background: rgba(255,255,255,.12); }
+/* Card states: the OPEN card is the spotlit workbench; CONFIRMED rows are thin
+   ledger lines. Strong size + tone contrast so "done" reads at a glance. */
+.ausb-card { animation: ausb-in .18s ease-out; }
+@keyframes ausb-in { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: none; } }
+.ausb-card.is-aberta { background: rgba(255,255,255,.13); box-shadow: 0 8px 22px rgba(0,0,0,.3), 0 0 0 1px rgba(255,255,255,.14); }
+
+.ausb-card-c { display: flex; align-items: center; gap: 8px; padding: 4px 9px 4px 10px; min-height: 34px; border-left-color: #2fa56a; background: rgba(255,255,255,.045); cursor: pointer; }
+.ausb-card-c:hover { background: rgba(255,255,255,.1); }
 .ausb-card-c.is-ro { cursor: default; }
-.ausb-card-c.is-ro:hover { background: rgba(255,255,255,.08); }
-.ausb-c-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.ausb-c-extra:not(:empty) { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 5px; }
-.ausb-card-c .ausb-badges { margin-top: 0; display: inline-flex; }
+.ausb-card-c.is-ro:hover { background: rgba(255,255,255,.045); }
+.ausb-c-check { flex: none; width: 14px; height: 14px; border-radius: 50%; background: rgba(47,165,106,.9); color: #fff; font-size: .58em; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
+.ausb-card-c .ausb-ava { width: 21px; height: 21px; font-size: .58em; box-shadow: none; }
+.ausb-card-c .ausb-name { flex: none; max-width: 34%; font-size: .84em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ausb-card-c .ausb-chip { font-size: .6em; padding: 1px 7px; }
+.ausb-c-meta { flex: 1; min-width: 40px; font-size: .68em; color: rgba(255,255,255,.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ausb-c-extra { display: inline-flex; align-items: center; gap: 5px; flex: none; min-width: 0; }
+.ausb-card-c .ausb-badges { margin-top: 0; display: inline-flex; gap: 5px; flex-wrap: nowrap; }
+.ausb-card-c .ausb-bdg { font-size: .58em; padding: 1px 6px; }
 .bdg-justif { background: rgba(47,165,106,.16); color: #8fe6b8; border: 1px solid rgba(47,165,106,.4); font-size: .68em; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
-.ausb-c-accao { font-size: .74em; color: #f4cd84; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ausb-c-accao { font-size: .62em; color: #f4cd84; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; }
 .ausb-pencil { background: rgba(255,255,255,.1); border: none; color: #8fd0ff; width: 26px; height: 26px; border-radius: 7px; font-size: .95em; line-height: 1; cursor: pointer; flex: none; }
 .ausb-pencil:hover { background: rgba(143,208,255,.25); }
+.ausb-card-c .ausb-pencil, .ausb-card-c .ausb-remove { width: 22px; height: 22px; font-size: .85em; opacity: .35; transition: opacity .12s; }
+.ausb-card-c:hover .ausb-pencil, .ausb-card-c:hover .ausb-remove { opacity: 1; }
 .ausb-confirm { background: rgba(47,165,106,.85); border: none; color: #fff; width: 26px; height: 26px; border-radius: 7px; font-size: 1em; line-height: 1; cursor: pointer; flex: none; }
 .ausb-confirm:hover { background: #2fa56a; }
 .ausb-card.is-incompleta { border-left-color: #e8a020; box-shadow: 0 0 0 1px rgba(232,160,32,.55); }
@@ -1005,6 +1019,11 @@ function _inject_css() {
 	.ausb-f { flex: 1; min-width: 0; }
 	.ausb-card.is-aberta .ausb-remove { position: absolute; top: 9px; right: 9px; }
 	.ausb-card.is-aberta .ausb-confirm { position: absolute; top: 9px; right: 41px; }
+	.ausb-card-c { flex-wrap: wrap; row-gap: 3px; padding: 7px 9px; }
+	.ausb-card-c .ausb-name { max-width: none; }
+	.ausb-c-meta { flex-basis: 100%; order: 9; }
+	.ausb-card-c .ausb-pencil, .ausb-card-c .ausb-remove { opacity: 1; margin-left: auto; }
+	.ausb-card-c .ausb-remove { margin-left: 0; }
 	.ausd-tile { flex: 1; min-width: 72px; padding: 8px 10px; }
 	.ausd-cta { width: 100%; padding: 12px; }
 }
