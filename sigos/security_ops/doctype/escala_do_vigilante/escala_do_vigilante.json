@@ -8,6 +8,8 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "sec_deck",
+  "deck_escala",
   "naming_series",
   "posto_de_vigilancia",
   "col_break_1",
@@ -30,6 +32,15 @@
   "tabela_de_escala"
  ],
  "fields": [
+  {
+   "fieldname": "sec_deck",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "deck_escala",
+   "fieldtype": "HTML",
+   "label": "Painel da Escala"
+  },
   {
    "fieldname": "naming_series",
    "fieldtype": "Select",

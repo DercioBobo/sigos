@@ -1,20 +1,33 @@
 frappe.ui.form.on("Escala Do Vigilante", {
 
 	refresh(frm) {
+		// The DECK supersedes the native header fields and buttons — same data,
+		// same handlers, premium chrome. Child tables stay native (inline editing).
+		["naming_series", "posto_de_vigilancia", "col_break_1", "cliente", "estado",
+		 "sec_config", "regime_do_vigilante", "data_de_inicio", "col_break_per", "gerado_ate",
+		 "sincronizar_vigilantes", "distribuir_turnos", "btn_gerar", "btn_limpar_futuro"]
+			.forEach(f => frm.set_df_property(f, "hidden", 1));
+
 		_estado_buttons(frm);
 		_snapshot_slots(frm);
+		_render_deck(frm);
 		_load_and_render(frm);
 		if (frm.doc.estado === "Arquivado") frm.disable_save();
 	},
 
 	onload(frm) {
 		frm.set_query("posto_de_vigilancia", () => ({ filters: { estado: "Activo" } }));
+		// naming_series is hidden by the deck — make sure new docs still get it
+		if (frm.is_new() && !frm.doc.naming_series) frm.set_value("naming_series", "ESC-.####");
 	},
 
 	posto_de_vigilancia(frm) {
 		if (frm.doc.posto_de_vigilancia && !frm.doc.cliente) {
 			frappe.db.get_value("Posto De Vigilancia", frm.doc.posto_de_vigilancia, "cliente")
-				.then(r => frm.set_value("cliente", r.message?.cliente));
+				.then(r => {
+					frm.set_value("cliente", r.message?.cliente);
+					_deck_identity(frm);
+				});
 		}
 	},
 
@@ -22,31 +35,36 @@ frappe.ui.form.on("Escala Do Vigilante", {
 
 	distribuir_turnos(frm) { _distribuir_turnos(frm); },
 
-	btn_gerar(frm) {
-		if (frm.is_dirty()) {
-			frm.save().then(() => frappe.show_alert({ message: __("Escala gerada."), indicator: "green" }, 3));
-		} else {
-			frappe.call({
-				method: "sigos.api.gerar_escala_posto",
-				args: { escala_name: frm.doc.name },
-				freeze: true, freeze_message: __("A gerar escala..."),
-				callback: () => frm.reload_doc(),
-			});
-		}
-	},
+	btn_gerar(frm) { _gerar_escala(frm); },
 
-	btn_limpar_futuro(frm) {
-		frappe.confirm(
-			__("Remover todos os dias futuros não-editados? Os dias com alteração manual são mantidos."),
-			() => frappe.call({
-				method: "sigos.api.limpar_futuro_escala",
-				args: { escala_name: frm.doc.name },
-				freeze: true,
-				callback: () => frm.reload_doc(),
-			})
-		);
-	},
+	btn_limpar_futuro(frm) { _limpar_futuro(frm); },
 });
+
+function _gerar_escala(frm) {
+	if (frm.is_dirty() || frm.is_new()) {
+		frm.save().then(() => frappe.show_alert({ message: __("Escala gerada."), indicator: "green" }, 3));
+	} else {
+		frappe.call({
+			method: "sigos.api.gerar_escala_posto",
+			args: { escala_name: frm.doc.name },
+			freeze: true, freeze_message: __("A gerar escala..."),
+			callback: () => frm.reload_doc(),
+		});
+	}
+}
+
+function _limpar_futuro(frm) {
+	if (frm.is_new()) { frappe.show_alert({ message: __("Grave a escala primeiro."), indicator: "orange" }, 3); return; }
+	frappe.confirm(
+		__("Remover todos os dias futuros não-editados? Os dias com alteração manual são mantidos."),
+		() => frappe.call({
+			method: "sigos.api.limpar_futuro_escala",
+			args: { escala_name: frm.doc.name },
+			freeze: true,
+			callback: () => frm.reload_doc(),
+		})
+	);
+}
 
 // ─── Auto-swap turno_inicial collisions in the guard list ─────────────────────
 frappe.ui.form.on("Tab Vigilante Do Posto", {
@@ -271,6 +289,7 @@ function _render_grid(frm, tipo_ciclo, seq) {
 			<div class="esc-empty-title">${__("Sem escala gerada")}</div>
 			<div class="esc-empty-sub">${__("Sincronize os vigilantes, defina o turno inicial e clique em <b>Gerar / Estender Escala</b>.")}</div>
 		</div>`);
+		_update_deck_stats(frm, null, tipo_ciclo);
 		return;
 	}
 
@@ -289,6 +308,8 @@ function _render_grid(frm, tipo_ciclo, seq) {
 	rows.forEach(r => { cellMap[`${r.vigilante}|${r.data}`] = r; });
 
 	const ctx = { frm, tipo_ciclo, seq, todasDatas, guards, nameMap, cellMap, hoje };
+
+	_update_deck_stats(frm, ctx, tipo_ciclo);
 
 	const toolbar = _render_toolbar(frm);
 	if (frm._esc_range === "7") {
@@ -560,6 +581,223 @@ function _abbr(turno) {
 	if (m) return m[1] + m[2][0].toUpperCase();
 	if (/folga/i.test(turno)) return "F";
 	return turno.length <= 4 ? turno : turno.slice(0, 4);
+}
+
+// ─── DECK — navy command panel (house pattern: HTML field + mounted controls) ──
+function _render_deck(frm) {
+	_inject_deck_css();
+	const w = frm.fields_dict.deck_escala?.$wrapper;
+	if (!w) return;   // field arrives with the next migrate — degrade gracefully
+
+	const editable = frm.doc.estado !== "Arquivado";
+	const key = `${frm.doc.name || "new"}|${frm.doc.estado}|${editable}`;
+	if (w.find("#sigos-esc-deck").attr("data-key") !== key) _build_deck_shell(frm, w, editable, key);
+	_deck_identity(frm);
+	_render_deck_tiles(frm);
+}
+
+function _build_deck_shell(frm, w, editable, key) {
+	w.html(`
+		<div id="sigos-esc-deck" data-key="${key}" class="${editable ? "" : "is-arquivada"}">
+			<div class="escd-top">
+				<div class="escd-id">
+					<div class="escd-kicker">${__("Escala do Posto")}</div>
+					<div class="escd-title" data-escd-title></div>
+					<div class="escd-sub" data-escd-sub></div>
+				</div>
+				<div class="escd-state">
+					<span data-escd-chip></span>
+					<span data-escd-stateact></span>
+				</div>
+			</div>
+			<div class="escd-controls">
+				<div class="escd-field"><label>${__("Posto")}</label><div id="escd-c-posto"></div></div>
+				<div class="escd-field"><label>${__("Regime")}</label><div id="escd-c-regime"></div></div>
+				<div class="escd-field"><label>${__("Início do Ciclo")}</label><div id="escd-c-inicio"></div></div>
+			</div>
+			<div class="escd-tiles" data-escd-tiles></div>
+			<div class="escd-actions">
+				<button type="button" class="escd-btn" data-act="sync">${__("Sincronizar Vigilantes")}</button>
+				<button type="button" class="escd-btn" data-act="dist">${__("Distribuir Turnos")}</button>
+				<button type="button" class="escd-btn escd-btn-danger" data-act="limpar">${__("Limpar Futuro")}</button>
+				<span class="escd-spacer"></span>
+				<button type="button" class="escd-btn escd-btn-primary" data-act="gerar">${__("Gerar / Estender Escala")}</button>
+			</div>
+		</div>`);
+
+	const ro = editable ? 0 : 1;
+	const c_posto = frappe.ui.form.make_control({
+		df: { fieldtype: "Link", fieldname: "posto_de_vigilancia", options: "Posto De Vigilancia", read_only: ro,
+			get_query: () => ({ filters: { estado: "Activo" } }),
+			onchange: () => {
+				const v = c_posto.get_value();
+				if ((v || "") !== (frm.doc.posto_de_vigilancia || "")) frm.set_value("posto_de_vigilancia", v || null).then(() => _deck_identity(frm));
+			} },
+		parent: w.find("#escd-c-posto"), render_input: true,
+	});
+	if (frm.doc.posto_de_vigilancia) c_posto.set_value(frm.doc.posto_de_vigilancia);
+
+	const c_regime = frappe.ui.form.make_control({
+		df: { fieldtype: "Link", fieldname: "regime_do_vigilante", options: "Regime", read_only: ro,
+			onchange: () => {
+				const v = c_regime.get_value();
+				if ((v || "") !== (frm.doc.regime_do_vigilante || "")) frm.set_value("regime_do_vigilante", v || null).then(() => { _deck_identity(frm); _load_and_render(frm); });
+			} },
+		parent: w.find("#escd-c-regime"), render_input: true,
+	});
+	if (frm.doc.regime_do_vigilante) c_regime.set_value(frm.doc.regime_do_vigilante);
+
+	const c_inicio = frappe.ui.form.make_control({
+		df: { fieldtype: "Date", fieldname: "data_de_inicio", read_only: ro,
+			onchange: () => {
+				const v = c_inicio.get_value();
+				if ((v || "") !== (frm.doc.data_de_inicio || "")) frm.set_value("data_de_inicio", v || null);
+			} },
+		parent: w.find("#escd-c-inicio"), render_input: true,
+	});
+	if (frm.doc.data_de_inicio) c_inicio.set_value(frm.doc.data_de_inicio);
+
+	w.find('[data-act="sync"]').on("click", () => _sincronizar_vigilantes(frm));
+	w.find('[data-act="dist"]').on("click", () => _distribuir_turnos(frm));
+	w.find('[data-act="limpar"]').on("click", () => _limpar_futuro(frm));
+	w.find('[data-act="gerar"]').on("click", () => _gerar_escala(frm));
+}
+
+function _deck_identity(frm) {
+	const w = frm.fields_dict.deck_escala?.$wrapper;
+	if (!w || !w.find("#sigos-esc-deck").length) return;
+
+	w.find("[data-escd-title]").text(frm.doc.posto_de_vigilancia || __("Nova Escala"));
+	const sub = [frm.doc.cliente, frm.doc.regime_do_vigilante].filter(Boolean).join("  ·  ");
+	w.find("[data-escd-sub]").text(sub);
+
+	const chips = {
+		"Rascunho":  ["escd-chip-draft", __("Rascunho")],
+		"Activo":    ["escd-chip-on",    __("Activa")],
+		"Arquivado": ["escd-chip-off",   __("Arquivada")],
+	};
+	const [cls, label] = chips[frm.doc.estado] || chips["Rascunho"];
+	w.find("[data-escd-chip]").html(`<span class="escd-chip ${cls}">${label}</span>`);
+
+	// estado transition (mirrors the Estado menu buttons)
+	const $act = w.find("[data-escd-stateact]").empty();
+	if (!frm.is_new()) {
+		let btn = null;
+		if (frm.doc.estado === "Rascunho")  btn = ["Activar", () => _set_estado(frm, "Activo"), "escd-state-on"];
+		if (frm.doc.estado === "Activo")    btn = ["Arquivar", () => frappe.confirm(__("Arquivar esta escala? Deixará de gerar e de ser usada."), () => _set_estado(frm, "Arquivado")), ""];
+		if (frm.doc.estado === "Arquivado") btn = ["Reactivar", () => _set_estado(frm, "Activo"), "escd-state-on"];
+		if (btn) {
+			$(`<button type="button" class="escd-state-btn ${btn[2]}">${__(btn[0])}</button>`)
+				.on("click", btn[1]).appendTo($act);
+		}
+	}
+}
+
+// Tiles: guards / horizon / coverage health for the next 7 days (Rotativo only).
+function _update_deck_stats(frm, ctx, tipo_ciclo) {
+	frm._escd_stats = { ctx, tipo_ciclo };
+	_render_deck_tiles(frm);
+}
+
+function _render_deck_tiles(frm) {
+	const w = frm.fields_dict.deck_escala?.$wrapper;
+	if (!w || !w.find("#sigos-esc-deck").length) return;
+	const $t = w.find("[data-escd-tiles]");
+	if (!$t.length) return;
+
+	const { ctx, tipo_ciclo } = frm._escd_stats || {};
+	const nGuards = (frm.doc.tab_vigilante_do_posto || []).length;
+	const tile = (n, lbl, cls) => `<div class="escd-tile ${cls || ""}"><span class="n">${n}</span><span class="lbl">${lbl}</span></div>`;
+
+	let html = tile(nGuards, __("vigilantes"), "t-vig");
+
+	if (ctx) {
+		const horizonte = frm.doc.gerado_ate || ctx.todasDatas[ctx.todasDatas.length - 1];
+		if (horizonte) {
+			const d = new Date(horizonte);
+			html += tile(`${d.getDate()} ${_MES[d.getMonth()]}`, __("gerada até"), "t-hor");
+		}
+		if (tipo_ciclo === "Rotativo") {
+			const dias7 = ctx.todasDatas.filter(d => d >= ctx.hoje).slice(0, 7);
+			let falhas = 0, dobras = 0;
+			dias7.forEach(d => {
+				const c = _coverage_for_day(d, ctx);
+				if (c && c.cls === "cov-gap") falhas++;
+				else if (c && c.cls === "cov-double") dobras++;
+			});
+			if (falhas)      html += tile(falhas, __("dias c/ falha (7d)"), "t-gap");
+			else if (dias7.length) html += tile("OK", __("cobertura (7d)"), "t-ok");
+			if (dobras)      html += tile(dobras, __("dias a mais (7d)"), "t-dbl");
+		}
+	} else if (!nGuards) {
+		html += `<div class="escd-hint">${__("Defina posto, regime e início do ciclo — depois sincronize os vigilantes.")}</div>`;
+	}
+
+	$t.html(html);
+}
+
+function _inject_deck_css() {
+	if (document.getElementById("sigos-esc-deck-css")) return;
+	const css = `
+#sigos-esc-deck {
+	margin: 0 0 14px; padding: 16px 18px; border-radius: 14px; color: #fff;
+	background: linear-gradient(135deg, #234a73 0%, #1a3a5c 60%, #14304c 100%);
+	box-shadow: 0 8px 24px rgba(20,48,76,.28), inset 0 1px 0 rgba(255,255,255,.08);
+	border: 1px solid rgba(255,255,255,.06);
+}
+#sigos-esc-deck.is-arquivada { filter: saturate(.6); }
+.escd-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.escd-kicker { font-size: .68em; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: rgba(255,255,255,.55); }
+.escd-title { font-family: var(--sigos-display, system-ui); font-weight: 700; font-size: 1.5em; letter-spacing: .02em; line-height: 1.15; }
+.escd-sub { font-size: .8em; font-weight: 600; color: #8fd0ff; margin-top: 2px; }
+.escd-state { display: flex; align-items: center; gap: 8px; flex: none; }
+.escd-chip { padding: 5px 12px; border-radius: 999px; font-size: .72em; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; border: 1px solid transparent; white-space: nowrap; }
+.escd-chip-on    { background: rgba(47,165,106,.18); color: #8fe6b8; border-color: rgba(47,165,106,.4); }
+.escd-chip-draft { background: rgba(232,160,32,.2); color: #f4cd84; border-color: rgba(232,160,32,.45); }
+.escd-chip-off   { background: rgba(255,255,255,.1); color: rgba(255,255,255,.6); }
+.escd-state-btn { background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.22); color: #fff; border-radius: 8px; padding: 5px 13px; font-size: .76em; font-weight: 700; cursor: pointer; }
+.escd-state-btn:hover { background: rgba(255,255,255,.2); }
+.escd-state-btn.escd-state-on { background: rgba(47,165,106,.8); border-color: rgba(47,165,106,.9); }
+.escd-state-btn.escd-state-on:hover { background: #2fa56a; }
+.escd-controls { display: flex; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
+.escd-field { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 160px; }
+.escd-field > label { font-size: .7em; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: rgba(255,255,255,.65); margin: 0; }
+#sigos-esc-deck .frappe-control { margin: 0 !important; }
+#sigos-esc-deck .control-label, #sigos-esc-deck .help-box { display: none !important; }
+#sigos-esc-deck .control-input input, #sigos-esc-deck .control-input .input-with-feedback {
+	background: rgba(255,255,255,.96); border: 1px solid rgba(255,255,255,.25); border-radius: 8px; color: #1a3a5c; font-weight: 600; height: 32px;
+}
+#sigos-esc-deck .control-value, #sigos-esc-deck .like-disabled-input { color: #fff; background: rgba(255,255,255,.08); border-radius: 8px; border-color: rgba(255,255,255,.15); }
+.escd-tiles { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; align-items: center; }
+.escd-tile { min-width: 88px; padding: 9px 14px; border-radius: 10px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.1); display: flex; flex-direction: column; gap: 2px; }
+.escd-tile .n { font-family: var(--sigos-display, system-ui); font-weight: 700; font-size: 1.55em; line-height: 1; font-variant-numeric: tabular-nums; }
+.escd-tile .lbl { font-size: .66em; text-transform: uppercase; letter-spacing: .05em; color: rgba(255,255,255,.65); white-space: nowrap; }
+.escd-tile.t-vig .n { color: #8fd0ff; }
+.escd-tile.t-hor .n { color: #fff; font-size: 1.2em; padding-top: 4px; }
+.escd-tile.t-ok  .n { color: #8fe6b8; }
+.escd-tile.t-dbl .n { color: #f4cd84; }
+.escd-tile.t-gap { background: rgba(224,92,92,.18); border-color: rgba(224,92,92,.5); animation: escd-alarm 1.6s ease-in-out infinite; }
+.escd-tile.t-gap .n { color: #ffb4b4; }
+@keyframes escd-alarm { 50% { background: rgba(224,92,92,.3); } }
+.escd-hint { font-size: .82em; font-style: italic; color: rgba(255,255,255,.6); }
+.escd-actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; align-items: center; border-top: 1px solid rgba(255,255,255,.12); padding-top: 13px; }
+.escd-spacer { flex: 1; }
+.escd-btn { background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2); color: #fff; border-radius: 9px; padding: 7px 15px; font-size: .82em; font-weight: 700; cursor: pointer; transition: background .12s; }
+.escd-btn:hover { background: rgba(255,255,255,.18); }
+.escd-btn-danger { border-color: rgba(224,92,92,.5); color: #ffb4b4; }
+.escd-btn-danger:hover { background: rgba(224,92,92,.2); }
+.escd-btn-primary { background: #e8a020; border-color: #e8a020; color: #14304c; font-weight: 800; padding: 8px 20px; box-shadow: 0 3px 10px rgba(0,0,0,.25); }
+.escd-btn-primary:hover { background: #f2b542; }
+@media (max-width: 640px) {
+	.escd-field { min-width: calc(50% - 8px); }
+	.escd-btn-primary { width: 100%; order: 9; }
+	.escd-spacer { display: none; }
+}
+`;
+	const s = document.createElement("style");
+	s.id = "sigos-esc-deck-css";
+	s.textContent = css;
+	document.head.appendChild(s);
 }
 
 function _override_dialog(frm, vig, data) {
