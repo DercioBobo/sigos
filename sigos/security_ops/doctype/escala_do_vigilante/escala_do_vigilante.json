@@ -10,6 +10,7 @@
  "field_order": [
   "sec_deck",
   "deck_escala",
+  "sec_cabecalho",
   "naming_series",
   "posto_de_vigilancia",
   "col_break_1",
@@ -40,6 +41,10 @@
    "fieldname": "deck_escala",
    "fieldtype": "HTML",
    "label": "Painel da Escala"
+  },
+  {
+   "fieldname": "sec_cabecalho",
+   "fieldtype": "Section Break"
   },
   {
    "fieldname": "naming_series",

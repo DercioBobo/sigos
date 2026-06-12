@@ -3,14 +3,18 @@ frappe.ui.form.on("Escala Do Vigilante", {
 	refresh(frm) {
 		// The DECK supersedes the native header fields and buttons — same data,
 		// same handlers, premium chrome. Child tables stay native (inline editing).
-		["naming_series", "posto_de_vigilancia", "col_break_1", "cliente", "estado",
-		 "sec_config", "regime_do_vigilante", "data_de_inicio", "col_break_per", "gerado_ate",
-		 "sincronizar_vigilantes", "distribuir_turnos", "btn_gerar", "btn_limpar_futuro"]
-			.forEach(f => frm.set_df_property(f, "hidden", 1));
+		// Only hide the natives once the deck field actually exists on this site
+		// (it arrives via migrate) — otherwise keep the classic form fully usable.
+		if (frm.fields_dict.deck_escala) {
+			["sec_cabecalho", "naming_series", "posto_de_vigilancia", "col_break_1", "cliente", "estado",
+			 "sec_config", "regime_do_vigilante", "data_de_inicio", "col_break_per", "gerado_ate",
+			 "sincronizar_vigilantes", "distribuir_turnos", "btn_gerar", "btn_limpar_futuro"]
+				.forEach(f => frm.set_df_property(f, "hidden", 1));
+			_render_deck(frm);
+		}
 
 		_estado_buttons(frm);
 		_snapshot_slots(frm);
-		_render_deck(frm);
 		_load_and_render(frm);
 		if (frm.doc.estado === "Arquivado") frm.disable_save();
 	},
@@ -329,19 +333,27 @@ function _render_grid(frm, tipo_ciclo, seq) {
 }
 
 // ─── Coverage helper (shared) ─────────────────────────────────────────────────
+// Coverage is per PERÍODO, not per turno-slot: "1a Manhã" vs "2a Manhã" is just
+// the guard's position in the rotation — the posto needs at least ONE guard on
+// Manhã and ONE on Noite (and Tarde, if the regime has it) each day.
 function _coverage_for_day(d, ctx) {
-	const working = (ctx.seq || []).filter(s => !s.e_folga).map(s => s.turno);
-	if (!working.length) return null;
+	const periodoDe = {};   // working turno -> its período
+	(ctx.seq || []).forEach(s => { if (!s.e_folga && s.periodo) periodoDe[s.turno] = s.periodo; });
+	const periodos = [...new Set(Object.values(periodoDe))];
+	if (!periodos.length) return null;
+
 	const counts = {};
 	ctx.guards.forEach(vig => {
 		const r = ctx.cellMap[`${vig}|${d}`];
-		if (r && working.includes(r.turno)) counts[r.turno] = (counts[r.turno] || 0) + 1;
+		const p = r && periodoDe[r.turno];   // folga rows don't count
+		if (p) counts[p] = (counts[p] || 0) + 1;
 	});
-	const gap = working.filter(w => !counts[w]);
-	const dbl = working.filter(w => (counts[w] || 0) > 1);
-	if (dbl.length) return { icon: "●", cls: "cov-double", tip: "Duplicado: " + dbl.join(", ") };
+
+	const gap = periodos.filter(p => !counts[p]);
+	const dbl = periodos.filter(p => (counts[p] || 0) > 1);
 	if (gap.length) return { icon: "▲", cls: "cov-gap",    tip: "Sem cobertura: " + gap.join(", ") };
-	return { icon: "✓", cls: "cov-ok", tip: "Totalmente coberto" };
+	if (dbl.length) return { icon: "●", cls: "cov-double", tip: "Mais de um vigilante: " + dbl.join(", ") };
+	return { icon: "✓", cls: "cov-ok", tip: "Todos os períodos cobertos" };
 }
 
 function _coverage_legend(tipo_ciclo) {
@@ -349,7 +361,7 @@ function _coverage_legend(tipo_ciclo) {
 	return `
 		<div class="esc-cobertura-help">
 			<span class="esc-ch-title">${__("Cobertura")}</span>
-			<span class="esc-ch-desc">${__("cada turno do dia tem vigilante?")}</span>
+			<span class="esc-ch-desc">${__("cada período do dia (Manhã/Noite) tem vigilante?")}</span>
 			<span class="esc-ch-item"><span class="esc-ch-dot cov-ok">✓</span> ${__("completo")}</span>
 			<span class="esc-ch-item"><span class="esc-ch-dot cov-gap">▲</span> ${__("falta alguém")}</span>
 			<span class="esc-ch-item"><span class="esc-ch-dot cov-double">●</span> ${__("a mais")}</span>
