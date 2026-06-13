@@ -37,10 +37,43 @@ class Ausencias(Document):
 		# This absence may make the guard's NEXT working shift qualify for de-dup —
 		# recompute its stored n_de_faltas if that shift is already recorded.
 		self._recalcular_turno_seguinte()
+		self._registar_timeline(cancelada=False)
 
 	def on_cancel(self):
 		# Cancelling removes this absence — the next shift may no longer de-dup.
 		self._recalcular_turno_seguinte()
+		self._registar_timeline(cancelada=True)
+
+	def _registar_timeline(self, cancelada: bool):
+		"""Vigilante timeline: one entry per absent guard, one per covering guard."""
+		from sigos.timeline import registar
+		from frappe.utils import formatdate
+
+		quando = f"{self.periodo or ''} · {formatdate(self.data)}".strip(" ·")
+		campo_accao = {
+			"Substituto": "vigilante_substituto",
+			"Dobra de Turno": "vigilante_a_dobrar",
+			"Adiantamento de Turno": "vigilante_a_adiantar",
+		}
+		for row in self.tabela_ausencia or []:
+			if not row.vigilante:
+				continue
+			if cancelada:
+				registar(row.vigilante, _("Ausência <b>cancelada</b> — {0}").format(quando), self)
+			else:
+				texto = _("Falta registada — {0} · conta <b>{1}</b> falta(s)").format(
+					quando, row.n_de_faltas or 1)
+				if row.tipo_justificacao:
+					texto += _(" · justificação: <b>{0}</b>").format(row.tipo_justificacao)
+				registar(row.vigilante, texto, self)
+
+			cobre = row.get(campo_accao.get(row.proxima_accao) or "")
+			if cobre:
+				if cancelada:
+					registar(cobre, _("Cobertura de ausência <b>cancelada</b> — {0}").format(quando), self)
+				else:
+					registar(cobre, _("Cobriu a ausência de <b>{0}</b> ({1}) — {2}").format(
+						row.nome_do_vigilante or row.vigilante, row.proxima_accao, quando), self)
 
 	# ─── Validation ────────────────────────────────────────────────────────────
 

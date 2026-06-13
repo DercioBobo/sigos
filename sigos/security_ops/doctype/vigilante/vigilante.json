@@ -8,12 +8,13 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "tab_geral",
   "naming_series",
   "foto",
   "col_break_header",
   "nome_completo",
   "status",
-  "tab_geral",
+  "sec_pessoais",
   "data_de_nascimento",
   "idade",
   "sexo",
@@ -29,7 +30,6 @@
   "col_break_contacto",
   "email",
   "residencia",
-  "dependentes",
   "tab_operacional",
   "sec_operacional",
   "delegacao",
@@ -52,6 +52,7 @@
   "col_break_prof",
   "motivo_de_admissao",
   "empresa",
+  "dependentes",
   "sec_id_prof",
   "mecanografico",
   "col_break_id",
@@ -110,6 +111,11 @@
    "fieldtype": "Select",
    "label": "Estado Civil",
    "options": "\nSolteiro\nCasado\nDivorciado\nViúvo\nUnião de Facto"
+  },
+  {
+   "fieldname": "sec_pessoais",
+   "fieldtype": "Section Break",
+   "label": "Dados Pessoais"
   },
   {
    "fieldname": "sec_documentos",
@@ -186,8 +192,10 @@
    "options": "Pre-Adimissão RH\nPre-Adimissão\nActivo\nReserva\nInactivo\nDemitido",
    "default": "Pre-Adimissão RH",
    "reqd": 1,
+   "read_only": 1,
    "in_list_view": 1,
-   "in_standard_filter": 1
+   "in_standard_filter": 1,
+   "description": "Definido pelo sistema — use os botões (Admitir RH, Ativar) e as operações (Rotatividade, Demissão) para mudar o estado. Mantém o Funcionário e a escala consistentes."
   },
   {
    "fieldname": "data_admissao",

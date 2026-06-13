@@ -23,6 +23,10 @@ class TrocaDeRegime(Document):
 			vig.flags.via_troca_regime = True   # bypass the direct-change guard
 			vig.save(ignore_permissions=True)
 
+			from sigos.timeline import registar
+			registar(self.vigilante,
+				_("Regime alterado: <b>{0}</b> → <b>{1}</b>").format(regime_antigo or "-", self.novo_regime), self)
+
 			frappe.msgprint(
 				_("Regime de <b>{0}</b> alterado: <b>{1}</b> → <b>{2}</b>. "
 				  "A escala foi actualizada automaticamente.").format(

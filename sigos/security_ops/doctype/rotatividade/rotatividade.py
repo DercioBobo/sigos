@@ -74,6 +74,25 @@ class Rotatividade(Document):
 		if demite:
 			self._criar_demissao()
 
+		# 4. Vigilante timeline — what changed, with a link back to this rotatividade
+		from sigos.timeline import registar
+		partes = []
+		if op and op.muda_posto and self.novo_posto:
+			partes.append(_("posto <b>{0}</b> → <b>{1}</b>").format(posto_vago or "-", self.novo_posto))
+		if op and op.muda_regime and self.novo_regime:
+			partes.append(_("regime <b>{0}</b> → <b>{1}</b>").format(self.regime or "-", self.novo_regime))
+		if demite:
+			partes.append(_("<b>demitido</b>"))
+		elif op and op.enviar_reserva:
+			partes.append(_("enviado para a <b>Reserva</b>"))
+		rotulo = op.operacao if op else (self.abreviatura_op or "Rotatividade")
+		registar(self.vigilante,
+			_("Rotatividade <b>{0}</b>: {1}").format(rotulo, ", ".join(partes) or _("aplicada")), self)
+		if op and op.requer_substituto and self.novo_vigilante and posto_vago:
+			registar(self.novo_vigilante,
+				_("Assumiu o posto <b>{0}</b> como substituto de <b>{1}</b>").format(
+					posto_vago, self.vigilante), self)
+
 		frappe.msgprint(
 			_("Rotatividade <b>{0}</b> aplicada a <b>{1}</b>.").format(
 				op.operacao if op else self.abreviatura_op, self.vigilante

@@ -691,6 +691,36 @@ def _marcar_ja_registados(rows, data, periodo, excluir_doc=None):
 
 
 @frappe.whitelist()
+def get_vigilante_dash(vigilante):
+	"""
+	Mini-dash for the Vigilante form: faltas accumulated this month (same single
+	source as payroll/report) + today's escala shift. Both indexed and cheap.
+	"""
+	from frappe.utils import getdate, nowdate
+	from sigos.utils import calcular_faltas_vigilante
+
+	hoje = getdate(nowdate())
+	out = {"faltas_mes": calcular_faltas_vigilante(vigilante, hoje.replace(day=1), hoje)}
+
+	turno = frappe.db.sql(
+		"""
+		SELECT te.turno, te.posto,
+		       COALESCE(NULLIF(te.periodo, ''), t.periodo) AS periodo,
+		       COALESCE(t.e_folga, 0) AS e_folga
+		FROM `tabTabela De Escala De Vigilante` te
+		JOIN `tabEscala Do Vigilante` e ON e.name = te.parent
+		LEFT JOIN `tabTurno` t ON t.name = te.turno
+		WHERE e.estado = 'Activo' AND te.vigilante = %(v)s AND te.data = %(d)s
+		LIMIT 1
+		""",
+		{"v": vigilante, "d": hoje},
+		as_dict=True,
+	)
+	out["hoje"] = turno[0] if turno else None
+	return out
+
+
+@frappe.whitelist()
 def get_contexto_faltas(data, linhas):
 	"""
 	Falta context for the Ausencias deck cards, in one batch call.

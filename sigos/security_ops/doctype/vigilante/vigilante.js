@@ -1,8 +1,11 @@
 frappe.ui.form.on("Vigilante", {
 	// ─── Setup ─────────────────────────────────────────────────────────────────
 	onload(frm) {
-		if (frm.is_new()) {
-			frm.set_value("status", "Pre-Adimissão RH");
+		if (frm.is_new() && !frm.doc.status) {
+			// status is read-only (system-managed) — set_value is a no-op on read-only
+			// fields, so write it directly to guarantee the onboarding state.
+			frm.doc.status = "Pre-Adimissão RH";
+			frm.refresh_field("status");
 		}
 
 		frm.set_query("posto_de_vigilancia", () => ({
@@ -17,6 +20,7 @@ frappe.ui.form.on("Vigilante", {
 		_calcular_idade(frm);
 		_colorir_tabs(frm);
 		_setup_proximo_btn(frm);
+		_render_mini_dash(frm);
 
 		// Ver Escala — only for active guards already assigned to a posto
 		if (!frm.is_new() && frm.doc.status === "Activo" && frm.doc.posto_de_vigilancia) {
@@ -110,6 +114,119 @@ frappe.ui.form.on("Vigilante", {
 		}
 	},
 });
+
+// ─── Mini-dash: operational readiness at a glance, above the tabs ──────────────
+// Shows the data the rest of the system depends on (Escala, Ausências, payroll).
+// Missing-but-required values render LIGHT RED so gaps jump out. Required set
+// depends on status — a Reserva guard has no posto/escala by design (neutral),
+// Demitido/Inactivo require nothing.
+
+const _DASH_REQ = {
+	"Activo":           ["posto_de_vigilancia", "regime_do_vigilante", "categoria", "delegacao", "mecanografico", "data_admissao"],
+	"Pre-Adimissão":    ["posto_de_vigilancia", "regime_do_vigilante", "categoria", "delegacao", "mecanografico", "data_admissao"],
+	"Pre-Adimissão RH": ["delegacao", "categoria", "data_admissao"],
+	"Reserva":          ["categoria", "delegacao", "mecanografico", "data_admissao"],
+};
+const _DASH_STATUS_CLS = {
+	"Activo": "vigd-st-on", "Reserva": "vigd-st-res",
+	"Pre-Adimissão": "vigd-st-pre", "Pre-Adimissão RH": "vigd-st-pre",
+	"Inactivo": "vigd-st-off", "Demitido": "vigd-st-dem",
+};
+const _DASH_PER_CLS = { "Manhã": "cell-manha", "Noite": "cell-noite", "Tarde": "cell-tarde" };
+
+function _render_mini_dash(frm) {
+	_inject_dash_css();
+	frm.$wrapper.find(".sigos-vig-dash").remove();
+	if (frm.is_new()) return;
+
+	const req = new Set(_DASH_REQ[frm.doc.status] || []);
+	const esc = frappe.utils.escape_html;
+
+	const cell = (lbl, valor, opts = {}) => {
+		const falta = opts.req && !valor;
+		const html = opts.html || (valor ? esc(valor) : (falta ? __("Não definido") : "—"));
+		return `<div class="vigd-cell ${falta ? "is-missing" : ""}" ${opts.attr || ""}>
+			<span class="vigd-lbl">${lbl}</span>
+			<span class="vigd-val">${html}</span>
+		</div>`;
+	};
+
+	const stCls = _DASH_STATUS_CLS[frm.doc.status] || "vigd-st-off";
+	let postoOpts = { req: req.has("posto_de_vigilancia") };
+	if (frm.doc.status === "Reserva" && !frm.doc.posto_de_vigilancia) {
+		postoOpts = { html: `<span class="vigd-dim">${__("Reserva — sem posto")}</span>` };
+	}
+
+	const $dash = $(`
+		<div class="sigos-vig-dash">
+			${cell(__("Estado"), null, { html: `<span class="vigd-st ${stCls}">${esc(frm.doc.status || "-")}</span>` })}
+			${cell(__("Posto"), frm.doc.posto_de_vigilancia, postoOpts)}
+			${cell(__("Regime"), frm.doc.regime_do_vigilante, { req: req.has("regime_do_vigilante") })}
+			${cell(__("Categoria"), frm.doc.categoria, { req: req.has("categoria") })}
+			${cell(__("Delegação"), frm.doc.delegacao, { req: req.has("delegacao") })}
+			${cell(__("Mecanográfico"), frm.doc.mecanografico, { req: req.has("mecanografico") })}
+			${cell(__("Admissão"), frm.doc.data_admissao ? frappe.datetime.str_to_user(frm.doc.data_admissao) : null, { req: req.has("data_admissao") })}
+			${cell(__("Escala Hoje"), null, { html: `<span class="vigd-dim">…</span>`, attr: 'data-vigd="hoje"' })}
+			${cell(__("Faltas (mês)"), null, { html: `<span class="vigd-dim">…</span>`, attr: 'data-vigd="faltas"' })}
+		</div>`);
+
+	(frm.layout?.wrapper ? $(frm.layout.wrapper) : frm.$wrapper.find(".form-layout")).prepend($dash);
+
+	// Async stats — monthly faltas (payroll single source) + today's shift
+	frappe.call({ method: "sigos.api.get_vigilante_dash", args: { vigilante: frm.doc.name } }).then(r => {
+		const d = r.message || {};
+		const $hoje = $dash.find('[data-vigd="hoje"] .vigd-val');
+		const $faltas = $dash.find('[data-vigd="faltas"] .vigd-val');
+
+		const ativo = frm.doc.status === "Activo";
+		if (d.hoje) {
+			if (d.hoje.e_folga) $hoje.html(`<span class="vigd-chip cell-folga">${__("Folga")}</span>`);
+			else $hoje.html(`<span class="vigd-chip ${_DASH_PER_CLS[d.hoje.periodo] || "cell-folga"}">${esc(d.hoje.turno || "")}</span>`);
+		} else if (ativo && frm.doc.posto_de_vigilancia) {
+			// active + posto but no row today = not in any active escala — that's a gap
+			$hoje.html(`<span class="vigd-warn">${__("Sem escala")}</span>`);
+			$hoje.closest(".vigd-cell").addClass("is-warn");
+		} else {
+			$hoje.html(`<span class="vigd-dim">—</span>`);
+		}
+
+		const n = d.faltas_mes || 0;
+		$faltas.html(`<span class="vigd-n ${n ? "vigd-n-warn" : ""}">${n}</span>`);
+	});
+}
+
+function _inject_dash_css() {
+	if (document.getElementById("sigos-vig-dash-css")) return;
+	const css = `
+.sigos-vig-dash {
+	display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 1px;
+	margin: 2px 0 14px; border: 1px solid #e4e8ec; border-radius: 12px; overflow: hidden;
+	background: #e4e8ec; box-shadow: 0 1px 3px rgba(0,0,0,.05);
+}
+.vigd-cell { background: #fff; padding: 9px 12px; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.vigd-lbl { font-size: .64em; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #9aa2aa; white-space: nowrap; }
+.vigd-val { font-size: .9em; font-weight: 700; color: #1a3a5c; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: var(--sigos-display, system-ui); }
+.vigd-cell.is-missing { background: #fdecef; box-shadow: inset 0 0 0 1px #f5c2c9; }
+.vigd-cell.is-missing .vigd-lbl { color: #b02a37; }
+.vigd-cell.is-missing .vigd-val { color: #b02a37; font-weight: 600; font-style: italic; }
+.vigd-cell.is-warn { background: #fff8e6; box-shadow: inset 0 0 0 1px #ffe08a; }
+.vigd-warn { color: #8a6d1a; font-weight: 700; }
+.vigd-dim { color: #aeb7c0; font-weight: 500; }
+.vigd-st { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: .82em; }
+.vigd-st-on  { background: #d1e7dd; color: #0f5132; }
+.vigd-st-res { background: #dbeafe; color: #1e429f; }
+.vigd-st-pre { background: #fff3cd; color: #856404; }
+.vigd-st-off { background: #e2e3e5; color: #41464b; }
+.vigd-st-dem { background: #f8d7da; color: #842029; }
+.vigd-chip { display: inline-block; padding: 2px 10px; border-radius: 999px; color: #fff; font-size: .82em; font-weight: 700; }
+.vigd-n { font-size: 1.25em; }
+.vigd-n-warn { color: #b8860b; }
+`;
+	const s = document.createElement("style");
+	s.id = "sigos-vig-dash-css";
+	s.textContent = css;
+	document.head.appendChild(s);
+}
 
 // ─── Wizard footer: Anterior / Próximo / Guardar at the bottom of the form ────
 function _setup_proximo_btn(frm) {

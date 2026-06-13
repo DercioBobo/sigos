@@ -38,6 +38,10 @@ class Readimissao(Document):
 		vig.flags.ignore_sync = True
 		vig.save(ignore_permissions=True)
 
+		from sigos.timeline import registar
+		registar(self.vigilante,
+			_("Readmitido — de <b>Demitido</b> para <b>Pre-Adimissão RH</b> (aguarda nova admissão)"), self)
+
 		frappe.msgprint(
 			_("Vigilante <b>{0}</b> readmitido — agora em <b>Pre-Adimissão RH</b>. "
 			  "Conclua a admissão (RH) com uma nova <b>Data de Admissão</b> para o reactivar.").format(

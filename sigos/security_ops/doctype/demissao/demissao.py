@@ -40,6 +40,13 @@ class Demissao(Document):
 				"SIGOS Demissao"
 			)
 
+		from sigos.timeline import registar
+		texto = _("Demissão registada — data <b>{0}</b>").format(
+			frappe.utils.formatdate(self.data_de_demissao) if self.data_de_demissao else "-")
+		if self.get("motivo"):
+			texto += _(" · motivo: {0}").format(self.motivo)
+		registar(self.vigilante, texto, self)
+
 		# Update linked Employee
 		try:
 			funcionario = frappe.db.get_value("Vigilante", self.vigilante, "funcionario")

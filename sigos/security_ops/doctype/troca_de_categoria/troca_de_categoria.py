@@ -14,8 +14,15 @@ class TrocaDeCategoria(Document):
 
 		try:
 			vigilante_doc = frappe.get_doc("Vigilante", self.vigilante)
+			categoria_antiga = vigilante_doc.categoria
 			vigilante_doc.categoria = self.categoria_nova
 			vigilante_doc.save(ignore_permissions=True)
+
+			from sigos.timeline import registar
+			registar(self.vigilante,
+				_("Categoria alterada: <b>{0}</b> → <b>{1}</b>").format(
+					categoria_antiga or "-", self.categoria_nova), self)
+
 			frappe.msgprint(
 				_("Categoria do vigilante {0} atualizada para {1}.").format(
 					self.vigilante, self.categoria_nova
