@@ -112,8 +112,49 @@ frappe.ui.form.on("Vigilante", {
 				);
 			}, __("Ações"));
 		}
+
+		// Operational benching — release posto + escala, keep the guard employed.
+		const pode_ops = frappe.user.has_role("Aprovador Operações")
+			|| frappe.user.has_role("SIGOS Manager")
+			|| frappe.user.has_role("System Manager");
+
+		// Colocar em Reserva: bench an active or suspended guard (Employee stays Active)
+		if (pode_ops && ["Activo", "Inactivo"].includes(frm.doc.status)) {
+			frm.add_custom_button(__("Colocar em Reserva"), () => {
+				_mudar_estado_op(frm, "colocar_em_reserva", __("Colocar em Reserva"),
+					__("O vigilante sai do posto e da escala, mas continua empregado e disponível para redistribuição."));
+			}, __("Ações"));
+		}
+
+		// Inactivar: suspend an active or reserve guard (Employee → Suspended)
+		if (pode_ops && ["Activo", "Reserva"].includes(frm.doc.status)) {
+			frm.add_custom_button(__("Inactivar"), () => {
+				_mudar_estado_op(frm, "inactivar", __("Inactivar Vigilante"),
+					__("O vigilante sai do posto e da escala e o Funcionário passa a <b>Suspenso</b>. Use para suspensões temporárias."));
+			}, __("Ações"));
+		}
 	},
 });
+
+// ─── Operational state change (Reserva / Inactivo) ────────────────────────────
+// Single dialog: shows the consequence + an optional reason, then calls the
+// whitelisted controller method which releases the posto and saves.
+function _mudar_estado_op(frm, metodo, titulo, aviso) {
+	const d = new frappe.ui.Dialog({
+		title: titulo,
+		fields: [
+			{ fieldtype: "HTML", options: `<p class="text-muted" style="margin-bottom:8px">${aviso}</p>` },
+			{ fieldname: "motivo", fieldtype: "Small Text", label: __("Motivo (opcional)") },
+		],
+		primary_action_label: __("Confirmar"),
+		primary_action(vals) {
+			d.hide();
+			frm.call(metodo, { motivo: (vals.motivo || "").trim() || null })
+				.then(() => frm.reload_doc());
+		},
+	});
+	d.show();
+}
 
 // ─── Mini-dash: operational readiness at a glance, above the tabs ──────────────
 // Shows the data the rest of the system depends on (Escala, Ausências, payroll).

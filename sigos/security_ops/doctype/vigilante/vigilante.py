@@ -308,3 +308,49 @@ class Vigilante(Document):
 			indicator="green",
 			alert=True,
 		)
+
+	# ─── Operational state transitions (called from the form buttons) ────────────
+
+	@frappe.whitelist()
+	def colocar_em_reserva(self, motivo=None):
+		"""Bench the guard: release posto + contract, keep them employed (Reserva)."""
+		return self._mudar_estado_operacional("Reserva", motivo)
+
+	@frappe.whitelist()
+	def inactivar(self, motivo=None):
+		"""Suspend the guard: release posto + contract; Employee becomes Suspended."""
+		return self._mudar_estado_operacional("Inactivo", motivo)
+
+	def _mudar_estado_operacional(self, novo_estado, motivo=None):
+		"""
+		Move the guard to Reserva/Inactivo from a form action. Releases the posto and
+		the derived contract fields, then saves — the save cascades the keystone escala
+		migration, occupation recount and Employee status sync (Reserva→Active,
+		Inactivo→Suspended). This is the controlled path that keeps the status read-only.
+		"""
+		if self.status == novo_estado:
+			frappe.throw(
+				_("O vigilante já está em <b>{0}</b>.").format(novo_estado),
+				title=_("Sem alteração"),
+			)
+
+		self.status = novo_estado
+		self.posto_de_vigilancia = None
+		self.projecto = None
+		self.cliente = None
+		self.nome_do_projecto = None
+		self.save()
+
+		from sigos.timeline import registar
+		rotulo = (
+			_("colocado em <b>Reserva</b>")
+			if novo_estado == "Reserva"
+			else _("<b>inactivado</b> (Funcionário suspenso)")
+		)
+		texto = _("Vigilante {0}").format(rotulo)
+		if motivo:
+			texto += _(" — motivo: {0}").format(motivo)
+		registar(self.name, texto, self)
+
+		frappe.msgprint(_("Vigilante {0}.").format(rotulo), indicator="blue", alert=True)
+		return self.status
