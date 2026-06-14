@@ -1,0 +1,106 @@
+import frappe
+from frappe import _
+from frappe.model.document import Document
+from frappe.utils import formatdate, today
+
+
+class Ocorrencia(Document):
+
+	def validate(self):
+		self._validar_posto_na_delegacao()
+		if not self.registado_por:
+			self.registado_por = frappe.session.user
+
+	def after_insert(self):
+		self._registar_timeline(
+			_("Ocorrência registada — <b>{0}</b> ({1})").format(
+				self.tipo or _("(sem tipo)"), self.gravidade or "-"
+			)
+		)
+
+	# ─── Delegação ───────────────────────────────────────────────────────────────
+
+	def _validar_posto_na_delegacao(self):
+		"""Keep the incident's delegação consistent with the posto it happened at."""
+		if not self.posto:
+			return
+		posto_deleg = frappe.db.get_value("Posto De Vigilancia", self.posto, "delegacao")
+		if not posto_deleg:
+			return
+		if not self.delegacao:
+			self.delegacao = posto_deleg
+		elif self.delegacao != posto_deleg:
+			frappe.throw(
+				_("O posto <b>{0}</b> pertence à delegação <b>{1}</b>, mas a ocorrência está "
+				  "na delegação <b>{2}</b>. Escolha um posto da mesma delegação.").format(
+					self.posto, posto_deleg, self.delegacao
+				),
+				title=_("Posto de Outra Delegação"),
+			)
+
+	# ─── Lifecycle (estado) ──────────────────────────────────────────────────────
+
+	@frappe.whitelist()
+	def investigar(self):
+		return self._mudar_estado("Em Investigação")
+
+	@frappe.whitelist()
+	def resolver(self, accao=None):
+		if accao:
+			self.accao_tomada = accao
+		self.resolvido_por = frappe.session.user
+		self.data_resolucao = today()
+		return self._mudar_estado("Resolvida")
+
+	@frappe.whitelist()
+	def fechar(self):
+		if not self.resolvido_por:
+			self.resolvido_por = frappe.session.user
+		if not self.data_resolucao:
+			self.data_resolucao = today()
+		return self._mudar_estado("Fechada")
+
+	@frappe.whitelist()
+	def reabrir(self, motivo=None):
+		self.resolvido_por = None
+		self.data_resolucao = None
+		return self._mudar_estado("Em Investigação", motivo=motivo)
+
+	def _mudar_estado(self, novo_estado, motivo=None):
+		if self.estado == novo_estado:
+			frappe.throw(_("A ocorrência já está em <b>{0}</b>.").format(novo_estado))
+		anterior = self.estado
+		self.estado = novo_estado
+		self.save()
+
+		rotulos = {
+			"Em Investigação": _("posta <b>em investigação</b>"),
+			"Resolvida": _("marcada como <b>Resolvida</b>"),
+			"Fechada": _("<b>Fechada</b>"),
+		}
+		texto = _("Ocorrência {0}").format(rotulos.get(novo_estado, novo_estado))
+		if novo_estado == "Em Investigação" and anterior in ("Resolvida", "Fechada"):
+			texto = _("Ocorrência <b>reaberta</b> (em investigação)")
+		if motivo:
+			texto += _(" — motivo: {0}").format(motivo)
+		self._registar_timeline(texto)
+
+		frappe.msgprint(
+			_("Ocorrência {0}.").format(rotulos.get(novo_estado, novo_estado)),
+			indicator="blue", alert=True,
+		)
+		return self.estado
+
+	# ─── Timeline ────────────────────────────────────────────────────────────────
+
+	def _registar_timeline(self, texto):
+		"""Log the incident on the involved guard's timeline (if any)."""
+		if not self.vigilante:
+			return
+		from sigos.timeline import registar
+		contexto = texto
+		if self.posto:
+			contexto += _(" · posto <b>{0}</b>").format(self.posto)
+		if self.data:
+			contexto += _(" · {0}").format(formatdate(self.data))
+		registar(self.vigilante, contexto, self)

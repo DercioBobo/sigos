@@ -1,29 +1,51 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import add_months, getdate
+from frappe.utils import add_months
+
+MESES = {
+	"Janeiro": "01", "Fevereiro": "02", "Março": "03", "Abril": "04",
+	"Maio": "05", "Junho": "06", "Julho": "07", "Agosto": "08",
+	"Setembro": "09", "Outubro": "10", "Novembro": "11", "Dezembro": "12",
+}
 
 
-class Deducoes(Document):
+class Emprestimo(Document):
 
 	def validate(self):
+		self._fetch_salario_base()
 		self._validar_emprestimo_ativo()
-		self._validar_limites_emprestimo()
+		self._validar_limites()
+		self._aplicar_mes_referencia()
 		self._calcular_valor_mensal()
 		self._calcular_data_fim()
 
-	# ─── Rules ────────────────────────────────────────────────────────────────
+	# ─── Salário base (para o tecto de %) ────────────────────────────────────────
+
+	def _fetch_salario_base(self):
+		"""Pull the latest assigned base so the % cap below is meaningful."""
+		if self.salario_base or not self.funcionario:
+			return
+		base = frappe.db.get_value(
+			"Salary Structure Assignment",
+			{"employee": self.funcionario, "docstatus": 1},
+			"base",
+			order_by="from_date desc",
+		)
+		if base:
+			self.salario_base = base
+
+	# ─── Regras ──────────────────────────────────────────────────────────────────
 
 	def _validar_emprestimo_ativo(self):
-		"""Only one active Emprestimo per employee at a time."""
-		if self.tipo != "Emprestimo" or not self.funcionario:
+		"""Only one active loan per employee at a time."""
+		if not self.funcionario:
 			return
 
 		ativo = frappe.get_all(
-			"Deducoes",
+			"Emprestimo",
 			filters={
 				"funcionario": self.funcionario,
-				"tipo": "Emprestimo",
 				"docstatus": 1,
 				"estado": "Activo",
 				"name": ["!=", self.name or "__new__"],
@@ -40,11 +62,8 @@ class Deducoes(Document):
 				title=_("Empréstimo Activo"),
 			)
 
-	def _validar_limites_emprestimo(self):
+	def _validar_limites(self):
 		"""Enforce max months and max % of salary from Settings."""
-		if self.tipo != "Emprestimo":
-			return
-
 		max_meses = (
 			frappe.db.get_single_value("SIGOS Settings", "meses_maximos_emprestimo") or 3
 		)
@@ -69,7 +88,14 @@ class Deducoes(Document):
 					title=_("Valor Excedido"),
 				)
 
-	# ─── Computed fields ──────────────────────────────────────────────────────
+	# ─── Campos calculados ───────────────────────────────────────────────────────
+
+	def _aplicar_mes_referencia(self):
+		if not self.data_de_inicio and self.mes_referencia:
+			mes_num = MESES.get(self.mes_referencia)
+			if mes_num:
+				from frappe.utils import getdate
+				self.data_de_inicio = f"{getdate().year}-{mes_num}-01"
 
 	def _calcular_valor_mensal(self):
 		if self.valor_a_pagar and self.meses_a_pagar and self.meses_a_pagar > 0:

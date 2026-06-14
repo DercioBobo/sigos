@@ -15,6 +15,7 @@
   "tipo",
   "estado",
   "sec_alocacao",
+  "delegacao",
   "posto",
   "col_break_2",
   "numero_de_municoes"
@@ -49,7 +50,7 @@
    "fieldname": "tipo",
    "fieldtype": "Select",
    "label": "Tipo",
-   "options": "\nPistola\nEspingarda\nMequetrefe\nOutro",
+   "options": "\nPistola\nEspingarda\nCaçadeira\nOutro",
    "in_list_view": 1
   },
   {
@@ -66,11 +67,21 @@
    "label": "Alocação"
   },
   {
+   "fieldname": "delegacao",
+   "fieldtype": "Link",
+   "label": "Delegação",
+   "options": "Delegacao",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
    "fieldname": "posto",
    "fieldtype": "Link",
    "label": "Posto",
    "options": "Posto De Vigilancia",
-   "in_list_view": 1
+   "in_list_view": 1,
+   "in_standard_filter": 1
   },
   {
    "fieldname": "col_break_2",

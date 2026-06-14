@@ -58,7 +58,8 @@
   "col_break_id",
   "codename",
   "sec_rh",
-  "funcionario"
+  "funcionario",
+  "salario_base_manual"
  ],
  "fields": [
   {
@@ -348,6 +349,12 @@
    "read_only": 1
   },
   {
+   "fieldname": "salario_base_manual",
+   "fieldtype": "Currency",
+   "label": "Salário Base (manual)",
+   "description": "Deixe vazio para herdar o salário base do contrato (por regime). Preencha apenas para excepções a este vigilante."
+  },
+  {
    "fieldname": "tab_geral",
    "fieldtype": "Tab Break",
    "label": "Dados Gerais"
@@ -371,7 +378,7 @@
   },
   {
    "group": "Disciplinar",
-   "link_doctype": "Repreensao Disciplinar",
+   "link_doctype": "Participacao",
    "link_fieldname": "vigilante"
   },
   {

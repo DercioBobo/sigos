@@ -38,6 +38,36 @@ class Vigilante(Document):
 	def on_update(self):
 		self._atualizar_ocupacao_postos()
 		self._migrar_escala_se_mudou()
+		self._seed_salario_base()
+
+	def _seed_salario_base(self):
+		"""
+		Auto-assign the contract/regime base salary to a newly-onboarded or
+		re-deployed guard's Salary Structure Assignment. Fires only when the guard
+		is Activo with a Funcionário and the relevant fields actually changed; it's
+		idempotent (no-op if the SSA already matches) and silent so a missing default
+		structure or any error never blocks the guard's save.
+		"""
+		if self.status != "Activo" or not self.funcionario:
+			return
+
+		before = self.get_doc_before_save()
+		mudou = (
+			before is None
+			or before.funcionario != self.funcionario
+			or before.regime_do_vigilante != self.regime_do_vigilante
+			or before.projecto != self.projecto
+			or before.status != self.status
+			or before.salario_base_manual != self.salario_base_manual
+		)
+		if not mudou:
+			return
+
+		try:
+			from sigos.api import aplicar_salario_base
+			aplicar_salario_base(vigilante=self.name, silent=True)
+		except Exception as e:
+			frappe.log_error(f"seed salario base {self.name}: {e}", "SIGOS Salario Base")
 
 	# ─── Keystone: escala follows the guard ──────────────────────────────────────
 

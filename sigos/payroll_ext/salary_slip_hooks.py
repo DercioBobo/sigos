@@ -21,7 +21,7 @@ Wire-up (hooks.py):
 
 import frappe
 from frappe.utils import getdate, add_days, date_diff
-from sigos.utils import calcular_faltas_vigilante
+from sigos.utils import calcular_faltas_vigilante, calcular_dobras_vigilante
 
 
 def _aprovado_filter(doctype):
@@ -94,13 +94,16 @@ def _set_dia_da_falta_inicio(doc):
 def before_validate(doc, method):
 	_add_project_subsidios(doc)
 	_add_subsidio_arma(doc)
+	_add_remuneracoes(doc)              # Outras Remuneracoes → earnings
 	_set_dias_de_trabalho(doc)          # divisor — must run before the deduction
 	_compute_faltas(doc)                # from Ausencias only
 	_add_deducoes(doc)
+	_add_emprestimos(doc)               # Emprestimo → deductions
 	_add_reclamacao(doc)
 	_compute_justificadas(doc)
 	_compute_faltas_nao_justificadas(doc)
 	_add_faltas_deduction(doc)          # uses the configured method
+	_add_dobras(doc)                    # extra pay for covered shifts (earning)
 	_compute_dias_trabalhados(doc)
 
 
@@ -151,6 +154,51 @@ def _add_subsidio_arma(doc):
 		)
 
 
+# ─── Outras Remuneracoes (earnings) ──────────────────────────────────────────────
+
+def _add_remuneracoes(doc):
+	"""
+	Append every approved Outras Remuneracoes whose period covers the slip.
+	The earnings counterpart of _add_deducoes — without this, Outras Remuneracoes
+	records compute a valor_mensal but never reach the slip. Each row carries its
+	own Salary Component (tipo_de_subsidios); same-component rows are de-duped so a
+	remuneração never doubles a project subsídio already present.
+	"""
+	if not doc.employee or not doc.start_date or not doc.end_date:
+		return
+	try:
+		filters = {
+			"funcionario": doc.employee,
+			"docstatus": 1,
+			"data_de_inicio": ["<=", doc.start_date],
+			"data_de_fim": [">=", doc.end_date],
+		}
+		filters.update(_aprovado_filter("Outras Remuneracoes"))
+		remuneracoes = frappe.get_all(
+			"Outras Remuneracoes",
+			filters=filters,
+			fields=["valor_mensal", "tipo_de_subsidios", "name"],
+		)
+
+		existentes = {e.salary_component for e in doc.earnings}
+		for rem in remuneracoes:
+			componente = rem.tipo_de_subsidios
+			if not componente or componente in existentes:
+				continue
+			if not frappe.db.exists("Salary Component", componente):
+				continue
+			doc.append("earnings", {
+				"salary_component": componente,
+				"amount": rem.valor_mensal or 0,
+			})
+			existentes.add(componente)
+	except Exception as e:
+		frappe.log_error(
+			f"SalarySlip {doc.name}: erro ao adicionar Outras Remuneracoes: {e}",
+			"SIGOS Salary Slip Hooks",
+		)
+
+
 # ─── Dias de trabalho (divisor) ──────────────────────────────────────────────────
 
 def _set_dias_de_trabalho(doc):
@@ -176,7 +224,7 @@ def _add_deducoes(doc):
 		return
 	try:
 		deducoes = frappe.get_all(
-			"Deducoes",
+			"Outras Deducoes",
 			filters={
 				"funcionario": doc.employee,
 				"docstatus": 1,
@@ -187,27 +235,63 @@ def _add_deducoes(doc):
 			fields=["valor_mensal", "name", "tipo"],
 		)
 
-		tipos_para_componentes = {
-			"Deducoes Diversas":   "Deducoes diversas",
-			"Uniforme":            "Uniforme",
-			"Emprestimo":          "Emprestimo",
-			"Processo Disciplinar": "Processo Disciplinar",
-		}
-
+		# Each record carries its own Salary Component directly in `tipo` (a Link),
+		# mirroring Outras Remuneracoes' `tipo_de_subsidios` — no Settings map needed.
 		existentes = {d.salary_component for d in doc.deductions}
 		for deducao in deducoes:
-			componente = tipos_para_componentes.get(deducao.tipo)
-			if not componente:
+			componente = deducao.tipo
+			if not componente or componente in existentes:
 				continue
-			if componente not in existentes and frappe.db.exists("Salary Component", componente):
-				doc.append("deductions", {
-					"salary_component": componente,
-					"amount": deducao.valor_mensal or 0,
-				})
-				existentes.add(componente)
+			if not frappe.db.exists("Salary Component", componente):
+				continue
+			doc.append("deductions", {
+				"salary_component": componente,
+				"amount": deducao.valor_mensal or 0,
+			})
+			existentes.add(componente)
 	except Exception as e:
 		frappe.log_error(
 			f"SalarySlip {doc.name}: erro ao adicionar deduções: {e}",
+			"SIGOS Salary Slip Hooks",
+		)
+
+
+def _add_emprestimos(doc):
+	"""
+	Append the monthly installment of every active Emprestimo covering the slip
+	period as a single 'Emprestimo' deduction. Only one loan per employee is
+	active at a time, but summing keeps it safe if that ever changes.
+	"""
+	if not doc.employee or not doc.start_date or not doc.end_date:
+		return
+	try:
+		componente = frappe.db.get_single_value("SIGOS Settings", "componente_emprestimo") or "Emprestimo"
+		if not frappe.db.exists("Salary Component", componente):
+			return
+		if componente in {d.salary_component for d in doc.deductions}:
+			return
+
+		emprestimos = frappe.get_all(
+			"Emprestimo",
+			filters={
+				"funcionario": doc.employee,
+				"docstatus": 1,
+				"estado": "Activo",
+				"data_de_inicio": ["<=", doc.start_date],
+				"data_de_fim": [">=", doc.end_date],
+			},
+			fields=["valor_mensal", "name"],
+		)
+
+		total = round(sum(e.valor_mensal or 0 for e in emprestimos), 2)
+		if total > 0:
+			doc.append("deductions", {
+				"salary_component": componente,
+				"amount": total,
+			})
+	except Exception as e:
+		frappe.log_error(
+			f"SalarySlip {doc.name}: erro ao adicionar empréstimos: {e}",
 			"SIGOS Salary Slip Hooks",
 		)
 
@@ -275,7 +359,12 @@ def _compute_faltas(doc):
 
 
 def _compute_justificadas(doc):
-	if not doc.employee:
+	# Match by vigilante — the same key faltas come from (Ausencias). Justificacao De
+	# Faltas is vigilante-primary (reqd); its funcionario is only a fetched mirror, so
+	# keying on it would silently miss justifications whenever the Vigilante→Employee
+	# link is empty/stale, over-deducting the guard.
+	if not doc.custom_vigilante:
+		doc.custom_faltas_justificadas = 0
 		return
 
 	inicio = doc.custom_dia_da_falta_inicio
@@ -286,7 +375,7 @@ def _compute_justificadas(doc):
 
 	try:
 		filters = {
-			"funcionario": doc.employee,
+			"vigilante": doc.custom_vigilante,
 			"docstatus": 1,
 			"data_do_justificativo": ["between", [inicio, fim]],
 		}
@@ -363,6 +452,58 @@ def _add_faltas_deduction(doc):
 			"salary_component": componente,
 			"amount": amount,
 		})
+
+
+def _add_dobras(doc):
+	"""
+	Credit a guard for EXTRA shifts covered — Dobra/Adiantamento — the earnings mirror
+	of the Faltas deduction. Toggled by SIGOS Settings 'dobras_activo' (default OFF), so
+	nothing changes until you enable it. Valuation mirrors faltas:
+	  Proporcional ao Salário → (base / dias_de_trabalho) × nº dobras
+	  Valor Fixo por Dobra     → nº dobras × valor_fixo_por_dobra
+	Keyed on custom_vigilante (ops side of the bridge), like faltas.
+	"""
+	if not doc.custom_vigilante or not doc.start_date or not doc.end_date:
+		return
+	try:
+		settings = frappe.get_single("SIGOS Settings")
+		if not settings.dobras_activo:
+			doc.custom_dobras_no_mes = 0
+			return
+
+		componente = settings.componente_dobra or "Dobra"
+		if not frappe.db.exists("Salary Component", componente):
+			return
+
+		n_dobras = calcular_dobras_vigilante(doc.custom_vigilante, doc.start_date, doc.end_date)
+		doc.custom_dobras_no_mes = n_dobras
+		if n_dobras <= 0:
+			return
+
+		if (settings.metodo_calculo_dobra or "Proporcional ao Salário") == "Valor Fixo por Dobra":
+			amount = n_dobras * (settings.valor_fixo_por_dobra or 0)
+		else:
+			base = _get_salario_base(doc)
+			dias = doc.custom_dias_de_trabalho or 0
+			amount = (base / dias) * n_dobras if dias > 0 else 0
+
+		amount = round(amount, 2)
+		if amount <= 0:
+			return
+
+		for e in doc.earnings:
+			if e.salary_component == componente:
+				e.amount = amount
+				return
+		doc.append("earnings", {
+			"salary_component": componente,
+			"amount": amount,
+		})
+	except Exception as e:
+		frappe.log_error(
+			f"SalarySlip {doc.name}: erro ao adicionar dobras: {e}",
+			"SIGOS Salary Slip Hooks",
+		)
 
 
 def _compute_dias_trabalhados(doc):

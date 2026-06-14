@@ -23,7 +23,7 @@
   "categoria",
   "tab_pd_proc",
   "sec_processo",
-  "repreensao_referente",
+  "participacao_referente",
   "gravidade",
   "col_pd_2",
   "motivo",
@@ -138,10 +138,10 @@
    "label": "Processo"
   },
   {
-   "fieldname": "repreensao_referente",
+   "fieldname": "participacao_referente",
    "fieldtype": "Link",
-   "label": "Repreensão Referente",
-   "options": "Repreensao Disciplinar",
+   "label": "Participação Referente",
+   "options": "Participacao",
    "read_only": 1
   },
   {

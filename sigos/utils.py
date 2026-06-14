@@ -161,6 +161,32 @@ def calcular_faltas_vigilante(vigilante: str, start_date, end_date) -> int:
 	return sum(r["n_de_faltas"] for r in calcular_faltas_detalhado(vigilante, start_date, end_date))
 
 
+def calcular_dobras_vigilante(vigilante: str, start_date, end_date) -> int:
+	"""
+	Number of EXTRA shifts a guard covered (Dobra / Adiantamento) in [start, end],
+	from SUBMITTED Ausencias. Each covered row = one extra shift worked on top of the
+	guard's own — the earnings mirror of a falta. Substituto is deliberately excluded
+	(a planned replacement filling a post, not extra effort beyond one's own shift).
+	Single source so the slip and any report agree, like calcular_faltas_vigilante.
+	"""
+	if not vigilante:
+		return 0
+	row = frappe.db.sql(
+		"""
+		SELECT COUNT(*)
+		FROM `tabTabela Ausencia` ta
+		JOIN `tabAusencias` a ON a.name = ta.parent
+		WHERE a.docstatus = 1 AND a.data BETWEEN %(s)s AND %(e)s
+		  AND (
+		    (ta.proxima_accao = 'Dobra de Turno' AND ta.vigilante_a_dobrar = %(v)s)
+		    OR (ta.proxima_accao = 'Adiantamento de Turno' AND ta.vigilante_a_adiantar = %(v)s)
+		  )
+		""",
+		{"v": vigilante, "s": getdate(start_date), "e": getdate(end_date)},
+	)
+	return int(row[0][0]) if row and row[0] else 0
+
+
 def _existe_falta(vigilante: str, data, excluir_ausencia: str = None) -> bool:
 	"""True if a SUBMITTED absence exists for the guard on `data`."""
 	cond = ""

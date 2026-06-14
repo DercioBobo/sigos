@@ -19,6 +19,11 @@ app_include_js = [
 	"/assets/sigos/js/rotatividade_wizard.js",
 ]
 
+# Form scripts attached to standard (non-SIGOS) doctypes
+doctype_js = {
+	"Project": "public/js/project.js",
+}
+
 # ─── Fixtures ─────────────────────────────────────────────────────────────────
 fixtures = [
 	{
@@ -56,9 +61,9 @@ fixtures = [
 	{"dt": "Property Setter", "filters": [["module", "=", "SIGOS Setup"]]},
 	{"dt": "Workflow", "filters": [["document_type", "in", [
 		"Vigilante", "Rotatividade", "Ausencias",
-		"Repreensao Disciplinar", "Processo Disciplinar",
+		"Participacao", "Processo Disciplinar",
 		"Demissao", "Readimissao", "Troca De Categoria", "Troca De Regime",
-		"Deducoes", "Proventos", "Justificacao De Faltas", "Reclamacao De Salario",
+		"Outras Deducoes", "Outras Remuneracoes", "Emprestimo", "Justificacao De Faltas", "Reclamacao De Salario",
 	]]]},
 	{"dt": "Workflow State", "filters": [["workflow_state_name", "in", [
 		"Rascunho", "Pendente De Aprovação", "Aprovado", "Rejeitado", "Cancelado",

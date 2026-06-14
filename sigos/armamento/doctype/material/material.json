@@ -1,0 +1,145 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:nome",
+ "creation": "2026-06-02 00:00:00.000000",
+ "doctype": "DocType",
+ "document_type": "Document",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "nome",
+  "categoria",
+  "tipo_de_material",
+  "col_break_1",
+  "retornavel",
+  "unidade",
+  "ativo",
+  "sec_desc",
+  "descricao"
+ ],
+ "fields": [
+  {
+   "fieldname": "nome",
+   "fieldtype": "Data",
+   "label": "Nome",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "categoria",
+   "fieldtype": "Select",
+   "label": "Categoria",
+   "options": "\nEquipamento de Protecção\nUniforme\nVeículo\nComunicações\nOutro",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "tipo_de_material",
+   "fieldtype": "Select",
+   "label": "Tipo de Material",
+   "options": "\nDo Posto\nDo Vigilante",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "description": "Do Posto = partilhado, fica no posto. Do Vigilante = pessoal, entregue ao vigilante."
+  },
+  {
+   "fieldname": "col_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "retornavel",
+   "fieldtype": "Check",
+   "label": "Retornável",
+   "default": "1",
+   "description": "Marcado: deve ser devolvido (rádios, uniformes). Desmarque para consumíveis (munições, pilhas)."
+  },
+  {
+   "fieldname": "unidade",
+   "fieldtype": "Data",
+   "label": "Unidade",
+   "default": "Unidade",
+   "description": "ex.: Unidade, Par, Conjunto"
+  },
+  {
+   "fieldname": "ativo",
+   "fieldtype": "Check",
+   "label": "Activo",
+   "default": "1"
+  },
+  {
+   "fieldname": "sec_desc",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "descricao",
+   "fieldtype": "Small Text",
+   "label": "Descrição"
+  }
+ ],
+ "links": [],
+ "modified": "2026-06-02 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Armamento",
+ "name": "Material",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "SIGOS Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 0,
+   "delete": 0,
+   "email": 0,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Aprovador Operações",
+   "share": 0,
+   "write": 0
+  },
+  {
+   "create": 0,
+   "delete": 0,
+   "email": 0,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Operações SIGOS",
+   "share": 0,
+   "write": 0
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "title_field": "nome",
+ "track_changes": 1,
+ "app": "sigos"
+}

@@ -78,7 +78,7 @@ bench build --app sigos
 |--------|-------------|
 | **Security Ops** | Vigilante, Posto de Vigilância, Escala Do Vigilante, Ausências, Rotatividade, Demissão, Turnos Extras, Troca De Categoria, Troca De Regime |
 | **Disciplinar** | Repreensão Disciplinar, Processo Disciplinar, Readmissão |
-| **Payroll Ext** | Deduções, Proventos, Justificação de Faltas, Reclamação de Salário |
+| **Payroll Ext** | Outras Deduções, Outras Remunerações, Empréstimo, Justificação de Faltas, Reclamação de Salário |
 | **Armamento** | Arma, Movimentação de Arma, Alocação de Material |
 | **SIGOS Setup** | Delegação, Grupo De Delegados, SIGOS Settings, Regime, Turno, Categoria Vigilante |
 

@@ -1,0 +1,27 @@
+{
+ "add_total_row": 0,
+ "columns": [],
+ "creation": "2026-06-02 00:00:00.000000",
+ "disabled": 0,
+ "docstatus": 0,
+ "doctype": "Report",
+ "filters": [],
+ "idx": 0,
+ "is_standard": "Yes",
+ "letterhead": null,
+ "modified": "2026-06-02 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Armamento",
+ "name": "Material em Posse",
+ "owner": "Administrator",
+ "prepared_report": 0,
+ "ref_doctype": "Alocacao De Material",
+ "report_name": "Material em Posse",
+ "report_type": "Script Report",
+ "roles": [
+  {"role": "System Manager"},
+  {"role": "SIGOS Manager"},
+  {"role": "Aprovador Operações"},
+  {"role": "Operações SIGOS"}
+ ]
+}

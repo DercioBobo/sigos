@@ -1,0 +1,290 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "naming_series:",
+ "creation": "2026-06-13 00:00:00.000000",
+ "doctype": "DocType",
+ "document_type": "Document",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "assunto",
+  "col_break_1",
+  "estado",
+  "sec_quando",
+  "data",
+  "hora",
+  "col_qo",
+  "delegacao",
+  "posto",
+  "cliente",
+  "sec_class",
+  "tipo",
+  "gravidade",
+  "col_class",
+  "vigilante",
+  "sec_desc",
+  "descricao",
+  "foto",
+  "sec_seg",
+  "accao_tomada",
+  "col_seg",
+  "registado_por",
+  "resolvido_por",
+  "data_resolucao"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Série",
+   "options": "OC-.YYYY.-.####",
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "assunto",
+   "fieldtype": "Data",
+   "label": "Assunto",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_global_search": 1,
+   "search_index": 1,
+   "description": "Resumo curto da ocorrência (ex.: \"Tentativa de intrusão no portão norte\")"
+  },
+  {
+   "fieldname": "col_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "estado",
+   "fieldtype": "Select",
+   "label": "Estado",
+   "options": "Aberta\nEm Investigação\nResolvida\nFechada",
+   "default": "Aberta",
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "description": "Definido pelo sistema — use os botões (Investigar, Resolver, Fechar, Reabrir)."
+  },
+  {
+   "fieldname": "sec_quando",
+   "fieldtype": "Section Break",
+   "label": "Quando e Onde"
+  },
+  {
+   "fieldname": "data",
+   "fieldtype": "Date",
+   "label": "Data",
+   "reqd": 1,
+   "default": "Today",
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "hora",
+   "fieldtype": "Time",
+   "label": "Hora"
+  },
+  {
+   "fieldname": "col_qo",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "delegacao",
+   "fieldtype": "Link",
+   "label": "Delegação",
+   "options": "Delegacao",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "posto",
+   "fieldtype": "Link",
+   "label": "Posto",
+   "options": "Posto De Vigilancia",
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "cliente",
+   "fieldtype": "Link",
+   "label": "Cliente",
+   "options": "Customer",
+   "read_only": 1,
+   "fetch_from": "posto.cliente",
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "sec_class",
+   "fieldtype": "Section Break",
+   "label": "Classificação"
+  },
+  {
+   "fieldname": "tipo",
+   "fieldtype": "Select",
+   "label": "Tipo de Ocorrência",
+   "options": "\nIntrusão\nRoubo ou Furto\nAgressão\nVandalismo ou Dano\nFalha de Equipamento\nReclamação de Cliente\nAusência de Vigilante\nEmergência Médica\nIncêndio\nOutro",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "gravidade",
+   "fieldtype": "Select",
+   "label": "Gravidade",
+   "options": "Baixa\nMédia\nAlta\nCrítica",
+   "default": "Média",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "col_class",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "vigilante",
+   "fieldtype": "Link",
+   "label": "Vigilante (em serviço / envolvido)",
+   "options": "Vigilante",
+   "in_standard_filter": 1,
+   "description": "Vigilante de serviço no momento, ou envolvido na ocorrência."
+  },
+  {
+   "fieldname": "sec_desc",
+   "fieldtype": "Section Break",
+   "label": "Descrição"
+  },
+  {
+   "fieldname": "descricao",
+   "fieldtype": "Text",
+   "label": "Descrição Detalhada",
+   "reqd": 1
+  },
+  {
+   "fieldname": "foto",
+   "fieldtype": "Attach Image",
+   "label": "Foto / Anexo"
+  },
+  {
+   "fieldname": "sec_seg",
+   "fieldtype": "Section Break",
+   "label": "Seguimento"
+  },
+  {
+   "fieldname": "accao_tomada",
+   "fieldtype": "Small Text",
+   "label": "Acção Tomada"
+  },
+  {
+   "fieldname": "col_seg",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "registado_por",
+   "fieldtype": "Link",
+   "label": "Registado Por",
+   "options": "User",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "resolvido_por",
+   "fieldtype": "Link",
+   "label": "Resolvido Por",
+   "options": "User",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "data_resolucao",
+   "fieldtype": "Date",
+   "label": "Data de Resolução",
+   "read_only": 1,
+   "no_copy": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-06-13 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Security Ops",
+ "name": "Ocorrencia",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "SIGOS Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Aprovador Operações",
+   "share": 0,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 0,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Operações SIGOS",
+   "share": 0,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [
+  {
+   "color": "Red",
+   "title": "Aberta"
+  },
+  {
+   "color": "Orange",
+   "title": "Em Investigação"
+  },
+  {
+   "color": "Green",
+   "title": "Resolvida"
+  },
+  {
+   "color": "Gray",
+   "title": "Fechada"
+  }
+ ],
+ "title_field": "assunto",
+ "track_changes": 1,
+ "app": "sigos"
+}

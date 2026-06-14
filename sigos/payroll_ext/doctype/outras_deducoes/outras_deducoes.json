@@ -42,11 +42,12 @@
   },
   {
    "fieldname": "tipo",
-   "fieldtype": "Select",
-   "label": "Tipo",
-   "options": "\nDeducoes Diversas\nUniforme\nEmprestimo\nProcesso Disciplinar",
+   "fieldtype": "Link",
+   "label": "Tipo (Componente de Dedução)",
+   "options": "Salary Component",
    "reqd": 1,
-   "in_list_view": 1
+   "in_list_view": 1,
+   "description": "Componente salarial (tipo Dedução) aplicado na Salary Slip. Ex.: Uniforme, Processo Disciplinar, Deducoes diversas."
   },
   {
    "fieldname": "estado",
@@ -166,7 +167,7 @@
  "modified": "2026-06-02 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Payroll Ext",
- "name": "Deducoes",
+ "name": "Outras Deducoes",
  "naming_rule": "By \"Naming Series\" field",
  "owner": "Administrator",
  "permissions": [

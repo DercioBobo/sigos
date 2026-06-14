@@ -38,13 +38,18 @@ frappe.ui.form.on("Reclamacao De Salario", {
 	mes_a_ser_pago(frm) {
 		if (!frm.doc.mes_a_ser_pago) return;
 
-		const mes = _RS_MESES_STR[frm.doc.mes_a_ser_pago];
-		const ano = frappe.datetime.get_today().split("-")[0];
+		// Mirror the server: nearest current/future occurrence of the chosen month.
+		const mes = parseInt(_RS_MESES_STR[frm.doc.mes_a_ser_pago]);
+		const hoje = frappe.datetime.str_to_obj(frappe.datetime.get_today());
+		const mes_actual = hoje.getMonth() + 1;
+		const ano = (mes >= mes_actual) ? hoje.getFullYear() : hoje.getFullYear() + 1;
 
-		frm.set_value("data_de_inicio", `${ano}-${mes}-01`);
+		const mes_fmt = mes.toString().padStart(2, "0");
+		frm.set_value("data_de_inicio", `${ano}-${mes_fmt}-01`);
+		const ultimo_dia = new Date(ano, mes, 0).getDate();
+		frm.set_value("data_de_fim", `${ano}-${mes_fmt}-${ultimo_dia.toString().padStart(2, "0")}`);
 
-		const ultimo_dia = new Date(parseInt(ano), parseInt(mes), 0).getDate();
-		frm.set_value("data_de_fim", `${ano}-${mes}-${ultimo_dia.toString().padStart(2, "0")}`);
+		_rs_verificar_slip(frm);
 	},
 
 	funcionario(frm) {
@@ -79,6 +84,8 @@ frappe.ui.form.on("Reclamacao De Salario", {
 				}
 			}
 		});
+
+		_rs_verificar_slip(frm);
 	},
 
 	dia_da_falta_inicio(frm) {
@@ -89,6 +96,36 @@ frappe.ui.form.on("Reclamacao De Salario", {
 		_rs_calcular_fim_falta(frm);
 	}
 });
+
+
+// Early hint: warn if the chosen month's slip was already submitted for this
+// employee (the server will reject it on save). Non-blocking — just instant feedback.
+function _rs_verificar_slip(frm) {
+	if (!frm.doc.funcionario || !frm.doc.data_de_inicio || !frm.doc.data_de_fim) return;
+
+	frappe.db.get_list("Salary Slip", {
+		filters: [
+			["employee", "=", frm.doc.funcionario],
+			["docstatus", "=", 1],
+			["start_date", "<=", frm.doc.data_de_fim],
+			["end_date", ">=", frm.doc.data_de_inicio],
+		],
+		fields: ["name"],
+		limit: 1,
+	}).then(rows => {
+		if (rows && rows.length) {
+			frappe.msgprint({
+				title: __("Mês já processado"),
+				message: __(
+					"Já existe uma Salary Slip submetida ({0}) para este funcionário no mês seleccionado. " +
+					"A reclamação será rejeitada ao guardar — escolha o mês actual ou um mês futuro ainda não processado.",
+					[rows[0].name]
+				),
+				indicator: "orange",
+			});
+		}
+	});
+}
 
 
 function _rs_calcular_fim_falta(frm) {

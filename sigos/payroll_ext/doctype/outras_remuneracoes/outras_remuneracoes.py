@@ -11,7 +11,7 @@ MESES = {
 }
 
 
-class Proventos(Document):
+class OutrasRemuneracoes(Document):
 
 	def validate(self):
 		self._calcular_valor_mensal()

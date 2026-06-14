@@ -67,7 +67,7 @@ function _prov_aplicar_regras(frm) {
 	_prov_aplicar_tipo_pagamento(frm);
 }
 
-frappe.ui.form.on("Proventos", {
+frappe.ui.form.on("Outras Remuneracoes", {
 
 	onload(frm) {
 		frm.set_query("tipo_de_subsidios", () => ({

@@ -1321,6 +1321,165 @@ def get_regime_rate(project, regime):
 	return frappe.db.get_value("Project", project, "custom_valor_do_contrato") or 0
 
 
+# ─── Salário base por contrato/regime ────────────────────────────────────────────
+
+@frappe.whitelist()
+def get_regime_salary(project, regime):
+	"""
+	Default base salary per vigilante for a regime under a contract (Project).
+	Reads the project's per-regime table (salario_base column). Unlike the billing
+	rate there is no project-level fallback — a regime with no base returns 0, which
+	the apply action surfaces as 'ignorado'.
+	"""
+	if not project or not regime:
+		return 0
+	return frappe.db.get_value(
+		"Project Regime Rate", {"parent": project, "regime": regime}, "salario_base"
+	) or 0
+
+
+@frappe.whitelist()
+def resolver_salario_base(vigilante):
+	"""
+	A vigilante's base = manual override if set, else the contract's per-regime
+	salary — then floored at the Salário Mínimo Padrão (SIGOS Settings). The floor
+	doubles as the fallback: a vigilante with no override and no contract/regime base
+	still resolves to the minimum (when one is set). `vigilante` may be a name (str)
+	or a dict carrying the needed fields.
+	"""
+	from frappe.utils import flt
+	if isinstance(vigilante, str):
+		v = frappe.db.get_value(
+			"Vigilante", vigilante,
+			["salario_base_manual", "projecto", "regime_do_vigilante"],
+			as_dict=True,
+		) or {}
+	else:
+		v = vigilante or {}
+
+	manual = flt(v.get("salario_base_manual"))
+	base = manual if manual > 0 else flt(get_regime_salary(v.get("projecto"), v.get("regime_do_vigilante")))
+
+	minimo = flt(frappe.db.get_single_value("SIGOS Settings", "salario_minimo_padrao"))
+	if minimo > 0:
+		base = max(base, minimo)
+	return base
+
+
+def _aplicar_salario_base_vigilante(v, estrutura, from_date):
+	"""
+	Write one vigilante's resolved base to a Salary Structure Assignment.
+	Idempotent: no-op when the latest SSA already carries the resolved base; a draft
+	on the same date is updated, otherwise a new dated, submitted SSA supersedes it.
+	Returns (status, detalhe) where status ∈ atribuido|actualizado|inalterado|ignorado.
+	"""
+	from frappe.utils import flt
+
+	funcionario = v.get("funcionario")
+	if not funcionario:
+		return ("ignorado", _("{0}: sem Funcionário").format(v.get("name")))
+
+	base = resolver_salario_base(v)
+	if flt(base) <= 0:
+		return ("ignorado", _("{0}: sem salário base (regime do contrato sem valor)").format(v.get("name")))
+
+	existing = frappe.get_all(
+		"Salary Structure Assignment",
+		filters={"employee": funcionario, "docstatus": ["<", 2]},
+		fields=["name", "base", "docstatus", "from_date"],
+		order_by="from_date desc",
+		limit=1,
+	)
+	if existing and flt(existing[0].base) == flt(base):
+		return ("inalterado", v.get("name"))
+
+	dup = frappe.db.exists("Salary Structure Assignment", {
+		"employee": funcionario,
+		"salary_structure": estrutura,
+		"from_date": from_date,
+		"docstatus": ["<", 2],
+	})
+	if dup:
+		ssa = frappe.get_doc("Salary Structure Assignment", dup)
+		if ssa.docstatus == 0:
+			ssa.base = base
+			ssa.save(ignore_permissions=True)
+			ssa.submit()
+			return ("actualizado", v.get("name"))
+		return ("ignorado", _("{0}: já existe SSA submetida em {1}").format(v.get("name"), from_date))
+
+	ssa = frappe.get_doc({
+		"doctype": "Salary Structure Assignment",
+		"employee": funcionario,
+		"salary_structure": estrutura,
+		"from_date": from_date,
+		"base": base,
+		"company": frappe.db.get_value("Employee", funcionario, "company"),
+		"custom_project": v.get("projecto"),
+		"custom_cliente": v.get("cliente"),
+	})
+	ssa.insert(ignore_permissions=True)
+	ssa.submit()
+	return ("atribuido", v.get("name"))
+
+
+@frappe.whitelist()
+def aplicar_salario_base(project=None, vigilante=None, silent=False):
+	"""
+	Assign the resolved base salary to the Salary Structure Assignment of every
+	active vigilante on a contract (Project) — or a single vigilante. Used by the
+	Project button (bulk) and by onboarding (single, silent). Idempotent.
+	"""
+	from frappe.utils import today
+
+	estrutura = frappe.db.get_single_value("SIGOS Settings", "estrutura_salarial_padrao")
+	if not estrutura:
+		if silent:
+			return {}
+		frappe.throw(_(
+			"Defina a <b>Estrutura Salarial Padrão</b> em SIGOS Settings antes de "
+			"atribuir o salário base."
+		), title=_("Estrutura Salarial em Falta"))
+
+	if vigilante:
+		filters = {"name": vigilante}
+	elif project:
+		filters = {"projecto": project, "status": "Activo"}
+	else:
+		frappe.throw(_("Indique um contrato (Projecto) ou um vigilante."))
+
+	vigs = frappe.get_all(
+		"Vigilante",
+		filters=filters,
+		fields=["name", "funcionario", "projecto", "cliente", "regime_do_vigilante", "salario_base_manual"],
+	)
+
+	resumo = {"atribuido": 0, "actualizado": 0, "inalterado": 0, "ignorado": 0}
+	ignorados = []
+	for v in vigs:
+		try:
+			status, detalhe = _aplicar_salario_base_vigilante(v, estrutura, today())
+		except Exception as e:
+			status, detalhe = "ignorado", _("{0}: erro — {1}").format(v.get("name"), e)
+			frappe.log_error(f"aplicar_salario_base {v.get('name')}: {e}", "SIGOS Salario Base")
+		resumo[status] = resumo.get(status, 0) + 1
+		if status == "ignorado":
+			ignorados.append(detalhe)
+
+	if not silent:
+		msg = _(
+			"Salário base — atribuídos: <b>{0}</b> · actualizados: <b>{1}</b> · "
+			"inalterados: <b>{2}</b> · ignorados: <b>{3}</b>"
+		).format(resumo["atribuido"], resumo["actualizado"], resumo["inalterado"], resumo["ignorado"])
+		if ignorados:
+			msg += "<br><br>" + "<br>".join(ignorados[:20])
+			if len(ignorados) > 20:
+				msg += "<br>…"
+		frappe.msgprint(msg, title=_("Atribuição de Salário Base"), indicator="blue")
+
+	return resumo
+
+
 @frappe.whitelist()
 def enviar_posto_para_reserva(posto, motivo):
 	"""

@@ -24,19 +24,22 @@ class ProcessoDisciplinar(Document):
 	# ─── Private helpers ──────────────────────────────────────────────────────
 
 	def _criar_deducao(self):
-		"""Create a Deducoes record linked to this Processo Disciplinar."""
+		"""Create an Outras Deducoes record linked to this Processo Disciplinar."""
 		# Avoid duplicates
 		existing = frappe.db.exists(
-			"Deducoes",
+			"Outras Deducoes",
 			{"processo_disciplinar": self.name}
 		)
 		if existing:
 			return
 
 		try:
+			componente = frappe.db.get_single_value(
+				"SIGOS Settings", "componente_processo_disciplinar"
+			) or "Processo Disciplinar"
 			deducao = frappe.get_doc({
-				"doctype": "Deducoes",
-				"tipo": "Processo Disciplinar",
+				"doctype": "Outras Deducoes",
+				"tipo": componente,
 				"estado": "Activo",
 				"funcionario": self.funcionario,
 				"vigilante": self.vigilante,
@@ -55,7 +58,7 @@ class ProcessoDisciplinar(Document):
 			)
 		except Exception as e:
 			frappe.log_error(
-				f"ProcessoDisciplinar {self.name}: erro ao criar Deducoes: {e}",
+				f"ProcessoDisciplinar {self.name}: erro ao criar Outras Deducoes: {e}",
 				"SIGOS Processo Disciplinar"
 			)
 

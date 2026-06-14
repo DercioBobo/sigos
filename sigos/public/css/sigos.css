@@ -24,8 +24,8 @@ body[data-route*="Repreensao"] .frappe-section,
 body[data-route*="Processo-Disciplinar"] .frappe-section,
 body[data-route*="Troca"] .frappe-section,
 body[data-route*="Turnos-Extras"] .frappe-section,
-body[data-route*="Deducoes"] .frappe-section,
-body[data-route*="Proventos"] .frappe-section,
+body[data-route*="Outras-Deducoes"] .frappe-section,
+body[data-route*="Outras-Remuneracoes"] .frappe-section,
 body[data-route*="Escala"] .frappe-section,
 body[data-route*="SIGOS-Settings"] .frappe-section {
 	border: 1px solid #e4e8ec;
@@ -46,8 +46,8 @@ body[data-route*="Repreensao"] .section-head,
 body[data-route*="Processo-Disciplinar"] .section-head,
 body[data-route*="Troca"] .section-head,
 body[data-route*="Turnos-Extras"] .section-head,
-body[data-route*="Deducoes"] .section-head,
-body[data-route*="Proventos"] .section-head,
+body[data-route*="Outras-Deducoes"] .section-head,
+body[data-route*="Outras-Remuneracoes"] .section-head,
 body[data-route*="Escala"] .section-head,
 body[data-route*="SIGOS-Settings"] .section-head {
 	background: #f6f8fa;

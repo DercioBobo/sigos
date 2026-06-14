@@ -74,47 +74,19 @@ function _jf_buscar_faltas(frm) {
 		frm.set_value("data_de_fim", frappe.datetime.obj_to_str(ultimo_dia));
 	}
 
-	const inicio = frm.doc.dia_de_inicio;
-	const fim = frm.doc.dia_de_fim;
-	const vigilante = frm.doc.vigilante;
-
+	// numero is the SAME escala-aware count the server stamps on save
+	// (preview_numero → calcular_faltas_vigilante), so what is shown matches
+	// what is stored — no raw-sum drift.
 	frappe.call({
-		method: "frappe.client.get_list",
+		method: "sigos.payroll_ext.doctype.justificacao_de_faltas.justificacao_de_faltas.preview_numero",
 		args: {
-			doctype: "Ausencias",
-			filters: [
-				["data", ">=", inicio],
-				["data", "<=", fim]
-			],
-			fields: ["name", "data"],
-			limit_page_length: 500
+			vigilante: frm.doc.vigilante,
+			dia_de_inicio: frm.doc.dia_de_inicio,
+			dia_de_fim: frm.doc.dia_de_fim,
 		},
 		callback(res) {
-			if (!res.message || res.message.length === 0) {
-				frm.set_value("numero", 0);
-				return;
-			}
-
-			let total_faltas = 0;
-			const chamadas = res.message.map(aus =>
-				frappe.call({
-					method: "frappe.client.get",
-					args: { doctype: "Ausencias", name: aus.name }
-				}).then(r => {
-					if (r.message && r.message.tabela_ausencia) {
-						const linha = r.message.tabela_ausencia.find(l => l.vigilante === vigilante);
-						if (linha && linha.n_de_faltas) {
-							total_faltas += linha.n_de_faltas;
-						}
-					}
-				})
-			);
-
-			Promise.all(chamadas).then(() => {
-				frm.set_df_property("numero", "read_only", 0);
-				frm.set_value("numero", total_faltas);
-				frm.refresh_field("numero");
-			});
-		}
+			frm.set_value("numero", res.message || 0);
+			frm.refresh_field("numero");
+		},
 	});
 }

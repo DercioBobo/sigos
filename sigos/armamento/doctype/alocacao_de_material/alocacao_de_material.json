@@ -10,9 +10,12 @@
  "field_order": [
   "naming_series",
   "data",
+  "alocar_a",
+  "estado",
   "col_break_1",
+  "delegacao",
   "posto",
-  "categoria",
+  "vigilante",
   "sec_material",
   "material_a_alocar",
   "observacoes"
@@ -35,22 +38,59 @@
    "default": "Today"
   },
   {
+   "fieldname": "alocar_a",
+   "fieldtype": "Select",
+   "label": "Alocar a",
+   "options": "Posto\nVigilante",
+   "default": "Posto",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "description": "Define o destino e que materiais aparecem na tabela (partilhados vs. pessoais)."
+  },
+  {
+   "fieldname": "estado",
+   "fieldtype": "Select",
+   "label": "Estado",
+   "options": "Alocado\nDevolvido Parcial\nDevolvido\nEntregue",
+   "default": "Alocado",
+   "read_only": 1,
+   "allow_on_submit": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
    "fieldname": "col_break_1",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "delegacao",
+   "fieldtype": "Link",
+   "label": "Delegação",
+   "options": "Delegacao",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
   },
   {
    "fieldname": "posto",
    "fieldtype": "Link",
    "label": "Posto",
    "options": "Posto De Vigilancia",
-   "in_list_view": 1
+   "depends_on": "eval:doc.alocar_a=='Posto'",
+   "mandatory_depends_on": "eval:doc.alocar_a=='Posto'",
+   "in_list_view": 1,
+   "in_standard_filter": 1
   },
   {
-   "fieldname": "categoria",
-   "fieldtype": "Select",
-   "label": "Categoria",
-   "options": "\nArmamento\nEquipamento de Protecção\nUniforme\nVeículo\nComunicações\nOutro",
-   "in_list_view": 1
+   "fieldname": "vigilante",
+   "fieldtype": "Link",
+   "label": "Vigilante",
+   "options": "Vigilante",
+   "depends_on": "eval:doc.alocar_a=='Vigilante'",
+   "mandatory_depends_on": "eval:doc.alocar_a=='Vigilante'",
+   "in_list_view": 1,
+   "in_standard_filter": 1
   },
   {
    "fieldname": "sec_material",
