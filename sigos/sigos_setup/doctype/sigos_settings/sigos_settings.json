@@ -19,6 +19,11 @@
   "col_ss_rh1",
   "valor_padrao_uniforme",
   "meses_padrao_uniforme",
+  "sec_ss_ferias",
+  "ferias_activo",
+  "leave_type_ferias",
+  "col_ss_ferias",
+  "dias_maximos_ferias",
   "sec_ss_disc",
   "acumulacao_pd_activa",
   "reprimendas_baixa_pd",
@@ -141,6 +146,38 @@
    "fieldtype": "Int",
    "label": "Meses Padrão Uniforme",
    "default": "6"
+  },
+  {
+   "fieldname": "sec_ss_ferias",
+   "fieldtype": "Section Break",
+   "label": "Férias (Acumulação Automática)",
+   "description": "Acumulação progressiva de férias por antiguidade (Lei do Trabalho). Acumula 1 dia/mês no 1º ano e 2,5 dias/mês a partir de 1 ano, no dia de admissão de cada colaborador. Uma única Leave Allocation rolante por colaborador reflecte sempre o saldo real."
+  },
+  {
+   "fieldname": "ferias_activo",
+   "fieldtype": "Check",
+   "label": "Activar Acumulação Automática de Férias",
+   "default": "0",
+   "description": "Quando activo, a tarefa diária acumula férias a cada colaborador activo no dia da sua admissão. Desactive para gerir as Leave Allocations manualmente."
+  },
+  {
+   "fieldname": "leave_type_ferias",
+   "fieldtype": "Link",
+   "label": "Tipo de Licença — Férias",
+   "options": "Leave Type",
+   "default": "Ferias",
+   "description": "Leave Type usado para as férias. Padrão: \"Ferias\"."
+  },
+  {
+   "fieldname": "col_ss_ferias",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "dias_maximos_ferias",
+   "fieldtype": "Int",
+   "label": "Máximo Acumulável de Férias (dias)",
+   "default": "60",
+   "description": "Tecto do saldo de férias. A partir de 2 anos de antiguidade, no aniversário de admissão o excedente acima deste valor expira. Padrão: 60 (2 anos)."
   },
   {
    "fieldname": "sec_ss_disc",

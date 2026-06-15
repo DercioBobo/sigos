@@ -17,6 +17,7 @@
   "regime_atual",
   "col_tr1",
   "novo_regime",
+  "accao_escala",
   "col_tr2",
   "motivo"
  ],
@@ -25,7 +26,7 @@
    "fieldname": "naming_series",
    "fieldtype": "Select",
    "label": "Série",
-   "options": "TR-.####",
+   "options": "TR-.YY.-.##",
    "reqd": 1,
    "set_only_once": 1
   },
@@ -77,6 +78,14 @@
    "label": "Novo Regime",
    "options": "Regime",
    "reqd": 1
+  },
+  {
+   "fieldname": "accao_escala",
+   "fieldtype": "Select",
+   "label": "Acção na Escala",
+   "options": "Criar nova escala\nAlocar em escala existente\nDeixar sem escala",
+   "reqd": 1,
+   "description": "O que fazer com a escala ao mudar de regime. O sistema sugere a opção correcta conforme já exista (ou não) uma escala para o posto no novo regime."
   },
   {
    "fieldname": "col_tr2",

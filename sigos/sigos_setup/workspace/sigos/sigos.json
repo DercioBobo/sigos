@@ -1,6 +1,6 @@
 {
  "charts": [],
- "content": "[{\"id\":\"kpi_section\",\"type\":\"header\",\"data\":{\"text\":\"<b>Operações de Segurança</b>\",\"col\":12}},{\"id\":\"op_shortcuts\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Vigilante\",\"col\":3}},{\"id\":\"op_shortcuts2\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Posto De Vigilancia\",\"col\":3}},{\"id\":\"op_shortcuts3\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Escala Do Vigilante\",\"col\":3}},{\"id\":\"op_shortcuts4\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Ausencias\",\"col\":3}},{\"id\":\"op_shortcuts6\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Rotatividade\",\"col\":3}},{\"id\":\"op_shortcuts7\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Turnos Extras\",\"col\":3}},{\"id\":\"hr_section\",\"type\":\"header\",\"data\":{\"text\":\"<b>Recursos Humanos</b>\",\"col\":12}},{\"id\":\"hr_shortcuts1\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Demissao\",\"col\":3}},{\"id\":\"hr_shortcuts2\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Readimissao\",\"col\":3}},{\"id\":\"hr_shortcuts3\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Participacao\",\"col\":3}},{\"id\":\"hr_shortcuts4\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Processo Disciplinar\",\"col\":3}},{\"id\":\"hr_shortcuts5\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Troca De Categoria\",\"col\":3}},{\"id\":\"hr_shortcuts6\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Troca De Regime\",\"col\":3}},{\"id\":\"pay_section\",\"type\":\"header\",\"data\":{\"text\":\"<b>Payroll</b>\",\"col\":12}},{\"id\":\"pay_shortcuts1\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Outras Deducoes\",\"col\":3}},{\"id\":\"pay_shortcuts2\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Outras Remuneracoes\",\"col\":3}},{\"id\":\"pay_shortcuts3\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Emprestimo\",\"col\":3}},{\"id\":\"pay_shortcuts4\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Justificacao De Faltas\",\"col\":3}},{\"id\":\"pay_shortcuts5\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Reclamacao De Salario\",\"col\":3}},{\"id\":\"arm_section\",\"type\":\"header\",\"data\":{\"text\":\"<b>Armamento e Material</b>\",\"col\":12}},{\"id\":\"arm_shortcuts1\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Arma\",\"col\":3}},{\"id\":\"arm_shortcuts2\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Movimentacao De Arma\",\"col\":3}},{\"id\":\"arm_shortcuts3\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Alocacao De Material\",\"col\":3}},{\"id\":\"setup_section\",\"type\":\"header\",\"data\":{\"text\":\"<b>Configurações</b>\",\"col\":12}},{\"id\":\"setup_shortcuts1\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"SIGOS Settings\",\"col\":3}},{\"id\":\"setup_shortcuts2\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Delegacao\",\"col\":3}},{\"id\":\"setup_shortcuts3\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Grupo De Delegados\",\"col\":3}}]",
+ "content": "[{\"id\": \"op_section\", \"type\": \"header\", \"data\": {\"text\": \"<b>Operações de Segurança</b>\", \"col\": 12}}, {\"id\": \"op_sc1\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Vigilante\", \"col\": 3}}, {\"id\": \"op_sc2\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Posto De Vigilancia\", \"col\": 3}}, {\"id\": \"op_sc3\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Escala Do Vigilante\", \"col\": 3}}, {\"id\": \"op_sc4\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Ausencias\", \"col\": 3}}, {\"id\": \"op_sc5\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Rotatividade\", \"col\": 3}}, {\"id\": \"op_sc6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Turnos Extras\", \"col\": 3}}, {\"id\": \"op_sc7\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Ocorrencia\", \"col\": 3}}, {\"id\": \"hr_section\", \"type\": \"header\", \"data\": {\"text\": \"<b>Recursos Humanos e Disciplinar</b>\", \"col\": 12}}, {\"id\": \"hr_sc1\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Demissao\", \"col\": 3}}, {\"id\": \"hr_sc2\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Readimissao\", \"col\": 3}}, {\"id\": \"hr_sc3\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Participacao\", \"col\": 3}}, {\"id\": \"hr_sc4\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Processo Disciplinar\", \"col\": 3}}, {\"id\": \"hr_sc5\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Troca De Categoria\", \"col\": 3}}, {\"id\": \"hr_sc6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Troca De Regime\", \"col\": 3}}, {\"id\": \"pay_section\", \"type\": \"header\", \"data\": {\"text\": \"<b>Payroll</b>\", \"col\": 12}}, {\"id\": \"pay_sc1\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Outras Deducoes\", \"col\": 3}}, {\"id\": \"pay_sc2\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Outras Remuneracoes\", \"col\": 3}}, {\"id\": \"pay_sc3\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Emprestimo\", \"col\": 3}}, {\"id\": \"pay_sc4\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Justificacao De Faltas\", \"col\": 3}}, {\"id\": \"pay_sc5\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Reclamacao De Salario\", \"col\": 3}}, {\"id\": \"arm_section\", \"type\": \"header\", \"data\": {\"text\": \"<b>Armamento e Material</b>\", \"col\": 12}}, {\"id\": \"arm_sc1\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Arma\", \"col\": 3}}, {\"id\": \"arm_sc2\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Movimentacao De Arma\", \"col\": 3}}, {\"id\": \"arm_sc3\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Alocacao De Material\", \"col\": 3}}, {\"id\": \"arm_sc4\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Material\", \"col\": 3}}, {\"id\": \"fat_section\", \"type\": \"header\", \"data\": {\"text\": \"<b>Faturação</b>\", \"col\": 12}}, {\"id\": \"fat_sc1\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Faturacao Mensal\", \"col\": 3}}, {\"id\": \"setup_section\", \"type\": \"header\", \"data\": {\"text\": \"<b>Configurações e Tabelas</b>\", \"col\": 12}}, {\"id\": \"setup_sc1\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"SIGOS Settings\", \"col\": 3}}, {\"id\": \"setup_sc2\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Delegacao\", \"col\": 3}}, {\"id\": \"setup_sc3\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Grupo De Delegados\", \"col\": 3}}, {\"id\": \"setup_sc4\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Regime\", \"col\": 3}}, {\"id\": \"setup_sc5\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Categoria Vigilante\", \"col\": 3}}, {\"id\": \"setup_sc6\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Turno\", \"col\": 3}}, {\"id\": \"setup_sc7\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Operacao De Rotatividade\", \"col\": 3}}, {\"id\": \"setup_sc8\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Tipo De Infracao\", \"col\": 3}}, {\"id\": \"setup_sc9\", \"type\": \"shortcut\", \"data\": {\"shortcut_name\": \"Tipo De Justificacao\", \"col\": 3}}]",
  "creation": "2026-06-02 00:00:00.000000",
  "doctype": "Workspace",
  "for_user": "",
@@ -11,7 +11,7 @@
  "label": "SIGOS",
  "title": "SIGOS",
  "links": [],
- "modified": "2026-06-02 00:00:00.000000",
+ "modified": "2026-06-14 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Security Ops",
  "name": "SIGOS",
@@ -22,29 +22,165 @@
  "roles": [],
  "sequence_id": 1.0,
  "shortcuts": [
-  {"label": "Vigilante",              "link_to": "Vigilante",              "type": "DocType"},
-  {"label": "Posto De Vigilancia",    "link_to": "Posto De Vigilancia",    "type": "DocType"},
-  {"label": "Escala Do Vigilante",    "link_to": "Escala Do Vigilante",    "type": "DocType"},
-  {"label": "Ausencias",              "link_to": "Ausencias",              "type": "DocType"},
-  {"label": "Rotatividade",           "link_to": "Rotatividade",           "type": "DocType"},
-  {"label": "Turnos Extras",          "link_to": "Turnos Extras",          "type": "DocType"},
-  {"label": "Demissao",               "link_to": "Demissao",               "type": "DocType"},
-  {"label": "Readimissao",            "link_to": "Readimissao",            "type": "DocType"},
-  {"label": "Participacao",           "link_to": "Participacao",           "type": "DocType"},
-  {"label": "Processo Disciplinar",   "link_to": "Processo Disciplinar",   "type": "DocType"},
-  {"label": "Troca De Categoria",     "link_to": "Troca De Categoria",     "type": "DocType"},
-  {"label": "Troca De Regime",        "link_to": "Troca De Regime",        "type": "DocType"},
-  {"label": "Outras Deducoes",        "link_to": "Outras Deducoes",        "type": "DocType"},
-  {"label": "Outras Remuneracoes",    "link_to": "Outras Remuneracoes",    "type": "DocType"},
-  {"label": "Emprestimo",             "link_to": "Emprestimo",             "type": "DocType"},
-  {"label": "Justificacao De Faltas", "link_to": "Justificacao De Faltas", "type": "DocType"},
-  {"label": "Reclamacao De Salario",  "link_to": "Reclamacao De Salario",  "type": "DocType"},
-  {"label": "Arma",                   "link_to": "Arma",                   "type": "DocType"},
-  {"label": "Movimentacao De Arma",   "link_to": "Movimentacao De Arma",   "type": "DocType"},
-  {"label": "Alocacao De Material",   "link_to": "Alocacao De Material",   "type": "DocType"},
-  {"label": "SIGOS Settings",         "link_to": "SIGOS Settings",         "type": "DocType"},
-  {"label": "Regime",                 "link_to": "Regime",                 "type": "DocType"},
-  {"label": "Categoria Vigilante",   "link_to": "Categoria Vigilante",    "type": "DocType"},
-  {"label": "Turno",                  "link_to": "Turno",                  "type": "DocType"}
+  {
+   "label": "Vigilante",
+   "link_to": "Vigilante",
+   "type": "DocType"
+  },
+  {
+   "label": "Posto De Vigilancia",
+   "link_to": "Posto De Vigilancia",
+   "type": "DocType"
+  },
+  {
+   "label": "Escala Do Vigilante",
+   "link_to": "Escala Do Vigilante",
+   "type": "DocType"
+  },
+  {
+   "label": "Ausencias",
+   "link_to": "Ausencias",
+   "type": "DocType"
+  },
+  {
+   "label": "Rotatividade",
+   "link_to": "Rotatividade",
+   "type": "DocType"
+  },
+  {
+   "label": "Turnos Extras",
+   "link_to": "Turnos Extras",
+   "type": "DocType"
+  },
+  {
+   "label": "Ocorrencia",
+   "link_to": "Ocorrencia",
+   "type": "DocType"
+  },
+  {
+   "label": "Demissao",
+   "link_to": "Demissao",
+   "type": "DocType"
+  },
+  {
+   "label": "Readimissao",
+   "link_to": "Readimissao",
+   "type": "DocType"
+  },
+  {
+   "label": "Participacao",
+   "link_to": "Participacao",
+   "type": "DocType"
+  },
+  {
+   "label": "Processo Disciplinar",
+   "link_to": "Processo Disciplinar",
+   "type": "DocType"
+  },
+  {
+   "label": "Troca De Categoria",
+   "link_to": "Troca De Categoria",
+   "type": "DocType"
+  },
+  {
+   "label": "Troca De Regime",
+   "link_to": "Troca De Regime",
+   "type": "DocType"
+  },
+  {
+   "label": "Outras Deducoes",
+   "link_to": "Outras Deducoes",
+   "type": "DocType"
+  },
+  {
+   "label": "Outras Remuneracoes",
+   "link_to": "Outras Remuneracoes",
+   "type": "DocType"
+  },
+  {
+   "label": "Emprestimo",
+   "link_to": "Emprestimo",
+   "type": "DocType"
+  },
+  {
+   "label": "Justificacao De Faltas",
+   "link_to": "Justificacao De Faltas",
+   "type": "DocType"
+  },
+  {
+   "label": "Reclamacao De Salario",
+   "link_to": "Reclamacao De Salario",
+   "type": "DocType"
+  },
+  {
+   "label": "Arma",
+   "link_to": "Arma",
+   "type": "DocType"
+  },
+  {
+   "label": "Movimentacao De Arma",
+   "link_to": "Movimentacao De Arma",
+   "type": "DocType"
+  },
+  {
+   "label": "Alocacao De Material",
+   "link_to": "Alocacao De Material",
+   "type": "DocType"
+  },
+  {
+   "label": "Material",
+   "link_to": "Material",
+   "type": "DocType"
+  },
+  {
+   "label": "Faturacao Mensal",
+   "link_to": "Faturacao Mensal",
+   "type": "DocType"
+  },
+  {
+   "label": "SIGOS Settings",
+   "link_to": "SIGOS Settings",
+   "type": "DocType"
+  },
+  {
+   "label": "Delegacao",
+   "link_to": "Delegacao",
+   "type": "DocType"
+  },
+  {
+   "label": "Grupo De Delegados",
+   "link_to": "Grupo De Delegados",
+   "type": "DocType"
+  },
+  {
+   "label": "Regime",
+   "link_to": "Regime",
+   "type": "DocType"
+  },
+  {
+   "label": "Categoria Vigilante",
+   "link_to": "Categoria Vigilante",
+   "type": "DocType"
+  },
+  {
+   "label": "Turno",
+   "link_to": "Turno",
+   "type": "DocType"
+  },
+  {
+   "label": "Operacao De Rotatividade",
+   "link_to": "Operacao De Rotatividade",
+   "type": "DocType"
+  },
+  {
+   "label": "Tipo De Infracao",
+   "link_to": "Tipo De Infracao",
+   "type": "DocType"
+  },
+  {
+   "label": "Tipo De Justificacao",
+   "link_to": "Tipo De Justificacao",
+   "type": "DocType"
+  }
  ]
 }

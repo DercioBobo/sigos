@@ -10,6 +10,8 @@ def after_install():
 	_set_project_naming()
 	_clean_project_fields()
 	_seccionar_contrato()
+	_set_employee_naming()
+	_ensure_ferias_leave_type()
 
 
 def after_migrate():
@@ -24,6 +26,66 @@ def after_migrate():
 	_set_project_naming()
 	_clean_project_fields()
 	_seccionar_contrato()
+	_set_employee_naming()
+	_ensure_ferias_leave_type()
+
+
+def _ensure_ferias_leave_type():
+	"""
+	Seed the 'Ferias' Leave Type and pin its allocation horizon. _load_default_data
+	only runs on after_install, so existing sites (after_migrate) need this. The
+	far-future custom_allocation_end_date stops HRMS auto-expiring the rolling
+	allocation — the SIGOS férias engine owns the 60-day cap/expiry. Idempotent.
+	"""
+	try:
+		if not frappe.db.exists("Leave Type", "Ferias"):
+			frappe.get_doc({
+				"doctype": "Leave Type",
+				"leave_type_name": "Ferias",
+				"max_leaves_allowed": 0,
+				"is_carry_forward": 0,
+				"is_lwp": 0,
+				"is_earned_leave": 0,
+				"include_holiday": 1,
+				"allow_negative": 0,
+			}).insert(ignore_permissions=True)
+		if frappe.get_meta("Leave Type").has_field("custom_allocation_end_date"):
+			if not frappe.db.get_value("Leave Type", "Ferias", "custom_allocation_end_date"):
+				frappe.db.set_value(
+					"Leave Type", "Ferias", "custom_allocation_end_date", "2099-12-31",
+					update_modified=False,
+				)
+		frappe.db.commit()
+	except Exception as e:
+		frappe.log_error(f"SIGOS: ensure Ferias Leave Type failed: {e}", "SIGOS Install")
+
+
+def _set_employee_naming():
+	"""
+	Employee numbering policy:
+	  • Vigilante employees MIRROR the guard's number (VIG-02 → FUNC-02), forced in
+	    Vigilante._criar_employee_se_necessario — FUNC- is reserved for them.
+	  • Admin (non-vigilante) employees use their own series ADM-.## so the two number
+	    spaces never collide.
+	So Employees are named by Naming Series, and the series defaults to ADM-.##. The
+	vigilante path bypasses the series (forced name), so the ADM counter only advances
+	for real admin staff. Idempotent (make_property_setter upserts).
+	"""
+	try:
+		frappe.make_property_setter({
+			"doctype": "Employee", "doctype_or_field": "DocField", "fieldname": "naming_series",
+			"property": "options", "value": "ADM-.##", "property_type": "Text",
+		})
+		frappe.make_property_setter({
+			"doctype": "Employee", "doctype_or_field": "DocField", "fieldname": "naming_series",
+			"property": "default", "value": "ADM-.##", "property_type": "Data",
+		})
+		# Name employees by their Naming Series so the ADM series applies to admin staff.
+		if frappe.db.exists("DocType", "HR Settings"):
+			frappe.db.set_single_value("HR Settings", "emp_created_by", "Naming Series")
+		frappe.db.commit()
+	except Exception as e:
+		frappe.log_error(f"SIGOS: set Employee naming failed: {e}", "SIGOS Install")
 
 
 def _seccionar_contrato():
@@ -160,6 +222,7 @@ def _load_default_data():
 			"Regime":                  "nome",
 			"Operacao De Rotatividade": "abreviatura",
 			"Tipo De Justificacao":    "justificacao",
+			"Leave Type":              "leave_type_name",
 		}.get(doctype)
 
 		if name_field:

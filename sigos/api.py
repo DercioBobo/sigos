@@ -1541,3 +1541,68 @@ def encerrar_posto(posto, motivo):
 		"rotatividades": resultado["rotatividades"],
 		"arquivadas": arquivadas,
 	}
+
+
+@frappe.whitelist()
+def ferias_na_escala(escala_name):
+	"""
+	Read-only FÉRIAS indicator for the escala grid. Returns {"<vig>|<YYYY-MM-DD>": 1}
+	for every day a guard in this escala is on APPROVED férias. It does NOT pull the
+	guard off the escala — it only flags the cells. Maps guards -> Employees and reads
+	their approved Leave Applications of the férias Leave Type within the escala window.
+	"""
+	from frappe.utils import getdate, add_days
+
+	datas = frappe.db.sql(
+		"""
+		SELECT DISTINCT te.vigilante, MIN(te.data) AS de, MAX(te.data) AS ate
+		FROM `tabTabela De Escala De Vigilante` te
+		WHERE te.parent = %s
+		GROUP BY te.vigilante
+		""",
+		(escala_name,),
+		as_dict=True,
+	)
+	if not datas:
+		return {}
+
+	vigs = [r.vigilante for r in datas if r.vigilante]
+	de = min(getdate(r.de) for r in datas)
+	ate = max(getdate(r.ate) for r in datas)
+
+	# Guard -> Employee (and reverse) — only guards that have an Employee.
+	pares = frappe.get_all(
+		"Vigilante", filters={"name": ["in", vigs]},
+		fields=["name", "funcionario"],
+	)
+	emp_de_vig = {p.name: p.funcionario for p in pares if p.funcionario}
+	if not emp_de_vig:
+		return {}
+	vig_de_emp = {emp: vig for vig, emp in emp_de_vig.items()}
+
+	leave_type = frappe.db.get_single_value("SIGOS Settings", "leave_type_ferias") or "Ferias"
+
+	apps = frappe.get_all(
+		"Leave Application",
+		filters={
+			"employee": ["in", list(emp_de_vig.values())],
+			"leave_type": leave_type,
+			"status": "Approved",
+			"docstatus": 1,
+			"from_date": ["<=", ate],
+			"to_date": [">=", de],
+		},
+		fields=["employee", "from_date", "to_date"],
+	)
+
+	marcas = {}
+	for a in apps:
+		vig = vig_de_emp.get(a.employee)
+		if not vig:
+			continue
+		d = max(getdate(a.from_date), de)
+		fim = min(getdate(a.to_date), ate)
+		while d <= fim:
+			marcas[f"{vig}|{d.isoformat()}"] = 1
+			d = getdate(add_days(d, 1))
+	return marcas

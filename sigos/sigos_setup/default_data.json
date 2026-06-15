@@ -282,5 +282,17 @@
  { "doctype": "Tipo De Justificacao", "justificacao": "Nojo", "activo": 1 },
  { "doctype": "Tipo De Justificacao", "justificacao": "Doença", "activo": 1 },
  { "doctype": "Tipo De Justificacao", "justificacao": "Formação", "activo": 1 },
- { "doctype": "Tipo De Justificacao", "justificacao": "Abandono de Posto", "activo": 1 }
+ { "doctype": "Tipo De Justificacao", "justificacao": "Abandono de Posto", "activo": 1 },
+
+ {
+  "doctype": "Leave Type",
+  "leave_type_name": "Ferias",
+  "max_leaves_allowed": 0,
+  "is_carry_forward": 0,
+  "is_lwp": 0,
+  "is_earned_leave": 0,
+  "include_holiday": 1,
+  "allow_negative": 0,
+  "custom_allocation_end_date": "2099-12-31"
+ }
 ]

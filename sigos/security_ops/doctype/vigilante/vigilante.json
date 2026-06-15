@@ -39,6 +39,7 @@
   "regime_do_vigilante",
   "sec_alocacao",
   "posto_de_vigilancia",
+  "nome_do_posto",
   "tipo_de_posto",
   "col_break_aloc",
   "cliente",
@@ -66,7 +67,7 @@
    "fieldname": "naming_series",
    "fieldtype": "Select",
    "label": "Série",
-   "options": "VIG-.####",
+   "options": "VIG-.##",
    "reqd": 1,
    "set_only_once": 1
   },
@@ -179,12 +180,14 @@
    "fieldname": "dependentes",
    "fieldtype": "Int",
    "label": "Nº de Dependentes",
-   "default": "0"
+   "default": "0",
+   "permlevel": 2
   },
   {
    "fieldname": "sec_profissional",
    "fieldtype": "Section Break",
-   "label": "Estado Profissional"
+   "label": "Estado Profissional",
+   "permlevel": 2
   },
   {
    "fieldname": "status",
@@ -201,28 +204,33 @@
   {
    "fieldname": "data_admissao",
    "fieldtype": "Date",
-   "label": "Data de Admissão"
+   "label": "Data de Admissão",
+   "permlevel": 2
   },
   {
    "fieldname": "col_break_prof",
-   "fieldtype": "Column Break"
+   "fieldtype": "Column Break",
+   "permlevel": 2
   },
   {
    "fieldname": "motivo_de_admissao",
    "fieldtype": "Select",
    "label": "Motivo de Admissão",
-   "options": "\nNova Contratação\nReadmissão\nTransferência\nSubstituição"
+   "options": "\nNova Contratação\nReadmissão\nTransferência\nSubstituição",
+   "permlevel": 2
   },
   {
    "fieldname": "empresa",
    "fieldtype": "Link",
    "label": "Empresa",
-   "options": "Company"
+   "options": "Company",
+   "permlevel": 2
   },
   {
    "fieldname": "sec_operacional",
    "fieldtype": "Section Break",
-   "label": "Dados Operacionais"
+   "label": "Dados Operacionais",
+   "permlevel": 1
   },
   {
    "fieldname": "delegacao",
@@ -230,7 +238,8 @@
    "label": "Delegação",
    "options": "Delegacao",
    "in_list_view": 1,
-   "in_standard_filter": 1
+   "in_standard_filter": 1,
+   "permlevel": 1
   },
   {
    "fieldname": "categoria",
@@ -238,29 +247,34 @@
    "label": "Categoria",
    "options": "Categoria Vigilante",
    "in_list_view": 1,
-   "in_standard_filter": 1
+   "in_standard_filter": 1,
+   "permlevel": 1
   },
   {
    "fieldname": "col_break_ops",
-   "fieldtype": "Column Break"
+   "fieldtype": "Column Break",
+   "permlevel": 1
   },
   {
    "fieldname": "tipo_de_vigilante",
    "fieldtype": "Select",
    "label": "Tipo de Vigilante",
-   "options": "\nVigilante\nSupervisor\nChefe de Grupo\nChefe de Posto"
+   "options": "\nVigilante\nSupervisor\nChefe de Grupo\nChefe de Posto",
+   "permlevel": 1
   },
   {
    "fieldname": "regime_do_vigilante",
    "fieldtype": "Link",
    "label": "Regime",
    "options": "Regime",
-   "in_standard_filter": 1
+   "in_standard_filter": 1,
+   "permlevel": 1
   },
   {
    "fieldname": "sec_alocacao",
    "fieldtype": "Section Break",
-   "label": "Alocação"
+   "label": "Alocação",
+   "permlevel": 1
   },
   {
    "fieldname": "posto_de_vigilancia",
@@ -268,18 +282,29 @@
    "label": "Posto de Vigilância",
    "options": "Posto De Vigilancia",
    "in_list_view": 1,
-   "in_standard_filter": 1
+   "in_standard_filter": 1,
+   "permlevel": 1
+  },
+  {
+   "fieldname": "nome_do_posto",
+   "fieldtype": "Data",
+   "label": "Nome do Posto",
+   "fetch_from": "posto_de_vigilancia.nome_do_posto",
+   "read_only": 1,
+   "permlevel": 1
   },
   {
    "fieldname": "tipo_de_posto",
    "fieldtype": "Data",
    "label": "Tipo de Posto",
    "fetch_from": "posto_de_vigilancia.tipo_de_posto",
-   "read_only": 1
+   "read_only": 1,
+   "permlevel": 1
   },
   {
    "fieldname": "col_break_aloc",
-   "fieldtype": "Column Break"
+   "fieldtype": "Column Break",
+   "permlevel": 1
   },
   {
    "fieldname": "cliente",
@@ -287,7 +312,8 @@
    "label": "Cliente",
    "options": "Customer",
    "fetch_from": "posto_de_vigilancia.cliente",
-   "read_only": 1
+   "read_only": 1,
+   "permlevel": 1
   },
   {
    "fieldname": "projecto",
@@ -295,64 +321,75 @@
    "label": "Projecto",
    "options": "Project",
    "fetch_from": "posto_de_vigilancia.project",
-   "read_only": 1
+   "read_only": 1,
+   "permlevel": 1
   },
   {
    "fieldname": "nome_do_projecto",
    "fieldtype": "Data",
    "label": "Nome do Projecto",
    "fetch_from": "projecto.project_name",
-   "read_only": 1
+   "read_only": 1,
+   "permlevel": 1
   },
   {
    "fieldname": "sec_id_prof",
    "fieldtype": "Section Break",
-   "label": "Identificação Profissional"
+   "label": "Identificação Profissional",
+   "permlevel": 2
   },
   {
    "fieldname": "mecanografico",
    "fieldtype": "Data",
    "label": "Número Mecanográfico",
    "in_list_view": 0,
-   "search_index": 1
+   "search_index": 1,
+   "permlevel": 2
   },
   {
    "fieldname": "col_break_id",
-   "fieldtype": "Column Break"
+   "fieldtype": "Column Break",
+   "permlevel": 2
   },
   {
    "fieldname": "codename",
    "fieldtype": "Data",
-   "label": "Codename / Alcunha"
+   "label": "Codename / Alcunha",
+   "permlevel": 2
   },
   {
    "fieldname": "sec_anexos",
    "fieldtype": "Section Break",
-   "label": "Documentos Anexos"
+   "label": "Documentos Anexos",
+   "permlevel": 1
   },
   {
    "fieldname": "anexar_documento",
    "fieldtype": "Attach",
-   "label": "Documento Anexo"
+   "label": "Documento Anexo",
+   "permlevel": 1
   },
   {
    "fieldname": "sec_rh",
    "fieldtype": "Section Break",
    "label": "Ligação RH",
-   "collapsible": 1
+   "collapsible": 1,
+   "permlevel": 2
   },
   {
    "fieldname": "funcionario",
    "fieldtype": "Link",
    "label": "Funcionário (Employee)",
    "options": "Employee",
-   "read_only": 1
+   "read_only": 1,
+   "permlevel": 2
   },
   {
    "fieldname": "salario_base_manual",
    "fieldtype": "Currency",
    "label": "Salário Base (manual)",
-   "description": "Deixe vazio para herdar o salário base do contrato (por regime). Preencha apenas para excepções a este vigilante."
+   "description": "Deixe vazio para herdar o salário base do contrato (por regime). Preencha apenas para excepções a este vigilante.",
+   "permlevel": 2
   },
   {
    "fieldname": "tab_geral",
@@ -362,12 +399,14 @@
   {
    "fieldname": "tab_operacional",
    "fieldtype": "Tab Break",
-   "label": "Dados Operacionais"
+   "label": "Dados Operacionais",
+   "permlevel": 1
   },
   {
    "fieldname": "tab_rh",
    "fieldtype": "Tab Break",
-   "label": "Dados RH"
+   "label": "Dados RH",
+   "permlevel": 2
   }
  ],
  "links": [
@@ -452,6 +491,66 @@
    "report": 1,
    "role": "Operações SIGOS",
    "share": 0,
+   "write": 0
+  },
+  {
+   "role": "System Manager",
+   "permlevel": 1,
+   "read": 1,
+   "write": 1
+  },
+  {
+   "role": "SIGOS Manager",
+   "permlevel": 1,
+   "read": 1,
+   "write": 1
+  },
+  {
+   "role": "Aprovador RH",
+   "permlevel": 1,
+   "read": 1,
+   "write": 0
+  },
+  {
+   "role": "Aprovador Operações",
+   "permlevel": 1,
+   "read": 1,
+   "write": 1
+  },
+  {
+   "role": "Operações SIGOS",
+   "permlevel": 1,
+   "read": 1,
+   "write": 0
+  },
+  {
+   "role": "System Manager",
+   "permlevel": 2,
+   "read": 1,
+   "write": 1
+  },
+  {
+   "role": "SIGOS Manager",
+   "permlevel": 2,
+   "read": 1,
+   "write": 1
+  },
+  {
+   "role": "Aprovador RH",
+   "permlevel": 2,
+   "read": 1,
+   "write": 1
+  },
+  {
+   "role": "Aprovador Operações",
+   "permlevel": 2,
+   "read": 1,
+   "write": 0
+  },
+  {
+   "role": "Operações SIGOS",
+   "permlevel": 2,
+   "read": 1,
    "write": 0
   }
  ],

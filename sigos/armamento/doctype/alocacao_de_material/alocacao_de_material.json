@@ -15,6 +15,7 @@
   "col_break_1",
   "delegacao",
   "posto",
+  "posto_nome",
   "vigilante",
   "sec_material",
   "material_a_alocar",
@@ -25,7 +26,7 @@
    "fieldname": "naming_series",
    "fieldtype": "Select",
    "label": "Série",
-   "options": "MAT-.####",
+   "options": "MAT-.YY.-.##",
    "reqd": 1,
    "set_only_once": 1
   },
@@ -81,6 +82,13 @@
    "mandatory_depends_on": "eval:doc.alocar_a=='Posto'",
    "in_list_view": 1,
    "in_standard_filter": 1
+  },
+  {
+   "fieldname": "posto_nome",
+   "fieldtype": "Data",
+   "label": "Nome do Posto",
+   "fetch_from": "posto.nome_do_posto",
+   "read_only": 1
   },
   {
    "fieldname": "vigilante",

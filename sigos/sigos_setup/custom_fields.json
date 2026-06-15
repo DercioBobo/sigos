@@ -468,5 +468,36 @@
   "options": "Project Subsidio Item",
   "label": "Subsídios do Projecto",
   "insert_after": "custom_regime_rates"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Employee",
+  "module": "SIGOS Setup",
+  "fieldname": "custom_data_antiguidade_ferias",
+  "fieldtype": "Date",
+  "label": "Antiguidade para Férias",
+  "description": "Data de início da antiguidade usada SÓ para o cálculo de férias. Predefinida com a Data de Admissão; reposta numa readmissão para reiniciar a antiguidade (ano 1). Não altera a Data de Admissão.",
+  "insert_after": "date_of_joining"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Employee",
+  "module": "SIGOS Setup",
+  "fieldname": "custom_ultima_acumulacao_ferias",
+  "fieldtype": "Date",
+  "label": "Última Acumulação de Férias",
+  "read_only": 1,
+  "description": "Data da última acumulação automática de férias. Usada para impedir acumulação dupla no mesmo dia.",
+  "insert_after": "custom_data_antiguidade_ferias"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Leave Type",
+  "module": "SIGOS Setup",
+  "fieldname": "custom_allocation_end_date",
+  "fieldtype": "Date",
+  "label": "Fim da Alocação (Férias SIGOS)",
+  "description": "Data de fim (to_date) usada nas Leave Allocations rolantes de férias. Mantida num horizonte distante (ex.: 2099-12-31) para impedir a expiração automática do HRMS — a expiração/limite é gerida pelo motor de férias do SIGOS.",
+  "insert_after": "max_leaves_allowed"
  }
 ]

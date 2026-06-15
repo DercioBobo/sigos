@@ -38,6 +38,16 @@ class Readimissao(Document):
 		vig.flags.ignore_sync = True
 		vig.save(ignore_permissions=True)
 
+		# Reiniciar a antiguidade de FÉRIAS (ano 1) — limpamos a âncora e a última
+		# acumulação no Employee; quando o RH concluir a admissão com a nova Data de
+		# Admissão, o motor de férias re-fixa a âncora nessa data nova.
+		if vig.funcionario and frappe.db.exists("Employee", vig.funcionario):
+			frappe.db.set_value(
+				"Employee", vig.funcionario,
+				{"custom_data_antiguidade_ferias": None, "custom_ultima_acumulacao_ferias": None},
+				update_modified=False,
+			)
+
 		from sigos.timeline import registar
 		registar(self.vigilante,
 			_("Readmitido — de <b>Demitido</b> para <b>Pre-Adimissão RH</b> (aguarda nova admissão)"), self)

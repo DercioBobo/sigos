@@ -20,6 +20,7 @@
   "col_pd_1",
   "funcionario",
   "posto",
+  "posto_nome",
   "categoria",
   "tab_pd_proc",
   "sec_processo",
@@ -121,6 +122,13 @@
    "read_only": 1
   },
   {
+   "fieldname": "posto_nome",
+   "fieldtype": "Data",
+   "label": "Nome do Posto",
+   "fetch_from": "posto.nome_do_posto",
+   "read_only": 1
+  },
+  {
    "fieldname": "categoria",
    "fieldtype": "Data",
    "label": "Categoria",
@@ -171,70 +179,82 @@
   {
    "fieldname": "tab_pd_dec",
    "fieldtype": "Tab Break",
-   "label": "Decisão"
+   "label": "Decisão",
+   "permlevel": 1
   },
   {
    "fieldname": "sec_decisao",
    "fieldtype": "Section Break",
-   "label": "Decisão"
+   "label": "Decisão",
+   "permlevel": 1
   },
   {
    "fieldname": "decisao",
    "fieldtype": "Select",
    "label": "Decisão",
    "options": "\nAdvertência\nDedução\nRetenção De Salário\nDemissão",
-   "in_list_view": 1
+   "in_list_view": 1,
+   "permlevel": 1
   },
   {
    "fieldname": "col_pd_4",
-   "fieldtype": "Column Break"
+   "fieldtype": "Column Break",
+   "permlevel": 1
   },
   {
    "fieldname": "valor_a_pagar",
    "fieldtype": "Currency",
    "label": "Valor a Pagar",
-   "depends_on": "eval:doc.decisao===\"Dedução\""
+   "depends_on": "eval:doc.decisao===\"Dedução\"",
+   "permlevel": 1
   },
   {
    "fieldname": "meses_a_pagar",
    "fieldtype": "Int",
    "label": "Meses a Pagar",
-   "depends_on": "eval:doc.decisao===\"Dedução\""
+   "depends_on": "eval:doc.decisao===\"Dedução\"",
+   "permlevel": 1
   },
   {
    "fieldname": "mes_referencia",
    "fieldtype": "Select",
    "label": "Mês de Referência",
    "options": "\nJaneiro\nFevereiro\nMarço\nAbril\nMaio\nJunho\nJulho\nAgosto\nSetembro\nOutubro\nNovembro\nDezembro",
-   "depends_on": "eval:doc.decisao===\"Dedução\""
+   "depends_on": "eval:doc.decisao===\"Dedução\"",
+   "permlevel": 1
   },
   {
    "fieldname": "data_de_inicio",
    "fieldtype": "Date",
    "label": "Data de Início",
-   "depends_on": "eval:doc.decisao===\"Dedução\""
+   "depends_on": "eval:doc.decisao===\"Dedução\"",
+   "permlevel": 1
   },
   {
    "fieldname": "descricao",
    "fieldtype": "Small Text",
    "label": "Descrição",
-   "depends_on": "eval:doc.decisao===\"Dedução\""
+   "depends_on": "eval:doc.decisao===\"Dedução\"",
+   "permlevel": 1
   },
   {
    "fieldname": "uniforme",
    "fieldtype": "Select",
    "label": "Uniforme",
    "options": "\nEntregue\nNão Entregue",
-   "depends_on": "eval:doc.decisao===\"Demissão\""
+   "depends_on": "eval:doc.decisao===\"Demissão\"",
+   "permlevel": 1
   },
   {
    "fieldname": "col_break_4",
-   "fieldtype": "Column Break"
+   "fieldtype": "Column Break",
+   "permlevel": 1
   },
   {
    "fieldname": "termo_de_responsabilidade",
    "fieldtype": "Attach",
-   "label": "Termo de Responsabilidade"
+   "label": "Termo de Responsabilidade",
+   "permlevel": 1
   }
  ],
  "is_submittable": 1,
@@ -315,6 +335,36 @@
    "write": 0,
    "submit": 0,
    "cancel": 0
+  },
+  {
+   "role": "System Manager",
+   "permlevel": 1,
+   "read": 1,
+   "write": 1
+  },
+  {
+   "role": "SIGOS Manager",
+   "permlevel": 1,
+   "read": 1,
+   "write": 1
+  },
+  {
+   "role": "Aprovador RH",
+   "permlevel": 1,
+   "read": 1,
+   "write": 1
+  },
+  {
+   "role": "Aprovador Operações",
+   "permlevel": 1,
+   "read": 1,
+   "write": 0
+  },
+  {
+   "role": "Operações SIGOS",
+   "permlevel": 1,
+   "read": 1,
+   "write": 0
   }
  ],
  "sort_field": "modified",

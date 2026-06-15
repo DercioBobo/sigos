@@ -25,7 +25,7 @@
    "fieldname": "naming_series",
    "fieldtype": "Select",
    "label": "Série",
-   "options": "TC-.####",
+   "options": "TC-.YY.-.##",
    "reqd": 1,
    "set_only_once": 1
   },

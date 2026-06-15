@@ -265,19 +265,31 @@ function _distribuir_turnos(frm) {
 // ─── Grid render (loads regime info first for the coverage row) ───────────────
 function _load_and_render(frm) {
 	if (!frm.doc.regime_do_vigilante) { _render_grid(frm, null, []); return; }
+	const ferias = (frm.doc.name && !frm.is_new())
+		? frappe.xcall("sigos.api.ferias_na_escala", { escala_name: frm.doc.name }).catch(() => ({}))
+		: Promise.resolve({});
 	Promise.all([
 		frappe.db.get_value("Regime", frm.doc.regime_do_vigilante, "tipo_ciclo"),
 		frappe.xcall("sigos.api.get_regime_turnos", { regime: frm.doc.regime_do_vigilante }),
-	]).then(([tc, seq]) => {
+		ferias,
+	]).then(([tc, seq, fer]) => {
+		frm._esc_ferias = fer || {};
 		_render_grid(frm, tc?.message?.tipo_ciclo || null, seq || []);
 	});
 }
+
+// Read-only "Férias" flag for a guard/day (does not change the scheduled turno).
+function _is_ferias(frm, vig, d) {
+	return !!(frm._esc_ferias && frm._esc_ferias[`${vig}|${d}`]);
+}
+const _FER_BADGE = `<span class="esc-fer-badge" title="Em férias (aprovadas)">FÉR</span>`;
 
 const _PERIODO_CLS = { "Manhã": "cell-manha", "Noite": "cell-noite", "Tarde": "cell-tarde" };
 const _DOW = ["D", "S", "T", "Q", "Q", "S", "S"];
 const _MES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
 function _render_grid(frm, tipo_ciclo, seq) {
+	_inject_ferias_css();
 	// Cache for instant re-render when the range/week changes
 	frm._esc_tc = tipo_ciclo;
 	frm._esc_seq = seq;
@@ -376,6 +388,7 @@ function _legend(tipo_ciclo) {
 			<span class="esc-lg cell-tarde">Tarde</span>
 			<span class="esc-lg cell-folga">Folga</span>
 			<span class="esc-lg esc-override-lg">Manual</span>
+			<span class="esc-lg esc-ferias-lg">Ferias</span>
 		</div>
 		${_coverage_legend(tipo_ciclo)}`;
 }
@@ -453,13 +466,17 @@ function _render_week(wrapper, toolbar, ctx) {
 		dias.forEach((d, di) => {
 			const r = cellMap[`${vig}|${d}`];
 			const isPast = d < hoje;
+			const fer = _is_ferias(frm, vig, d);
+			const ferCls = fer ? "esc-wk-fer" : "";
+			const ferBadge = fer ? _FER_BADGE : "";
 			if (!r) {
-				body += `<td class="esc-wk-cell esc-wk-blank ${weCls(di)} ${isPast ? "esc-wk-past" : ""}"></td>`;
+				body += `<td class="esc-wk-cell esc-wk-blank ${ferCls} ${weCls(di)} ${isPast ? "esc-wk-past" : ""}">${ferBadge}</td>`;
 			} else {
 				const cls = _PERIODO_CLS[r.periodo] || "cell-folga";
 				const ovr = r.override ? "esc-wk-override" : "";
-				body += `<td class="esc-wk-cell ${weCls(di)} ${isPast ? "esc-wk-past" : ""}"
+				body += `<td class="esc-wk-cell ${ferCls} ${weCls(di)} ${isPast ? "esc-wk-past" : ""}"
 					${isPast ? "" : `data-vig="${vig}" data-data="${d}"`}>
+					${ferBadge}
 					<div class="esc-wk-chip ${cls} ${ovr}" title="${r.turno}${r.override ? " (manual)" : ""}">
 						${frappe.utils.escape_html(r.turno)}${r.override ? ' <span class="esc-wk-star">✎</span>' : ""}
 					</div>
@@ -536,13 +553,15 @@ function _render_compact(wrapper, toolbar, ctx) {
 		datas.forEach(d => {
 			const r = cellMap[`${vig}|${d}`];
 			const isPast = d < hoje;
+			const ferCls = _is_ferias(ctx.frm, vig, d) ? "esc-fer" : "";
 			if (!r) {
-				body += `<td class="esc-cell esc-empty ${isPast ? "esc-pastcell" : ""}"></td>`;
+				body += `<td class="esc-cell esc-empty ${ferCls} ${isPast ? "esc-pastcell" : ""}"></td>`;
 			} else {
 				const cls = _PERIODO_CLS[r.periodo] || "cell-folga";
 				const ovr = r.override ? "esc-override" : "";
-				body += `<td class="esc-cell ${cls} ${ovr} ${isPast ? "esc-pastcell" : ""}"
-					data-vig="${vig}" data-data="${d}" title="${r.turno}${r.override ? " (manual)" : ""}">${_abbr(r.turno)}</td>`;
+				const fTitle = ferCls ? " · em férias" : "";
+				body += `<td class="esc-cell ${cls} ${ovr} ${ferCls} ${isPast ? "esc-pastcell" : ""}"
+					data-vig="${vig}" data-data="${d}" title="${r.turno}${r.override ? " (manual)" : ""}${fTitle}">${_abbr(r.turno)}</td>`;
 			}
 		});
 		body += `</tr>`;
@@ -593,6 +612,31 @@ function _abbr(turno) {
 	if (m) return m[1] + m[2][0].toUpperCase();
 	if (/folga/i.test(turno)) return "F";
 	return turno.length <= 4 ? turno : turno.slice(0, 4);
+}
+
+// ─── Férias indicator styles (read-only flag; ASCII-only per house rule) ───────
+function _inject_ferias_css() {
+	if (document.getElementById("sigos-esc-ferias-css")) return;
+	const css = `
+.esc-wk-cell { position: relative; }
+.esc-cell { position: relative; }
+.esc-fer-badge {
+	position: absolute; top: 2px; right: 2px; z-index: 2;
+	font-size: 8px; font-weight: 800; letter-spacing: .03em;
+	color: #7a5300; background: #ffd864; border: 1px solid #e8a020;
+	border-radius: 3px; padding: 0 3px; line-height: 1.5; pointer-events: none;
+}
+.esc-wk-fer { box-shadow: inset 0 0 0 2px #e8a020; }
+.esc-fer::after {
+	content: ""; position: absolute; top: 1px; right: 1px;
+	width: 0; height: 0; border-top: 6px solid #e8a020; border-left: 6px solid transparent;
+}
+.esc-ferias-lg { background: #ffd864; color: #7a5300; border: 1px solid #e8a020; }
+`;
+	const s = document.createElement("style");
+	s.id = "sigos-esc-ferias-css";
+	s.textContent = css;
+	document.head.appendChild(s);
 }
 
 // ─── DECK — navy command panel (house pattern: HTML field + mounted controls) ──

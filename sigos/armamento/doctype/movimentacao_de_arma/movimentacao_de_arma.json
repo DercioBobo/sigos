@@ -16,6 +16,7 @@
   "numero_municoes_atual",
   "sec_novo",
   "novo_posto",
+  "novo_posto_nome",
   "col_break_2",
   "novo_numero",
   "motivo"
@@ -25,7 +26,7 @@
    "fieldname": "naming_series",
    "fieldtype": "Select",
    "label": "Série",
-   "options": "MOV-.####",
+   "options": "MOV-.YY.-.##",
    "reqd": 1,
    "set_only_once": 1
   },
@@ -74,6 +75,13 @@
    "label": "Novo Posto",
    "options": "Posto De Vigilancia",
    "reqd": 1
+  },
+  {
+   "fieldname": "novo_posto_nome",
+   "fieldtype": "Data",
+   "label": "Nome do Posto",
+   "fetch_from": "novo_posto.nome_do_posto",
+   "read_only": 1
   },
   {
    "fieldname": "col_break_2",

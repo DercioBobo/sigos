@@ -93,7 +93,11 @@ class Vigilante(Document):
 			return
 
 		# Only place the guard into a new escala if they are active and assigned.
-		if self.status == "Activo" and new_posto and new_regime:
+		# escala_modo == "sem_escala" (set by Troca De Regime "Deixar sem escala") forces
+		# a remove-only migration: the guard leaves the old escala but joins none.
+		if self.flags.get("escala_modo") == "sem_escala":
+			destino = (None, None)
+		elif self.status == "Activo" and new_posto and new_regime:
 			destino = (new_posto, new_regime)
 		else:
 			destino = (None, None)
@@ -321,8 +325,28 @@ class Vigilante(Document):
 			emp.custom_delegacao = self.delegacao
 			emp.custom_posto = self.posto_de_vigilancia
 
+			# Mirror the guard's number onto the Employee: VIG-02 → FUNC-02 (same suffix),
+			# so a vigilante and their funcionário always share one number. FUNC- is
+			# reserved for vigilante employees; admin staff use the ADM-.## series.
+			# We force the name (flags.name_set bypasses the Employee naming series) only
+			# when that exact FUNC-<n> is free — otherwise fall back to the normal series.
+			mirror = None
+			if self.name and "-" in self.name:
+				cand = "FUNC-" + self.name.rsplit("-", 1)[1]
+				if not frappe.db.exists("Employee", cand):
+					mirror = cand
+					emp.name = mirror
+					emp.employee = mirror
+					emp.flags.name_set = True
+
 			emp.flags.ignore_sync = True
 			emp.insert(ignore_permissions=True)
+
+			# Safety net: if the install's Employee naming overrode our forced name,
+			# rename to the mirror so VIG/FUNC stay in lock-step.
+			if mirror and emp.name != mirror and not frappe.db.exists("Employee", mirror):
+				frappe.rename_doc("Employee", emp.name, mirror, force=True)
+				emp.name = mirror
 		except Exception as e:
 			frappe.log_error(f"Erro ao criar Employee para Vigilante {self.name}: {e}", "SIGOS")
 			frappe.throw(

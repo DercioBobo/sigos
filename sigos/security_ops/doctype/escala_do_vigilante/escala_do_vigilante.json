@@ -13,6 +13,7 @@
   "sec_cabecalho",
   "naming_series",
   "posto_de_vigilancia",
+  "nome_do_posto",
   "col_break_1",
   "cliente",
   "estado",
@@ -50,7 +51,7 @@
    "fieldname": "naming_series",
    "fieldtype": "Select",
    "label": "Série",
-   "options": "ESC-.####",
+   "options": "ESC-.##",
    "reqd": 1,
    "set_only_once": 1
   },
@@ -62,6 +63,13 @@
    "reqd": 1,
    "in_list_view": 1,
    "in_standard_filter": 1
+  },
+  {
+   "fieldname": "nome_do_posto",
+   "fieldtype": "Data",
+   "label": "Nome do Posto",
+   "fetch_from": "posto_de_vigilancia.nome_do_posto",
+   "read_only": 1
   },
   {
    "fieldname": "col_break_1",

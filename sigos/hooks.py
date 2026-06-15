@@ -24,6 +24,11 @@ doctype_js = {
 	"Project": "public/js/project.js",
 }
 
+# Show all Postos of a contract under the Project's Connections tab
+override_doctype_dashboards = {
+	"Project": "sigos.overrides.project_dashboard",
+}
+
 # ─── Fixtures ─────────────────────────────────────────────────────────────────
 fixtures = [
 	{

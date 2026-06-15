@@ -21,6 +21,7 @@
   "mecanografico",
   "col_part_1",
   "posto",
+  "posto_nome",
   "categoria",
   "sec_infracao",
   "tipo_de_infracao",
@@ -34,7 +35,7 @@
    "fieldname": "naming_series",
    "fieldtype": "Select",
    "label": "Série",
-   "options": "PART-.YYYY.-.####",
+   "options": "PART-.YY.-.##",
    "reqd": 1,
    "set_only_once": 1
   },
@@ -116,6 +117,13 @@
    "fetch_from": "vigilante.posto_de_vigilancia",
    "read_only": 1,
    "in_standard_filter": 1
+  },
+  {
+   "fieldname": "posto_nome",
+   "fieldtype": "Data",
+   "label": "Nome do Posto",
+   "fetch_from": "posto.nome_do_posto",
+   "read_only": 1
   },
   {
    "fieldname": "categoria",

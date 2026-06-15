@@ -7,6 +7,17 @@ def daily():
 	_atualizar_todas_ocupacoes()
 	_rolar_escalas()
 	_verificar_postos_temporarios()
+	_acumular_ferias()
+
+
+def _acumular_ferias():
+	"""Progressive monthly leave accrual (each employee on their admission day)."""
+	from sigos.ferias import acumular_ferias
+	try:
+		acumular_ferias()
+	except Exception as ex:
+		frappe.db.rollback()
+		frappe.log_error(f"Erro na acumulação de férias: {ex}", "SIGOS Férias Daily")
 
 
 def _verificar_postos_temporarios():

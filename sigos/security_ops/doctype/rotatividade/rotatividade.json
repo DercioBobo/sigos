@@ -17,6 +17,7 @@
   "sec_rot_ant",
   "vigilante",
   "antigo_posto",
+  "antigo_posto_nome",
   "col_rot_1",
   "cliente_antigo_posto",
   "categoria_vigilante",
@@ -28,16 +29,19 @@
   "motivo",
   "col_rot_2",
   "novo_posto",
+  "novo_posto_nome",
   "novo_regime",
   "sec_substituto",
   "alocar_vigilante_substituto",
   "novo_vigilante",
   "alocado_ao_posto",
+  "alocado_ao_posto_nome",
   "col_rot_3",
   "cliente_novo_posto",
   "categoria_vigilante_a_alocar",
   "sec_reserva",
   "novo_posto_do_reserva",
+  "novo_posto_do_reserva_nome",
   "tab_rot_doc",
   "sec_justificativas",
   "motivo_3meses",
@@ -54,7 +58,7 @@
    "fieldname": "naming_series",
    "fieldtype": "Select",
    "label": "Série",
-   "options": "ROT-.YYYY.-.####",
+   "options": "ROT-.YY.-.##",
    "reqd": 1,
    "set_only_once": 1
   },
@@ -104,6 +108,13 @@
    "label": "Antigo Posto",
    "options": "Posto De Vigilancia",
    "fetch_from": "vigilante.posto_de_vigilancia",
+   "read_only": 1
+  },
+  {
+   "fieldname": "antigo_posto_nome",
+   "fieldtype": "Data",
+   "label": "Nome do Posto",
+   "fetch_from": "antigo_posto.nome_do_posto",
    "read_only": 1
   },
   {
@@ -167,6 +178,13 @@
    "options": "Posto De Vigilancia"
   },
   {
+   "fieldname": "novo_posto_nome",
+   "fieldtype": "Data",
+   "label": "Nome do Posto",
+   "fetch_from": "novo_posto.nome_do_posto",
+   "read_only": 1
+  },
+  {
    "fieldname": "sec_substituto",
    "fieldtype": "Section Break",
    "label": "Vigilante Substituto",
@@ -191,6 +209,13 @@
    "label": "Alocado ao Posto",
    "options": "Posto De Vigilancia",
    "fetch_from": "novo_vigilante.posto_de_vigilancia",
+   "read_only": 1
+  },
+  {
+   "fieldname": "alocado_ao_posto_nome",
+   "fieldtype": "Data",
+   "label": "Nome do Posto",
+   "fetch_from": "alocado_ao_posto.nome_do_posto",
    "read_only": 1
   },
   {
@@ -222,6 +247,13 @@
    "fieldtype": "Link",
    "label": "Novo Posto do Reserva",
    "options": "Posto De Vigilancia"
+  },
+  {
+   "fieldname": "novo_posto_do_reserva_nome",
+   "fieldtype": "Data",
+   "label": "Nome do Posto",
+   "fetch_from": "novo_posto_do_reserva.nome_do_posto",
+   "read_only": 1
   },
   {
    "fieldname": "tab_rot_doc",
