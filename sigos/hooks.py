@@ -96,6 +96,23 @@ doc_events = {
 		"before_validate": "sigos.payroll_ext.salary_slip_hooks.before_validate",
 		"before_submit": "sigos.payroll_ext.salary_slip_hooks.before_submit",
 	},
+	# Live nudge for the Painel Operacional CCO (re-fetch when ground truth changes).
+	# These run IN ADDITION to each doctype's own controller handlers.
+	"Ausencias": {
+		"on_submit": "sigos.painel.notificar_mudanca",
+		"on_cancel": "sigos.painel.notificar_mudanca",
+		"on_update_after_submit": "sigos.painel.notificar_mudanca",
+	},
+	"Ocorrencia": {
+		"after_insert": "sigos.painel.notificar_mudanca",
+		"on_update": "sigos.painel.notificar_mudanca",
+	},
+	"Escala Do Vigilante": {
+		"on_update": "sigos.painel.notificar_mudanca",
+	},
+	"Rotatividade": {
+		"on_submit": "sigos.painel.notificar_mudanca",
+	},
 }
 
 # ─── Jinja (print formats) ────────────────────────────────────────────────────
