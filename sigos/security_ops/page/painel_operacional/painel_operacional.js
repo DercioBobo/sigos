@@ -36,6 +36,7 @@ sigos.PainelOperacional = class PainelOperacional {
 
 	on_show() {
 		// Re-fetch when the user comes back to the page (data may have moved on).
+		this._close_modal();
 		this.refresh();
 	}
 
@@ -114,6 +115,11 @@ sigos.PainelOperacional = class PainelOperacional {
 			this.render();
 		}, 250));
 
+		// Primary action
+		$(`<button class="po-act-aus">+ ${__("Registar ausência")}</button>`)
+			.appendTo($filters)
+			.on("click", () => this._registar_ausencia());
+
 		// Live controls
 		const $live = $(`
 			<div class="po-live">
@@ -188,7 +194,7 @@ sigos.PainelOperacional = class PainelOperacional {
 		const tiles = [
 			{ cls: "k-cob", val: k.postos_cobertos, lbl: __("Cobertos") },
 			{ cls: "k-lac", val: k.postos_com_lacuna, lbl: __("Com lacuna") },
-			{ cls: "k-desc", val: k.postos_descobertos, lbl: __("Descobertos") },
+			{ cls: "k-desc", val: k.postos_descobertos, lbl: __("Sem Cobertura") },
 			{ cls: "k-falta", val: k.faltas, lbl: __("Faltas") },
 			{ cls: "k-sub", val: k.substituidos, lbl: __("Substituidos") },
 			{ cls: "k-fer", val: k.ferias, lbl: __("Ferias") },
@@ -226,7 +232,7 @@ sigos.PainelOperacional = class PainelOperacional {
 		const defs = [
 			{ key: "todos", lbl: __("Todos"), n: k.postos_total },
 			{ key: "atencao", lbl: __("Com lacuna"), n: k.postos_com_lacuna },
-			{ key: "descobertos", lbl: __("Descobertos"), n: k.postos_descobertos },
+			{ key: "descobertos", lbl: __("Sem Cobertura"), n: k.postos_descobertos },
 			{ key: "ok", lbl: __("OK"), n: k.postos_cobertos },
 		];
 		this.$chips.html(defs.map((d) => `
@@ -271,11 +277,11 @@ sigos.PainelOperacional = class PainelOperacional {
 
 		this.$board.find("[data-posto]").on("click", (e) => {
 			if ($(e.target).closest("[data-vig]").length) return;
-			frappe.set_route("Form", "Posto De Vigilancia", $(e.currentTarget).data("posto"));
+			this._abrir_posto($(e.currentTarget).data("posto"));
 		});
 		this.$board.find("[data-vig]").on("click", (e) => {
 			e.stopPropagation();
-			frappe.set_route("Form", "Vigilante", $(e.currentTarget).data("vig"));
+			this._abrir_vigilante($(e.currentTarget).data("vig"));
 		});
 	}
 
@@ -393,9 +399,9 @@ sigos.PainelOperacional = class PainelOperacional {
 		`);
 
 		this.$side.find("[data-posto]").on("click", (e) =>
-			frappe.set_route("Form", "Posto De Vigilancia", $(e.currentTarget).data("posto")));
+			this._abrir_posto($(e.currentTarget).data("posto")));
 		this.$side.find("[data-vig]").on("click", (e) =>
-			frappe.set_route("Form", "Vigilante", $(e.currentTarget).data("vig")));
+			this._abrir_vigilante($(e.currentTarget).data("vig")));
 		this.$side.find("[data-oc]").on("click", (e) =>
 			frappe.set_route("Form", "Ocorrencia", $(e.currentTarget).data("oc")));
 		this.$side.find(".po-add-oc").on("click", () => {
@@ -408,6 +414,171 @@ sigos.PainelOperacional = class PainelOperacional {
 
 	_grav_key(g) {
 		return { "Crítica": "critica", "Alta": "alta", "Média": "media", "Baixa": "baixa" }[g] || "media";
+	}
+
+	// ─────────────────────────────────────────────────────── modals (week view)
+
+	_registar_ausencia() {
+		frappe.new_doc("Ausencias", { data: this.state.data });
+	}
+
+	_modal_shell() {
+		this._close_modal();
+		this.$modal = $(`
+			<div class="po-modal-back">
+				<div class="po-modal">
+					<div class="po-modal-h">
+						<div class="po-modal-title"></div>
+						<div class="po-modal-actions"></div>
+						<button class="po-modal-x" title="${__("Fechar")}">&times;</button>
+					</div>
+					<div class="po-modal-b"></div>
+				</div>
+			</div>`).appendTo(document.body);
+		this.$modal.on("mousedown", (e) => { if (e.target === this.$modal.get(0)) this._close_modal(); });
+		this.$modal.find(".po-modal-x").on("click", () => this._close_modal());
+		this._esc = (e) => { if (e.key === "Escape") this._close_modal(); };
+		$(document).on("keydown", this._esc);
+		return this.$modal;
+	}
+
+	_close_modal() {
+		if (this.$modal) { this.$modal.remove(); this.$modal = null; }
+		if (this._esc) { $(document).off("keydown", this._esc); this._esc = null; }
+	}
+
+	_abrir_posto(posto) {
+		if (!posto) return;
+		const $m = this._modal_shell();
+		$m.find(".po-modal-b").html(`<div class="po-mloading">${__("A carregar...")}</div>`);
+		frappe.call({
+			method: "sigos.painel.escala_semana_posto",
+			args: { posto, data: this.state.data },
+			callback: (r) => { if (this.$modal && r.message) this._fill_posto_modal(r.message); },
+		});
+	}
+
+	_abrir_vigilante(vig) {
+		if (!vig) return;
+		const $m = this._modal_shell();
+		$m.find(".po-modal-b").html(`<div class="po-mloading">${__("A carregar...")}</div>`);
+		frappe.call({
+			method: "sigos.painel.escala_semana_vigilante",
+			args: { vigilante: vig, data: this.state.data },
+			callback: (r) => { if (this.$modal && r.message) this._fill_vig_modal(r.message); },
+		});
+	}
+
+	_fill_posto_modal(m) {
+		const p = m.posto;
+		const sub = [p.delegacao, p.cliente].filter(Boolean)
+			.map((x) => frappe.utils.escape_html(x)).join(" &middot; ");
+		this.$modal.find(".po-modal-title").html(`
+			<span class="po-mt-code">${frappe.utils.escape_html(p.name)}</span>
+			<div class="po-vtitle">
+				<span class="po-mt-name">${frappe.utils.escape_html(p.nome_do_posto || "")}</span>
+				${sub ? `<span class="po-mt-sub">${sub}</span>` : ""}
+			</div>`);
+		this.$modal.find(".po-modal-actions").html(
+			`<button class="po-mbtn ghost" data-go-posto="${frappe.utils.escape_html(p.name)}">${__("Abrir posto")}</button>`);
+		this.$modal.find(".po-modal-b").html(this._week_caption() + this._week_html(m.dias, "posto"));
+		this._bind_modal_common();
+	}
+
+	_fill_vig_modal(m) {
+		const v = m.vigilante;
+		const ini = (v.nome_completo || v.name || "?").trim().slice(0, 1).toUpperCase();
+		const foto = v.foto
+			? `<img class="po-vphoto" src="${frappe.utils.escape_html(v.foto)}"/>`
+			: `<div class="po-vphoto po-vph-ph">${frappe.utils.escape_html(ini)}</div>`;
+		const sub = [v.name, v.codename, v.mecanografico].filter(Boolean)
+			.map((x) => frappe.utils.escape_html(x)).join(" &middot; ");
+		this.$modal.find(".po-modal-title").html(`
+			${foto}
+			<div class="po-vtitle">
+				<span class="po-mt-name">${frappe.utils.escape_html(v.nome_completo || v.name)}</span>
+				<span class="po-mt-sub">${sub}</span>
+			</div>`);
+		this.$modal.find(".po-modal-actions").html(`
+			<button class="po-mbtn" data-new-aus="1">+ ${__("Registar ausência")}</button>
+			<button class="po-mbtn ghost" data-go-vig="${frappe.utils.escape_html(v.name)}">${__("Abrir ficha")}</button>`);
+		const chips = [
+			[__("Estado"), v.status],
+			[__("Categoria"), v.categoria],
+			[__("Regime"), v.regime_do_vigilante],
+			[__("Tipo"), v.tipo_de_vigilante],
+			[__("Delegação"), v.delegacao],
+			[__("Posto"), v.nome_do_posto || v.posto_de_vigilancia],
+			[__("Cliente"), v.cliente],
+			[__("Contacto"), v.contacto],
+			[__("Admissão"), v.data_admissao ? frappe.datetime.str_to_user(v.data_admissao) : null],
+		].filter(([, val]) => val);
+		const meta = `<div class="po-vmeta">${chips.map(([k, val]) =>
+			`<div class="po-vchip"><span>${k}</span><b>${frappe.utils.escape_html(String(val))}</b></div>`).join("")}</div>`;
+		this.$modal.find(".po-modal-b").html(meta + this._week_caption() + this._week_html(m.dias, "vig"));
+		this._bind_modal_common();
+	}
+
+	_week_caption() {
+		return `<div class="po-week-cap">${__("Escala")} &middot; ${__("7 dias a partir de")} ${this._fmt_day(this.state.data)}</div>`;
+	}
+
+	_week_html(dias, mode) {
+		const cols = dias.map((d) => {
+			const today = d.data === this.state.data ? " is-today" : "";
+			const body = d.rows.length
+				? d.rows.map((r) => this._week_row(r, mode)).join("")
+				: `<div class="po-wempty">&mdash;</div>`;
+			return `<div class="po-wday${today}">
+				<div class="po-wday-h"><b>${d.label}</b><span>${this._fmt_day(d.data)}</span></div>
+				<div class="po-wday-b">${body}</div>
+			</div>`;
+		}).join("");
+		return `<div class="po-week">${cols}</div>`;
+	}
+
+	_week_row(r, mode) {
+		const turno = r.turno ? `<span class="po-turno">${frappe.utils.escape_html(r.turno)}</span>` : "";
+		if (r.e_folga) {
+			return `<div class="po-wrow folga"><span class="po-folga">${__("Folga")}</span>${turno}</div>`;
+		}
+		const per = r.periodo
+			? `<span class="po-wper p-${this._per_key(r.periodo)}">${frappe.utils.escape_html(r.periodo)}</span>` : "";
+		if (mode === "posto") {
+			return `<div class="po-wrow" data-vig="${frappe.utils.escape_html(r.vigilante)}">
+				<span class="po-wname">${frappe.utils.escape_html(r.nome_completo || r.vigilante)}</span>
+				<div class="po-wtags">${per}${turno}</div></div>`;
+		}
+		return `<div class="po-wrow" data-posto="${frappe.utils.escape_html(r.posto || "")}">
+			<span class="po-wname">${frappe.utils.escape_html(r.nome_do_posto || r.posto || "—")}</span>
+			<div class="po-wtags">${per}${turno}</div></div>`;
+	}
+
+	_bind_modal_common() {
+		this.$modal.find("[data-go-posto]").on("click", (e) => {
+			const n = $(e.currentTarget).data("go-posto"); this._close_modal();
+			frappe.set_route("Form", "Posto De Vigilancia", n);
+		});
+		this.$modal.find("[data-go-vig]").on("click", (e) => {
+			const n = $(e.currentTarget).data("go-vig"); this._close_modal();
+			frappe.set_route("Form", "Vigilante", n);
+		});
+		this.$modal.find("[data-new-aus]").on("click", () => { this._close_modal(); this._registar_ausencia(); });
+		this.$modal.find("[data-vig]").on("click", (e) => {
+			e.stopPropagation(); this._abrir_vigilante($(e.currentTarget).data("vig"));
+		});
+		this.$modal.find("[data-posto]").on("click", (e) => {
+			e.stopPropagation(); this._abrir_posto($(e.currentTarget).data("posto"));
+		});
+	}
+
+	_per_key(p) {
+		return { "Manhã": "m", "Tarde": "t", "Noite": "n" }[p] || "x";
+	}
+
+	_fmt_day(iso) {
+		const parts = (iso || "").split("-");
+		return parts.length === 3 ? parts[2] + "/" + parts[1] : iso;
 	}
 
 	// ──────────────────────────────────────────────────────────── live / utils
@@ -563,6 +734,60 @@ sigos.PainelOperacional = class PainelOperacional {
 .po-oc-estado { color:#9fb1c6; }
 .po-add-oc { width:calc(100% - 16px); margin:0 8px 10px; background:#16202c; color:#9fc6ff; border:1px dashed #2a3a4d; border-radius:8px; padding:7px; font-size:12px; cursor:pointer; }
 .po-add-oc:hover { border-color:#3aa0ff; color:#eaf2fb; }
+
+/* Primary action button (toolbar) */
+.po-act-aus { background:#13351f; color:#5be09a; border:1px solid #1f6b3f; border-radius:8px; height:30px; padding:0 12px; font-size:12px; cursor:pointer; white-space:nowrap; }
+.po-act-aus:hover { border-color:#2ec36b; color:#eaffef; }
+
+/* Modal */
+.po-modal-back { position:fixed; inset:0; background:rgba(5,8,12,.72); backdrop-filter:blur(3px); z-index:1050; display:flex; align-items:flex-start; justify-content:center; padding:46px 16px; overflow:auto; }
+.po-modal { width:min(1040px,100%); background:linear-gradient(180deg,#141a23,#0e131b); border:1px solid #243140; border-radius:16px; box-shadow:0 24px 70px rgba(0,0,0,.6); overflow:hidden; animation:po-pop .12s ease; }
+@keyframes po-pop { from { transform:translateY(8px); opacity:0; } to { transform:none; opacity:1; } }
+.po-modal-h { display:flex; align-items:center; gap:14px; padding:14px 18px; border-bottom:1px solid #1f2935; background:linear-gradient(180deg,#161d27,#121821); }
+.po-modal-title { display:flex; align-items:center; gap:11px; flex:1; min-width:0; }
+.po-mt-code { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:15px; font-weight:700; color:#eaf2fb; background:#1b2430; border:1px solid #2a3a4d; border-radius:7px; padding:2px 9px; }
+.po-mt-name { font-size:16px; font-weight:600; color:#eaf2fb; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.po-mt-sub { font-size:11.5px; color:#7c8ea3; }
+.po-vtitle { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.po-vphoto { width:46px; height:46px; border-radius:11px; object-fit:cover; border:1px solid #2a3a4d; flex:none; }
+.po-vph-ph { display:grid; place-items:center; background:#1b2430; color:#9fc6ff; font-size:20px; font-weight:600; }
+.po-modal-actions { display:flex; gap:8px; flex:none; }
+.po-mbtn { background:#13351f; color:#7df0aa; border:1px solid #1f6b3f; border-radius:8px; padding:6px 12px; font-size:12px; cursor:pointer; white-space:nowrap; }
+.po-mbtn:hover { border-color:#2ec36b; color:#eaffef; }
+.po-mbtn.ghost { background:#1c2a3a; color:#cfe3fb; border-color:#2a4a6d; }
+.po-mbtn.ghost:hover { border-color:#3aa0ff; color:#fff; }
+.po-modal-x { background:transparent; border:0; color:#7c8ea3; font-size:24px; line-height:1; cursor:pointer; width:32px; height:32px; border-radius:8px; flex:none; }
+.po-modal-x:hover { background:#1b2430; color:#eaf2fb; }
+.po-modal-b { padding:16px 18px 22px; max-height:calc(100vh - 170px); overflow:auto; }
+.po-mloading { color:#6b7e93; text-align:center; padding:40px; font-size:13px; }
+.po-vmeta { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+.po-vchip { background:#10161f; border:1px solid #1f2935; border-radius:9px; padding:6px 10px; min-width:92px; }
+.po-vchip span { display:block; font-size:9.5px; text-transform:uppercase; letter-spacing:.07em; color:#6b7e93; }
+.po-vchip b { font-size:12.5px; color:#dbe5f1; font-weight:600; }
+.po-week-cap { font-size:10.5px; text-transform:uppercase; letter-spacing:.08em; color:#6b7e93; margin:2px 0 8px; }
+
+/* Week grid */
+.po-week { display:grid; grid-template-columns:repeat(7,minmax(116px,1fr)); gap:8px; }
+@media (max-width:900px) { .po-week { grid-auto-flow:column; grid-template-columns:none; grid-auto-columns:minmax(150px,70%); overflow-x:auto; } }
+.po-wday { background:#10161f; border:1px solid #1c2531; border-radius:11px; overflow:hidden; min-height:88px; }
+.po-wday.is-today { border-color:#3aa0ff; box-shadow:inset 0 0 0 1px rgba(58,160,255,.35); }
+.po-wday-h { display:flex; justify-content:space-between; align-items:baseline; padding:7px 9px; background:#141b24; border-bottom:1px solid #1c2531; }
+.po-wday-h b { font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:#bccadb; }
+.po-wday-h span { font-size:11px; color:#6b7e93; font-family:ui-monospace,Menlo,Consolas,monospace; }
+.po-wday-b { padding:6px; display:flex; flex-direction:column; gap:5px; }
+.po-wempty { color:#3f4d5d; text-align:center; font-size:13px; padding:8px 0; }
+.po-wrow { background:#161e29; border:1px solid #1f2935; border-radius:8px; padding:5px 7px; cursor:pointer; display:flex; flex-direction:column; gap:4px; }
+.po-wrow:hover { border-color:#3aa0ff; }
+.po-wrow.folga { background:#12181f; cursor:default; flex-direction:row; align-items:center; gap:6px; }
+.po-wrow.folga:hover { border-color:#1f2935; }
+.po-wname { font-size:12px; color:#eaf2fb; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.po-wtags { display:flex; flex-wrap:wrap; gap:4px; align-items:center; }
+.po-wper { font-size:9.5px; text-transform:uppercase; letter-spacing:.04em; border-radius:4px; padding:1px 6px; }
+.po-wper.p-m { background:#10263b; color:#6fb4ff; }
+.po-wper.p-t { background:#2e2510; color:#ffce6b; }
+.po-wper.p-n { background:#221a33; color:#c4a6ff; }
+.po-wper.p-x { background:#1a2330; color:#9fb1c6; }
+.po-folga { font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:#6b7e93; background:#1a2330; border-radius:4px; padding:1px 7px; }
 `;
 		const style = document.createElement("style");
 		style.id = "sigos-painel-css";

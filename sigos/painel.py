@@ -310,6 +310,87 @@ def _filtrar_busca(cards, busca):
 	return out
 
 
+# ──────────────────────────────────────────────────── week detail (modals)
+
+_DIAS_SEMANA = ("Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom")
+
+
+def _agrupar_dias(d0, rows):
+	"""Bucket pre-sorted escala rows into the 7 days starting at d0 (always all 7)."""
+	por_dia = {}
+	for r in rows:
+		por_dia.setdefault(str(r["data"]), []).append(r)
+	dias = []
+	for i in range(7):
+		di = getdate(frappe.utils.add_days(d0, i))
+		dias.append({
+			"data": di.isoformat(),
+			"label": _DIAS_SEMANA[di.weekday()],
+			"rows": por_dia.get(di.isoformat(), []),
+		})
+	return dias
+
+
+@frappe.whitelist()
+def escala_semana_posto(posto, data=None):
+	"""7-day escala for one posto (from `data`), grouped per day — for the board modal."""
+	d0 = getdate(data or nowdate())
+	d1 = getdate(frappe.utils.add_days(d0, 6))
+	info = frappe.db.get_value(
+		"Posto De Vigilancia", posto,
+		["name", "nome_do_posto", "cliente", "delegacao", "tipo_de_posto",
+		 "estado", "numero_de_vagas"],
+		as_dict=True,
+	) or {"name": posto}
+	rows = frappe.db.sql(
+		"""
+		SELECT te.data, te.vigilante, v.nome_completo, v.mecanografico,
+		       te.turno, COALESCE(NULLIF(te.periodo, ''), t.periodo) AS periodo,
+		       te.regime, COALESCE(t.e_folga, 0) AS e_folga
+		FROM `tabTabela De Escala De Vigilante` te
+		JOIN `tabEscala Do Vigilante` e ON e.name = te.parent AND e.estado = 'Activo'
+		JOIN `tabVigilante` v ON v.name = te.vigilante
+		LEFT JOIN `tabTurno` t ON t.name = te.turno
+		WHERE e.posto_de_vigilancia = %(posto)s AND te.data BETWEEN %(d1)s AND %(d2)s
+		""",
+		{"posto": posto, "d1": d0, "d2": d1},
+		as_dict=True,
+	)
+	rows.sort(key=lambda r: (str(r["data"]), _ORD_PERIODO.get(r.get("periodo"), 9), r.get("nome_completo") or ""))
+	return {"posto": info, "dias": _agrupar_dias(d0, rows)}
+
+
+@frappe.whitelist()
+def escala_semana_vigilante(vigilante, data=None):
+	"""7-day escala for one vigilante (from `data`) plus key profile fields — board modal."""
+	d0 = getdate(data or nowdate())
+	d1 = getdate(frappe.utils.add_days(d0, 6))
+	v = frappe.db.get_value(
+		"Vigilante", vigilante,
+		["name", "nome_completo", "mecanografico", "codename", "status",
+		 "categoria", "regime_do_vigilante", "tipo_de_vigilante", "delegacao",
+		 "posto_de_vigilancia", "nome_do_posto", "cliente", "contacto",
+		 "data_admissao", "foto"],
+		as_dict=True,
+	) or {"name": vigilante}
+	rows = frappe.db.sql(
+		"""
+		SELECT te.data, te.posto, p.nome_do_posto, te.turno,
+		       COALESCE(NULLIF(te.periodo, ''), t.periodo) AS periodo,
+		       te.regime, COALESCE(t.e_folga, 0) AS e_folga
+		FROM `tabTabela De Escala De Vigilante` te
+		JOIN `tabEscala Do Vigilante` e ON e.name = te.parent AND e.estado = 'Activo'
+		LEFT JOIN `tabTurno` t ON t.name = te.turno
+		LEFT JOIN `tabPosto De Vigilancia` p ON p.name = te.posto
+		WHERE te.vigilante = %(vig)s AND te.data BETWEEN %(d1)s AND %(d2)s
+		""",
+		{"vig": vigilante, "d1": d0, "d2": d1},
+		as_dict=True,
+	)
+	rows.sort(key=lambda r: (str(r["data"]), _ORD_PERIODO.get(r.get("periodo"), 9), r.get("nome_do_posto") or ""))
+	return {"vigilante": v, "dias": _agrupar_dias(d0, rows)}
+
+
 def notificar_mudanca(doc, method=None):
 	"""
 	Realtime nudge so EVERY open Painel Operacional re-fetches — broadcast to the whole
