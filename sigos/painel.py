@@ -260,20 +260,27 @@ def _reserva_disponivel(delegacao):
 	)
 
 
+_ORD_GRAVIDADE = {"Crítica": 0, "Alta": 1, "Média": 2, "Baixa": 3}
+
+
 def _ocorrencias(d, delegacao, posto):
 	filters = {"data": d}
 	if delegacao:
 		filters["delegacao"] = delegacao
 	if posto:
 		filters["posto"] = posto
-	return frappe.get_all(
+	rows = frappe.get_all(
 		"Ocorrencia",
 		filters=filters,
 		fields=["name", "assunto", "tipo", "gravidade", "estado", "posto",
 		        "posto_nome", "hora", "vigilante", "delegacao"],
-		order_by="field(gravidade,'Crítica','Alta','Média','Baixa'), hora desc",
+		order_by="hora desc",
 		limit_page_length=200,
 	)
+	# Severity ranking via SQL field() is rejected by get_all's order_by guard, so rank here.
+	# Stable sort keeps the query's `hora desc` order within each gravidade.
+	rows.sort(key=lambda o: _ORD_GRAVIDADE.get(o.get("gravidade"), 9))
+	return rows
 
 
 def _contar_ocorrencias_abertas(delegacao):
