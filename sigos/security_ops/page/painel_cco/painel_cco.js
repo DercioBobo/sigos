@@ -1,5 +1,6 @@
-// SIGOS — Painel CCO (estatístico). Editorial light, all-custom charts (no chart lib).
-// Analytical sibling of the RH dashboard; shares the paper/Fraunces/terracotta language.
+// SIGOS - Painel CCO (estatistico). "Operations Daylight": bright control surface,
+// all-custom charts (no chart lib). Indigo = interaction; green/amber/red = coverage
+// status only. Space Grotesk numerals, Inter body, IBM Plex Mono for entity codes.
 frappe.provide("sigos");
 
 frappe.pages["painel-cco"].on_page_load = function (wrapper) {
@@ -22,21 +23,22 @@ sigos.PainelCCO = class PainelCCO {
 			busca: "",
 		};
 		this.THEME_KEY = "sigos_cco_theme";
-		this.theme = localStorage.getItem(this.THEME_KEY) || "dark"; // CCO defaults to dark
+		this.theme = localStorage.getItem(this.THEME_KEY) || "light"; // daylight by default
 		this._palettes = {
 			light: {
-				accent: "#BC4A22", accentInk: "#8E3315", graphite: "#574E42", ink3: "#A99E8B",
-				good: "#5E7A3E", bad: "#A8472E", amber: "#C99A52", stroke: "#FBF8F1",
-				palette: ["#BC4A22", "#574E42", "#5E7A3E", "#C99A52", "#8C6A4F", "#7C8B5A", "#A8472E", "#9E8B6A"],
+				accent: "#4F46E5", accentInk: "#4338CA", graphite: "#64748B", ink3: "#93A1B5",
+				good: "#16A34A", bad: "#E5484D", amber: "#F59E0B", info: "#2F6FED", stroke: "#FFFFFF",
+				palette: ["#4F46E5", "#2F6FED", "#16A34A", "#F59E0B", "#E5484D", "#0EA5A3", "#8B5CF6", "#64748B"],
 			},
 			dark: {
-				accent: "#D2622F", accentInk: "#E8865A", graphite: "#8A7A66", ink3: "#7D7165",
-				good: "#7BA35C", bad: "#D2452A", amber: "#D69A3C", stroke: "#171310",
-				palette: ["#D2622F", "#C99A6A", "#7BA35C", "#D6A94C", "#B98A5E", "#9DB36A", "#D2452A", "#B49A72"],
+				accent: "#7C83FF", accentInk: "#A5ABFF", graphite: "#7A8699", ink3: "#6B7688",
+				good: "#3DD68C", bad: "#FF6166", amber: "#FBBF4D", info: "#5AA2FF", stroke: "#171B22",
+				palette: ["#7C83FF", "#5AA2FF", "#3DD68C", "#FBBF4D", "#FF6166", "#3FD0CE", "#B79BFF", "#8A97AD"],
 			},
 		};
 		this.C = this._palettes[this.theme];
 		this._tables = [];
+		this._spid = 0;
 		this._fmt = (n) => (Number(n) || 0).toLocaleString("pt-PT");
 		this._inject_fonts();
 		this._inject_css();
@@ -87,21 +89,18 @@ sigos.PainelCCO = class PainelCCO {
   <header class="cco-mast cco-rise">
     <div class="cco-mast-l">
       <div class="cco-mark">S</div>
-      <div>
-        <div class="cco-wordmark"><b>SIGOS</b></div>
-        <div class="cco-eyebrow"><span class="cco-tick"></span><span class="cco-up">Painel CCO &middot; Centro de Controlo Operacional</span></div>
+      <div class="cco-mast-id">
+        <div class="cco-eyebrow"><span class="cco-up">Centro de Controlo Operacional</span></div>
+        <h1 class="cco-h1">Painel CCO</h1>
+        <div class="cco-dateline">&mdash;</div>
       </div>
     </div>
     <div class="cco-mast-r">
-      <div class="cco-dateline">&mdash;</div>
-      <div class="cco-mast-meta">
-        <span class="cco-pulse"><i></i><span class="cco-stamp">${__("A carregar...")}</span></span>
-        <button class="cco-btn cco-icon cco-theme" title="${__("Tema claro / escuro")}" aria-label="theme"></button>
-        <button class="cco-btn cco-refresh">${__("Actualizar")}</button>
-      </div>
+      <span class="cco-pulse"><i></i><span class="cco-stamp">${__("A carregar...")}</span></span>
+      <button class="cco-btn cco-icon cco-theme" title="${__("Tema claro / escuro")}" aria-label="theme"></button>
+      <button class="cco-btn cco-refresh">${__("Actualizar")}</button>
     </div>
   </header>
-  <div class="cco-rule cco-rise"></div>
 
   <div class="cco-controls cco-rise">
     <div class="cco-ctl-grp">
@@ -110,7 +109,6 @@ sigos.PainelCCO = class PainelCCO {
       <div class="cco-range"></div>
     </div>
     <div class="cco-ctl-grp cco-scope">
-      <span class="cco-ctl-lbl">${__("Âmbito")}</span>
       <div class="cco-filters"></div>
       <div class="cco-search">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg>
@@ -121,7 +119,7 @@ sigos.PainelCCO = class PainelCCO {
 
   <div class="cco-kpis cco-rise"></div>
 
-  ${this._sec("01", "Cobertura &amp; Efectivo", "Escala publicada vs faltas e férias")}
+  ${this._sec("Cobertura &amp; Efectivo", "Escala publicada vs faltas e férias")}
   <div class="cco-card cco-span">
     ${this._cardhead("Taxa de Cobertura Diária", "Percentagem de slots cobertos por dia")}
     <div class="cco-callouts" id="cco-cob-callouts"></div>
@@ -137,12 +135,12 @@ sigos.PainelCCO = class PainelCCO {
     <div id="cco-lacunas"></div>
   </div>
 
-  ${this._sec("02", "Scorecard Regional", "Estado por delegação", "", "score")}
+  ${this._sec("Scorecard Regional", "Estado por delegação")}
   <div class="cco-card cco-span">
     <div id="cco-scorecard"></div>
   </div>
 
-  ${this._sec("03", "Ocorrências", "Incidentes registados")}
+  ${this._sec("Ocorrências", "Incidentes registados")}
   <div class="cco-card cco-span">
     ${this._cardhead("Ocorrências por Dia", "Volume diário")}
     <div class="cco-trend-host" id="cco-oc-trend"></div>
@@ -161,7 +159,7 @@ sigos.PainelCCO = class PainelCCO {
     ${this._card("cco-oc-vigs", "Top Vigilantes", "Mais ocorrências", "table")}
   </div>
 
-  ${this._sec("04", "Ausências &amp; Reserva", "Faltas e capacidade disponível")}
+  ${this._sec("Ausências &amp; Reserva", "Faltas e capacidade disponível")}
   <div class="cco-card cco-span">
     ${this._cardhead("Faltas por Dia", "Faltas registadas (submetidas)")}
     <div class="cco-trend-host" id="cco-aus-trend"></div>
@@ -176,7 +174,7 @@ sigos.PainelCCO = class PainelCCO {
     <div id="cco-aus-vigs"></div>
   </div>
 
-  ${this._sec("05", "Armamento", "Parque e distribuição")}
+  ${this._sec("Armamento", "Parque e distribuição")}
   <div class="cco-card cco-span">
     ${this._cardhead("Estado do Parque", "Inventário de armas")}
     <div class="cco-parque" id="cco-arm-stats"></div>
@@ -190,10 +188,10 @@ sigos.PainelCCO = class PainelCCO {
 		this._build_controls();
 	}
 
-	_sec(idx, title, aside, right, cls) {
-		return `<div class="cco-sec ${cls ? "cco-sec-" + cls : ""} cco-rise">
-			<span class="cco-sec-idx">${idx}</span><h2 class="cco-sec-title">${title}</h2>
-			<span class="cco-sec-line"></span>${right || `<span class="cco-sec-aside">${aside}</span>`}</div>`;
+	_sec(title, aside) {
+		return `<div class="cco-sec cco-rise">
+			<span class="cco-sec-bar"></span><h2 class="cco-sec-title">${title}</h2>
+			<span class="cco-sec-line"></span><span class="cco-sec-aside">${aside}</span></div>`;
 	}
 	_cardhead(title, sub) {
 		return `<div class="cco-card-head"><div>
@@ -280,49 +278,58 @@ sigos.PainelCCO = class PainelCCO {
 
 	_render_kpis() {
 		const k = this.data.kpis;
+		const trend = (this.data.cobertura || {}).trend || [];
+		const ocTrend = (this.data.ocorrencias || {}).trend || [];
+		const cobVals = trend.map((d) => (d.pct == null ? 0 : d.pct));
+		const gapVals = trend.map((d) => d.gaps || 0);
+		const ocVals = ocTrend.map((d) => d.n || 0);
 		const tiles = [
-			this._kpi("Cobertura Média", k.cobertura_media, k.cobertura_media_prev, true, "%", { feature: true, meta: k.meta_cobertura }),
-			this._kpi("Slots Descobertos", k.gap_slots, k.gap_slots_prev, false, "", {}),
-			this._kpi("Ocorrências", k.ocorrencias, k.ocorrencias_prev, false, "", {}),
-			this._kpi("Graves", k.ocorrencias_graves, k.ocorrencias_graves_prev, false, "", { tone: "bad", sub: "Alta / Crítica" }),
-			this._kpi("Taxa Substituição", k.taxa_substituicao, k.taxa_substituicao_prev, true, "%", {}),
-			this._kpi("Reserva", k.reserva, null, true, "", { sub: "disponível" }),
+			this._kpi({ label: "Cobertura", val: k.cobertura_media, prev: k.cobertura_media_prev, higher: true, suffix: "%", feature: true, meta: k.meta_cobertura, spark: { vals: cobVals, type: "area", color: this.C.good } }),
+			this._kpi({ label: "Descobertos", val: k.gap_slots, prev: k.gap_slots_prev, higher: false, sub: "slots", spark: { vals: gapVals, type: "bar", color: this.C.bad } }),
+			this._kpi({ label: "Ocorrências", val: k.ocorrencias, prev: k.ocorrencias_prev, higher: false, sub: "no período", spark: { vals: ocVals, type: "bar", color: this.C.accent } }),
+			this._kpi({ label: "Graves", val: k.ocorrencias_graves, prev: k.ocorrencias_graves_prev, higher: false, tone: "bad", sub: "Alta / Crítica" }),
+			this._kpi({ label: "Substituição", val: k.taxa_substituicao, prev: k.taxa_substituicao_prev, higher: true, suffix: "%", sub: "faltas cobertas" }),
+			this._kpi({ label: "Reserva", val: k.reserva, prev: null, higher: true, sub: "disponível" }),
 		];
 		this.$root.find(".cco-kpis").html(tiles.join(""));
 		this._countup();
 	}
 
-	_kpi(label, val, prev, higher_better, suffix, o) {
-		o = o || {};
-		const dec = suffix === "%" ? 1 : 0;
-		let delta = `<span class="cco-dsub">${o.sub || "&nbsp;"}</span>`;
-		if (prev !== null && prev !== undefined) {
-			const diff = Math.round((val - prev) * 10) / 10;
-			if (!diff) delta = `<span class="cco-delta flat">&plusmn;0</span><span class="cco-dsub">${__("vs anterior")}</span>`;
+	_kpi(o) {
+		const suffix = o.suffix || "", dec = suffix === "%" ? 1 : 0;
+		let delta = "";
+		if (o.prev !== null && o.prev !== undefined) {
+			const diff = Math.round((o.val - o.prev) * 10) / 10;
+			if (!diff) delta = `<span class="cco-delta flat">&plusmn;0</span>`;
 			else {
-				const up = diff > 0, good = higher_better ? up : !up;
-				delta = `<span class="cco-delta ${good ? "up" : "down"}">${up ? "&#9650;" : "&#9660;"} ${Math.abs(diff)}${suffix}</span><span class="cco-dsub">${__("vs anterior")}</span>`;
+				const up = diff > 0, good = o.higher ? up : !up;
+				delta = `<span class="cco-delta ${good ? "up" : "down"}">${up ? "&#9650;" : "&#9660;"} ${Math.abs(diff)}${suffix}</span>`;
 			}
 		}
-		let meta = "";
+		const spark = o.spark ? this._spark(o.spark.vals, { type: o.spark.type, color: o.spark.color }) : "";
+		let foot;
 		if (o.meta != null) {
-			const ok = (Number(val) || 0) >= o.meta;
-			meta = `<div class="cco-meta-bar"><span style="width:${Math.min(Number(val) || 0, 100)}%" class="${ok ? "ok" : "under"}"></span>
-				<em>${__("Meta")} ${o.meta}%</em></div>`;
+			const v = Number(o.val) || 0, ok = v >= o.meta;
+			foot = `<div class="cco-meta"><div class="cco-meta-tr">
+				<span class="cco-meta-fill ${ok ? "ok" : "under"}" style="width:${Math.min(v, 100)}%"></span>
+				<i class="cco-meta-tick" style="left:${o.meta}%"></i></div>
+				<span class="cco-meta-lbl">${__("Meta")} ${o.meta}%</span></div>`;
+		} else {
+			foot = `<span class="cco-kpi-sub">${o.sub || "&nbsp;"}</span>`;
 		}
-		const shown = (val === null || val === undefined) ? "—" : "";
 		return `
-			<div class="cco-kpi ${o.feature ? "cco-feature" : ""} ${o.tone === "bad" ? "cco-tone-bad" : ""}">
-				<div class="cco-kpi-lbl"><span class="cco-up">${label}</span></div>
-				<div class="cco-kpi-val cco-num" data-to="${val == null ? 0 : val}" data-dec="${dec}" data-suffix="${suffix}">${shown || "0"}</div>
-				${meta}
-				<div class="cco-kpi-foot">${delta}</div>
+			<div class="cco-kpi ${o.feature ? "feature" : ""} ${o.tone === "bad" ? "tone-bad" : ""}">
+				<div class="cco-kpi-top"><span class="cco-up cco-kpi-lbl">${o.label}</span>${delta}</div>
+				<div class="cco-kpi-mid">
+					<div class="cco-kpi-val cco-num" data-to="${o.val == null ? 0 : o.val}" data-dec="${dec}" data-suffix="${suffix}">0</div>
+					${spark ? `<div class="cco-kpi-spark">${spark}</div>` : ""}
+				</div>
+				<div class="cco-kpi-foot">${foot}</div>
 			</div>`;
 	}
 
 	_render_cobertura() {
 		const c = this.data.cobertura || {};
-		// callouts: best / worst day
 		const co = [];
 		if (c.melhor_dia) co.push(`<span class="cco-callout good"><i>&#9650;</i>${__("Melhor")} ${this._dlabel(c.melhor_dia.data)} &middot; <b>${c.melhor_dia.pct}%</b></span>`);
 		if (c.pior_dia) co.push(`<span class="cco-callout bad"><i>&#9660;</i>${__("Pior")} ${this._dlabel(c.pior_dia.data)} &middot; <b>${c.pior_dia.pct}%</b></span>`);
@@ -331,7 +338,7 @@ sigos.PainelCCO = class PainelCCO {
 
 		const pts = (c.trend || []).map((d) => ({ label: d.data, v: d.pct }));
 		this._trend("cco-cob-trend", "cco-cob-x", pts, {
-			pct: true, yMax: 100, meta: c.meta || 95,
+			pct: true, yMax: 100, meta: c.meta || 95, color: this.C.good,
 			best: c.melhor_dia && c.melhor_dia.data, worst: c.pior_dia && c.pior_dia.data,
 		});
 
@@ -430,13 +437,41 @@ sigos.PainelCCO = class PainelCCO {
 	_countup() {
 		this.$root.find(".cco-num[data-to]").each((_, el) => {
 			const to = +el.getAttribute("data-to"), dec = +(el.getAttribute("data-dec") || 0);
-			const suffix = el.getAttribute("data-suffix") || "", t0 = performance.now(), dur = 900, self = this;
+			const suffix = el.getAttribute("data-suffix") || "", t0 = performance.now(), dur = 850, self = this;
 			(function tick(t) {
 				const p = Math.min((t - t0) / dur, 1), e = 1 - Math.pow(1 - p, 3), cur = to * e;
 				el.textContent = (dec ? cur.toFixed(dec) : self._fmt(Math.round(cur))) + suffix;
 				if (p < 1) requestAnimationFrame(tick);
 			})(t0);
 		});
+	}
+
+	// tiny inline KPI chart: area (line+fill) or bars; last value emphasized
+	_spark(values, opts) {
+		opts = opts || {};
+		const vals = (values || []).map((v) => (v == null ? 0 : +v));
+		if (!vals.length || !vals.some((v) => v)) return "";
+		const color = opts.color || this.C.accent;
+		const W = 116, H = 34;
+		if (opts.type === "bar") {
+			const n = vals.length, mx = Math.max(...vals, 1), bw = W / n, gap = Math.min(2.6, bw * 0.32);
+			const bars = vals.map((v, i) => {
+				const h = Math.max(1.5, (v / mx) * (H - 3)), x = i * bw + gap / 2, w = Math.max(0.6, bw - gap);
+				return `<rect x="${x.toFixed(1)}" y="${(H - h).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="1" fill="${color}" opacity="${i === n - 1 ? 1 : 0.42}"/>`;
+			}).join("");
+			return `<svg class="cco-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${bars}</svg>`;
+		}
+		const n = vals.length, mn = Math.min(...vals), mx = Math.max(...vals), span = (mx - mn) || 1;
+		const x = (i) => i * (W / (n - 1 || 1));
+		const y = (v) => 3 + (1 - (v - mn) / span) * (H - 6);
+		const line = vals.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+		const fill = `M0,${H} L${line.replace(/ /g, " L")} L${W},${H} Z`;
+		const id = "ccosp" + (++this._spid);
+		return `<svg class="cco-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+			<defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1">
+			<stop offset="0" stop-color="${color}" stop-opacity="0.24"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>
+			<path d="${fill}" fill="url(#${id})"/>
+			<polyline points="${line}" fill="none" stroke="${color}" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
 	}
 
 	_rank(id, items) {
@@ -482,7 +517,7 @@ sigos.PainelCCO = class PainelCCO {
 		const R = 52, C = 2 * Math.PI * R; let off = 0;
 		const rings = segs.map((s) => {
 			const len = (s.val / total) * C;
-			const seg = `<circle cx="70" cy="70" r="${R}" fill="none" stroke="${s.color}" stroke-width="16"
+			const seg = `<circle cx="70" cy="70" r="${R}" fill="none" stroke="${s.color}" stroke-width="15"
 				stroke-dasharray="${len} ${C - len}" stroke-dashoffset="${-off}" transform="rotate(-90 70 70)"/>`;
 			off += len; return seg;
 		}).join("");
@@ -531,7 +566,7 @@ sigos.PainelCCO = class PainelCCO {
 		let metaLine = "";
 		if (opts.meta != null) {
 			const my = y(opts.meta).toFixed(1);
-			metaLine = `<line x1="${padX}" y1="${my}" x2="${W - padX}" y2="${my}" stroke="${this.C.accentInk}" stroke-width="1" stroke-dasharray="4 4" opacity="0.55"/>`;
+			metaLine = `<line x1="${padX}" y1="${my}" x2="${W - padX}" y2="${my}" stroke="${this.C.accentInk}" stroke-width="1" stroke-dasharray="4 4" opacity="0.5"/>`;
 		}
 		let markers = "";
 		const showDots = n <= 31 && !opts.pct;
@@ -545,7 +580,7 @@ sigos.PainelCCO = class PainelCCO {
 		host.innerHTML = `
 		<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" class="cco-trend-svg" style="width:100%;height:200px">
 		  <defs><linearGradient id="cg-${hostId}" x1="0" y1="0" x2="0" y2="1">
-			<stop offset="0%" stop-color="${color}" stop-opacity="0.20"/>
+			<stop offset="0%" stop-color="${color}" stop-opacity="0.22"/>
 			<stop offset="100%" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>
 		  ${metaLine}
 		  <path d="${fill}" fill="url(#cg-${hostId})"/>
@@ -636,7 +671,7 @@ sigos.PainelCCO = class PainelCCO {
 	_maxBy(rows, key) { return (rows || []).reduce((m, r) => Math.max(m, r[key] || 0), 0); }
 	_dlabel(iso) { const p = (iso || "").split("-"); return p.length === 3 ? p[2] + "/" + p[1] : iso; }
 	_raf2(fn) { requestAnimationFrame(() => requestAnimationFrame(fn)); }
-	_grav_color(g) { return { "Crítica": this.C.bad, "Alta": this.C.accent, "Média": this.C.amber, "Baixa": this.C.good }[g] || this.C.graphite; }
+	_grav_color(g) { return { "Crítica": this.C.bad, "Alta": this.C.amber, "Média": this.C.info, "Baixa": this.C.good }[g] || this.C.graphite; }
 	_estado_color(e) { return { "Aberta": this.C.bad, "Em Investigação": this.C.amber, "Resolvida": this.C.good, "Fechada": this.C.graphite }[e] || this.C.ink3; }
 	_stamp() {
 		const now = frappe.datetime.str_to_user(this.data.gerado_em);
@@ -648,165 +683,172 @@ sigos.PainelCCO = class PainelCCO {
 		if (document.getElementById("cco-fonts")) return;
 		const l = document.createElement("link");
 		l.id = "cco-fonts"; l.rel = "stylesheet";
-		l.href = "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap";
+		l.href = "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap";
 		document.head.appendChild(l);
 	}
 
 	_inject_css() {
 		if (document.getElementById("cco-css")) return;
 		const css = `
-/* SIGOS Painel CCO — editorial light. ASCII-only. */
-.sigos-cco { background:#F4EFE4; }
-.layout-main-section-wrapper:has(.sigos-cco), .page-body:has(.sigos-cco) { background:#F4EFE4; }
+/* SIGOS Painel CCO - Operations Daylight. ASCII-only. */
+.sigos-cco { background:#F4F6FA; }
+.layout-main-section-wrapper:has(.sigos-cco), .page-body:has(.sigos-cco) { background:#F4F6FA; }
 .sigos-cco .page-head, .sigos-cco + .page-head { display:none; }
 .cco-root {
-  --paper:#F4EFE4; --paper2:#FBF8F1; --paper3:#EFE8D8; --ink:#1B1712; --ink2:#6A6053;
-  --ink3:#A99E8B; --line:#E1D7C4; --line2:#D2C6AF; --accent:#BC4A22; --accentInk:#8E3315;
-  --wash:rgba(188,74,34,.08); --good:#5E7A3E; --bad:#A8472E; --amber:#C99A52; --graphite:#574E42;
-  --serif:'Fraunces',Georgia,serif; --mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
-  --shadow:0 1px 2px rgba(40,30,15,.05), 0 12px 28px -18px rgba(40,30,15,.18);
-  position:relative; max-width:1180px; margin:0 auto; padding:6px 12px 70px;
-  color:var(--ink); font-family:var(--mono); font-size:13px; font-feature-settings:"tnum" 1;
+  --paper:#F4F6FA; --paper2:#FFFFFF; --paper3:#EEF1F6; --ink:#0E1726; --ink2:#5B6B82;
+  --ink3:#93A1B5; --line:#E6EAF2; --line2:#D5DCE8; --accent:#4F46E5; --accentInk:#4338CA;
+  --wash:rgba(79,70,229,.07); --good:#16A34A; --bad:#E5484D; --amber:#F59E0B; --info:#2F6FED;
+  --graphite:#64748B; --goodWash:rgba(22,163,74,.12); --badWash:rgba(229,72,77,.12);
+  --display:'Space Grotesk',system-ui,sans-serif; --body:'Inter',system-ui,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+  --shadow:0 1px 2px rgba(16,23,38,.04), 0 14px 34px -20px rgba(16,23,38,.22);
+  --r:16px;
+  position:relative; max-width:1200px; margin:0 auto; padding:8px 14px 80px;
+  color:var(--ink); font-family:var(--body); font-size:13px; font-feature-settings:"tnum" 1; -webkit-font-smoothing:antialiased;
 }
-.cco-root::before { content:""; position:fixed; inset:0; z-index:0; pointer-events:none; mix-blend-mode:multiply; opacity:.5;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.38'/%3E%3C/svg%3E"); }
-.cco-root > * { position:relative; z-index:1; }
-.cco-num { font-family:var(--serif); font-feature-settings:"tnum" 1; letter-spacing:-.01em; }
-.cco-up { font-family:var(--mono); text-transform:uppercase; letter-spacing:.14em; font-size:10px; color:var(--ink3); font-weight:500; }
+.cco-num { font-family:var(--display); font-feature-settings:"tnum" 1; letter-spacing:-.01em; }
+.cco-up { font-family:var(--body); text-transform:uppercase; letter-spacing:.12em; font-size:10px; color:var(--ink3); font-weight:600; }
 
 /* masthead */
-.cco-mast { display:flex; justify-content:space-between; align-items:flex-end; padding:18px 4px 16px; }
-.cco-mast-l { display:flex; align-items:flex-end; gap:16px; }
-.cco-mark { width:44px; height:44px; border:1.5px solid var(--ink); border-radius:50%; display:grid; place-items:center;
-  font-family:var(--serif); font-size:20px; font-weight:500; position:relative; flex:none; }
-.cco-mark::after { content:""; position:absolute; inset:4px; border:1px solid var(--line2); border-radius:50%; }
-.cco-wordmark { font-family:var(--serif); font-weight:400; font-size:34px; line-height:.9; letter-spacing:-.02em; }
-.cco-wordmark b { font-weight:600; }
-.cco-eyebrow { margin-top:7px; display:flex; gap:10px; align-items:center; }
-.cco-tick { width:14px; height:1.5px; background:var(--accent); }
-.cco-mast-r { text-align:right; display:flex; flex-direction:column; gap:6px; align-items:flex-end; }
-.cco-dateline { font-family:var(--serif); font-size:15px; }
-.cco-dl-days { color:var(--ink3); font-size:12px; }
-.cco-mast-meta { display:flex; gap:14px; align-items:center; }
-.cco-pulse { display:inline-flex; align-items:center; gap:6px; color:var(--good); font-size:10px; text-transform:uppercase; letter-spacing:.1em; }
-.cco-pulse i { width:6px; height:6px; border-radius:50%; background:var(--good); animation:cco-blip 2.4s ease-in-out infinite; }
-@keyframes cco-blip { 0%,100%{opacity:1} 50%{opacity:.4} }
-.cco-btn { font-family:var(--mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.12em; border:1px solid var(--line2);
-  background:var(--paper2); color:var(--ink); padding:7px 13px; border-radius:2px; cursor:pointer; transition:.25s; }
-.cco-btn:hover { border-color:var(--accent); color:var(--accentInk); }
-.cco-rule { height:1.5px; background:var(--ink); position:relative; }
-.cco-rule::after { content:""; position:absolute; left:0; right:0; top:3px; height:1px; background:var(--line2); }
+.cco-mast { display:flex; justify-content:space-between; align-items:flex-start; padding:20px 4px 14px; gap:16px; flex-wrap:wrap; }
+.cco-mast-l { display:flex; align-items:flex-start; gap:15px; }
+.cco-mark { width:42px; height:42px; border-radius:13px; display:grid; place-items:center; flex:none;
+  background:linear-gradient(150deg,var(--accent),var(--accentInk)); color:#fff; font-family:var(--display); font-size:21px; font-weight:600;
+  box-shadow:0 6px 16px -6px rgba(79,70,229,.6); }
+.cco-eyebrow { margin-bottom:4px; }
+.cco-h1 { font-family:var(--display); font-weight:600; font-size:27px; line-height:1; letter-spacing:-.02em; margin:0; color:var(--ink); }
+.cco-dateline { font-family:var(--body); font-size:13px; color:var(--ink2); margin-top:7px; font-weight:500; }
+.cco-dl-days { color:var(--ink3); }
+.cco-mast-r { display:flex; gap:10px; align-items:center; }
+.cco-pulse { display:inline-flex; align-items:center; gap:7px; color:var(--ink3); font-size:10px; text-transform:uppercase; letter-spacing:.08em; font-weight:600; }
+.cco-pulse i { width:7px; height:7px; border-radius:50%; background:var(--good); box-shadow:0 0 0 3px var(--goodWash); animation:cco-blip 2.4s ease-in-out infinite; }
+@keyframes cco-blip { 0%,100%{opacity:1} 50%{opacity:.45} }
+.cco-btn { font-family:var(--body); font-size:11px; font-weight:600; letter-spacing:.02em; border:1px solid var(--line2);
+  background:var(--paper2); color:var(--ink2); padding:8px 14px; border-radius:10px; cursor:pointer; transition:.2s; box-shadow:var(--shadow); }
+.cco-btn:hover { border-color:var(--accent); color:var(--accent); }
+.cco-refresh:hover { background:var(--accent); color:#fff; border-color:var(--accent); }
 
 /* controls */
-.cco-controls { display:flex; flex-wrap:wrap; gap:12px 24px; align-items:flex-end; margin:18px 4px 4px; }
+.cco-controls { display:flex; flex-wrap:wrap; gap:12px 20px; align-items:center; margin:10px 4px 4px; }
 .cco-ctl-grp { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
 .cco-ctl-grp.cco-scope { flex:1; justify-content:flex-end; }
-.cco-ctl-lbl { font-family:var(--mono); text-transform:uppercase; letter-spacing:.14em; font-size:9.5px; color:var(--ink3); }
-.cco-pills { display:flex; gap:3px; background:var(--paper3); border:1px solid var(--line); border-radius:3px; padding:3px; }
-.cco-pill { font-family:var(--mono); font-size:10px; letter-spacing:.06em; border:0; background:transparent; color:var(--ink2);
-  padding:5px 11px; border-radius:2px; cursor:pointer; transition:.2s; }
-.cco-pill:hover { color:var(--ink); } .cco-pill.on { background:var(--ink); color:var(--paper2); }
+.cco-ctl-lbl { font-family:var(--body); text-transform:uppercase; letter-spacing:.1em; font-size:9.5px; color:var(--ink3); font-weight:600; }
+.cco-pills { display:flex; gap:3px; background:var(--paper3); border:1px solid var(--line); border-radius:11px; padding:3px; }
+.cco-pill { font-family:var(--body); font-size:11px; font-weight:600; border:0; background:transparent; color:var(--ink2);
+  padding:6px 13px; border-radius:8px; cursor:pointer; transition:.18s; }
+.cco-pill:hover { color:var(--ink); } .cco-pill.on { background:var(--paper2); color:var(--accent); box-shadow:0 1px 3px rgba(16,23,38,.12); }
 .cco-range { display:flex; gap:8px; }
 .cco-date { display:flex; flex-direction:column; gap:3px; }
 .cco-date label { font-size:8.5px; }
 .cco-filter { min-width:140px; }
 .cco-filters { display:flex; gap:8px; flex-wrap:wrap; }
 .cco-root .cco-date-i input, .cco-root .cco-filter input { background:var(--paper2) !important; color:var(--ink) !important;
-  border:1px solid var(--line2) !important; border-radius:3px !important; height:30px !important; font-family:var(--mono) !important; font-size:11.5px !important; box-shadow:none !important; }
+  border:1px solid var(--line2) !important; border-radius:10px !important; height:32px !important; font-family:var(--body) !important; font-size:12px !important; box-shadow:none !important; }
 .cco-root .cco-date-i input { min-width:120px; }
-.cco-search { display:flex; align-items:center; gap:8px; background:var(--paper2); border:1px solid var(--line2); border-radius:3px; padding:0 11px; height:30px; }
-.cco-search svg { width:12px; height:12px; color:var(--ink3); flex:none; }
-.cco-search input { border:0; background:transparent; outline:0; font-family:var(--mono); font-size:11.5px; color:var(--ink); width:150px; }
+.cco-search { display:flex; align-items:center; gap:8px; background:var(--paper2); border:1px solid var(--line2); border-radius:10px; padding:0 12px; height:32px; }
+.cco-search svg { width:13px; height:13px; color:var(--ink3); flex:none; }
+.cco-search input { border:0; background:transparent; outline:0; font-family:var(--body); font-size:12px; color:var(--ink); width:150px; }
 
 /* sections */
-.cco-sec { display:flex; align-items:baseline; gap:14px; margin:42px 4px 18px; }
-.cco-sec-idx { font-family:var(--mono); font-size:11px; color:var(--accent); font-weight:600; letter-spacing:.1em; }
-.cco-sec-title { font-family:var(--serif); font-size:21px; font-weight:500; letter-spacing:-.01em; margin:0; }
-.cco-sec-line { flex:1; height:1px; background:var(--line); align-self:center; }
-.cco-sec-aside { font-size:10px; text-transform:uppercase; letter-spacing:.14em; color:var(--ink3); }
+.cco-sec { display:flex; align-items:center; gap:13px; margin:40px 4px 18px; }
+.cco-sec-bar { width:4px; height:20px; border-radius:3px; background:var(--accent); flex:none; }
+.cco-sec-title { font-family:var(--display); font-size:19px; font-weight:600; letter-spacing:-.01em; margin:0; }
+.cco-sec-line { flex:1; height:1px; background:var(--line); }
+.cco-sec-aside { font-size:11px; color:var(--ink3); font-weight:500; }
 
 /* KPIs */
-.cco-kpis { display:grid; grid-template-columns:repeat(6,1fr); gap:0; margin-top:18px; background:var(--paper2); border:1px solid var(--line); border-radius:4px; box-shadow:var(--shadow); overflow:hidden; }
-.cco-kpi { padding:18px 18px 16px; border-left:1px solid var(--line); }
-.cco-kpi:first-child { border-left:0; }
-.cco-kpi-lbl { margin-bottom:12px; }
-.cco-kpi-val { font-family:var(--serif); font-weight:300; font-size:38px; line-height:.9; letter-spacing:-.025em; }
-.cco-feature { background:linear-gradient(180deg,var(--wash),transparent); }
-.cco-feature .cco-kpi-val { color:var(--accentInk); }
-.cco-tone-bad .cco-kpi-val { color:var(--bad); }
-.cco-kpi-foot { margin-top:11px; display:flex; align-items:center; gap:8px; min-height:15px; }
-.cco-delta { font-size:11px; font-weight:500; } .cco-delta.up { color:var(--good); } .cco-delta.down { color:var(--bad); } .cco-delta.flat { color:var(--ink3); }
-.cco-dsub { font-size:9.5px; color:var(--ink3); text-transform:uppercase; letter-spacing:.1em; }
-.cco-meta-bar { margin-top:10px; height:4px; background:var(--paper3); border-radius:3px; position:relative; }
-.cco-meta-bar span { position:absolute; left:0; top:0; bottom:0; border-radius:3px; background:var(--good); }
-.cco-meta-bar span.under { background:var(--bad); }
-.cco-meta-bar em { position:absolute; right:0; top:7px; font-style:normal; font-size:8.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--ink3); }
-@media (max-width:980px){ .cco-kpis { grid-template-columns:repeat(3,1fr); } .cco-kpi:nth-child(4){ border-left:0; } .cco-kpi:nth-child(n+4){ border-top:1px solid var(--line); } }
+.cco-kpis { display:grid; grid-template-columns:repeat(6,1fr); gap:14px; margin-top:18px; }
+.cco-kpi { background:var(--paper2); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--shadow); padding:16px 17px 15px; display:flex; flex-direction:column; min-width:0; }
+.cco-kpi.feature { border-color:transparent; box-shadow:0 1px 2px rgba(16,23,38,.04), 0 18px 40px -22px rgba(79,70,229,.45); position:relative; }
+.cco-kpi.feature::before { content:""; position:absolute; inset:0; border-radius:var(--r); padding:1px; background:linear-gradient(150deg,var(--accent),transparent 60%); -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask-composite:exclude; pointer-events:none; }
+.cco-kpi-top { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; min-height:16px; }
+.cco-kpi-lbl { flex:1; min-width:0; font-size:9.5px; letter-spacing:.08em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cco-kpi-top .cco-delta { flex:none; }
+.cco-kpi-mid { display:flex; align-items:flex-end; justify-content:space-between; gap:8px; }
+.cco-kpi-val { font-family:var(--display); font-weight:600; font-size:32px; line-height:.95; letter-spacing:-.025em; color:var(--ink); }
+.cco-kpi.feature .cco-kpi-val { color:var(--accentInk); }
+.cco-kpi.tone-bad .cco-kpi-val { color:var(--bad); }
+.cco-kpi-spark { flex:none; width:50%; max-width:118px; }
+.cco-spark { width:100%; height:34px; display:block; }
+.cco-kpi-foot { margin-top:12px; min-height:14px; }
+.cco-kpi-sub { font-size:10px; color:var(--ink3); text-transform:uppercase; letter-spacing:.07em; font-weight:600; }
+.cco-delta { font-family:var(--body); font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px; white-space:nowrap; }
+.cco-delta.up { color:var(--good); background:var(--goodWash); }
+.cco-delta.down { color:var(--bad); background:var(--badWash); }
+.cco-delta.flat { color:var(--ink3); background:var(--paper3); }
+.cco-meta { }
+.cco-meta-tr { position:relative; height:5px; background:var(--paper3); border-radius:3px; }
+.cco-meta-fill { position:absolute; left:0; top:0; bottom:0; border-radius:3px; background:var(--good); transition:width .8s cubic-bezier(.2,.9,.25,1); }
+.cco-meta-fill.under { background:var(--bad); }
+.cco-meta-tick { position:absolute; top:-2px; width:1.5px; height:9px; background:var(--ink2); border-radius:1px; transform:translateX(-50%); }
+.cco-meta-lbl { display:block; margin-top:6px; font-size:9px; text-transform:uppercase; letter-spacing:.07em; color:var(--ink3); font-weight:600; }
+@media (max-width:1080px){ .cco-kpis { grid-template-columns:repeat(3,1fr); } }
+@media (max-width:640px){ .cco-kpis { grid-template-columns:repeat(2,1fr); } }
 
 /* cards */
 .cco-grid2 { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-bottom:18px; }
-.cco-card { background:var(--paper2); border:1px solid var(--line); border-radius:4px; box-shadow:var(--shadow); padding:22px 24px; margin-bottom:18px; min-width:0; }
+.cco-card { background:var(--paper2); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--shadow); padding:22px 24px; margin-bottom:18px; min-width:0; }
 .cco-grid2 .cco-card { margin-bottom:0; }
 .cco-card-head { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px; }
-.cco-card-title { font-family:var(--serif); font-size:18px; font-weight:500; letter-spacing:-.01em; }
-.cco-card-sub { font-size:10px; text-transform:uppercase; letter-spacing:.13em; color:var(--ink3); margin-top:3px; }
+.cco-card-title { font-family:var(--display); font-size:16px; font-weight:600; letter-spacing:-.01em; }
+.cco-card-sub { font-size:11px; color:var(--ink3); margin-top:3px; font-weight:500; }
 .cco-card-body { margin-top:18px; }
-.cco-empty { padding:26px; text-align:center; color:var(--ink3); font-size:11px; letter-spacing:.06em; }
+.cco-empty { padding:26px; text-align:center; color:var(--ink3); font-size:12px; }
 
 /* trend */
-.cco-trend-host { margin-top:8px; border-bottom:1px solid var(--line); }
+.cco-trend-host { margin-top:8px; }
 .cco-trendx { display:flex; margin-top:9px; }
-.cco-trendx span { flex:1; text-align:center; font-size:9px; letter-spacing:.02em; color:var(--ink3); white-space:nowrap; overflow:hidden; }
-.cco-callouts { display:flex; gap:8px; flex-wrap:wrap; margin:4px 0 6px; }
-.cco-callout { font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--ink2); background:var(--paper3); border:1px solid var(--line); border-radius:2px; padding:4px 9px; display:inline-flex; gap:6px; align-items:center; }
-.cco-callout b { font-family:var(--serif); font-size:12px; letter-spacing:0; }
+.cco-trendx span { flex:1; text-align:center; font-size:9.5px; color:var(--ink3); white-space:nowrap; overflow:hidden; font-weight:500; }
+.cco-callouts { display:flex; gap:8px; flex-wrap:wrap; margin:4px 0 8px; }
+.cco-callout { font-size:10.5px; color:var(--ink2); background:var(--paper3); border:1px solid var(--line); border-radius:999px; padding:4px 11px; display:inline-flex; gap:6px; align-items:center; font-weight:500; }
+.cco-callout b { font-family:var(--display); font-size:12px; font-weight:600; }
 .cco-callout i { font-style:normal; font-size:9px; }
-.cco-callout.good i { color:var(--good); } .cco-callout.bad i { color:var(--bad); } .cco-callout.meta i { color:var(--accentInk); }
+.cco-callout.good i { color:var(--good); } .cco-callout.bad i { color:var(--bad); } .cco-callout.meta i { color:var(--accent); }
 
 /* rank */
 .cco-rank-row { display:grid; grid-template-columns:120px 1fr 78px; align-items:center; gap:14px; margin-bottom:14px; }
 .cco-rank-row:last-child { margin-bottom:0; }
-.cco-rank-name { font-size:11.5px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.cco-rank-track { height:9px; background:var(--paper3); border-radius:5px; overflow:hidden; position:relative; }
-.cco-rank-bar { height:100%; width:0; background:var(--graphite); border-radius:5px; transition:width .9s cubic-bezier(.2,.9,.25,1); }
+.cco-rank-name { font-size:12px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:500; }
+.cco-rank-track { height:9px; background:var(--paper3); border-radius:6px; overflow:hidden; position:relative; }
+.cco-rank-bar { height:100%; width:0; background:var(--graphite); border-radius:6px; transition:width .9s cubic-bezier(.2,.9,.25,1); }
 .cco-rank-bar.first { background:var(--accent); }
 .cco-rank-bar.ghost { background:var(--line2); }
 .cco-rank-bar.over { background:var(--accent); position:absolute; left:0; top:0; }
-.cco-rank-val { font-family:var(--serif); font-size:15px; text-align:right; font-weight:500; }
-.cco-rank-sub { font-family:var(--mono); font-size:9px; color:var(--ink3); margin-left:3px; }
+.cco-rank-val { font-family:var(--display); font-size:15px; text-align:right; font-weight:600; }
+.cco-rank-sub { font-family:var(--mono); font-size:9.5px; color:var(--ink3); margin-left:3px; font-weight:400; }
 
 /* donut */
 .cco-donut { display:flex; align-items:center; gap:24px; flex-wrap:wrap; }
-.cco-donut-c { font-family:var(--serif); font-size:20px; font-weight:500; fill:var(--ink); }
-.cco-donut-l { font-family:var(--mono); font-size:7px; letter-spacing:.18em; fill:var(--ink3); }
+.cco-donut-c { font-family:var(--display); font-size:20px; font-weight:600; fill:var(--ink); }
+.cco-donut-l { font-family:var(--body); font-size:7px; font-weight:600; letter-spacing:.18em; fill:var(--ink3); }
 .cco-dleg { display:flex; flex-direction:column; gap:9px; flex:1; min-width:150px; }
-.cco-dleg-i { display:grid; grid-template-columns:11px 1fr auto auto; align-items:center; gap:9px; font-size:11px; color:var(--ink2); }
-.cco-dleg-i i { width:11px; height:11px; border-radius:2px; }
-.cco-dleg-i b { font-family:var(--serif); font-size:14px; color:var(--ink); font-weight:500; }
-.cco-dleg-i em { font-style:normal; font-size:9.5px; color:var(--ink3); min-width:32px; text-align:right; }
+.cco-dleg-i { display:grid; grid-template-columns:11px 1fr auto auto; align-items:center; gap:9px; font-size:12px; color:var(--ink2); }
+.cco-dleg-i i { width:11px; height:11px; border-radius:3px; }
+.cco-dleg-i b { font-family:var(--display); font-size:14px; color:var(--ink); font-weight:600; }
+.cco-dleg-i em { font-style:normal; font-size:10px; color:var(--ink3); min-width:32px; text-align:right; font-weight:500; }
 
 /* stacked bar */
-.cco-stk-bar { display:flex; height:16px; border-radius:3px; overflow:hidden; background:var(--paper3); }
+.cco-stk-bar { display:flex; height:16px; border-radius:6px; overflow:hidden; background:var(--paper3); }
 .cco-stk-seg { flex-grow:0; flex-shrink:0; flex-basis:0; transition:flex-basis .8s cubic-bezier(.2,.9,.25,1); }
 .cco-stk-legs { display:flex; flex-direction:column; gap:9px; margin-top:16px; }
-.cco-stk-leg { display:grid; grid-template-columns:11px 1fr auto auto; align-items:center; gap:9px; font-size:11px; color:var(--ink2); }
-.cco-stk-leg i { width:11px; height:11px; border-radius:2px; }
-.cco-stk-leg b { font-family:var(--serif); font-size:14px; color:var(--ink); font-weight:500; }
-.cco-stk-leg em { font-style:normal; font-size:9.5px; color:var(--ink3); min-width:32px; text-align:right; }
+.cco-stk-leg { display:grid; grid-template-columns:11px 1fr auto auto; align-items:center; gap:9px; font-size:12px; color:var(--ink2); }
+.cco-stk-leg i { width:11px; height:11px; border-radius:3px; }
+.cco-stk-leg b { font-family:var(--display); font-size:14px; color:var(--ink); font-weight:600; }
+.cco-stk-leg em { font-style:normal; font-size:10px; color:var(--ink3); min-width:32px; text-align:right; font-weight:500; }
 
-/* big stat (resolução) */
+/* big stat (resolucao) */
 .cco-bigstat { padding:6px 0 14px; border-bottom:1px solid var(--line); }
-.cco-bigstat-v { font-family:var(--serif); font-weight:300; font-size:40px; line-height:.9; color:var(--accentInk); letter-spacing:-.02em; }
+.cco-bigstat-v { font-family:var(--display); font-weight:600; font-size:38px; line-height:.95; color:var(--accentInk); letter-spacing:-.02em; }
 .cco-bigstat-l { display:block; margin-top:8px; }
 .cco-ministats { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:16px; }
-.cco-ministats b { font-family:var(--serif); font-size:22px; font-weight:500; display:block; }
-.cco-ministats span { font-size:9px; text-transform:uppercase; letter-spacing:.1em; color:var(--ink3); }
+.cco-ministats b { font-family:var(--display); font-size:22px; font-weight:600; display:block; }
+.cco-ministats span { font-size:9.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--ink3); font-weight:600; }
 .cco-bad { color:var(--bad); }
 
 /* parque (armamento) */
 .cco-parque { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; }
-.cco-pq { text-align:center; padding:16px 8px; border:1px solid var(--line); border-radius:3px; background:var(--paper3); border-top:3px solid var(--graphite); }
-.cco-pq-v { font-family:var(--serif); font-size:30px; font-weight:400; display:block; line-height:1; }
+.cco-pq { text-align:center; padding:16px 8px; border:1px solid var(--line); border-radius:12px; background:var(--paper3); border-top:3px solid var(--graphite); }
+.cco-pq-v { font-family:var(--display); font-size:28px; font-weight:600; display:block; line-height:1; }
 .cco-pq-l { display:block; margin-top:7px; }
 .cco-pq-good { border-top-color:var(--good); } .cco-pq-accent { border-top-color:var(--accent); }
 .cco-pq-amber { border-top-color:var(--amber); } .cco-pq-bad { border-top-color:var(--bad); }
@@ -814,8 +856,8 @@ sigos.PainelCCO = class PainelCCO {
 
 /* tables */
 .cco-table { width:100%; border-collapse:collapse; }
-.cco-table thead th { font-family:var(--mono); font-size:9.5px; text-transform:uppercase; letter-spacing:.12em; color:var(--ink3);
-  font-weight:500; text-align:left; padding:9px 10px; border-bottom:1px solid var(--line2); }
+.cco-table thead th { font-family:var(--body); font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--ink3);
+  font-weight:600; text-align:left; padding:9px 10px; border-bottom:1px solid var(--line2); }
 .cco-table th.r, .cco-table td.r { text-align:right; }
 .cco-table tbody td { padding:11px 10px; border-bottom:1px solid var(--line); font-size:12.5px; color:var(--ink2); }
 .cco-table tbody tr:last-child td { border-bottom:0; }
@@ -823,49 +865,52 @@ sigos.PainelCCO = class PainelCCO {
 .cco-table td.main { display:flex; align-items:baseline; gap:9px; }
 .cco-table td.main.clk { cursor:pointer; }
 .cco-rt-rank { font-family:var(--mono); font-size:10px; color:var(--ink3); min-width:14px; }
-.cco-rt-name { color:var(--ink); }
-.cco-table td.main.clk:hover .cco-rt-name { color:var(--accentInk); }
+.cco-rt-name { color:var(--ink); font-weight:500; }
+.cco-table td.main.clk:hover .cco-rt-name { color:var(--accent); }
 .cco-rt-code { font-family:var(--mono); font-size:9.5px; color:var(--ink3); }
-.cco-table td.r.cco-num, .cco-table td .cco-num { font-size:14px; font-weight:500; color:var(--ink); }
+.cco-table td.r.cco-num, .cco-table td .cco-num { font-size:14px; font-weight:600; color:var(--ink); }
 .cco-barcell { display:flex; align-items:center; justify-content:flex-end; gap:9px; position:relative; min-height:16px; }
 .cco-barcell .cco-bar { position:absolute; right:0; height:7px; border-radius:4px; opacity:.22; }
 .cco-barcell b { position:relative; }
 .cco-bar.bad { background:var(--bad); } .cco-bar.accent { background:var(--accent); } .cco-bar.graphite { background:var(--graphite); }
-.cco-grave-badge { font-family:var(--mono); font-size:8.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--bad); background:var(--wash); border-radius:2px; padding:1px 5px; }
+.cco-grave-badge { font-family:var(--body); font-size:9px; font-weight:600; text-transform:uppercase; letter-spacing:.04em; color:var(--bad); background:var(--badWash); border-radius:999px; padding:2px 7px; }
 .cco-gauge { display:flex; align-items:center; justify-content:flex-end; gap:9px; }
 .cco-gauge-tr { width:74px; height:7px; background:var(--paper3); border-radius:4px; overflow:hidden; }
 .cco-gauge-fill { display:block; height:100%; border-radius:4px; }
 .cco-gauge-fill.ok { background:var(--good); } .cco-gauge-fill.warn { background:var(--amber); } .cco-gauge-fill.under { background:var(--bad); }
-.cco-gauge b { font-family:var(--serif); font-size:13px; min-width:38px; text-align:right; }
+.cco-gauge b { font-family:var(--display); font-size:13px; min-width:38px; text-align:right; font-weight:600; }
 .cco-gauge-na { color:var(--ink3); }
 .cco-scoretable thead th { border-bottom-width:1.5px; }
 
 /* reveal */
-.cco-rise { opacity:0; transform:translateY(12px); animation:cco-rise .7s cubic-bezier(.2,.9,.25,1) forwards; }
+.cco-rise { opacity:0; transform:translateY(12px); animation:cco-rise .6s cubic-bezier(.2,.9,.25,1) forwards; }
 .cco-rise:nth-of-type(2){animation-delay:.04s}.cco-rise:nth-of-type(3){animation-delay:.08s}
 .cco-rise:nth-of-type(4){animation-delay:.12s}.cco-rise:nth-of-type(5){animation-delay:.16s}
 @keyframes cco-rise { to { opacity:1; transform:none; } }
+@media (prefers-reduced-motion:reduce){ .cco-rise{ animation:none; opacity:1; transform:none; } .cco-spark,.cco-rank-bar,.cco-meta-fill,.cco-stk-seg{ transition:none; } }
 
 @media (max-width:880px){ .cco-grid2 { grid-template-columns:1fr; } .cco-grid2 .cco-card { margin-bottom:18px; } }
 
 /* theme toggle button */
-.cco-icon { padding:6px; width:32px; display:inline-grid; place-items:center; }
+.cco-icon { padding:7px; width:34px; display:inline-grid; place-items:center; }
 .cco-icon svg { width:15px; height:15px; }
 
 /* smooth theme switch */
 .sigos-cco { transition:background-color .35s ease; }
-.cco-card, .cco-kpis, .cco-pq, .cco-callout { transition:background-color .35s ease, border-color .35s ease; }
+.cco-card, .cco-kpi, .cco-pq, .cco-callout, .cco-btn { transition:background-color .35s ease, border-color .35s ease, box-shadow .35s ease; }
 
 /* ---------------------------------------------------------------- DARK THEME */
-.sigos-cco.theme-dark { background:#0d0b09; }
-.layout-main-section-wrapper:has(.sigos-cco.theme-dark), .page-body:has(.sigos-cco.theme-dark) { background:#0d0b09; }
+.sigos-cco.theme-dark { background:#0E1117; }
+.layout-main-section-wrapper:has(.sigos-cco.theme-dark), .page-body:has(.sigos-cco.theme-dark) { background:#0E1117; }
 .sigos-cco.theme-dark .cco-root {
-  --paper:#0d0b09; --paper2:#171310; --paper3:#221b15; --ink:#ECE4D8; --ink2:#B3A695;
-  --ink3:#7D7165; --line:#2A221B; --line2:#3A2F25; --accent:#D2622F; --accentInk:#E8865A;
-  --wash:rgba(210,98,47,.12); --good:#7BA35C; --bad:#D2452A; --amber:#D69A3C; --graphite:#8A7A66;
-  --shadow:0 1px 2px rgba(0,0,0,.4), 0 16px 36px -20px rgba(0,0,0,.7);
+  --paper:#0E1117; --paper2:#171B22; --paper3:#1F242E; --ink:#E8ECF3; --ink2:#A4AEC0;
+  --ink3:#6B7688; --line:#242A34; --line2:#323A47; --accent:#7C83FF; --accentInk:#A5ABFF;
+  --wash:rgba(124,131,255,.12); --good:#3DD68C; --bad:#FF6166; --amber:#FBBF4D; --info:#5AA2FF;
+  --graphite:#7A8699; --goodWash:rgba(61,214,140,.14); --badWash:rgba(255,97,102,.14);
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 18px 42px -24px rgba(0,0,0,.75);
 }
-.sigos-cco.theme-dark .cco-root::before { mix-blend-mode:screen; opacity:.05; }
+.sigos-cco.theme-dark .cco-mark { box-shadow:0 6px 16px -6px rgba(124,131,255,.5); }
+.sigos-cco.theme-dark .cco-pill.on { background:var(--paper2); }
 `;
 		const s = document.createElement("style");
 		s.id = "cco-css"; s.textContent = css;
