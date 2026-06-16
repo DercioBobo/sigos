@@ -1,0 +1,18 @@
+{
+ "content": null,
+ "creation": "2026-06-16 00:00:00.000000",
+ "doctype": "Page",
+ "modified": "2026-06-16 00:00:00.000000",
+ "module": "Security Ops",
+ "name": "painel-estatistico",
+ "page_name": "painel-estatistico",
+ "standard": "Yes",
+ "system_page": 0,
+ "title": "Painel Estatístico",
+ "roles": [
+  { "role": "System Manager" },
+  { "role": "SIGOS Manager" },
+  { "role": "Aprovador Operações" },
+  { "role": "Operações SIGOS" }
+ ]
+}

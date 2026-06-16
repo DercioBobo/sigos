@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SIGOS · Painel Estatístico</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ============================================================  TOKENS  */
+:root{
+  --paper:#F4EFE4;          /* warm ivory page          */
+  --paper-2:#FBF8F1;        /* raised card              */
+  --paper-3:#EFE8D8;        /* sunken / strip           */
+  --ink:#1B1712;            /* warm near-black text     */
+  --ink-2:#6A6053;          /* secondary               */
+  --ink-3:#A99E8B;          /* faint / axes            */
+  --line:#E1D7C4;           /* hairline                */
+  --line-2:#D2C6AF;         /* stronger hairline       */
+  --accent:#BC4A22;         /* burnt terracotta — THE accent */
+  --accent-ink:#8E3315;     /* darker accent for text  */
+  --accent-wash:rgba(188,74,34,.08);
+  --good:#5E7A3E;           /* olive — positive delta  */
+  --bad:#A8472E;            /* brick — negative delta  */
+  --graphite:#574E42;       /* neutral chart bars      */
+  --shadow:0 1px 2px rgba(40,30,15,.05), 0 12px 28px -18px rgba(40,30,15,.18);
+  --serif:'Fraunces',Georgia,serif;
+  --mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--mono);
+  font-size:13px;
+  line-height:1.5;
+  font-feature-settings:"tnum" 1,"cv05" 1;
+  padding:0 0 80px;
+  position:relative;
+  min-height:100vh;
+}
+/* paper grain ------------------------------------------------------ */
+body::before{
+  content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.38'/%3E%3C/svg%3E");
+  mix-blend-mode:multiply;opacity:.5;
+}
+.wrap{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding:0 40px}
+
+/* numerals utility */
+.num{font-family:var(--serif);font-feature-settings:"tnum" 1;letter-spacing:-.01em}
+.mono-up{font-family:var(--mono);text-transform:uppercase;letter-spacing:.14em;font-size:10px;color:var(--ink-3);font-weight:500}
+
+/* ============================================================  MASTHEAD  */
+.mast{display:flex;justify-content:space-between;align-items:flex-end;padding:40px 0 18px}
+.mast-l{display:flex;align-items:flex-end;gap:18px}
+.mark{
+  width:46px;height:46px;border:1.5px solid var(--ink);border-radius:50%;
+  display:grid;place-items:center;font-family:var(--serif);font-size:21px;font-weight:500;
+  position:relative;flex:none;
+}
+.mark::after{content:"";position:absolute;inset:4px;border:1px solid var(--line-2);border-radius:50%}
+.wordmark{font-family:var(--serif);font-weight:400;font-size:38px;line-height:.9;letter-spacing:-.02em}
+.wordmark b{font-weight:600}
+.eyebrow{margin-top:7px;display:flex;gap:10px;align-items:center}
+.eyebrow .tick{width:14px;height:1.5px;background:var(--accent)}
+.mast-r{text-align:right;display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+.mast-date{font-family:var(--serif);font-size:15px;color:var(--ink)}
+.mast-meta{display:flex;gap:14px;align-items:center}
+.pulse{display:inline-flex;align-items:center;gap:6px;color:var(--good);font-size:10px;text-transform:uppercase;letter-spacing:.12em}
+.pulse i{width:6px;height:6px;border-radius:50%;background:var(--good);animation:blip 2.4s ease-in-out infinite}
+@keyframes blip{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(94,122,62,.4)}50%{opacity:.5;box-shadow:0 0 0 5px rgba(94,122,62,0)}}
+.btn{
+  font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.12em;
+  border:1px solid var(--line-2);background:var(--paper-2);color:var(--ink);
+  padding:7px 13px;border-radius:2px;cursor:pointer;display:inline-flex;gap:7px;align-items:center;
+  transition:.25s;
+}
+.btn:hover{border-color:var(--accent);color:var(--accent-ink)}
+.btn svg{width:12px;height:12px}
+.rule{height:1.5px;background:var(--ink);position:relative}
+.rule::after{content:"";position:absolute;left:0;right:0;top:3px;height:1px;background:var(--line-2)}
+
+/* ============================================================  SECTION HEAD  */
+.sec-head{display:flex;align-items:baseline;gap:14px;margin:46px 0 20px}
+.sec-idx{font-family:var(--mono);font-size:11px;color:var(--accent);font-weight:600;letter-spacing:.1em}
+.sec-title{font-family:var(--serif);font-size:21px;font-weight:500;letter-spacing:-.01em}
+.sec-line{flex:1;height:1px;background:var(--line);align-self:center}
+.sec-aside{font-size:10px;text-transform:uppercase;letter-spacing:.14em;color:var(--ink-3)}
+
+/* ============================================================  HERO BAND  */
+.hero{
+  display:grid;grid-template-columns:repeat(4,1fr);
+  background:var(--paper-2);border:1px solid var(--line);border-radius:4px;
+  box-shadow:var(--shadow);overflow:hidden;
+}
+.hero-cell{padding:26px 28px 24px;position:relative}
+.hero-cell + .hero-cell{border-left:1px solid var(--line)}
+.hero-cell .lbl{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+.hero-val{font-family:var(--serif);font-weight:300;font-size:54px;line-height:.9;letter-spacing:-.025em}
+.hero-foot{display:flex;align-items:center;gap:8px;margin-top:14px}
+.delta{font-size:11px;font-weight:500;display:inline-flex;align-items:center;gap:3px;letter-spacing:.02em}
+.delta.up{color:var(--good)} .delta.down{color:var(--bad)} .delta.flat{color:var(--ink-3)}
+.delta svg{width:9px;height:9px}
+.delta-sub{font-size:10px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.1em}
+.hero-cell .spark{position:absolute;right:18px;bottom:20px;display:flex;gap:2px;align-items:flex-end;height:26px;opacity:.55}
+.spark span{width:3px;background:var(--ink-3);border-radius:1px}
+.hero-cell.feature .hero-val{color:var(--accent-ink)}
+.hero-cell.feature{background:linear-gradient(180deg,var(--accent-wash),transparent)}
+.hero-cell.feature .spark span{background:var(--accent)}
+
+/* ============================================================  STAT STRIP  */
+.strip{
+  margin-top:14px;background:var(--paper-3);border:1px solid var(--line);border-radius:4px;
+  display:flex;flex-wrap:wrap;align-items:center;padding:4px 6px;
+}
+.strip-item{display:flex;align-items:baseline;gap:8px;padding:11px 18px;position:relative;flex:1 0 auto}
+.strip-item + .strip-item::before{content:"";position:absolute;left:0;top:13px;bottom:13px;width:1px;background:var(--line-2)}
+.strip-item .k{font-size:9.5px;text-transform:uppercase;letter-spacing:.13em;color:var(--ink-2)}
+.strip-item .v{font-family:var(--serif);font-size:19px;font-weight:500}
+
+/* ============================================================  CARDS GRID  */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.card{
+  background:var(--paper-2);border:1px solid var(--line);border-radius:4px;
+  box-shadow:var(--shadow);padding:22px 24px;
+}
+.card-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
+.card-title{font-family:var(--serif);font-size:18px;font-weight:500;letter-spacing:-.01em}
+.card-sub{font-size:10px;text-transform:uppercase;letter-spacing:.13em;color:var(--ink-3);margin-top:3px}
+.pills{display:flex;gap:3px;background:var(--paper-3);border:1px solid var(--line);border-radius:3px;padding:3px}
+.pill{font-family:var(--mono);font-size:10px;letter-spacing:.06em;border:0;background:transparent;color:var(--ink-2);
+  padding:4px 10px;border-radius:2px;cursor:pointer;transition:.2s}
+.pill:hover{color:var(--ink)}
+.pill.on{background:var(--ink);color:var(--paper-2)}
+
+/* column chart */
+.colchart{display:flex;align-items:flex-end;gap:8px;height:190px;margin-top:26px;padding-bottom:2px;border-bottom:1px solid var(--line)}
+.colwrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;height:100%;justify-content:flex-end}
+.col{width:100%;max-width:34px;background:var(--graphite);border-radius:2px 2px 0 0;height:0;
+  transition:height 1.1s cubic-bezier(.2,.9,.25,1);position:relative}
+.col.accent{background:var(--accent)}
+.col .v{position:absolute;top:-19px;left:50%;transform:translateX(-50%);font-family:var(--serif);font-size:12px;
+  color:var(--ink-2);opacity:0;transition:opacity .4s .7s}
+.col.accent .v{color:var(--accent-ink);font-weight:600}
+.colchart.in .col .v{opacity:1}
+.col-x{display:flex;gap:8px;margin-top:9px}
+.col-x span{flex:1;text-align:center;font-size:9.5px;letter-spacing:.06em;color:var(--ink-3);text-transform:uppercase}
+
+/* horizontal rank chart */
+.rank{margin-top:24px;display:flex;flex-direction:column;gap:15px}
+.rank-row{display:grid;grid-template-columns:118px 1fr 52px;align-items:center;gap:14px}
+.rank-name{font-size:11.5px;color:var(--ink);letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rank-track{height:9px;background:var(--paper-3);border-radius:5px;overflow:hidden}
+.rank-bar{height:100%;width:0;background:var(--graphite);border-radius:5px;transition:width 1.1s cubic-bezier(.2,.9,.25,1)}
+.rank-row:first-child .rank-bar{background:var(--accent)}
+.rank-val{font-family:var(--serif);font-size:15px;text-align:right;font-weight:500}
+
+/* ============================================================  DRAWER CARD  */
+.alert-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:0}
+.badge{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+  background:var(--accent-wash);color:var(--accent-ink);border:1px solid rgba(188,74,34,.25);
+  padding:5px 11px;border-radius:2px}
+.alert-chart{display:flex;align-items:flex-end;gap:6px;height:88px;margin:24px 0 6px;padding-bottom:2px;border-bottom:1px solid var(--line)}
+.alert-chart .colwrap{justify-content:flex-end}
+.alert-chart .col{background:var(--bad);max-width:30px;opacity:.85}
+.toggle{width:100%;margin-top:18px;background:transparent;border:1px dashed var(--line-2);color:var(--ink-2);
+  font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.14em;
+  padding:11px;border-radius:3px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;transition:.25s}
+.toggle:hover{border-color:var(--accent);color:var(--accent-ink)}
+.toggle svg{width:13px;height:13px;transition:transform .35s}
+.drawer{max-height:0;overflow:hidden;transition:max-height .45s cubic-bezier(.3,.8,.3,1)}
+.drawer.open{max-height:760px}
+.search{display:flex;align-items:center;gap:9px;background:var(--paper-3);border:1px solid var(--line);
+  border-radius:3px;padding:0 13px;margin:18px 0 4px;height:38px}
+.search svg{width:13px;height:13px;color:var(--ink-3);flex:none}
+.search input{flex:1;border:0;background:transparent;outline:0;font-family:var(--mono);font-size:12px;color:var(--ink)}
+.search input::placeholder{color:var(--ink-3);text-transform:uppercase;letter-spacing:.1em;font-size:10px}
+
+table{width:100%;border-collapse:collapse;margin-top:10px}
+thead th{font-family:var(--mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.13em;color:var(--ink-3);
+  font-weight:500;text-align:left;padding:10px 12px;border-bottom:1px solid var(--line-2)}
+thead th.r,tbody td.r{text-align:right}
+tbody td{padding:13px 12px;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--ink-2)}
+tbody tr:hover{background:var(--accent-wash)}
+tbody td.idx{font-family:var(--mono);color:var(--ink-3);font-size:11px}
+tbody td.name{color:var(--ink)}
+tbody a{color:var(--accent-ink);text-decoration:none;border-bottom:1px solid transparent;transition:.2s}
+tbody a:hover{border-color:var(--accent-ink)}
+.faltas-n{font-family:var(--serif);font-size:15px;font-weight:600;color:var(--bad)}
+.drawer-foot{display:flex;justify-content:space-between;align-items:center;padding:14px 12px 2px;color:var(--ink-3);font-size:10px;text-transform:uppercase;letter-spacing:.1em}
+.empty{padding:30px;text-align:center;color:var(--ink-3);font-size:11px;letter-spacing:.06em}
+
+/* ============================================================  REVEAL  */
+.rise{opacity:0;transform:translateY(14px);animation:rise .8s cubic-bezier(.2,.9,.25,1) forwards}
+@keyframes rise{to{opacity:1;transform:none}}
+
+/* ============================================================  RESPONSIVE  */
+@media(max-width:900px){
+  .wrap{padding:0 22px}
+  .hero{grid-template-columns:1fr 1fr}
+  .hero-cell:nth-child(3){border-left:0}
+  .hero-cell:nth-child(n+3){border-top:1px solid var(--line)}
+  .grid-2{grid-template-columns:1fr}
+}
+footer{max-width:1180px;margin:50px auto 0;padding:0 40px;display:flex;justify-content:space-between;
+  color:var(--ink-3);font-size:10px;text-transform:uppercase;letter-spacing:.14em}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ─────────────────────────────────── MASTHEAD -->
+  <header class="mast rise" style="animation-delay:.02s">
+    <div class="mast-l">
+      <div class="mark">S</div>
+      <div>
+        <div class="wordmark"><b>SIGOS</b></div>
+        <div class="eyebrow"><span class="tick"></span><span class="mono-up">Painel Estatístico · Recursos Humanos</span></div>
+      </div>
+    </div>
+    <div class="mast-r">
+      <div class="mast-date">Terça, 16 Junho 2026</div>
+      <div class="mast-meta">
+        <span class="pulse"><i></i>Actualizado há 2 min</span>
+        <button class="btn" onclick="boot()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M1 4v6h6"/><path d="M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+          Actualizar
+        </button>
+      </div>
+    </div>
+  </header>
+  <div class="rule rise" style="animation-delay:.05s"></div>
+
+  <!-- ─────────────────────────────────── 01 RESUMO -->
+  <div class="sec-head rise" style="animation-delay:.10s">
+    <span class="sec-idx">01</span>
+    <h2 class="sec-title">Resumo Operacional</h2>
+    <span class="sec-line"></span>
+    <span class="sec-aside">Efectivo em serviço</span>
+  </div>
+
+  <div class="hero rise" style="animation-delay:.14s">
+    <div class="hero-cell feature">
+      <div class="lbl"><span class="mono-up">Vigilantes Activos</span></div>
+      <div class="hero-val num" data-to="1248">0</div>
+      <div class="hero-foot">
+        <span class="delta up"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 15l6-6 6 6"/></svg>3,2%</span>
+        <span class="delta-sub">vs. mês anterior</span>
+      </div>
+      <div class="spark" data-spark="6,9,7,11,10,14,13,16"></div>
+    </div>
+    <div class="hero-cell">
+      <div class="lbl"><span class="mono-up">Postos Activos</span></div>
+      <div class="hero-val num" data-to="187">0</div>
+      <div class="hero-foot">
+        <span class="delta up"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 15l6-6 6 6"/></svg>4</span>
+        <span class="delta-sub">novos este mês</span>
+      </div>
+      <div class="spark" data-spark="10,11,11,12,13,13,14,14"></div>
+    </div>
+    <div class="hero-cell">
+      <div class="lbl"><span class="mono-up">Em Reserva</span></div>
+      <div class="hero-val num" data-to="42">0</div>
+      <div class="hero-foot">
+        <span class="delta down"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>6</span>
+        <span class="delta-sub">destacados</span>
+      </div>
+      <div class="spark" data-spark="14,13,12,12,10,9,8,7"></div>
+    </div>
+    <div class="hero-cell">
+      <div class="lbl"><span class="mono-up">Vigilantes Armados</span></div>
+      <div class="hero-val num" data-to="76">0</div>
+      <div class="hero-foot">
+        <span class="delta flat">±0</span>
+        <span class="delta-sub">estável</span>
+      </div>
+      <div class="spark" data-spark="9,9,10,9,10,10,9,10"></div>
+    </div>
+  </div>
+
+  <!-- secondary ledger strip -->
+  <div class="strip rise" style="animation-delay:.20s">
+    <div class="strip-item"><span class="k">Mulheres</span><span class="v num" data-to="312">0</span></div>
+    <div class="strip-item"><span class="k">Homens</span><span class="v num" data-to="936">0</span></div>
+    <div class="strip-item"><span class="k">Supervisores</span><span class="v num" data-to="34">0</span></div>
+    <div class="strip-item"><span class="k">Feriadores</span><span class="v num" data-to="58">0</span></div>
+    <div class="strip-item"><span class="k">Administrativos</span><span class="v num" data-to="29">0</span></div>
+    <div class="strip-item"><span class="k">Clientes</span><span class="v num" data-to="64">0</span></div>
+    <div class="strip-item"><span class="k">Delegações</span><span class="v num" data-to="12">0</span></div>
+  </div>
+
+  <!-- ─────────────────────────────────── 02 MOVIMENTO -->
+  <div class="sec-head rise" style="animation-delay:.26s">
+    <span class="sec-idx">02</span>
+    <h2 class="sec-title">Movimento &amp; Distribuição</h2>
+    <span class="sec-line"></span>
+    <span class="sec-aside">Últimos 12 meses</span>
+  </div>
+
+  <div class="grid-2">
+    <!-- column chart -->
+    <div class="card rise" style="animation-delay:.30s">
+      <div class="card-head">
+        <div>
+          <div class="card-title">Rotatividades Mensais</div>
+          <div class="card-sub">Movimentações de efectivo</div>
+        </div>
+        <div class="pills">
+          <button class="pill">6M</button><button class="pill on">12M</button><button class="pill">24M</button>
+        </div>
+      </div>
+      <div class="colchart" id="colchart"></div>
+      <div class="col-x" id="colx"></div>
+    </div>
+
+    <!-- rank chart -->
+    <div class="card rise" style="animation-delay:.36s">
+      <div class="card-head">
+        <div>
+          <div class="card-title">Vigilantes por Delegação</div>
+          <div class="card-sub">Distribuição do efectivo activo</div>
+        </div>
+        <div class="pills">
+          <button class="pill on">Activos</button><button class="pill">Todos</button>
+        </div>
+      </div>
+      <div class="rank" id="rank"></div>
+    </div>
+  </div>
+
+  <!-- ─────────────────────────────────── 03 ALERTAS -->
+  <div class="sec-head rise" style="animation-delay:.42s">
+    <span class="sec-idx">03</span>
+    <h2 class="sec-title">Alertas &amp; Relatórios</h2>
+    <span class="sec-line"></span>
+    <span class="sec-aside">Acção recomendada</span>
+  </div>
+
+  <div class="card rise" style="animation-delay:.46s">
+    <div class="alert-head">
+      <div>
+        <div class="card-title">Vigilantes com mais de 8 Faltas</div>
+        <div class="card-sub">Período seleccionado · 6 meses</div>
+      </div>
+      <span class="badge" id="faltas-badge">— vigilantes</span>
+    </div>
+
+    <div class="alert-chart" id="alertchart"></div>
+
+    <button class="toggle" id="drawer-toggle">
+      <span id="toggle-label">Ver todos os vigilantes</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+
+    <div class="drawer" id="drawer">
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input id="faltas-search" type="text" placeholder="Filtrar por nome, posto, delegação…">
+      </div>
+      <table>
+        <thead><tr>
+          <th style="width:34px">#</th><th>Vigilante</th><th>Nome</th><th>Posto</th><th>Delegação</th><th class="r">Faltas</th>
+        </tr></thead>
+        <tbody id="faltas-body"></tbody>
+      </table>
+      <div class="drawer-foot"><span id="faltas-count">—</span><span>Fonte · Cumulativo de Faltas</span></div>
+    </div>
+  </div>
+
+</div>
+
+<footer class="rise" style="animation-delay:.5s">
+  <span>SIGOS · Sistema Integrado de Gestão de Operações de Segurança</span>
+  <span>Protótipo de design · v0.1</span>
+</footer>
+
+<script>
+/* ----------------------------------------------------------- DATA */
+const ROT = {
+  labels:["Jul","Ago","Set","Out","Nov","Dez","Jan","Fev","Mar","Abr","Mai","Jun"],
+  values:[14,18,11,22,19,27,16,21,30,24,28,35]
+};
+const DELEG = [
+  ["Maputo Cidade",412],["Matola",318],["Beira",196],
+  ["Nampula",142],["Tete",98],["Quelimane",64]
+];
+const FALTAS = [
+  ["VIG-0148","Armando Chissano","Banco BCI — Sede","Maputo Cidade",19],
+  ["VIG-0312","Felizardo Mucavel","Shoprite Matola","Matola",17],
+  ["VIG-0077","Beatriz Nhamposa","Hospital Central","Maputo Cidade",15],
+  ["VIG-0521","Custódio Mabjaia","Porto da Beira","Beira",14],
+  ["VIG-0203","Ilídio Tembe","Mozal — Portaria 2","Matola",13],
+  ["VIG-0419","Salomão Cumbe","UEM — Campus","Maputo Cidade",12],
+  ["VIG-0260","Rosalina Macuácua","Standard Bank","Nampula",11],
+  ["VIG-0388","Egídio Sitoe","Cervejas de Moçambique","Maputo Cidade",10],
+  ["VIG-0094","Aderito Langa","Vale — Moatize","Tete",9],
+  ["VIG-0455","Hortência Bila","Aeroporto de Nampula","Nampula",9],
+];
+
+const fmt = n => n.toLocaleString("pt-PT");
+
+/* ----------------------------------------------------------- COUNT-UP */
+function countUp(el){
+  const to = +el.dataset.to, dur = 1100, t0 = performance.now();
+  (function tick(t){
+    const p = Math.min((t-t0)/dur,1), e = 1-Math.pow(1-p,3);
+    el.textContent = fmt(Math.round(to*e));
+    if(p<1) requestAnimationFrame(tick);
+  })(t0);
+}
+
+/* ----------------------------------------------------------- SPARKS */
+function sparks(){
+  document.querySelectorAll(".spark").forEach(s=>{
+    const d = s.dataset.spark.split(",").map(Number), mx = Math.max(...d);
+    s.innerHTML = d.map(v=>`<span style="height:${(v/mx*100)}%"></span>`).join("");
+  });
+}
+
+/* ----------------------------------------------------------- COLUMN CHART */
+function colchart(){
+  const c = document.getElementById("colchart"), x = document.getElementById("colx");
+  const mx = Math.max(...ROT.values), peak = ROT.values.indexOf(mx);
+  c.innerHTML = ROT.values.map((v,i)=>`
+    <div class="colwrap"><div class="col ${i===peak?'accent':''}" data-h="${v/mx*100}">
+      <span class="v">${v}</span></div></div>`).join("");
+  x.innerHTML = ROT.labels.map(l=>`<span>${l}</span>`).join("");
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    c.classList.add("in");
+    c.querySelectorAll(".col").forEach((col,i)=>
+      setTimeout(()=>col.style.height = col.dataset.h+"%", 40*i));
+  }));
+}
+
+/* ----------------------------------------------------------- RANK CHART */
+function rank(){
+  const r = document.getElementById("rank"), mx = Math.max(...DELEG.map(d=>d[1]));
+  r.innerHTML = DELEG.map(([n,v])=>`
+    <div class="rank-row">
+      <span class="rank-name">${n}</span>
+      <div class="rank-track"><div class="rank-bar" data-w="${v/mx*100}"></div></div>
+      <span class="rank-val num">${fmt(v)}</span>
+    </div>`).join("");
+  requestAnimationFrame(()=>requestAnimationFrame(()=>
+    r.querySelectorAll(".rank-bar").forEach((b,i)=>
+      setTimeout(()=>b.style.width = b.dataset.w+"%", 70*i))));
+}
+
+/* ----------------------------------------------------------- ALERT MINI-CHART */
+function alertchart(){
+  const a = document.getElementById("alertchart");
+  const top = FALTAS.slice(0,10), mx = Math.max(...top.map(f=>f[4]));
+  a.innerHTML = top.map(f=>`<div class="colwrap"><div class="col" data-h="${f[4]/mx*100}"></div></div>`).join("");
+  requestAnimationFrame(()=>requestAnimationFrame(()=>
+    a.querySelectorAll(".col").forEach((c,i)=>
+      setTimeout(()=>c.style.height = c.dataset.h+"%", 45*i))));
+  document.getElementById("faltas-badge").textContent = FALTAS.length+" vigilantes";
+}
+
+/* ----------------------------------------------------------- DRAWER + SEARCH */
+function renderRows(q=""){
+  q = q.toLowerCase().trim();
+  const rows = FALTAS.filter(f =>
+    !q || (f[1]+f[0]+f[2]+f[3]).toLowerCase().includes(q));
+  const b = document.getElementById("faltas-body");
+  b.innerHTML = rows.length ? rows.map((f,i)=>`
+    <tr>
+      <td class="idx">${i+1}</td>
+      <td><a href="#">${f[0]}</a></td>
+      <td class="name">${f[1]}</td>
+      <td>${f[2]}</td>
+      <td>${f[3]}</td>
+      <td class="r"><span class="faltas-n">${f[4]}</span></td>
+    </tr>`).join("")
+    : `<tr><td colspan="6" class="empty">Nenhum vigilante encontrado.</td></tr>`;
+  document.getElementById("faltas-count").textContent = `${rows.length} de ${FALTAS.length}`;
+}
+function wireDrawer(){
+  const t = document.getElementById("drawer-toggle"),
+        d = document.getElementById("drawer"),
+        chev = t.querySelector("svg"),
+        lbl = document.getElementById("toggle-label");
+  let open=false;
+  t.onclick = ()=>{
+    open=!open; d.classList.toggle("open",open);
+    chev.style.transform = open?"rotate(180deg)":"";
+    lbl.textContent = open?"Fechar":"Ver todos os vigilantes";
+    if(open) renderRows();
+  };
+  document.getElementById("faltas-search").oninput = e=>renderRows(e.target.value);
+}
+
+/* ----------------------------------------------------------- BOOT */
+function boot(){
+  document.querySelectorAll(".num[data-to]").forEach(countUp);
+  sparks(); colchart(); rank(); alertchart();
+}
+wireDrawer();
+boot();
+</script>
+</body>
+</html>
