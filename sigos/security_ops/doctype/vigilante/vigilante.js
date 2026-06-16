@@ -98,7 +98,7 @@ frappe.ui.form.on("Vigilante", {
 						});
 					}
 				);
-			}, __("Ações"));
+			}, __("Acções"));
 		}
 
 		// Ops: Pre-Adimissão → Activo
@@ -114,7 +114,7 @@ frappe.ui.form.on("Vigilante", {
 						});
 					}
 				);
-			}, __("Ações"));
+			}, __("Acções"));
 		}
 
 		// Operational benching — release posto + escala, keep the guard employed.
@@ -127,7 +127,7 @@ frappe.ui.form.on("Vigilante", {
 			frm.add_custom_button(__("Colocar em Reserva"), () => {
 				_mudar_estado_op(frm, "colocar_em_reserva", __("Colocar em Reserva"),
 					__("O vigilante sai do posto e da escala, mas continua empregado e disponível para redistribuição."));
-			}, __("Ações"));
+			}, __("Acções"));
 		}
 
 		// Inactivar: suspend an active or reserve guard (Employee → Suspended)
@@ -135,7 +135,7 @@ frappe.ui.form.on("Vigilante", {
 			frm.add_custom_button(__("Inactivar"), () => {
 				_mudar_estado_op(frm, "inactivar", __("Inactivar Vigilante"),
 					__("O vigilante sai do posto e da escala e o Funcionário passa a <b>Suspenso</b>. Use para suspensões temporárias."));
-			}, __("Ações"));
+			}, __("Acções"));
 		}
 	},
 });

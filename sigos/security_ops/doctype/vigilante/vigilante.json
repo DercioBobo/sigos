@@ -386,7 +386,6 @@
    "fieldname": "inss",
    "fieldtype": "Data",
    "label": "INSS",
-   "description": "Número de inscrição no INSS. Sincronizado com o Funcionário (Employee).",
    "permlevel": 2
   },
   {
