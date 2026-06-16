@@ -25,7 +25,7 @@ class Ausencias(Document):
 		self._validar_duplicados_na_tabela()
 		self._validar_tipo_ausencia()
 		self._validar_proxima_accao()
-		self._validar_categoria_substitutos()
+		self._validar_estado_substitutos()
 		self._validar_conflitos_de_substituicao()
 		self._calcular_n_faltas_todas_linhas()
 
@@ -176,33 +176,25 @@ class Ausencias(Document):
 					)
 				)
 
-	def _validar_categoria_substitutos(self):
-		"""Substitutos must have a Categoria Vigilante with pode_ser_substituto = 1."""
-		cats_validas = frappe.get_all(
-			"Categoria Vigilante",
-			filters={"pode_ser_substituto": 1},
-			pluck="name",
-		)
-		if not cats_validas:
-			return  # No categorias configured — skip validation
-
+	def _validar_estado_substitutos(self):
+		"""Substitutos must be benched reserve guards (status = Reserva). Reserva is an
+		ESTADO — an available guard, not a categoria."""
 		for i, row in enumerate(self.tabela_ausencia or [], start=1):
 			if not row.vigilante_substituto:
 				continue
-			cat = frappe.db.get_value("Vigilante", row.vigilante_substituto, "categoria")
-			if cat not in cats_validas:
+			estado = frappe.db.get_value("Vigilante", row.vigilante_substituto, "status")
+			if estado != "Reserva":
 				frappe.throw(
 					_(
-						"Linha {0}: o vigilante substituto <b>{1}</b> tem categoria "
-						"<b>{2}</b> que não está autorizada para substituição. "
-						"Categorias permitidas: <b>{3}</b>."
+						"Linha {0}: o vigilante substituto <b>{1}</b> não está em "
+						"<b>Reserva</b> (estado actual: <b>{2}</b>). Apenas vigilantes "
+						"em Reserva podem cobrir ausências."
 					).format(
 						i,
 						row.vigilante_substituto,
-						cat or _("sem categoria"),
-						", ".join(cats_validas),
+						estado or _("sem estado"),
 					),
-					title=_("Categoria de Substituto Inválida"),
+					title=_("Substituto Indisponível"),
 				)
 
 	def _validar_conflitos_de_substituicao(self):

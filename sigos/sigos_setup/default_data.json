@@ -1,35 +1,20 @@
 [
  {
   "doctype": "Categoria Vigilante",
-  "nome": "Vigilante Normal",
-  "pode_ser_substituto": 0,
-  "bloqueada": 0
+  "nome": "Vigilante Normal",  "bloqueada": 0
  },
  {
   "doctype": "Categoria Vigilante",
-  "nome": "Vigilante Armado",
-  "pode_ser_substituto": 0,
-  "bloqueada": 0
+  "nome": "Vigilante Armado",  "bloqueada": 0
  },
  {
   "doctype": "Categoria Vigilante",
-  "nome": "Reserva",
-  "pode_ser_substituto": 1,
-  "bloqueada": 1,
-  "descricao": "Vigilantes de reserva autorizados a cobrir ausências"
- },
- {
-  "doctype": "Categoria Vigilante",
-  "nome": "Administrativo",
-  "pode_ser_substituto": 0,
-  "bloqueada": 1,
+  "nome": "Administrativo",  "bloqueada": 1,
   "descricao": "Pessoal administrativo — não escalado em postos"
  },
  {
   "doctype": "Categoria Vigilante",
-  "nome": "Supervisor",
-  "pode_ser_substituto": 0,
-  "bloqueada": 0
+  "nome": "Supervisor",  "bloqueada": 0
  },
  {
   "doctype": "Turno",

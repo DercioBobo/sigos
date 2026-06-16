@@ -11,7 +11,6 @@
   "nome",
   "descricao",
   "col_break_1",
-  "pode_ser_substituto",
   "bloqueada"
  ],
  "fields": [
@@ -31,14 +30,6 @@
   {
    "fieldname": "col_break_1",
    "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "pode_ser_substituto",
-   "fieldtype": "Check",
-   "label": "Pode ser Substituto",
-   "default": "0",
-   "in_list_view": 1,
-   "description": "Vigilantes com esta categoria podem cobrir ausências como substitutos"
   },
   {
    "fieldname": "bloqueada",

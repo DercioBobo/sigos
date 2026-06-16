@@ -26,18 +26,13 @@ def _vigilantes_com_escala_futura(excluir_escala=None):
 @frappe.whitelist()
 def get_reservas_disponiveis(delegacao=None, excluir_escala=None):
 	"""
-	Return Activo reserve-pool vigilantes (Categoria pode_ser_substituto = 1) that are
-	NOT already committed to an active escala. Used by the Escala 'Alocar Reservas' dialog.
+	Return benched reserve guards (status = Reserva) that are NOT already committed to an
+	active escala. Used by the Escala 'Alocar Reservas' dialog. Reserva is an ESTADO — a
+	benched, available guard; categoria is irrelevant to the pool.
 	"""
-	cats = frappe.get_all(
-		"Categoria Vigilante", filters={"pode_ser_substituto": 1}, pluck="name"
-	)
-	if not cats:
-		return []
-
 	ocupados = set(_vigilantes_com_escala_futura(excluir_escala=excluir_escala))
 
-	filters = {"status": "Activo", "categoria": ["in", cats]}
+	filters = {"status": "Reserva"}
 	if delegacao:
 		filters["delegacao"] = delegacao
 
@@ -94,9 +89,9 @@ def alocar_reservas(posto, vigilantes, regime=None):
 @frappe.whitelist()
 def get_substitutos_disponiveis(doctype, txt, searchfield, start, page_len, filters):
 	"""
-	Frappe link search for vigilante_substituto. Eligible = Categoria with
-	pode_ser_substituto = 1, status Activo OR Reserva (a benched reserve is the ideal
-	pick). Reserves are surfaced first.
+	Frappe link search for vigilante_substituto. Eligible = benched reserve guards
+	(status = Reserva). Reserva is an ESTADO, not a categoria — an available, benched
+	guard ready to cover an absence.
 	When grupo_delegados is passed, the pool is scoped to that grupo's delegações —
 	each grupo covers its absences with its own people.
 	When data (+periodo) is passed, guards are EXCLUDED if a submitted Ausencias of
@@ -116,14 +111,6 @@ def get_substitutos_disponiveis(doctype, txt, searchfield, start, page_len, filt
 	excluir_lista = filters.get("excluir_lista") or []
 	if isinstance(excluir_lista, str):
 		excluir_lista = json.loads(excluir_lista)
-
-	cats = frappe.get_all(
-		"Categoria Vigilante",
-		filters={"pode_ser_substituto": 1},
-		pluck="name",
-	)
-	if not cats:
-		return []
 
 	lista = [v for v in excluir_lista if v]
 	if excluir:
@@ -155,17 +142,15 @@ def get_substitutos_disponiveis(doctype, txt, searchfield, start, page_len, filt
 		f"""
 		SELECT v.name, v.nome_completo, v.categoria, v.status
 		FROM `tabVigilante` v
-		WHERE v.status IN ('Activo', 'Reserva')
-		  AND v.categoria IN %(cats)s
+		WHERE v.status = 'Reserva'
 		  AND (v.name LIKE %(txt)s OR v.nome_completo LIKE %(txt)s)
 		  {excluir_sql}
 		  {grupo_sql}
 		  {ocupado_sql}
-		ORDER BY FIELD(v.status, 'Reserva') DESC, v.nome_completo
+		ORDER BY v.nome_completo
 		LIMIT %(start)s, %(page_len)s
 		""",
 		{
-			"cats":        tuple(cats),
 			"txt":         f"%{txt}%",
 			"lista":       tuple(lista) or ("",),
 			"delegs":      delegs,
@@ -238,8 +223,8 @@ def get_escalados_no_posto_dia(doctype, txt, searchfield, start, page_len, filte
 @frappe.whitelist()
 def get_substitutos_para_wizard(doctype, txt, searchfield, start, page_len, filters):
 	"""
-	Wizard substituto search: pode_ser_substituto = 1 AND not in another active Escala
-	overlapping the given escala's period.
+	Wizard substituto search: benched reserve guards (status = Reserva) AND not in another
+	active Escala overlapping the given escala's period. Reserva is an ESTADO, not a categoria.
 	"""
 	import json
 	if isinstance(filters, str):
@@ -247,14 +232,6 @@ def get_substitutos_para_wizard(doctype, txt, searchfield, start, page_len, filt
 
 	escala_name = filters.get("escala_name") or ""
 	excluir     = filters.get("excluir")     or ""
-
-	cats = frappe.get_all(
-		"Categoria Vigilante",
-		filters={"pode_ser_substituto": 1},
-		pluck="name",
-	)
-	if not cats:
-		return []
 
 	# Vigilantes already committed to a future schedule in another active Escala
 	ocupados = _vigilantes_com_escala_futura(excluir_escala=escala_name) if escala_name else []
@@ -266,15 +243,13 @@ def get_substitutos_para_wizard(doctype, txt, searchfield, start, page_len, filt
 		f"""
 		SELECT v.name, v.nome_completo, v.categoria
 		FROM `tabVigilante` v
-		WHERE v.status    = 'Activo'
-		  AND v.categoria IN %(cats)s
+		WHERE v.status    = 'Reserva'
 		  AND (v.name LIKE %(txt)s OR v.nome_completo LIKE %(txt)s)
 		  {not_in}
 		ORDER BY v.nome_completo
 		LIMIT %(start)s, %(page_len)s
 		""",
 		{
-			"cats":      tuple(cats),
 			"txt":       f"%{txt}%",
 			"excluidos": tuple(excluidos) if excluidos else ("__none__",),
 			"start":     start,
@@ -1257,10 +1232,7 @@ def preview_rotatividade(vigilante, abreviatura_op=None, novo_posto=None, novo_r
 		cat_vig = vig.categoria
 		cat_sub = frappe.db.get_value("Vigilante", novo_vigilante, "categoria")
 		if cat_vig and cat_sub and cat_vig != cat_sub:
-			pode = (frappe.db.get_value("Categoria Vigilante", cat_sub, "pode_ser_substituto")
-			        or frappe.db.get_value("Categoria Vigilante", cat_vig, "pode_ser_substituto"))
-			if not pode:
-				out["avisos"].append("Categorias diferentes ({0} vs {1}) e nenhuma autorizada para substituição.".format(cat_vig, cat_sub))
+			out["avisos"].append("Categorias diferentes ({0} vs {1}) — faça primeiro uma Troca De Categoria.".format(cat_vig, cat_sub))
 	dias_min = frappe.db.get_single_value("SIGOS Settings", "dias_minimos_rotatividade") or 90
 	base = frappe.db.get_value("Vigilante", vigilante, "data_admissao")
 	if base and not motivo_3meses:
@@ -1278,14 +1250,10 @@ def search_vigilantes_rich(txt="", status="Activo", delegacao=None, excluir=None
 	params = {"txt": "%" + (txt or "") + "%"}
 	substituto = int(so_substitutos or 0)
 	if substituto:
-		# A substituto is reserve-eligible by categoria and AVAILABLE to deploy — that
-		# means a benched guard (status Reserva, the ideal pick) OR a floating reserve-
-		# categoria guard (status Activo). We never pull a fixed guard from their posto.
-		cats = frappe.get_all("Categoria Vigilante", filters={"pode_ser_substituto": 1}, pluck="name")
-		if not cats:
-			return []
-		params["cats"] = tuple(cats); cond.append("v.categoria IN %(cats)s")
-		cond.append("v.status IN ('Reserva', 'Activo')")
+		# A substituto is an AVAILABLE benched guard: Reserva is an ESTADO, not a categoria.
+		# We surface guards in Reserva and never pull one from an active posto. Categoria-
+		# match to the vacancy is enforced at submit (see _validar_substituto_categoria).
+		cond.append("v.status = 'Reserva'")
 	else:
 		cond.append("v.status = %(status)s"); params["status"] = status
 	if delegacao:
@@ -1294,7 +1262,7 @@ def search_vigilantes_rich(txt="", status="Activo", delegacao=None, excluir=None
 		cond.append("v.name != %(excluir)s"); params["excluir"] = excluir
 	where = " AND ".join(cond)
 	# For substitutos, surface benched guards (Reserva) first — they free no posto.
-	order = "FIELD(v.status, 'Reserva') DESC, v.nome_completo" if substituto else "v.nome_completo"
+	order = "v.nome_completo"
 	return frappe.db.sql(f"""
 		SELECT v.name, v.nome_completo, v.mecanografico, v.posto_de_vigilancia AS posto,
 		       v.regime_do_vigilante AS regime, v.categoria, v.delegacao, v.status

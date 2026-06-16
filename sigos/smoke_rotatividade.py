@@ -190,7 +190,7 @@ def _run_scenarios():
 
 	# Guards
 	main = _make_vigilante("MAIN", posto_a, "H24", "Vigilante Normal", deleg, company)
-	subv = _make_vigilante("SUB",  posto_c, "H24", "Reserva",          deleg, company)
+	subv = _make_vigilante("SUB",  posto_c, "H24", "Vigilante Normal", deleg, company)
 	demv = _make_vigilante("DEMV", posto_b, "H24", "Vigilante Normal", deleg, company)
 	frappe.db.commit()
 

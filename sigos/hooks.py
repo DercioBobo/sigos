@@ -44,7 +44,7 @@ fixtures = [
 	{
 		"dt": "Categoria Vigilante",
 		"filters": [["nome", "in", [
-			"Vigilante Normal", "Vigilante Armado", "Reserva", "Administrativo", "Supervisor",
+			"Vigilante Normal", "Vigilante Armado", "Administrativo", "Supervisor",
 		]]],
 	},
 	{
