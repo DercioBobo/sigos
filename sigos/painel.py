@@ -11,7 +11,7 @@ Read-only and cheap: a handful of indexed queries merged in Python. The page cal
 (`notificar_mudanca`) so an open board re-fetches when the ground truth changes.
 """
 import frappe
-from frappe.utils import getdate, nowdate
+from frappe.utils import getdate, nowdate, add_days
 
 
 # Absence types that still leave the posto manned (guard showed up, partially).
@@ -125,11 +125,57 @@ def painel_operacional(data=None, delegacao=None, cliente=None, posto=None, busc
 			"ocorrencias_abertas": ocorr_abertas,
 			"taxa_cobertura": taxa,
 		},
+		"sparkline": _sparkline(d, nomes_posto, leave_type),
 		"postos": cards,
 		"reserva": reserva[:300],
 		"ocorrencias": ocorrencias,
 		"gerado_em": frappe.utils.now(),
 	}
+
+
+def _sparkline(ate_d, nomes_posto, lt):
+	"""Daily coverage % for the 7 days ending at `ate_d` (same gap logic as the board)."""
+	de_d = getdate(add_days(ate_d, -6))
+	idx = {}
+	if nomes_posto:
+		rows = frappe.db.sql(
+			"""
+			SELECT te.data AS d, COUNT(*) AS escalados,
+			       SUM(CASE WHEN g.vigilante IS NOT NULL OR EXISTS (
+			             SELECT 1 FROM `tabLeave Application` f
+			             WHERE f.employee = vv.funcionario AND f.status = 'Approved'
+			               AND f.docstatus = 1 AND f.leave_type = %(lt)s
+			               AND f.from_date <= te.data AND f.to_date >= te.data
+			           ) THEN 1 ELSE 0 END) AS gaps
+			FROM `tabTabela De Escala De Vigilante` te
+			JOIN `tabEscala Do Vigilante` e ON e.name = te.parent AND e.estado = 'Activo'
+			JOIN `tabVigilante` vv ON vv.name = te.vigilante
+			LEFT JOIN `tabTurno` t ON t.name = te.turno
+			LEFT JOIN (
+				SELECT a.data AS d, ta.vigilante
+				FROM `tabTabela Ausencia` ta JOIN `tabAusencias` a ON a.name = ta.parent
+				WHERE a.docstatus = 1
+				  AND ( (ta.tipo_de_ausencia = 'Falta'
+				         AND (ta.proxima_accao IS NULL OR ta.proxima_accao IN ('', 'Sem Acção')))
+				        OR ta.tipo_de_ausencia IN ('Suspensão', 'Licença', 'Outro') )
+				GROUP BY a.data, ta.vigilante
+			) g ON g.vigilante = te.vigilante AND g.d = te.data
+			WHERE te.data BETWEEN %(de)s AND %(ate)s
+			  AND (t.e_folga IS NULL OR t.e_folga = 0)
+			  AND e.posto_de_vigilancia IN %(postos)s
+			GROUP BY te.data
+			""",
+			{"lt": lt, "de": de_d, "ate": ate_d, "postos": tuple(nomes_posto)},
+			as_dict=True,
+		)
+		idx = {str(r["d"]): (int(r["escalados"]), int(r["gaps"])) for r in rows}
+
+	out, d = [], de_d
+	while d <= ate_d:
+		esc, gap = idx.get(str(d), (0, 0))
+		out.append({"data": d.isoformat(), "pct": round((esc - gap) / esc * 100) if esc else None})
+		d = getdate(add_days(d, 1))
+	return out
 
 
 # Map guard estado -> aggregate counter key

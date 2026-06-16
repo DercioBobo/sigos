@@ -204,9 +204,12 @@ sigos.PainelOperacional = class PainelOperacional {
 		this.$kpis.html(`
 			<div class="po-ring-card">
 				${ring}
-				<div class="po-ring-meta">
-					<div class="po-ring-lbl">${__("Cobertura")}</div>
-					<div class="po-ring-sub">${k.escalados} ${__("escalados")} &middot; ${k.postos_total} ${__("postos")}</div>
+				<div class="po-ring-info">
+					<div class="po-ring-meta">
+						<div class="po-ring-lbl">${__("Cobertura")}</div>
+						<div class="po-ring-sub">${k.escalados} ${__("escalados")} &middot; ${k.postos_total} ${__("postos")}</div>
+					</div>
+					${this._sparkline_html()}
 				</div>
 			</div>
 			<div class="po-tiles">
@@ -217,6 +220,35 @@ sigos.PainelOperacional = class PainelOperacional {
 					</div>`).join("")}
 			</div>
 		`);
+	}
+
+	// 7-day coverage trend (from painel.py _sparkline) — a compact bar sparkline
+	// under the ring. Nulls (days with no escala) render as a hatched ghost bar.
+	_sparkline_html() {
+		const spark = this.data.sparkline || [];
+		if (!spark.length) return "";
+		const vals = spark.map((s) => s.pct).filter((v) => v !== null && v !== undefined);
+		const avg = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : null;
+		const bars = spark.map((s, i) => {
+			const last = i === spark.length - 1 ? " is-today" : "";
+			const wd = this._wd(s.data);
+			if (s.pct === null || s.pct === undefined) {
+				return `<span class="po-sbar po-sbar-void${last}" title="${this._fmt_day(s.data)}: ${__("sem escala")}"><i style="--h:8%"></i><em>${wd}</em></span>`;
+			}
+			const tone = s.pct >= 95 ? "ok" : s.pct >= 85 ? "warn" : "bad";
+			const h = Math.max(8, Math.round(s.pct));
+			return `<span class="po-sbar tone-${tone}${last}" title="${this._fmt_day(s.data)}: ${s.pct}%"><i style="--h:${h}%"></i><em>${wd}</em></span>`;
+		}).join("");
+		return `
+			<div class="po-spark">
+				<div class="po-spark-h">${__("Cobertura 7 dias")}${avg !== null ? `<span class="po-spark-avg">${__("media")} ${avg}%</span>` : ""}</div>
+				<div class="po-spark-bars">${bars}</div>
+			</div>`;
+	}
+
+	_wd(iso) {
+		const dt = new Date(iso + "T00:00:00");
+		return ["D", "S", "T", "Q", "Q", "S", "S"][dt.getDay()] || "";
 	}
 
 	_coverage_ring(pct) {
@@ -639,16 +671,34 @@ sigos.PainelOperacional = class PainelOperacional {
 
 /* KPI strip */
 .po-kpis { display:flex; gap:12px; margin-top:14px; flex-wrap:wrap; }
-.po-ring-card { display:flex; align-items:center; gap:14px; background:linear-gradient(180deg,#141a23,#10151d); border:1px solid #1f2935; border-radius:14px; padding:14px 20px; }
-.po-ring { --pct:0; width:84px; height:84px; border-radius:50%; display:grid; place-items:center;
+.po-ring-card { display:flex; align-items:center; gap:18px; background:linear-gradient(180deg,#141a23,#10151d); border:1px solid #1f2935; border-radius:14px; padding:16px 22px; }
+.po-ring { --pct:0; width:84px; height:84px; border-radius:50%; display:grid; place-items:center; flex:none;
 	background: conic-gradient(var(--ring) calc(var(--pct)*1%), #202a37 0); }
 .po-ring-ok { --ring:#2ec36b; } .po-ring-warn { --ring:#f5a623; } .po-ring-bad { --ring:#ef4444; }
 .po-ring-hole { width:62px; height:62px; border-radius:50%; background:#10151d; display:grid; place-items:center; }
 .po-ring-hole span { font-size:22px; font-weight:600; color:#eaf2fb; } .po-ring-hole small { font-size:11px; color:#8aa0b8; }
+.po-ring-info { display:flex; flex-direction:column; gap:12px; }
 .po-ring-lbl { font-size:13px; letter-spacing:.12em; text-transform:uppercase; color:#8aa0b8; }
 .po-ring-sub { font-size:12px; color:#6b7e93; margin-top:3px; }
+
+/* Coverage sparkline (7 days) */
+.po-spark { min-width:172px; }
+.po-spark-h { font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:#6b7e93; display:flex; align-items:baseline; gap:8px; margin-bottom:6px; }
+.po-spark-avg { color:#9fb1c6; letter-spacing:.04em; }
+.po-spark-bars { display:flex; align-items:flex-end; gap:5px; height:42px; margin-bottom:16px; }
+.po-sbar { position:relative; width:15px; height:100%; display:flex; align-items:flex-end; }
+.po-sbar i { width:100%; height:var(--h,8%); border-radius:3px 3px 0 0; background:#3b4a5c; display:block; transition:height .25s ease; }
+.po-sbar em { position:absolute; left:0; right:0; bottom:-15px; text-align:center; font-size:9px; font-style:normal; color:#6b7e93; }
+.po-sbar.tone-ok i { background:#2ec36b; }
+.po-sbar.tone-warn i { background:#f5a623; }
+.po-sbar.tone-bad i { background:#ef4444; }
+.po-sbar-void i { background:repeating-linear-gradient(45deg,#1c2531,#1c2531 3px,#141a23 3px,#141a23 6px); }
+.po-sbar.is-today i { outline:1.5px solid rgba(234,242,251,.35); outline-offset:1px; }
+.po-sbar.is-today em { color:#eaf2fb; font-weight:600; }
+
 .po-tiles { display:grid; grid-template-columns:repeat(4,minmax(86px,1fr)); gap:10px; flex:1; }
-.po-tile { background:linear-gradient(180deg,#141a23,#10151d); border:1px solid #1f2935; border-left-width:3px; border-radius:12px; padding:10px 12px; }
+.po-tile { background:linear-gradient(180deg,#141a23,#10151d); border:1px solid #1f2935; border-left-width:3px; border-radius:12px; padding:10px 12px; transition:transform .08s ease, border-color .12s ease; }
+.po-tile:hover { transform:translateY(-2px); }
 .po-tile-val { font-size:24px; font-weight:600; color:#eaf2fb; line-height:1.1; }
 .po-tile-lbl { font-size:11px; color:#8aa0b8; text-transform:uppercase; letter-spacing:.06em; margin-top:2px; }
 .po-tile.k-cob { border-left-color:#2ec36b; } .po-tile.k-lac { border-left-color:#f5a623; }

@@ -18,6 +18,8 @@ from frappe.utils import getdate, nowdate, add_days, date_diff, flt
 _AUSENCIA_GAP = ("Suspensão", "Licença", "Outro")
 # Actions on a Falta that keep the posto manned (the absence was covered).
 _ACCAO_COBERTA = ("Substituto", "Dobra de Turno", "Adiantamento de Turno")
+# Coverage SLA target (%) — the line the board measures every delegação against.
+_META_COBERTURA = 95.0
 
 
 @frappe.whitelist()
@@ -45,11 +47,14 @@ def cco_dashboard(de=None, ate=None, delegacao=None, cliente=None, posto=None):
 	efe = _efectivo(scope)
 	arm = _armamento(scope)
 	reserva = _reserva(scope)
+	scorecard = _scorecard(de_d, ate_d, scope, cob.get("por_delegacao", []),
+	                       efe["delegacao"], reserva["por_delegacao"])
 
 	return {
 		"periodo": {"de": de_d.isoformat(), "ate": ate_d.isoformat(), "dias": dias},
 		"kpis": {
 			"cobertura_media": cob["media"], "cobertura_media_prev": cob_prev["media"],
+			"meta_cobertura": _META_COBERTURA,
 			"gap_slots": cob["gap_slots"], "gap_slots_prev": cob_prev["gap_slots"],
 			"ocorrencias": ocor["total"], "ocorrencias_prev": ocor_prev["total"],
 			"ocorrencias_graves": ocor["graves"], "ocorrencias_graves_prev": ocor_prev["graves"],
@@ -57,6 +62,7 @@ def cco_dashboard(de=None, ate=None, delegacao=None, cliente=None, posto=None):
 			"reserva": reserva["total"],
 		},
 		"cobertura": dict(cob, efectivo_delegacao=efe["delegacao"], efectivo_categoria=efe["categoria"]),
+		"scorecard": scorecard,
 		"ocorrencias": ocor,
 		"ausencias": dict(aus, reserva=reserva),
 		"armamento": arm,
@@ -90,6 +96,7 @@ def _cobertura(de_d, ate_d, scope, lt, trend=True):
 	rows = frappe.db.sql(
 		f"""
 		SELECT te.data AS d, e.posto_de_vigilancia AS posto, po.nome_do_posto AS nome,
+		       COALESCE(NULLIF(po.delegacao, ''), 'Sem delegação') AS deleg,
 		       COUNT(*) AS escalados,
 		       SUM(CASE WHEN g.vigilante IS NOT NULL OR EXISTS (
 		             SELECT 1 FROM `tabLeave Application` f
@@ -121,7 +128,7 @@ def _cobertura(de_d, ate_d, scope, lt, trend=True):
 		as_dict=True,
 	)
 
-	por_dia, por_posto = {}, {}
+	por_dia, por_posto, por_deleg = {}, {}, {}
 	tot_esc = tot_gap = 0
 	for r in rows:
 		esc, gap = int(r["escalados"]), int(r["gaps"])
@@ -130,6 +137,8 @@ def _cobertura(de_d, ate_d, scope, lt, trend=True):
 		dd["escalados"] += esc; dd["gaps"] += gap
 		pp = por_posto.setdefault(r["posto"], {"posto": r["posto"], "nome": r["nome"], "escalados": 0, "gaps": 0})
 		pp["escalados"] += esc; pp["gaps"] += gap
+		pdl = por_deleg.setdefault(r["deleg"], {"k": r["deleg"], "escalados": 0, "gaps": 0})
+		pdl["escalados"] += esc; pdl["gaps"] += gap
 
 	media = round((tot_esc - tot_gap) / tot_esc * 100, 1) if tot_esc else 100.0
 	out = {"media": media, "gap_slots": tot_gap, "escalados": tot_esc}
@@ -150,8 +159,72 @@ def _cobertura(de_d, ate_d, scope, lt, trend=True):
 
 	top = sorted(por_posto.values(), key=lambda x: (-x["gaps"], -x["escalados"]))
 	top = [x for x in top if x["gaps"] > 0][:12]
+
+	deleg = [
+		dict(k=v["k"], escalados=v["escalados"], gaps=v["gaps"],
+		     pct=round((v["escalados"] - v["gaps"]) / v["escalados"] * 100, 1) if v["escalados"] else None)
+		for v in por_deleg.values()
+	]
+
+	# Best / worst staffed day in the window (insight callouts).
+	validos = [x for x in dias if x["pct"] is not None]
+	melhor = max(validos, key=lambda x: x["pct"]) if validos else None
+	pior = min(validos, key=lambda x: x["pct"]) if validos else None
+
 	out["trend"] = dias
 	out["top_lacunas"] = top
+	out["por_delegacao"] = deleg
+	out["meta"] = _META_COBERTURA
+	out["melhor_dia"] = melhor
+	out["pior_dia"] = pior
+	return out
+
+
+def _scorecard(de_d, ate_d, scope, cob_deleg, efe_deleg, reserva_deleg):
+	"""
+	Per-delegação roll-up — the single regional view a controller scans first:
+	cobertura %, efectivo, faltas, ocorrências (+ graves) and reserva, side by side.
+	Merges the coverage breakdown with three light grouped queries.
+	"""
+	sc, sp = _cond(scope, "ta.delegacao", "ta.posto")
+	where = "a.docstatus = 1 AND a.data BETWEEN %(de)s AND %(ate)s" + (" AND " + " AND ".join(sc) if sc else "")
+	faltas = frappe.db.sql(
+		f"""SELECT COALESCE(NULLIF(ta.delegacao, ''), 'Sem delegação') AS k, COUNT(*) AS n
+		    FROM `tabTabela Ausencia` ta JOIN `tabAusencias` a ON a.name = ta.parent
+		    WHERE {where} AND ta.tipo_de_ausencia = 'Falta' GROUP BY k""",
+		dict(sp, de=de_d, ate=ate_d), as_dict=True,
+	)
+	sc2, sp2 = _cond(scope, "delegacao", "posto", "cliente")
+	where2 = "data BETWEEN %(de)s AND %(ate)s" + (" AND " + " AND ".join(sc2) if sc2 else "")
+	ocor = frappe.db.sql(
+		f"""SELECT COALESCE(NULLIF(delegacao, ''), 'Sem delegação') AS k, COUNT(*) AS n,
+		           SUM(gravidade IN ('Alta', 'Crítica')) AS graves
+		    FROM `tabOcorrencia` WHERE {where2} GROUP BY k""",
+		dict(sp2, de=de_d, ate=ate_d), as_dict=True,
+	)
+
+	rows = {}
+
+	def slot(k):
+		return rows.setdefault(k, {
+			"delegacao": k, "efectivo": 0, "escalados": 0, "cobertura": None,
+			"faltas": 0, "ocorrencias": 0, "graves": 0, "reserva": 0,
+		})
+
+	for r in cob_deleg:
+		s = slot(r["k"]); s["cobertura"] = r["pct"]; s["escalados"] = r["escalados"]
+	for r in efe_deleg:
+		slot(r["k"])["efectivo"] = int(r["n"])
+	for r in faltas:
+		slot(r["k"])["faltas"] = int(r["n"])
+	for r in ocor:
+		s = slot(r["k"]); s["ocorrencias"] = int(r["n"]); s["graves"] = int(r["graves"] or 0)
+	for r in reserva_deleg:
+		slot(r["k"])["reserva"] = int(r["n"])
+
+	out = list(rows.values())
+	# Worst coverage first (None = no escala → last), then by efectivo desc.
+	out.sort(key=lambda r: (r["cobertura"] if r["cobertura"] is not None else 999, -r["efectivo"]))
 	return out
 
 
