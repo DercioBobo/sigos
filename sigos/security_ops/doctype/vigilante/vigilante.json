@@ -17,7 +17,9 @@
   "sec_pessoais",
   "data_de_nascimento",
   "idade",
+  "col_break_pessoais1",
   "sexo",
+  "col_break_pessoais2",
   "estado_civil",
   "sec_documentos",
   "documento",
@@ -66,6 +68,7 @@
   "nib",
   "sec_rh",
   "funcionario",
+  "col_break_rh",
   "salario_base_manual"
  ],
  "fields": [
@@ -108,11 +111,19 @@
    "read_only": 1
   },
   {
+   "fieldname": "col_break_pessoais1",
+   "fieldtype": "Column Break"
+  },
+  {
    "fieldname": "sexo",
    "fieldtype": "Select",
    "label": "Sexo",
    "options": "\nMasculino\nFeminino",
    "reqd": 1
+  },
+  {
+   "fieldname": "col_break_pessoais2",
+   "fieldtype": "Column Break"
   },
   {
    "fieldname": "estado_civil",
@@ -423,6 +434,11 @@
    "label": "Funcionário (Employee)",
    "options": "Employee",
    "read_only": 1,
+   "permlevel": 2
+  },
+  {
+   "fieldname": "col_break_rh",
+   "fieldtype": "Column Break",
    "permlevel": 2
   },
   {
