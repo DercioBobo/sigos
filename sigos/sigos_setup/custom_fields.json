@@ -88,10 +88,37 @@
   "doctype": "Custom Field",
   "dt": "Employee",
   "module": "SIGOS Setup",
+  "fieldname": "custom_inss",
+  "fieldtype": "Data",
+  "label": "INSS",
+  "insert_after": "custom_tipo_de_vigilante"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Employee",
+  "module": "SIGOS Setup",
+  "fieldname": "custom_banco",
+  "fieldtype": "Data",
+  "label": "Banco",
+  "insert_after": "custom_inss"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Employee",
+  "module": "SIGOS Setup",
+  "fieldname": "custom_conta",
+  "fieldtype": "Data",
+  "label": "Conta",
+  "insert_after": "custom_banco"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Employee",
+  "module": "SIGOS Setup",
   "fieldname": "custom_contanib",
   "fieldtype": "Data",
-  "label": "Conta NIB",
-  "insert_after": "custom_tipo_de_vigilante"
+  "label": "NIB",
+  "insert_after": "custom_conta"
  },
  {
   "doctype": "Custom Field",

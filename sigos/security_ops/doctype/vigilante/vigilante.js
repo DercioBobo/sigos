@@ -69,9 +69,13 @@ frappe.ui.form.on("Vigilante", {
 		// funcionario always read-only (system-managed)
 		frm.set_df_property("funcionario", "read_only", 1);
 
-		// Regime drives the Escala — once the guard exists, changes must go through
-		// "Troca De Regime" (which migrates the escala). Editable only on a new doc.
-		if (!frm.is_new()) {
+		// Regime drives the Escala — once it's SET, changes must go through
+		// "Troca De Regime" (which migrates the escala). We only lock it when it
+		// already has a value: an empty regime stays editable (and visible) so a
+		// guard saved without one — e.g. Pre-Adimissão/Reserva — can still get it
+		// assigned. (A read-only Frappe field with no value renders as nothing,
+		// which is why an empty regime appeared to "disappear" after the first save.)
+		if (!frm.is_new() && frm.doc.regime_do_vigilante) {
 			frm.set_df_property("regime_do_vigilante", "read_only", 1);
 			frm.set_df_property("regime_do_vigilante", "description",
 				__("Para alterar o regime use o documento <b>Troca De Regime</b> — mantém a escala consistente."));

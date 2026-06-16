@@ -58,6 +58,12 @@
   "mecanografico",
   "col_break_id",
   "codename",
+  "sec_bancarios",
+  "inss",
+  "banco",
+  "col_break_banco",
+  "conta",
+  "nib",
   "sec_rh",
   "funcionario",
   "salario_base_manual"
@@ -224,6 +230,7 @@
    "fieldtype": "Link",
    "label": "Empresa",
    "options": "Company",
+   "hidden": 1,
    "permlevel": 2
   },
   {
@@ -368,6 +375,41 @@
    "fieldtype": "Attach",
    "label": "Documento Anexo",
    "permlevel": 1
+  },
+  {
+   "fieldname": "sec_bancarios",
+   "fieldtype": "Section Break",
+   "label": "Dados Bancários e Segurança Social",
+   "permlevel": 2
+  },
+  {
+   "fieldname": "inss",
+   "fieldtype": "Data",
+   "label": "INSS",
+   "description": "Número de inscrição no INSS. Sincronizado com o Funcionário (Employee).",
+   "permlevel": 2
+  },
+  {
+   "fieldname": "banco",
+   "fieldtype": "Data",
+   "label": "Banco",
+   "permlevel": 2
+  },
+  {
+   "fieldname": "col_break_banco",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "conta",
+   "fieldtype": "Data",
+   "label": "Conta",
+   "permlevel": 2
+  },
+  {
+   "fieldname": "nib",
+   "fieldtype": "Data",
+   "label": "NIB",
+   "permlevel": 2
   },
   {
    "fieldname": "sec_rh",

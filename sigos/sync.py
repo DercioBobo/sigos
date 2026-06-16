@@ -36,6 +36,10 @@ _PERSONAL = [
 	("numero_documento",     "custom_numero_documento"),
 	("residencia",           "custom_residencia"),
 	("dependentes",          "custom_dependentes"),
+	("inss",                 "custom_inss"),
+	("banco",                "custom_banco"),
+	("conta",                "custom_conta"),
+	("nib",                  "custom_contanib"),
 ]
 
 # Operational data — FORWARD ONLY (Vigilante owns these; Employee fields are
