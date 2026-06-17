@@ -390,6 +390,9 @@ class Vigilante(Document):
 
 		self.status = novo_estado
 		self.posto_de_vigilancia = None
+		self.nome_do_posto = None
+		self.tipo_de_posto = None
+		self.regime_do_vigilante = None
 		self.projecto = None
 		self.cliente = None
 		self.nome_do_projecto = None

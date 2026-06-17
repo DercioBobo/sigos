@@ -109,7 +109,38 @@ def before_validate(doc, method):
 
 # ─── Subsídios ──────────────────────────────────────────────────────────────────
 
+def _resolve_projecto(doc):
+	"""
+	The slip's custom_projecto has no fetch_from (the Employee carries no project),
+	so derive it when empty: prefer the SSA actually applied to this slip (the
+	contract in force), falling back to the guard's current Vigilante.projecto.
+	Without this the project subsídios below never get appended.
+	"""
+	if doc.custom_projecto:
+		return
+	try:
+		if doc.salary_structure and doc.employee:
+			proj = frappe.db.get_value(
+				"Salary Structure Assignment",
+				{"employee": doc.employee, "salary_structure": doc.salary_structure, "docstatus": 1},
+				"custom_project",
+			)
+			if proj:
+				doc.custom_projecto = proj
+				return
+		if doc.custom_vigilante:
+			doc.custom_projecto = frappe.db.get_value(
+				"Vigilante", doc.custom_vigilante, "projecto"
+			)
+	except Exception as e:
+		frappe.log_error(
+			f"SalarySlip {doc.name}: erro ao resolver projecto: {e}",
+			"SIGOS Salary Slip Hooks",
+		)
+
+
 def _add_project_subsidios(doc):
+	_resolve_projecto(doc)
 	if not doc.custom_projecto:
 		return
 	try:

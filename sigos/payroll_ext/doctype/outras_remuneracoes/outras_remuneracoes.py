@@ -1,7 +1,7 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import add_months
+from frappe.utils import add_months, add_days, getdate
 
 
 MESES = {
@@ -26,9 +26,6 @@ class OutrasRemuneracoes(Document):
 		if not self.mes_referencia:
 			return
 
-		from frappe.utils import getdate
-		import datetime
-
 		mes_num = MESES.get(self.mes_referencia)
 		if not mes_num:
 			return
@@ -40,4 +37,6 @@ class OutrasRemuneracoes(Document):
 			self.meses_a_pagar = 1
 
 		meses = self.meses_a_pagar or 1
-		self.data_de_fim = add_months(self.data_de_inicio, meses)
+		# Last day of the final covered month — must match the client formula exactly
+		# (last-day-of-month), or the form re-dirties on every refresh (stale "Not Saved").
+		self.data_de_fim = add_days(add_months(self.data_de_inicio, meses), -1)

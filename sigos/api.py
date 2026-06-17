@@ -1341,7 +1341,7 @@ def _aplicar_salario_base_vigilante(v, estrutura, from_date):
 	on the same date is updated, otherwise a new dated, submitted SSA supersedes it.
 	Returns (status, detalhe) where status ∈ atribuido|actualizado|inalterado|ignorado.
 	"""
-	from frappe.utils import flt
+	from frappe.utils import flt, getdate
 
 	funcionario = v.get("funcionario")
 	if not funcionario:
@@ -1361,31 +1361,48 @@ def _aplicar_salario_base_vigilante(v, estrutura, from_date):
 	if existing and flt(existing[0].base) == flt(base):
 		return ("inalterado", v.get("name"))
 
+	# Effective date of the assignment. The FIRST SSA must start at the employee's
+	# date_of_joining so the joining-month salary slip can be generated; later changes
+	# (raises) take effect at the change date passed in (today). It can never be before
+	# the joining date — ERPNext rejects an SSA from_date earlier than date_of_joining.
+	doj, company = frappe.db.get_value("Employee", funcionario, ["date_of_joining", "company"])
+	efetiva = from_date if existing else (doj or from_date)
+	if doj and getdate(efetiva) < getdate(doj):
+		efetiva = doj
+
 	dup = frappe.db.exists("Salary Structure Assignment", {
 		"employee": funcionario,
 		"salary_structure": estrutura,
-		"from_date": from_date,
+		"from_date": efetiva,
 		"docstatus": ["<", 2],
 	})
+	# Payroll Payable account comes from SIGOS Settings (falls back to the company
+	# default when left blank). Drives the credit side of the salary slip's accounting.
+	conta_pagar = frappe.db.get_single_value("SIGOS Settings", "payroll_payable_account")
+
 	if dup:
 		ssa = frappe.get_doc("Salary Structure Assignment", dup)
 		if ssa.docstatus == 0:
 			ssa.base = base
+			if conta_pagar:
+				ssa.payroll_payable_account = conta_pagar
 			ssa.save(ignore_permissions=True)
 			ssa.submit()
 			return ("actualizado", v.get("name"))
-		return ("ignorado", _("{0}: já existe SSA submetida em {1}").format(v.get("name"), from_date))
+		return ("ignorado", _("{0}: já existe SSA submetida em {1}").format(v.get("name"), efetiva))
 
 	ssa = frappe.get_doc({
 		"doctype": "Salary Structure Assignment",
 		"employee": funcionario,
 		"salary_structure": estrutura,
-		"from_date": from_date,
+		"from_date": efetiva,
 		"base": base,
-		"company": frappe.db.get_value("Employee", funcionario, "company"),
+		"company": company,
 		"custom_project": v.get("projecto"),
 		"custom_cliente": v.get("cliente"),
 	})
+	if conta_pagar:
+		ssa.payroll_payable_account = conta_pagar
 	ssa.insert(ignore_permissions=True)
 	ssa.submit()
 	return ("atribuido", v.get("name"))
@@ -1446,6 +1463,76 @@ def aplicar_salario_base(project=None, vigilante=None, silent=False):
 		frappe.msgprint(msg, title=_("Atribuição de Salário Base"), indicator="blue")
 
 	return resumo
+
+
+@frappe.whitelist()
+def definir_salario_base(vigilante, valor=None, usar_contrato=0, confirmar_reducao=0):
+	"""
+	Set (or clear) a single guard's manual base salary and immediately write the
+	resolved base to a new Salary Structure Assignment. Unlike the on-save seed,
+	this works for ANY employed guard (Activo/Reserva/Inactivo) — it has no status
+	gate. `usar_contrato` clears the manual override so the guard reverts to the
+	contract's per-regime base.
+
+	Safety: if the new resolved base is LOWER than the guard's current one, nothing
+	is written — the method returns {"requires_confirm": 1, "atual", "novo"} so the
+	caller can confirm a pay cut with HR before re-calling with confirmar_reducao=1.
+	Otherwise returns {"base", "resumo"}.
+	"""
+	from frappe.utils import flt
+
+	if not frappe.db.exists("Vigilante", vigilante):
+		frappe.throw(_("Vigilante {0} não encontrado.").format(vigilante))
+
+	func = frappe.db.get_value("Vigilante", vigilante, "funcionario")
+	if not func:
+		frappe.throw(
+			_("O vigilante <b>{0}</b> ainda não tem Funcionário associado — admita-o "
+			  "pelo RH antes de definir o salário.").format(vigilante),
+			title=_("Sem Funcionário"),
+		)
+
+	usar_contrato = int(usar_contrato or 0)
+	if usar_contrato:
+		novo_manual = None
+	else:
+		novo_manual = flt(valor)
+		if novo_manual <= 0:
+			frappe.throw(
+				_("Indique um salário maior que zero — ou opte por herdar o salário do contrato."),
+				title=_("Valor Inválido"),
+			)
+
+	# Resolve current vs prospective base WITHOUT mutating anything yet, so a pay
+	# cut can be confirmed first. resolver_salario_base accepts a dict, so we mirror
+	# the guard's contract/regime with the proposed manual override.
+	atual = flt(resolver_salario_base(vigilante))
+	proj, regime = frappe.db.get_value(
+		"Vigilante", vigilante, ["projecto", "regime_do_vigilante"]
+	)
+	novo = flt(resolver_salario_base({
+		"salario_base_manual": novo_manual,
+		"projecto": proj,
+		"regime_do_vigilante": regime,
+	}))
+
+	if novo < atual and not int(confirmar_reducao or 0):
+		return {"requires_confirm": 1, "atual": atual, "novo": novo}
+
+	# permlevel-2 field — set server-side (whitelisted method already trusts the role gate)
+	frappe.db.set_value("Vigilante", vigilante, "salario_base_manual", novo_manual)
+
+	resumo = aplicar_salario_base(vigilante=vigilante, silent=True)
+	base = resolver_salario_base(vigilante)
+
+	from sigos.timeline import registar
+	base_fmt = frappe.format_value(base, {"fieldtype": "Currency"})
+	if usar_contrato:
+		registar(vigilante, _("Salário base passou a <b>herdar do contrato</b> — base resolvida: <b>{0}</b>").format(base_fmt))
+	else:
+		registar(vigilante, _("Salário base (manual) definido para <b>{0}</b>").format(base_fmt))
+
+	return {"base": base, "resumo": resumo}
 
 
 @frappe.whitelist()

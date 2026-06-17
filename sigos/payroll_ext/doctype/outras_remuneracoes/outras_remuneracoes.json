@@ -10,6 +10,7 @@
  "field_order": [
   "naming_series",
   "funcionario",
+  "funcionario_nome",
   "tipo_de_subsidios",
   "col_break_1",
   "tipo_de_pagamento",
@@ -38,6 +39,14 @@
    "label": "Funcionário",
    "options": "Employee",
    "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "funcionario_nome",
+   "fieldtype": "Data",
+   "label": "Nome do Funcionário",
+   "fetch_from": "funcionario.employee_name",
+   "read_only": 1,
    "in_list_view": 1
   },
   {

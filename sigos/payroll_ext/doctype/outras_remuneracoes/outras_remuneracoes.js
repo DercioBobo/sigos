@@ -14,7 +14,9 @@ function _prov_ultimo_dia_do_mes(ano, mes) {
 function _prov_calcular_valor_mensal(frm) {
 	const total = frm.doc.valor_a_pagar || 0;
 	const meses = frm.doc.meses_a_pagar || 0;
-	frm.set_value("valor_mensal", meses > 0 ? total / meses : 0);
+	// Round to 2 like the server (round(total/meses, 2)) — otherwise refresh's
+	// set_value writes an unrounded value that never matches the saved one (stale form).
+	frm.set_value("valor_mensal", meses > 0 ? flt(total / meses, 2) : 0);
 }
 
 function _prov_aplicar_tipo_pagamento(frm) {

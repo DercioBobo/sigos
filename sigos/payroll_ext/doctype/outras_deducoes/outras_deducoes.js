@@ -39,7 +39,9 @@ function _ded_aplicar_tipo_pagamento(frm) {
 function _ded_calcular_valor_mensal(frm) {
 	const total = frm.doc.valor_a_pagar;
 	const meses = frm.doc.meses_a_pagar;
-	frm.set_value("valor_mensal", (total && meses && meses > 0) ? total / meses : 0);
+	// Round to 2 like the server (round(total/meses, 2)) — otherwise refresh's
+	// set_value writes an unrounded value that never matches the saved one (stale form).
+	frm.set_value("valor_mensal", (total && meses && meses > 0) ? flt(total / meses, 2) : 0);
 }
 
 // =========================

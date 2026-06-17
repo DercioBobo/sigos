@@ -55,6 +55,7 @@
   "sec_ss_base",
   "estrutura_salarial_padrao",
   "salario_minimo_padrao",
+  "payroll_payable_account",
   "tab_ss_sis",
   "empresa_padrao",
   "col_ss_sis1",
@@ -372,6 +373,13 @@
    "fieldtype": "Currency",
    "label": "Salário Mínimo Padrão",
    "description": "Piso do salário base. Usado quando o contrato/regime não define um valor, e como mínimo quando o valor resolvido é inferior. Deixe vazio para não aplicar piso."
+  },
+  {
+   "fieldname": "payroll_payable_account",
+   "fieldtype": "Link",
+   "label": "Conta a Pagar de Salários (Payroll Payable)",
+   "options": "Account",
+   "description": "Conta usada nos Salary Structure Assignments criados automaticamente. Deixe vazio para usar a conta padrão da empresa."
   },
   {
    "fieldname": "tab_ss_sis",
