@@ -39,7 +39,8 @@
    "label": "Funcionário",
    "options": "Employee",
    "reqd": 1,
-   "in_list_view": 1
+   "in_list_view": 1,
+   "link_filters": "[[\"Employee\",\"status\",\"!=\",\"Left\"]]"
   },
   {
    "fieldname": "funcionario_nome",

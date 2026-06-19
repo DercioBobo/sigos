@@ -12,8 +12,8 @@
   "estado",
   "col_break_1",
   "funcionario",
+  "funcionario_nome",
   "salario_base",
-  "vigilante",
   "sec_val",
   "valor_a_pagar",
   "meses_a_pagar",
@@ -56,6 +56,15 @@
    "label": "Funcionário",
    "options": "Employee",
    "reqd": 1,
+   "in_list_view": 1,
+   "link_filters": "[[\"Employee\",\"status\",\"!=\",\"Left\"]]"
+  },
+  {
+   "fieldname": "funcionario_nome",
+   "fieldtype": "Data",
+   "label": "Nome do Funcionário",
+   "fetch_from": "funcionario.employee_name",
+   "read_only": 1,
    "in_list_view": 1
   },
   {
@@ -63,12 +72,6 @@
    "fieldtype": "Currency",
    "label": "Salário Base",
    "read_only": 1
-  },
-  {
-   "fieldname": "vigilante",
-   "fieldtype": "Link",
-   "label": "Vigilante",
-   "options": "Vigilante"
   },
   {
    "fieldname": "sec_val",

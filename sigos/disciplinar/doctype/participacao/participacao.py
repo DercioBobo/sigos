@@ -45,15 +45,13 @@ class Participacao(Document):
 
 	def _abrir_processo(self, razao):
 		"""Insert a draft Processo Disciplinar from this participação. `razao` is
-		stamped on `automatico` (the audit trail of why the process opened)."""
-		funcionario = frappe.db.get_value("Vigilante", self.vigilante, "funcionario") if self.vigilante else None
-
+		stamped on `automatico` (the audit trail of why the process opened). The PD
+		is keyed only on the vigilante; the Employee is derived downstream when needed."""
 		processo = frappe.get_doc({
 			"doctype": "Processo Disciplinar",
 			"data": self.data,
 			"delegacao": self.delegacao,
 			"vigilante": self.vigilante,
-			"funcionario": funcionario,
 			"gravidade": self.gravidade,
 			"motivo": self.tipo_de_infracao,
 			"detalhes": self.relato,

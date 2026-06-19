@@ -159,7 +159,8 @@
    "label": "Vigilante (em serviço / envolvido)",
    "options": "Vigilante",
    "in_standard_filter": 1,
-   "description": "Vigilante de serviço no momento, ou envolvido na ocorrência."
+   "description": "Vigilante de serviço no momento, ou envolvido na ocorrência.",
+   "link_filters": "[[\"Vigilante\",\"status\",\"!=\",\"Demitido\"]]"
   },
   {
    "fieldname": "sec_desc",

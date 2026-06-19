@@ -98,7 +98,8 @@
    "depends_on": "eval:doc.alocar_a=='Vigilante'",
    "mandatory_depends_on": "eval:doc.alocar_a=='Vigilante'",
    "in_list_view": 1,
-   "in_standard_filter": 1
+   "in_standard_filter": 1,
+   "link_filters": "[[\"Vigilante\",\"status\",\"!=\",\"Demitido\"]]"
   },
   {
    "fieldname": "sec_material",

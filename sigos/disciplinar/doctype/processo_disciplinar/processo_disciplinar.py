@@ -37,12 +37,13 @@ class ProcessoDisciplinar(Document):
 			componente = frappe.db.get_single_value(
 				"SIGOS Settings", "componente_processo_disciplinar"
 			) or "Processo Disciplinar"
+			# Outras Deducoes is keyed on the Employee — derive it from the vigilante.
+			funcionario = frappe.db.get_value("Vigilante", self.vigilante, "funcionario")
 			deducao = frappe.get_doc({
 				"doctype": "Outras Deducoes",
 				"tipo": componente,
 				"estado": "Activo",
-				"funcionario": self.funcionario,
-				"vigilante": self.vigilante,
+				"funcionario": funcionario,
 				"valor_a_pagar": self.valor_a_pagar,
 				"meses_a_pagar": self.meses_a_pagar,
 				"mes_referencia": self.mes_referencia,
@@ -65,15 +66,16 @@ class ProcessoDisciplinar(Document):
 	def _aplicar_retencao_salario(self):
 		"""Suspend Employee and deactivate Vigilante."""
 		try:
-			if self.funcionario:
-				emp = frappe.get_doc("Employee", self.funcionario)
-				emp.status = "Suspended"
-				emp.save(ignore_permissions=True)
-
 			if self.vigilante:
 				vig = frappe.get_doc("Vigilante", self.vigilante)
 				vig.status = "Inactivo"
 				vig.save(ignore_permissions=True)
+
+				# Employee is derived from the vigilante (no funcionario field on the PD).
+				if vig.funcionario:
+					emp = frappe.get_doc("Employee", vig.funcionario)
+					emp.status = "Suspended"
+					emp.save(ignore_permissions=True)
 		except Exception as e:
 			frappe.log_error(
 				f"ProcessoDisciplinar {self.name}: erro ao aplicar Retenção de Salário: {e}",

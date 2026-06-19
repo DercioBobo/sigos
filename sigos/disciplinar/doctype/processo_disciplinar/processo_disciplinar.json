@@ -10,25 +10,23 @@
  "field_order": [
   "naming_series",
   "tab_pd_colab",
-  "data",
-  "delegacao",
-  "automatico",
   "sec_colaborador",
   "vigilante",
   "nome_do_vigilante",
   "mecanografico",
+  "categoria",
   "col_pd_1",
-  "funcionario",
   "posto",
   "posto_nome",
-  "categoria",
-  "tab_pd_proc",
+  "col_pd_1b",
+  "data",
+  "delegacao",
+  "automatico",
   "sec_processo",
   "participacao_referente",
   "gravidade",
-  "col_pd_2",
   "motivo",
-  "col_pd_3",
+  "col_pd_2",
   "detalhes",
   "tab_pd_dec",
   "sec_decisao",
@@ -39,8 +37,8 @@
   "mes_referencia",
   "data_de_inicio",
   "descricao",
-  "uniforme",
   "col_break_4",
+  "uniforme",
   "termo_de_responsabilidade"
  ],
  "fields": [
@@ -55,7 +53,7 @@
   {
    "fieldname": "tab_pd_colab",
    "fieldtype": "Tab Break",
-   "label": "Colaborador"
+   "label": "Colaborador e Processo"
   },
   {
    "fieldname": "data",
@@ -87,7 +85,10 @@
    "fieldname": "vigilante",
    "fieldtype": "Link",
    "label": "Vigilante",
-   "options": "Vigilante"
+   "options": "Vigilante",
+   "reqd": 1,
+   "in_list_view": 1,
+   "link_filters": "[[\"Vigilante\",\"status\",\"!=\",\"Demitido\"]]"
   },
   {
    "fieldname": "nome_do_vigilante",
@@ -108,12 +109,6 @@
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "funcionario",
-   "fieldtype": "Link",
-   "label": "Funcionário",
-   "options": "Employee"
-  },
-  {
    "fieldname": "posto",
    "fieldtype": "Link",
    "label": "Posto",
@@ -129,16 +124,15 @@
    "read_only": 1
   },
   {
+   "fieldname": "col_pd_1b",
+   "fieldtype": "Column Break"
+  },
+  {
    "fieldname": "categoria",
    "fieldtype": "Data",
    "label": "Categoria",
    "fetch_from": "vigilante.categoria",
    "read_only": 1
-  },
-  {
-   "fieldname": "tab_pd_proc",
-   "fieldtype": "Tab Break",
-   "label": "Processo"
   },
   {
    "fieldname": "sec_processo",
@@ -166,10 +160,6 @@
    "fieldname": "motivo",
    "fieldtype": "Small Text",
    "label": "Motivo"
-  },
-  {
-   "fieldname": "col_pd_3",
-   "fieldtype": "Column Break"
   },
   {
    "fieldname": "detalhes",

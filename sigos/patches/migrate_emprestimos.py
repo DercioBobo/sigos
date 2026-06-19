@@ -18,7 +18,7 @@ def execute():
 		"Outras Deducoes",
 		filters={"tipo": "Emprestimo"},
 		fields=[
-			"name", "funcionario", "vigilante", "salario_base",
+			"name", "funcionario", "salario_base",
 			"valor_a_pagar", "meses_a_pagar", "valor_mensal", "mes_referencia",
 			"data_de_inicio", "data_de_fim", "estado", "descricao",
 			"termo_de_responsabilidade", "docstatus",
@@ -33,7 +33,6 @@ def execute():
 			emp = frappe.get_doc({
 				"doctype": "Emprestimo",
 				"funcionario": old.funcionario,
-				"vigilante": old.vigilante,
 				"salario_base": old.salario_base,
 				"valor_a_pagar": old.valor_a_pagar,
 				"meses_a_pagar": old.meses_a_pagar,

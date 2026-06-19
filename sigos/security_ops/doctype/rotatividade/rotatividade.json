@@ -100,7 +100,8 @@
    "label": "Vigilante",
    "options": "Vigilante",
    "reqd": 1,
-   "in_list_view": 1
+   "in_list_view": 1,
+   "link_filters": "[[\"Vigilante\",\"status\",\"!=\",\"Demitido\"]]"
   },
   {
    "fieldname": "antigo_posto",
@@ -201,7 +202,8 @@
    "fieldname": "novo_vigilante",
    "fieldtype": "Link",
    "label": "Novo Vigilante",
-   "options": "Vigilante"
+   "options": "Vigilante",
+   "link_filters": "[[\"Vigilante\",\"status\",\"!=\",\"Demitido\"]]"
   },
   {
    "fieldname": "alocado_ao_posto",
