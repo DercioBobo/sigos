@@ -38,9 +38,8 @@ function _prov_aplicar_tipo_pagamento(frm) {
 function _prov_calcular_datas_determinado(frm) {
 	if (!frm.doc.mes_referencia) return;
 
-	const hoje = frappe.datetime.str_to_obj(frappe.datetime.get_today());
-	const ano = hoje.getFullYear();
 	const mes = _PROV_MESES[frm.doc.mes_referencia];
+	const ano = _prov_ano_para_mes(mes);
 
 	const data_inicio = new Date(ano, mes, 1);
 	const data_fim = _prov_ultimo_dia_do_mes(ano, mes);
@@ -52,9 +51,8 @@ function _prov_calcular_datas_determinado(frm) {
 function _prov_calcular_datas_prestacoes(frm) {
 	if (!frm.doc.mes_referencia || !frm.doc.meses_a_pagar) return;
 
-	const hoje = frappe.datetime.str_to_obj(frappe.datetime.get_today());
-	const ano = hoje.getFullYear();
 	const mes = _PROV_MESES[frm.doc.mes_referencia];
+	const ano = _prov_ano_para_mes(mes);
 
 	const data_inicio = new Date(ano, mes, 1);
 	const data_fim_temp = new Date(ano, mes + frm.doc.meses_a_pagar - 1, 1);
@@ -67,6 +65,31 @@ function _prov_calcular_datas_prestacoes(frm) {
 function _prov_aplicar_regras(frm) {
 	if (!frm.doc.tipo_de_pagamento || !frm.doc.mes_referencia) return;
 	_prov_aplicar_tipo_pagamento(frm);
+}
+
+// Year for the chosen month (0-based index): current year if it's the current month
+// or later; next year ONLY at the year-end Dez→Jan wrap (we're in December). Any other
+// earlier month stays in the current year — a genuine past month the server rejects.
+function _prov_ano_para_mes(idx) {
+	const hoje = frappe.datetime.str_to_obj(frappe.datetime.get_today());
+	if (idx >= hoje.getMonth()) return hoje.getFullYear();
+	if (hoje.getMonth() === 11) return hoje.getFullYear() + 1;   // December → next year
+	return hoje.getFullYear();
+}
+
+// Aviso (não bloqueante) — mês no passado. O servidor bloqueia ao guardar.
+function _prov_avisar_mes_passado(frm) {
+	const idx = _PROV_MESES[frm.doc.mes_referencia];   // 0-based
+	if (idx === undefined) return;
+	const inicio = new Date(_prov_ano_para_mes(idx), idx, 1);
+	const hoje = frappe.datetime.str_to_obj(frappe.datetime.get_today());
+	const primeiro_mes_actual = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+	if (inicio < primeiro_mes_actual) {
+		frappe.show_alert({
+			message: __("O mês seleccionado já passou — não será possível guardar. Escolha o mês actual ou um mês futuro."),
+			indicator: "orange",
+		}, 6);
+	}
 }
 
 frappe.ui.form.on("Outras Remuneracoes", {
@@ -96,6 +119,7 @@ frappe.ui.form.on("Outras Remuneracoes", {
 
 	mes_referencia(frm) {
 		_prov_aplicar_regras(frm);
+		_prov_avisar_mes_passado(frm);
 	},
 
 	meses_a_pagar(frm) {

@@ -62,6 +62,31 @@ function _ded_calcular_data_fim(frm) {
 	}
 }
 
+// Year for the chosen month (1-based "01".."12"): current year if it's the current
+// month or later; next year ONLY at the year-end Dez→Jan wrap (we're in December).
+// Any other earlier month stays in the current year — a genuine past month that the
+// server rejects (e.g. "Março" escolhido em Junho).
+function _ded_ano_para_mes(mes_str) {
+	const hoje = frappe.datetime.str_to_obj(frappe.datetime.get_today());
+	const mes = parseInt(mes_str, 10);          // 1-based
+	const mes_actual = hoje.getMonth() + 1;     // 1-based
+	if (mes >= mes_actual) return hoje.getFullYear();
+	if (mes_actual === 12) return hoje.getFullYear() + 1;
+	return hoje.getFullYear();
+}
+
+// Aviso (não bloqueante) — mês no passado. O servidor bloqueia ao guardar.
+function _ded_avisar_mes_passado(frm) {
+	if (!frm.doc.data_de_inicio) return;
+	const inicio_mes_actual = frappe.datetime.get_today().slice(0, 8) + "01";
+	if (frm.doc.data_de_inicio < inicio_mes_actual) {
+		frappe.show_alert({
+			message: __("O mês seleccionado já passou — não será possível guardar. Escolha o mês actual ou um mês futuro."),
+			indicator: "orange",
+		}, 6);
+	}
+}
+
 // =========================
 // Calcular data_de_inicio por mês
 // =========================
@@ -69,7 +94,7 @@ function _ded_calcular_data_inicio_por_mes(frm) {
 	if (!frm.doc.mes_referencia) return;
 
 	const mes = _DED_MESES[frm.doc.mes_referencia];
-	const ano = frappe.datetime.get_today().split("-")[0];
+	const ano = _ded_ano_para_mes(mes);
 	frm.set_value("data_de_inicio", `${ano}-${mes}-01`);
 	_ded_calcular_data_fim(frm);
 }
@@ -135,9 +160,10 @@ frappe.ui.form.on("Outras Deducoes", {
 	mes_referencia(frm) {
 		if (!frm.doc.mes_referencia) return;
 		const mes = _DED_MESES[frm.doc.mes_referencia];
-		const ano = frappe.datetime.get_today().split("-")[0];
+		const ano = _ded_ano_para_mes(mes);
 		frm.set_value("data_de_inicio", `${ano}-${mes}-01`);
 		_ded_calcular_data_fim(frm);
+		_ded_avisar_mes_passado(frm);
 	},
 
 	valor_a_pagar(frm) {

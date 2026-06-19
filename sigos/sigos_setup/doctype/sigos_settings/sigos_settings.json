@@ -52,6 +52,7 @@
   "componente_deducoes_diversas",
   "componente_uniforme",
   "componente_processo_disciplinar",
+  "componente_proporcional",
   "sec_ss_base",
   "estrutura_salarial_padrao",
   "salario_minimo_padrao",
@@ -355,6 +356,13 @@
    "label": "Salary Component — Processo Disciplinar",
    "options": "Salary Component",
    "description": "Componente usado na dedução criada automaticamente por um Processo Disciplinar. Padrão: \"Processo Disciplinar\""
+  },
+  {
+   "fieldname": "componente_proporcional",
+   "fieldtype": "Link",
+   "label": "Salary Component — Proporcional (Admissão/Demissão)",
+   "options": "Salary Component",
+   "description": "Componente de dedução usado para o desconto proporcional dos dias fora do vínculo (admissão ou demissão a meio do mês). Criado automaticamente se não existir. Padrão: \"Proporcional\""
   },
   {
    "fieldname": "sec_ss_base",

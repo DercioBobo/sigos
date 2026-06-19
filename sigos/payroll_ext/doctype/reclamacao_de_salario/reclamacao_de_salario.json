@@ -12,8 +12,15 @@
   "data",
   "col_break_1",
   "funcionario",
-  "vigilante",
+  "funcionario_nome",
+  "sec_reclamado",
+  "mes_de_reclamacao",
+  "ano_de_reclamacao",
+  "col_rs_ref1",
   "slip_do_funcionario",
+  "col_rs_ref2",
+  "valor_bruto_processado",
+  "valor_liquido_processado",
   "sec_periodo",
   "mes_a_ser_pago",
   "data_de_inicio",
@@ -58,20 +65,59 @@
    "link_filters": "[[\"Employee\",\"status\",\"!=\",\"Left\"]]"
   },
   {
-   "fieldname": "vigilante",
-   "fieldtype": "Link",
-   "label": "Vigilante",
-   "options": "Vigilante",
-   "fetch_from": "funcionario.custom_vigilante",
+   "fieldname": "funcionario_nome",
+   "fieldtype": "Data",
+   "label": "Nome do Funcionário",
+   "fetch_from": "funcionario.employee_name",
    "read_only": 1,
-   "link_filters": "[[\"Vigilante\",\"status\",\"!=\",\"Demitido\"]]"
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "sec_reclamado",
+   "fieldtype": "Section Break",
+   "label": "Mês em Reclamação (o que o sistema pagou)"
+  },
+  {
+   "fieldname": "mes_de_reclamacao",
+   "fieldtype": "Select",
+   "label": "Mês de Reclamação",
+   "options": "\nJaneiro\nFevereiro\nMarço\nAbril\nMaio\nJunho\nJulho\nAgosto\nSetembro\nOutubro\nNovembro\nDezembro",
+   "description": "Mês em que o pagamento foi incompleto. O sistema procura a Salary Slip processada desse mês."
+  },
+  {
+   "fieldname": "ano_de_reclamacao",
+   "fieldtype": "Int",
+   "label": "Ano de Reclamação"
+  },
+  {
+   "fieldname": "col_rs_ref1",
+   "fieldtype": "Column Break"
   },
   {
    "fieldname": "slip_do_funcionario",
    "fieldtype": "Link",
-   "label": "Salary Slip",
+   "label": "Folha Processada (encontrada)",
    "options": "Salary Slip",
+   "read_only": 1,
    "in_list_view": 1
+  },
+  {
+   "fieldname": "col_rs_ref2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "valor_bruto_processado",
+   "fieldtype": "Currency",
+   "label": "Valor Bruto Processado",
+   "read_only": 1,
+   "description": "Salário bruto que o sistema processou nesse mês (referência)."
+  },
+  {
+   "fieldname": "valor_liquido_processado",
+   "fieldtype": "Currency",
+   "label": "Valor Líquido Processado",
+   "read_only": 1,
+   "description": "Valor líquido efectivamente pago nesse mês (referência)."
   },
   {
    "fieldname": "sec_periodo",

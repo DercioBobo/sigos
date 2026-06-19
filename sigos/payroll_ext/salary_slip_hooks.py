@@ -104,6 +104,7 @@ def before_validate(doc, method):
 	_compute_faltas_nao_justificadas(doc)
 	_add_faltas_deduction(doc)          # uses the configured method
 	_add_dobras(doc)                    # extra pay for covered shifts (earning)
+	_add_proporcional_admissao_demissao(doc)   # prorate base for partial-month employment
 	_compute_dias_trabalhados(doc)
 
 
@@ -537,14 +538,89 @@ def _add_dobras(doc):
 		)
 
 
+# ─── Proporcional por admissão/demissão a meio do mês ───────────────────────────
+
+def _dias_fora_emprego(doc):
+	"""Calendar days within the slip period that fall OUTSIDE the employment window
+	[date_of_joining, relieving_date] — i.e. days not yet joined or already left.
+	0 for a normal full-month employee."""
+	if not (doc.employee and doc.start_date and doc.end_date):
+		return 0
+	emp = frappe.db.get_value(
+		"Employee", doc.employee, ["date_of_joining", "relieving_date"], as_dict=True
+	)
+	if not emp:
+		return 0
+	start, end = getdate(doc.start_date), getdate(doc.end_date)
+	total = date_diff(end, start) + 1
+	emp_start = max(start, getdate(emp.date_of_joining)) if emp.date_of_joining else start
+	emp_end = min(end, getdate(emp.relieving_date)) if emp.relieving_date else end
+	empregado = (date_diff(emp_end, emp_start) + 1) if emp_start <= emp_end else 0
+	return max(0, total - empregado)
+
+
+def _get_componente_proporcional():
+	"""Deduction component for the partial-month proration; auto-created (type
+	Deduction) if missing so proration never silently no-ops. None on failure."""
+	nome = frappe.db.get_single_value("SIGOS Settings", "componente_proporcional") or "Proporcional"
+	if frappe.db.exists("Salary Component", nome):
+		return nome
+	try:
+		frappe.get_doc({
+			"doctype": "Salary Component",
+			"salary_component": nome,
+			"type": "Deduction",
+			"description": "Desconto proporcional por admissão/demissão a meio do mês (SIGOS).",
+		}).insert(ignore_permissions=True)
+		return nome
+	except Exception as e:
+		frappe.log_error(f"Falha ao criar Salary Component {nome}: {e}", "SIGOS Salary Slip Hooks")
+		return None
+
+
+def _add_proporcional_admissao_demissao(doc):
+	"""Deduct the base portion for days the employee was NOT in service this period
+	(joined or left mid-month): base × dias_fora / total_dias. Uses the exact calendar
+	fraction (independent of the faltas divisor) and is disjoint from faltas — no
+	Ausencias exist outside the employment window. No-op for full-month employees."""
+	if not (doc.employee and doc.start_date and doc.end_date):
+		return
+	try:
+		dias_fora = _dias_fora_emprego(doc)
+		if dias_fora <= 0:
+			return
+		total = date_diff(getdate(doc.end_date), getdate(doc.start_date)) + 1
+		base = _get_salario_base(doc)
+		if total <= 0 or base <= 0:
+			return
+		componente = _get_componente_proporcional()
+		if not componente:
+			return
+		amount = round(base * dias_fora / total, 2)
+		if amount <= 0:
+			return
+		for d in doc.deductions:
+			if d.salary_component == componente:
+				d.amount = amount
+				return
+		doc.append("deductions", {"salary_component": componente, "amount": amount})
+	except Exception as e:
+		frappe.log_error(
+			f"SalarySlip {doc.name}: erro no proporcional admissão/demissão: {e}",
+			"SIGOS Salary Slip Hooks",
+		)
+
+
 def _compute_dias_trabalhados(doc):
 	"""
-	Days credited as worked for pay = divisor − unjustified faltas.
+	Days credited as worked for pay = divisor − unjustified faltas − days outside the
+	employment window (partial month from admission/dismissal).
 	(Justified faltas are paid, so they count as worked.)
 	"""
 	dias = doc.custom_dias_de_trabalho or 0
 	faltas_nao = doc.custom_faltas_nao_justificadas or 0
-	doc.custom_dias_trabalhados = max(0, dias - faltas_nao)
+	dias_fora = _dias_fora_emprego(doc)
+	doc.custom_dias_trabalhados = max(0, dias - faltas_nao - dias_fora)
 
 
 # ─── before_submit ─────────────────────────────────────────────────────────────

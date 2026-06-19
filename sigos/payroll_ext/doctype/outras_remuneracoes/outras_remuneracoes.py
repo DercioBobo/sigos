@@ -11,11 +11,27 @@ MESES = {
 }
 
 
+def ano_para_mes(mes):
+	"""Year for the chosen month, anchored to today:
+	  - current month or later  → current year;
+	  - earlier month, only at year-end (we're in December) → next year (Dez→Jan wrap);
+	  - any other earlier month  → current year (a genuine past month — left to be
+	    rejected by the past-month validation, e.g. Março escolhido em Junho).
+	"""
+	hoje = getdate()
+	if mes >= hoje.month:
+		return hoje.year
+	if hoje.month == 12:
+		return hoje.year + 1
+	return hoje.year
+
+
 class OutrasRemuneracoes(Document):
 
 	def validate(self):
 		self._calcular_valor_mensal()
 		self._calcular_datas()
+		self._validar_mes_nao_passado()
 
 	def _calcular_valor_mensal(self):
 		total = self.valor_a_pagar or 0
@@ -30,8 +46,7 @@ class OutrasRemuneracoes(Document):
 		if not mes_num:
 			return
 
-		ano = getdate().year
-		self.data_de_inicio = f"{ano}-{mes_num}-01"
+		self.data_de_inicio = f"{ano_para_mes(int(mes_num))}-{mes_num}-01"
 
 		if self.tipo_de_pagamento == "Determinado":
 			self.meses_a_pagar = 1
@@ -40,3 +55,20 @@ class OutrasRemuneracoes(Document):
 		# Last day of the final covered month — must match the client formula exactly
 		# (last-day-of-month), or the form re-dirties on every refresh (stale "Not Saved").
 		self.data_de_fim = add_days(add_months(self.data_de_inicio, meses), -1)
+
+	def _validar_mes_nao_passado(self):
+		"""Reject a month already past (e.g. Março quando estamos em Junho). The Dez→Jan
+		wrap in ano_para_mes keeps year-end selections in the future, so only genuine
+		back-references are blocked. Edit-safe: only fires for new records or when the
+		start date is actually changed."""
+		if not self.data_de_inicio:
+			return
+		before = self.get_doc_before_save()
+		if before and str(before.data_de_inicio) == str(self.data_de_inicio):
+			return
+		if getdate(self.data_de_inicio) < getdate().replace(day=1):
+			frappe.throw(
+				_("O mês seleccionado (<b>{0}</b>) já passou. Escolha o mês actual ou um "
+				  "mês futuro.").format(self.mes_referencia or str(self.data_de_inicio)),
+				title=_("Mês no Passado"),
+			)

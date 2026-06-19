@@ -16,6 +16,17 @@ frappe.ui.form.on("Reclamacao De Salario", {
 		frm.set_query("funcionario", () => ({
 			filters: { status: "Active" }
 		}));
+		if (frm.is_new() && !frm.doc.ano_de_reclamacao) {
+			frm.set_value("ano_de_reclamacao", new Date().getFullYear());
+		}
+	},
+
+	mes_de_reclamacao(frm) {
+		_rs_resolver_folha(frm);
+	},
+
+	ano_de_reclamacao(frm) {
+		_rs_resolver_folha(frm);
 	},
 
 	data(frm) {
@@ -54,37 +65,7 @@ frappe.ui.form.on("Reclamacao De Salario", {
 
 	funcionario(frm) {
 		if (!frm.doc.funcionario) return;
-
-		frappe.call({
-			method: "frappe.client.get_list",
-			args: {
-				doctype: "Salary Slip",
-				filters: {
-					employee: frm.doc.funcionario,
-					docstatus: 1
-				},
-				fields: ["name", "start_date", "end_date", "posting_date"],
-				order_by: "posting_date desc",
-				limit_page_length: 1
-			},
-			callback(r) {
-				if (r.message && r.message.length > 0) {
-					const last_slip = r.message[0].name;
-
-					frm.set_query("slip_do_funcionario", () => ({
-						filters: { name: last_slip }
-					}));
-					frm.set_value("slip_do_funcionario", last_slip);
-				} else {
-					frm.set_query("slip_do_funcionario", () => ({
-						filters: { name: "___" }
-					}));
-					frm.set_value("slip_do_funcionario", "");
-					frappe.msgprint(__("Este funcionário ainda não possui Salary Slip submetido."));
-				}
-			}
-		});
-
+		_rs_resolver_folha(frm);
 		_rs_verificar_slip(frm);
 	},
 
@@ -96,6 +77,50 @@ frappe.ui.form.on("Reclamacao De Salario", {
 		_rs_calcular_fim_falta(frm);
 	}
 });
+
+
+// Resolve the processed Salary Slip for the CLAIMED month (funcionario + mês/ano de
+// reclamação) and surface what the system paid (gross + net) as read-only reference.
+// Server-authoritative copy runs in validate(); this is just live feedback.
+function _rs_resolver_folha(frm) {
+	// Blank (not 0) when there's no slip — 0.00 would read like "paid zero".
+	const clear = () => {
+		frm.set_value("slip_do_funcionario", null);
+		frm.set_value("valor_bruto_processado", null);
+		frm.set_value("valor_liquido_processado", null);
+	};
+	if (!frm.doc.funcionario || !frm.doc.mes_de_reclamacao || !frm.doc.ano_de_reclamacao) {
+		clear();
+		frm.set_intro("");
+		return;
+	}
+	frappe.call({
+		method: "sigos.payroll_ext.doctype.reclamacao_de_salario.reclamacao_de_salario.resolver_folha_reclamacao",
+		args: {
+			funcionario: frm.doc.funcionario,
+			mes: frm.doc.mes_de_reclamacao,
+			ano: frm.doc.ano_de_reclamacao,
+		},
+		callback(r) {
+			const d = r.message || {};
+			if (d.slip) {
+				frm.set_value("slip_do_funcionario", d.slip);
+				frm.set_value("valor_bruto_processado", d.bruto);
+				frm.set_value("valor_liquido_processado", d.liquido);
+				frm.set_intro("");   // clear the no-slip banner
+			} else {
+				clear();
+				// Persistent banner (not just a toast) — but non-blocking: a claim for a
+				// genuinely-unpaid month is valid, so the save still goes through.
+				frm.set_intro(
+					__("Nenhuma Salary Slip processada encontrada para {0}/{1} — sem pagamento registado nesse mês. Pode prosseguir se a reclamação for mesmo de um mês não pago.",
+						[frm.doc.mes_de_reclamacao, frm.doc.ano_de_reclamacao]),
+					"orange"
+				);
+			}
+		},
+	});
+}
 
 
 // Early hint: warn if the chosen month's slip was already submitted for this
