@@ -138,7 +138,6 @@ function _sincronizar_vigilantes(frm) {
 			filters: [
 				["posto_de_vigilancia", "=", frm.doc.posto_de_vigilancia],
 				["regime_do_vigilante", "=", frm.doc.regime_do_vigilante],
-				["categoria", "!=", "Administrativo"],
 				["status", "=", "Activo"],
 			],
 			fields: ["name", "nome_completo"],

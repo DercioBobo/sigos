@@ -44,7 +44,7 @@ fixtures = [
 	{
 		"dt": "Categoria Vigilante",
 		"filters": [["nome", "in", [
-			"Vigilante Normal", "Vigilante Armado", "Administrativo", "Supervisor",
+			"Vigilante Normal", "Vigilante Armado", "Supervisor",
 		]]],
 	},
 	{
@@ -95,6 +95,9 @@ doc_events = {
 		"before_insert": "sigos.payroll_ext.salary_slip_hooks.before_insert",
 		"before_validate": "sigos.payroll_ext.salary_slip_hooks.before_validate",
 		"before_submit": "sigos.payroll_ext.salary_slip_hooks.before_submit",
+	},
+	"Payroll Entry": {
+		"before_validate": "sigos.payroll_ext.payroll_entry_hooks.before_validate",
 	},
 	# Live nudge for the Painel Operacional CCO (re-fetch when ground truth changes).
 	# These run IN ADDITION to each doctype's own controller handlers.

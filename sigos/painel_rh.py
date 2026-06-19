@@ -54,12 +54,17 @@ def get_cards():
           SUM(status = 'Activo' AND sexo = 'Masculino')                AS homens,
           SUM(status = 'Activo' AND categoria = 'Vigilante Armado')    AS armados,
           SUM(status = 'Activo' AND tipo_de_vigilante = 'Supervisor')  AS supervisores,
-          SUM(status = 'Activo' AND categoria = 'Administrativo')       AS administrativos,
           COUNT(DISTINCT CASE WHEN status = 'Activo' THEN cliente END) AS clientes
         FROM `tabVigilante`
         """,
         as_dict=True,
     )[0]
+
+    # Administrativos are pure Employees (ADM-.##), NOT vigilantes — count active
+    # Employees that have no Vigilante link.
+    administrativos = frappe.db.count(
+        "Employee", {"status": "Active", "custom_vigilante": ["is", "not set"]}
+    )
 
     postos = frappe.db.sql(
         """SELECT COUNT(*) AS total, SUM(estado = 'Activo') AS activos
@@ -80,7 +85,7 @@ def get_cards():
         "mulheres":        int(v.mulheres or 0),
         "homens":          int(v.homens or 0),
         "supervisores":    int(v.supervisores or 0),
-        "administrativos": int(v.administrativos or 0),
+        "administrativos": int(administrativos or 0),
         "clientes":        int(v.clientes or 0),
         "postos_total":    int(postos.total or 0),
         "postos_activos":  int(postos.activos or 0),

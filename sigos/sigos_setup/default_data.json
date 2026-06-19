@@ -9,11 +9,6 @@
  },
  {
   "doctype": "Categoria Vigilante",
-  "nome": "Administrativo",  "bloqueada": 1,
-  "descricao": "Pessoal administrativo — não escalado em postos"
- },
- {
-  "doctype": "Categoria Vigilante",
   "nome": "Supervisor",  "bloqueada": 0
  },
  {
