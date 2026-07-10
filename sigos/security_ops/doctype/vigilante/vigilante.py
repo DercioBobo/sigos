@@ -339,8 +339,13 @@ class Vigilante(Document):
 					emp.employee = mirror
 					emp.flags.name_set = True
 
+			# ignore_links: self.name (VIG-####) is assigned by autoname but this
+			# Vigilante row isn't written to the DB yet — validate() runs before
+			# db_insert() — so a strict link check on custom_vigilante would fail
+			# with "Could not find Vigilante". Same transaction/request, so the
+			# row will exist by the time it commits.
 			emp.flags.ignore_sync = True
-			emp.insert(ignore_permissions=True)
+			emp.insert(ignore_permissions=True, ignore_links=True)
 
 			# Safety net: if the install's Employee naming overrode our forced name,
 			# rename to the mirror so VIG/FUNC stay in lock-step.
