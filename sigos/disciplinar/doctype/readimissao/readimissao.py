@@ -3,7 +3,40 @@ from frappe import _
 from frappe.model.document import Document
 
 
+def _buscar_ultima_demissao(vigilante):
+	return frappe.db.get_value(
+		"Demissao",
+		{"vigilante": vigilante, "docstatus": 1},
+		["motivo", "data_de_demissao", "observacoes"],
+		order_by="data_de_demissao desc, creation desc",
+		as_dict=True,
+	)
+
+
+@frappe.whitelist()
+def ultima_demissao(vigilante):
+	"""Vigilante's most recent submitted Demissao (motivo/data/observacoes) — lets
+	RH see why they left last time before deciding on the readmission. Called from
+	the form as soon as the vigilante is picked, before the doc is even saved."""
+	return _buscar_ultima_demissao(vigilante) or {}
+
+
 class Readimissao(Document):
+
+	def validate(self):
+		self._preencher_ultima_demissao()
+
+	def _preencher_ultima_demissao(self):
+		"""Server-side snapshot so the context survives regardless of how the
+		record was created (the JS call is just for live feedback in the form)."""
+		if not self.vigilante:
+			return
+		ultima = _buscar_ultima_demissao(self.vigilante)
+		if not ultima:
+			return
+		self.motivo_ultima_demissao = ultima.motivo
+		self.data_ultima_demissao = ultima.data_de_demissao
+		self.observacoes_ultima_demissao = ultima.observacoes
 
 	def on_submit(self):
 		if (self.get("workflow_state") or "Aprovado") != "Aprovado":

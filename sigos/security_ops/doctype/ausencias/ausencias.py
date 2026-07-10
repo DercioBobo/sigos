@@ -28,6 +28,7 @@ class Ausencias(Document):
 		self._validar_estado_substitutos()
 		self._validar_conflitos_de_substituicao()
 		self._calcular_n_faltas_todas_linhas()
+		self._avisar_licenca_aprovada()
 
 	def before_save(self):
 		self._validar_vigilante_em_outro_doc()
@@ -155,6 +156,51 @@ class Ausencias(Document):
 				frappe.throw(
 					_("Linha {0}: o campo <b>Tipo de Ausência</b> é obrigatório.").format(i)
 				)
+
+	def _avisar_licenca_aprovada(self):
+		"""Soft warning (not a block) — a guard marked Falta with an approved leave
+		covering this day is very likely a supervisor mistake. The Ausencias deck
+		already flags this before the row is even added (sigos.api._marcar_licencas);
+		this is the server-side net for anything created another way (API, older
+		rows, etc.)."""
+		faltas = {
+			r.vigilante for r in (self.tabela_ausencia or [])
+			if r.tipo_de_ausencia == "Falta" and r.vigilante
+		}
+		if not faltas or not self.data:
+			return
+
+		vigilantes = frappe.get_all(
+			"Vigilante", filters={"name": ["in", list(faltas)]}, fields=["name", "funcionario"],
+		)
+		emp_de_vig = {v.name: v.funcionario for v in vigilantes if v.funcionario}
+		if not emp_de_vig:
+			return
+		vig_de_emp = {emp: vig for vig, emp in emp_de_vig.items()}
+
+		apps = frappe.get_all(
+			"Leave Application",
+			filters={
+				"employee": ["in", list(emp_de_vig.values())],
+				"status": "Approved",
+				"docstatus": 1,
+				"from_date": ["<=", self.data],
+				"to_date": [">=", self.data],
+			},
+			fields=["employee", "leave_type"],
+		)
+		linhas = [
+			_("{0} ({1})").format(vig_de_emp[a.employee], a.leave_type)
+			for a in apps if a.employee in vig_de_emp
+		]
+		if linhas:
+			frappe.msgprint(
+				_("Marcado(s) como <b>Falta</b> mas com licença aprovada neste dia: {0}. "
+				  "Confirme se não deveria ser <b>Licença</b> em vez de Falta.").format(
+					", ".join(linhas)),
+				title=_("Possível Falta Indevida"),
+				indicator="orange",
+			)
 
 	def _validar_proxima_accao(self):
 		accao_campo = {

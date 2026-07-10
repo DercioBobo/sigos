@@ -36,10 +36,9 @@ def cco_dashboard(de=None, ate=None, delegacao=None, cliente=None, posto=None):
 	pde = getdate(add_days(pate, -(dias - 1)))
 
 	scope = {"delegacao": delegacao or None, "cliente": cliente or None, "posto": posto or None}
-	lt = frappe.db.get_single_value("SIGOS Settings", "leave_type_ferias") or "Ferias"
 
-	cob = _cobertura(de_d, ate_d, scope, lt)
-	cob_prev = _cobertura(pde, pate, scope, lt, trend=False)
+	cob = _cobertura(de_d, ate_d, scope)
+	cob_prev = _cobertura(pde, pate, scope, trend=False)
 	ocor = _ocorrencias(de_d, ate_d, scope)
 	ocor_prev = _ocorrencias(pde, pate, scope, resumo=True)
 	aus = _ausencias(de_d, ate_d, scope)
@@ -86,11 +85,12 @@ def _cond(scope, col_deleg=None, col_posto=None, col_cli=None, prefix="s"):
 
 # ──────────────────────────────────────────────────────────────── cobertura
 
-def _cobertura(de_d, ate_d, scope, lt, trend=True):
+def _cobertura(de_d, ate_d, scope, trend=True):
 	"""
 	Per-(day, posto) escalados vs gaps from the published Escala, overlaying
-	uncovered Faltas / Suspensão / Licença / Outro and approved Férias. Aggregated
-	in Python into a daily trend and a per-posto lacuna ranking.
+	uncovered Faltas / Suspensão / Licença / Outro and any approved leave (Férias,
+	sickness, unpaid, ...). Aggregated in Python into a daily trend and a per-posto
+	lacuna ranking.
 	"""
 	sc, sp = _cond(scope, "po.delegacao", "e.posto_de_vigilancia", "e.cliente")
 	rows = frappe.db.sql(
@@ -101,7 +101,7 @@ def _cobertura(de_d, ate_d, scope, lt, trend=True):
 		       SUM(CASE WHEN g.vigilante IS NOT NULL OR EXISTS (
 		             SELECT 1 FROM `tabLeave Application` f
 		             WHERE f.employee = vv.funcionario AND f.status = 'Approved'
-		               AND f.docstatus = 1 AND f.leave_type = %(lt)s
+		               AND f.docstatus = 1
 		               AND f.from_date <= te.data AND f.to_date >= te.data
 		           ) THEN 1 ELSE 0 END) AS gaps
 		FROM `tabTabela De Escala De Vigilante` te
@@ -124,7 +124,7 @@ def _cobertura(de_d, ate_d, scope, lt, trend=True):
 		  {('AND ' + ' AND '.join(sc)) if sc else ''}
 		GROUP BY te.data, e.posto_de_vigilancia
 		""",
-		dict(sp, lt=lt, de=de_d, ate=ate_d),
+		dict(sp, de=de_d, ate=ate_d),
 		as_dict=True,
 	)
 

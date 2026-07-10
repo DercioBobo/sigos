@@ -1,0 +1,270 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "naming_series:",
+ "creation": "2026-07-10 00:00:00.000000",
+ "doctype": "DocType",
+ "document_type": "Document",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "data_pedido",
+  "col_break_1",
+  "vigilante",
+  "nome_do_vigilante",
+  "funcionario",
+  "delegacao",
+  "sec_licenca",
+  "tipo_de_licenca",
+  "data_inicio",
+  "col_break_2",
+  "data_fim",
+  "saldo_disponivel",
+  "sec_motivo",
+  "motivo",
+  "col_break_3",
+  "observacoes",
+  "sec_processo",
+  "leave_application_ref",
+  "dias_aprovados",
+  "col_break_4",
+  "registado_por"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Série",
+   "options": "PL-.YY.-.##",
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "data_pedido",
+   "fieldtype": "Date",
+   "label": "Data do Pedido",
+   "reqd": 1,
+   "default": "Today",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "col_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "vigilante",
+   "fieldtype": "Link",
+   "label": "Vigilante",
+   "options": "Vigilante",
+   "reqd": 1,
+   "in_list_view": 1,
+   "link_filters": "[[\"Vigilante\",\"status\",\"!=\",\"Demitido\"]]"
+  },
+  {
+   "fieldname": "nome_do_vigilante",
+   "fieldtype": "Data",
+   "label": "Nome do Vigilante",
+   "fetch_from": "vigilante.nome_completo",
+   "read_only": 1
+  },
+  {
+   "fieldname": "funcionario",
+   "fieldtype": "Link",
+   "label": "Funcionário",
+   "options": "Employee",
+   "fetch_from": "vigilante.funcionario",
+   "read_only": 1,
+   "link_filters": "[[\"Employee\",\"status\",\"!=\",\"Left\"]]"
+  },
+  {
+   "fieldname": "delegacao",
+   "fieldtype": "Link",
+   "label": "Delegação",
+   "options": "Delegacao",
+   "fetch_from": "vigilante.delegacao",
+   "read_only": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "sec_licenca",
+   "fieldtype": "Section Break",
+   "label": "Licença"
+  },
+  {
+   "fieldname": "tipo_de_licenca",
+   "fieldtype": "Link",
+   "label": "Tipo de Licença",
+   "options": "Leave Type",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "data_inicio",
+   "fieldtype": "Date",
+   "label": "Data de Início",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "col_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "data_fim",
+   "fieldtype": "Date",
+   "label": "Data de Fim",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "saldo_disponivel",
+   "fieldtype": "Float",
+   "label": "Saldo Disponível Antes do Pedido (dias)",
+   "read_only": 1,
+   "precision": "1",
+   "no_copy": 1,
+   "description": "Saldo do vigilante para este tipo de licença, à data de início — só para ajudar na decisão."
+  },
+  {
+   "fieldname": "sec_motivo",
+   "fieldtype": "Section Break",
+   "label": "Motivo"
+  },
+  {
+   "fieldname": "motivo",
+   "fieldtype": "Small Text",
+   "label": "Motivo do Pedido",
+   "reqd": 1
+  },
+  {
+   "fieldname": "col_break_3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "observacoes",
+   "fieldtype": "Small Text",
+   "label": "Observações"
+  },
+  {
+   "fieldname": "sec_processo",
+   "fieldtype": "Section Break",
+   "label": "Processamento",
+   "depends_on": "eval:doc.leave_application_ref"
+  },
+  {
+   "fieldname": "leave_application_ref",
+   "fieldtype": "Link",
+   "label": "Licença Criada (Leave Application)",
+   "options": "Leave Application",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "dias_aprovados",
+   "fieldtype": "Float",
+   "label": "Dias Aprovados",
+   "read_only": 1,
+   "precision": "1",
+   "no_copy": 1
+  },
+  {
+   "fieldname": "col_break_4",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "registado_por",
+   "fieldtype": "Link",
+   "label": "Registado Por",
+   "options": "User",
+   "read_only": 1,
+   "no_copy": 1
+  }
+ ],
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-07-10 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Payroll Ext",
+ "name": "Pedido De Licenca",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1,
+   "submit": 1,
+   "cancel": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "SIGOS Manager",
+   "share": 1,
+   "write": 1,
+   "submit": 1,
+   "cancel": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 0,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Aprovador RH",
+   "share": 0,
+   "write": 1,
+   "submit": 1,
+   "cancel": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 0,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Aprovador Operações",
+   "share": 0,
+   "write": 1,
+   "submit": 0,
+   "cancel": 0
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 0,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Operações SIGOS",
+   "share": 0,
+   "write": 1,
+   "submit": 0,
+   "cancel": 0
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "title_field": "nome_do_vigilante",
+ "track_changes": 1,
+ "app": "sigos"
+}

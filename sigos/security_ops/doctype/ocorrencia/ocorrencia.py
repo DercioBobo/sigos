@@ -91,6 +91,45 @@ class Ocorrencia(Document):
 		)
 		return self.estado
 
+	# ─── Participação ────────────────────────────────────────────────────────────
+
+	@frappe.whitelist()
+	def criar_participacao(self):
+		"""Open a draft Participação pre-filled from this ocorrência.
+		Returns the (existing or new) participação name so the UI can route to it."""
+		if not self.vigilante:
+			frappe.throw(_("Defina o Vigilante envolvido antes de abrir uma Participação."))
+
+		existente = frappe.db.exists("Participacao", {"ocorrencia_referente": self.name})
+		if existente:
+			frappe.msgprint(
+				_("Já existe a Participação {0} para esta ocorrência.").format(existente),
+				alert=True,
+			)
+			return existente
+
+		# Participação has no "Crítica" tier — fold it into "Alta".
+		mapa_gravidade = {"Baixa": "Baixa", "Média": "Média", "Alta": "Alta", "Crítica": "Alta"}
+		participacao = frappe.get_doc({
+			"doctype": "Participacao",
+			"data": self.data,
+			"delegacao": self.delegacao,
+			"vigilante": self.vigilante,
+			"posto": self.posto,
+			"gravidade": mapa_gravidade.get(self.gravidade, "Média"),
+			"relato": self.descricao,
+			"ocorrencia_referente": self.name,
+		})
+		# tipo_de_infracao is mandatory on Participação but has no equivalent on
+		# Ocorrencia — leave it blank and let the user pick it before submitting.
+		participacao.insert(ignore_permissions=True, ignore_mandatory=True)
+		frappe.msgprint(
+			_("Participação {0} criada a partir desta ocorrência. Defina o "
+			  "<b>Tipo de Infracção</b> antes de submeter.").format(participacao.name),
+			indicator="blue", alert=True,
+		)
+		return participacao.name
+
 	# ─── Timeline ────────────────────────────────────────────────────────────────
 
 	def _registar_timeline(self, texto):

@@ -601,6 +601,7 @@ def get_vigilantes_da_escala(data, periodo, grupo_delegados=None, excluir_doc=No
 
 	rows = frappe.db.sql(base_sql.format(extra=extra), params, as_dict=True)
 	_marcar_ja_registados(rows, data, periodo, excluir_doc)
+	_marcar_licencas(rows, data)
 	return rows
 
 
@@ -663,6 +664,42 @@ def _marcar_ja_registados(rows, data, periodo, excluir_doc=None):
 		if not r.get("ja_registado_em") and r.vigilante in cobre_doc:
 			r["ja_registado_em"] = cobre_doc[r.vigilante]
 			r["ja_registado_estado"] = "a cobrir uma ausência"
+
+
+def _marcar_licencas(rows, data):
+	"""
+	Annotate roster rows whose guard has an APPROVED leave (any Leave Type)
+	covering `data` — soft warning only, does NOT grey the guard out like
+	_marcar_ja_registados does. Lets the Ausencias deck flag "this guard is on
+	leave" before a supervisor taps Falta on them by mistake.
+	"""
+	vigs = [r.vigilante for r in rows if r.get("vigilante")]
+	if not vigs:
+		return
+
+	pares = frappe.get_all(
+		"Vigilante", filters={"name": ["in", vigs]}, fields=["name", "funcionario"],
+	)
+	emp_de_vig = {p.name: p.funcionario for p in pares if p.funcionario}
+	if not emp_de_vig:
+		return
+	vig_de_emp = {emp: vig for vig, emp in emp_de_vig.items()}
+
+	apps = frappe.get_all(
+		"Leave Application",
+		filters={
+			"employee": ["in", list(emp_de_vig.values())],
+			"status": "Approved",
+			"docstatus": 1,
+			"from_date": ["<=", data],
+			"to_date": [">=", data],
+		},
+		fields=["employee", "leave_type"],
+	)
+	licenca_de_vig = {vig_de_emp[a.employee]: a.leave_type for a in apps if a.employee in vig_de_emp}
+	for r in rows:
+		if r.vigilante in licenca_de_vig:
+			r["em_licenca"] = licenca_de_vig[r.vigilante]
 
 
 @frappe.whitelist()
@@ -1599,12 +1636,13 @@ def encerrar_posto(posto, motivo):
 
 
 @frappe.whitelist()
-def ferias_na_escala(escala_name):
+def licencas_na_escala(escala_name):
 	"""
-	Read-only FÉRIAS indicator for the escala grid. Returns {"<vig>|<YYYY-MM-DD>": 1}
-	for every day a guard in this escala is on APPROVED férias. It does NOT pull the
-	guard off the escala — it only flags the cells. Maps guards -> Employees and reads
-	their approved Leave Applications of the férias Leave Type within the escala window.
+	Read-only leave indicator for the escala grid. Returns {"<vig>|<YYYY-MM-DD>":
+	"<leave_type>"} for every day a guard in this escala is on an APPROVED leave —
+	any Leave Type (férias, doença, sem vencimento, ...), not just férias. It does
+	NOT pull the guard off the escala — it only flags the cells. Maps guards ->
+	Employees and reads their approved Leave Applications within the escala window.
 	"""
 	from frappe.utils import getdate, add_days
 
@@ -1635,19 +1673,16 @@ def ferias_na_escala(escala_name):
 		return {}
 	vig_de_emp = {emp: vig for vig, emp in emp_de_vig.items()}
 
-	leave_type = frappe.db.get_single_value("SIGOS Settings", "leave_type_ferias") or "Ferias"
-
 	apps = frappe.get_all(
 		"Leave Application",
 		filters={
 			"employee": ["in", list(emp_de_vig.values())],
-			"leave_type": leave_type,
 			"status": "Approved",
 			"docstatus": 1,
 			"from_date": ["<=", ate],
 			"to_date": [">=", de],
 		},
-		fields=["employee", "from_date", "to_date"],
+		fields=["employee", "leave_type", "from_date", "to_date"],
 	)
 
 	marcas = {}
@@ -1658,6 +1693,8 @@ def ferias_na_escala(escala_name):
 		d = max(getdate(a.from_date), de)
 		fim = min(getdate(a.to_date), ate)
 		while d <= fim:
-			marcas[f"{vig}|{d.isoformat()}"] = 1
+			# If a guard somehow has two overlapping approved leaves the same day,
+			# the last one read just wins — not expected in practice.
+			marcas[f"{vig}|{d.isoformat()}"] = a.leave_type
 			d = getdate(add_days(d, 1))
 	return marcas

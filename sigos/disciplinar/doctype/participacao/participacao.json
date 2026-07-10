@@ -24,6 +24,7 @@
   "posto_nome",
   "categoria",
   "sec_infracao",
+  "ocorrencia_referente",
   "tipo_de_infracao",
   "relato",
   "col_part_2",
@@ -139,6 +140,13 @@
    "fieldname": "sec_infracao",
    "fieldtype": "Section Break",
    "label": "Infracção"
+  },
+  {
+   "fieldname": "ocorrencia_referente",
+   "fieldtype": "Link",
+   "label": "Ocorrência Referente",
+   "options": "Ocorrencia",
+   "read_only": 1
   },
   {
    "fieldname": "tipo_de_infracao",

@@ -3,8 +3,8 @@ SIGOS — Painel Operacional CCO.
 
 Live operational board for the Centro de Controlo Operacional: for a given day it
 reads the published Escala (the source of truth for who should be at each posto),
-overlays submitted Ausencias, approved Férias and today's Ocorrências, and reports
-per-posto coverage plus the deployable Reserva pool.
+overlays submitted Ausencias, approved leave (any Leave Type) and today's
+Ocorrências, and reports per-posto coverage plus the deployable Reserva pool.
 
 Read-only and cheap: a handful of indexed queries merged in Python. The page calls
 `painel_operacional` on load / filter / refresh; doc events publish a realtime nudge
@@ -22,14 +22,13 @@ _AUSENCIA_PARCIAL = ("Atraso", "Saída Antecipada")
 def painel_operacional(data=None, delegacao=None, cliente=None, posto=None, busca=None):
 	"""Snapshot of the operation for `data` (default today), optionally scoped."""
 	d = getdate(data or nowdate())
-	leave_type = frappe.db.get_single_value("SIGOS Settings", "leave_type_ferias") or "Ferias"
 
 	postos = _postos_activos(delegacao, cliente, posto)
 	nomes_posto = [p["name"] for p in postos]
 
 	escala = _escala_do_dia(d, nomes_posto)
 	ausencias = _ausencias_do_dia(d)
-	ferias = _ferias_do_dia(d, leave_type)
+	ferias = _ferias_do_dia(d)
 	reserva = _reserva_disponivel(delegacao)
 	ocorrencias = _ocorrencias(d, delegacao, posto)
 	ocorr_abertas = _contar_ocorrencias_abertas(delegacao)
@@ -125,7 +124,7 @@ def painel_operacional(data=None, delegacao=None, cliente=None, posto=None, busc
 			"ocorrencias_abertas": ocorr_abertas,
 			"taxa_cobertura": taxa,
 		},
-		"sparkline": _sparkline(d, nomes_posto, leave_type),
+		"sparkline": _sparkline(d, nomes_posto),
 		"postos": cards,
 		"reserva": reserva[:300],
 		"ocorrencias": ocorrencias,
@@ -133,7 +132,7 @@ def painel_operacional(data=None, delegacao=None, cliente=None, posto=None, busc
 	}
 
 
-def _sparkline(ate_d, nomes_posto, lt):
+def _sparkline(ate_d, nomes_posto):
 	"""Daily coverage % for the 7 days ending at `ate_d` (same gap logic as the board)."""
 	de_d = getdate(add_days(ate_d, -6))
 	idx = {}
@@ -144,7 +143,7 @@ def _sparkline(ate_d, nomes_posto, lt):
 			       SUM(CASE WHEN g.vigilante IS NOT NULL OR EXISTS (
 			             SELECT 1 FROM `tabLeave Application` f
 			             WHERE f.employee = vv.funcionario AND f.status = 'Approved'
-			               AND f.docstatus = 1 AND f.leave_type = %(lt)s
+			               AND f.docstatus = 1
 			               AND f.from_date <= te.data AND f.to_date >= te.data
 			           ) THEN 1 ELSE 0 END) AS gaps
 			FROM `tabTabela De Escala De Vigilante` te
@@ -165,7 +164,7 @@ def _sparkline(ate_d, nomes_posto, lt):
 			  AND e.posto_de_vigilancia IN %(postos)s
 			GROUP BY te.data
 			""",
-			{"lt": lt, "de": de_d, "ate": ate_d, "postos": tuple(nomes_posto)},
+			{"de": de_d, "ate": ate_d, "postos": tuple(nomes_posto)},
 			as_dict=True,
 		)
 		idx = {str(r["d"]): (int(r["escalados"]), int(r["gaps"])) for r in rows}
@@ -276,18 +275,17 @@ def _ausencias_do_dia(d):
 	return out
 
 
-def _ferias_do_dia(d, leave_type):
-	"""Set of vigilantes on APPROVED férias covering the date."""
+def _ferias_do_dia(d):
+	"""Set of vigilantes on an APPROVED leave (any Leave Type) covering the date."""
 	rows = frappe.db.sql(
 		"""
 		SELECT v.name AS vigilante
 		FROM `tabLeave Application` la
 		JOIN `tabVigilante` v ON v.funcionario = la.employee
 		WHERE la.status = 'Approved' AND la.docstatus = 1
-		  AND la.leave_type = %(lt)s
 		  AND la.from_date <= %(data)s AND la.to_date >= %(data)s
 		""",
-		{"lt": leave_type, "data": d},
+		{"data": d},
 		as_dict=True,
 	)
 	return {r["vigilante"] for r in rows}

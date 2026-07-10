@@ -198,7 +198,7 @@ sigos.PainelOperacional = class PainelOperacional {
 			{ cls: "k-desc", val: k.postos_descobertos, lbl: __("Sem Cobertura") },
 			{ cls: "k-falta", val: k.faltas, lbl: __("Faltas") },
 			{ cls: "k-sub", val: k.substituidos, lbl: __("Substituidos") },
-			{ cls: "k-fer", val: k.ferias, lbl: __("Ferias") },
+			{ cls: "k-fer", val: k.ferias, lbl: __("Licença") },
 			{ cls: "k-res", val: k.reserva_disponivel, lbl: __("Reserva") },
 			{ cls: "k-oc", val: k.ocorrencias_abertas, lbl: __("Ocorr. abertas") },
 		];
@@ -378,7 +378,7 @@ sigos.PainelOperacional = class PainelOperacional {
 
 	_estado_label(e) {
 		return {
-			presente: __("Presente"), falta: __("Falta"), ferias: __("Ferias"),
+			presente: __("Presente"), falta: __("Falta"), ferias: __("Licença"),
 			substituido: __("Substituido"), atraso: __("Atraso / saida antecipada"),
 		}[e] || e;
 	}
@@ -457,8 +457,12 @@ sigos.PainelOperacional = class PainelOperacional {
 
 	_modal_shell() {
 		this._close_modal();
+		// po-root is re-declared here (not just inherited) because this shell is
+		// appended to document.body, OUTSIDE the .po-root element that defines all
+		// the --paper/--ink/--line/etc custom properties — without it every var()
+		// below resolves to nothing and the whole modal renders transparent.
 		this.$modal = $(`
-			<div class="po-modal-back">
+			<div class="po-modal-back po-root">
 				<div class="po-modal">
 					<div class="po-modal-h">
 						<div class="po-modal-title"></div>
@@ -531,25 +535,50 @@ sigos.PainelOperacional = class PainelOperacional {
 			<div class="po-vtitle">
 				<span class="po-mt-name">${frappe.utils.escape_html(v.nome_completo || v.name)}</span>
 				<span class="po-mt-sub">${sub}</span>
-			</div>`);
+			</div>
+			${v.status ? `<span class="po-vstatus-pill ${this._vstatus_cls(v.status)}">${frappe.utils.escape_html(v.status)}</span>` : ""}`);
 		this.$modal.find(".po-modal-actions").html(`
 			<button class="po-mbtn" data-new-aus="1">+ ${__("Registar ausência")}</button>
 			<button class="po-mbtn ghost" data-go-vig="${frappe.utils.escape_html(v.name)}">${__("Abrir ficha")}</button>`);
-		const chips = [
-			[__("Estado"), v.status],
-			[__("Categoria"), v.categoria],
-			[__("Regime"), v.regime_do_vigilante],
-			[__("Tipo"), v.tipo_de_vigilante],
-			[__("Delegação"), v.delegacao],
-			[__("Posto"), v.nome_do_posto || v.posto_de_vigilancia],
-			[__("Cliente"), v.cliente],
-			[__("Contacto"), v.contacto],
-			[__("Admissão"), v.data_admissao ? frappe.datetime.str_to_user(v.data_admissao) : null],
-		].filter(([, val]) => val);
-		const meta = `<div class="po-vmeta">${chips.map(([k, val]) =>
-			`<div class="po-vchip"><span>${k}</span><b>${frappe.utils.escape_html(String(val))}</b></div>`).join("")}</div>`;
+
+		// Grouped instead of one flat bag of chips — Estado moved to the header
+		// pill above (it's the one fact worth a glance, not buried in a list).
+		const grupos = [
+			[__("Atribuição"), [
+				[__("Categoria"), v.categoria],
+				[__("Regime"), v.regime_do_vigilante],
+				[__("Tipo"), v.tipo_de_vigilante],
+				[__("Delegação"), v.delegacao],
+				[__("Posto"), v.nome_do_posto || v.posto_de_vigilancia],
+				[__("Cliente"), v.cliente],
+			]],
+			[__("Contacto"), [
+				[__("Contacto"), v.contacto],
+				[__("Admissão"), v.data_admissao ? frappe.datetime.str_to_user(v.data_admissao) : null],
+			]],
+		];
+		const meta = grupos.map(([titulo, campos]) => {
+			const linhas = campos.filter(([, val]) => val);
+			if (!linhas.length) return "";
+			return `<div class="po-vgroup">
+				<div class="po-vgroup-h">${titulo}</div>
+				<div class="po-vgrid">${linhas.map(([k, val]) =>
+					`<div class="po-vfield"><span>${k}</span><b>${frappe.utils.escape_html(String(val))}</b></div>`).join("")}</div>
+			</div>`;
+		}).join("");
 		this.$modal.find(".po-modal-b").html(meta + this._week_caption() + this._week_html(m.dias, "vig"));
 		this._bind_modal_common();
+	}
+
+	_vstatus_cls(status) {
+		return {
+			"Activo": "st-v-activo",
+			"Reserva": "st-v-reserva",
+			"Pre-Adimissão": "st-v-pre",
+			"Pre-Adimissão RH": "st-v-pre",
+			"Inactivo": "st-v-inactivo",
+			"Demitido": "st-v-demitido",
+		}[status] || "st-v-outro";
 	}
 
 	_week_caption() {
@@ -809,6 +838,8 @@ sigos.PainelOperacional = class PainelOperacional {
 .po-act-aus:hover { background:var(--accentInk); border-color:var(--accentInk); }
 
 /* Modal */
+/* Also carries the po-root class (see _modal_shell) - this rule's padding must
+   stay declared AFTER .po-root's in this stylesheet so it wins the cascade. */
 .po-modal-back { position:fixed; inset:0; background:rgba(14,23,38,.4); backdrop-filter:blur(3px); z-index:1050; display:flex; align-items:flex-start; justify-content:center; padding:46px 16px; overflow:auto; }
 .po-modal { width:min(1040px,100%); background:var(--paper2); border:1px solid var(--line); border-radius:18px; box-shadow:0 30px 80px -24px rgba(16,23,38,.5); overflow:hidden; animation:po-pop .12s ease; }
 @keyframes po-pop { from { transform:translateY(8px); opacity:0; } to { transform:none; opacity:1; } }
@@ -817,7 +848,14 @@ sigos.PainelOperacional = class PainelOperacional {
 .po-mt-code { font-size:15px; font-weight:600; color:var(--accentInk); background:var(--wash); border:1px solid var(--line2); border-radius:8px; padding:2px 10px; }
 .po-mt-name { font-family:var(--display); font-size:17px; font-weight:600; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .po-mt-sub { font-size:11.5px; color:var(--ink3); }
-.po-vtitle { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.po-vtitle { display:flex; flex-direction:column; gap:2px; min-width:0; flex:1; }
+.po-vstatus-pill { flex:none; font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; padding:4px 11px; border-radius:999px; }
+.st-v-activo { background:var(--goodWash); color:var(--good); }
+.st-v-reserva { background:rgba(14,165,163,.14); color:var(--teal); }
+.st-v-pre { background:rgba(245,158,11,.16); color:#9A6608; }
+.st-v-inactivo { background:var(--paper3); color:var(--ink2); }
+.st-v-demitido { background:var(--badWash); color:var(--bad); }
+.st-v-outro { background:var(--paper3); color:var(--ink2); }
 .po-vphoto { width:46px; height:46px; border-radius:12px; object-fit:cover; border:1px solid var(--line2); flex:none; }
 .po-vph-ph { display:grid; place-items:center; background:linear-gradient(150deg,var(--accent),var(--accentInk)); color:#fff; font-family:var(--display); font-size:20px; font-weight:600; }
 .po-modal-actions { display:flex; gap:8px; flex:none; }
@@ -829,10 +867,13 @@ sigos.PainelOperacional = class PainelOperacional {
 .po-modal-x:hover { background:var(--paper3); color:var(--ink); }
 .po-modal-b { padding:18px 20px 24px; max-height:calc(100vh - 170px); overflow:auto; }
 .po-mloading { color:var(--ink3); text-align:center; padding:40px; font-size:13px; }
-.po-vmeta { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
-.po-vchip { background:var(--paper3); border:1px solid var(--line); border-radius:11px; padding:7px 11px; min-width:92px; }
-.po-vchip span { display:block; font-size:9px; text-transform:uppercase; letter-spacing:.07em; color:var(--ink3); font-weight:600; }
-.po-vchip b { font-size:12.5px; color:var(--ink); font-weight:600; }
+.po-vgroup { margin-bottom:14px; padding-bottom:14px; border-bottom:1px solid var(--line); }
+.po-vgroup:last-of-type { border-bottom:none; padding-bottom:2px; }
+.po-vgroup-h { font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--ink3); font-weight:700; margin-bottom:9px; }
+.po-vgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:12px 18px; }
+.po-vfield { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.po-vfield span { font-size:9px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink3); font-weight:600; }
+.po-vfield b { font-size:13px; color:var(--ink); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .po-week-cap { font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--ink3); font-weight:600; margin:2px 0 8px; }
 
 /* Week grid */

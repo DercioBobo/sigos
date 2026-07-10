@@ -8,6 +8,7 @@ frappe.ui.form.on("Ocorrencia", {
 		_filtros(frm);
 		_destaque_gravidade(frm);
 		_botoes(frm);
+		_botao_participacao(frm);
 	},
 
 	delegacao(frm) {
@@ -63,6 +64,29 @@ function _botoes(frm) {
 	if (["Resolvida", "Fechada"].includes(estado)) {
 		frm.add_custom_button(__("Reabrir"), () => _dialog_reabrir(frm), grupo);
 	}
+}
+
+// Once the incident is wrapped up, offer to open (or jump to) the Participação —
+// same optional-link pattern as Participação → Processo Disciplinar.
+function _botao_participacao(frm) {
+	if (frm.is_new() || !["Resolvida", "Fechada"].includes(frm.doc.estado)) return;
+
+	frappe.db.get_value(
+		"Participacao", { ocorrencia_referente: frm.doc.name }, "name"
+	).then((r) => {
+		const existente = r.message && r.message.name;
+		if (existente) {
+			frm.add_custom_button(__("Ver Participação"), () => {
+				frappe.set_route("Form", "Participacao", existente);
+			}, __("Acções"));
+		} else {
+			frm.add_custom_button(__("Abrir Participação"), () => {
+				frm.call("criar_participacao").then((res) => {
+					if (res.message) frappe.set_route("Form", "Participacao", res.message);
+				});
+			}, __("Acções"));
+		}
+	});
 }
 
 function _dialog_resolver(frm) {

@@ -69,6 +69,7 @@ fixtures = [
 		"Participacao", "Processo Disciplinar",
 		"Demissao", "Readimissao", "Troca De Categoria", "Troca De Regime",
 		"Outras Deducoes", "Outras Remuneracoes", "Emprestimo", "Justificacao De Faltas", "Reclamacao De Salario",
+		"Pedido De Licenca",
 	]]]},
 	{"dt": "Workflow State", "filters": [["workflow_state_name", "in", [
 		"Rascunho", "Pendente De Aprovação", "Aprovado", "Rejeitado", "Cancelado",

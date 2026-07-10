@@ -24,6 +24,7 @@
   "automatico",
   "sec_processo",
   "participacao_referente",
+  "participacao_preview",
   "gravidade",
   "motivo",
   "col_pd_2",
@@ -145,6 +146,12 @@
    "label": "Participação Referente",
    "options": "Participacao",
    "read_only": 1
+  },
+  {
+   "fieldname": "participacao_preview",
+   "fieldtype": "HTML",
+   "label": "Registo Original da Participação",
+   "depends_on": "eval:doc.participacao_referente"
   },
   {
    "fieldname": "gravidade",

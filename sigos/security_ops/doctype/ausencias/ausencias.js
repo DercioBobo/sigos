@@ -275,6 +275,7 @@ function _render_results(frm, w, filtro) {
 			const linhas = items.map(v => {
 				const neste = ja.has(v.vigilante);
 				const outro = !neste && v.ja_registado_em;
+				const licenca = !neste && !outro && v.em_licenca;
 				const meta = [v.mecanografico, v.regime].filter(Boolean).join(" · ");
 				let tag = "", off = "";
 				if (neste) {
@@ -283,6 +284,10 @@ function _render_results(frm, w, filtro) {
 				} else if (outro) {
 					off = "is-off is-outro";
 					tag = `<span class="ausb-res-tag tag-outro">${__("já em")} ${frappe.utils.escape_html(v.ja_registado_em)}</span>`;
+				} else if (licenca) {
+					// Not blocked — a supervisor may still need to mark Atraso/Suspensão etc.
+					// on a leave day; this just flags it before they tap Falta by mistake.
+					tag = `<span class="ausb-res-tag tag-licenca">${__("licença")}: ${frappe.utils.escape_html(v.em_licenca)}</span>`;
 				}
 				return `<div class="ausb-res ${off}" data-vig="${frappe.utils.escape_html(v.vigilante)}">
 					${_avatar_html(v.nome_completo || v.vigilante)}
@@ -331,6 +336,15 @@ function _add_absent(frm, w, vd) {
 			indicator: "orange",
 		}, 5);
 		return;
+	}
+	// Soft warning only — a guard with approved leave can still legitimately get
+	// an Atraso/Suspensão/Outro row; this just makes sure Falta isn't a mistake.
+	if (vd.em_licenca) {
+		frappe.show_alert({
+			message: __("{0} tem licença aprovada ({1}) neste dia — confirme o Tipo de Ausência.",
+				[vd.nome_completo || vd.vigilante, vd.em_licenca]),
+			indicator: "orange",
+		}, 6);
 	}
 	// Can't be absent while covering someone else's absence on this sheet.
 	const cobre = (frm.doc.tabela_ausencia || []).find(r => PICKER_FIELDS.some(f => r[f] === vd.vigilante));
@@ -939,6 +953,7 @@ function _inject_css() {
 .ausb-res-tag { flex: none; margin-left: auto; font-size: .66em; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
 .tag-neste { background: rgba(255,255,255,.12); color: rgba(255,255,255,.7); }
 .tag-outro { background: rgba(232,160,32,.2); color: #f4cd84; border: 1px solid rgba(232,160,32,.4); }
+.tag-licenca { background: rgba(90,140,220,.2); color: #a8c8f0; border: 1px solid rgba(90,140,220,.4); }
 .ausb-res-head { display: flex; justify-content: space-between; align-items: center; padding: 4px 8px 8px; font-size: .76em; color: rgba(255,255,255,.65); }
 .ausb-addall { background: rgba(232,160,32,.9); color: #1a3a5c; border: none; border-radius: 7px; padding: 4px 10px; font-weight: 700; font-size: .92em; cursor: pointer; }
 .ausb-addall:hover { background: #f2b542; }

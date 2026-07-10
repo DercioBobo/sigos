@@ -15,6 +15,11 @@
   "nome_do_vigilante",
   "col_r1",
   "delegacao",
+  "sec_ultima_demissao",
+  "motivo_ultima_demissao",
+  "data_ultima_demissao",
+  "col_ud1",
+  "observacoes_ultima_demissao",
   "sec_motivo",
   "motivo_readimissao",
   "col_r2",
@@ -66,6 +71,37 @@
    "fieldtype": "Link",
    "label": "Delegação",
    "options": "Delegacao"
+  },
+  {
+   "fieldname": "sec_ultima_demissao",
+   "fieldtype": "Section Break",
+   "label": "Última Demissão"
+  },
+  {
+   "fieldname": "motivo_ultima_demissao",
+   "fieldtype": "Data",
+   "label": "Motivo",
+   "read_only": 1,
+   "no_copy": 1,
+   "description": "Motivo da última Demissão submetida deste vigilante — só para contexto."
+  },
+  {
+   "fieldname": "data_ultima_demissao",
+   "fieldtype": "Date",
+   "label": "Data",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "col_ud1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "observacoes_ultima_demissao",
+   "fieldtype": "Small Text",
+   "label": "Observações",
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "sec_motivo",
