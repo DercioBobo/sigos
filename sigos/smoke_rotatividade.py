@@ -61,6 +61,7 @@ def _make_delegacao():
 
 def _make_posto(suffix, cliente, delegacao, vagas=10):
 	doc = frappe.new_doc("Posto De Vigilancia")
+	doc.indicativo = f"{PFX}-{suffix}"
 	doc.nome_do_posto = f"{PFX}-{suffix}"
 	doc.estado = "Activo"
 	doc.tipo_de_posto = "Permanente"

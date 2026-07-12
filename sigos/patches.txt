@@ -10,3 +10,4 @@ sigos.patches.seed_tipos_justificacao
 sigos.patches.migrate_emprestimos
 sigos.patches.remap_deducoes_tipo_componente
 sigos.patches.remover_repreensao_disciplinar
+sigos.patches.backfill_posto_indicativo

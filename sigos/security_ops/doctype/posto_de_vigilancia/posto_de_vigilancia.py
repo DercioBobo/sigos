@@ -6,6 +6,7 @@ from frappe.model.document import Document
 class PostoDeVigilancia(Document):
 
 	def validate(self):
+		self._preencher_nome_financeiro()
 		self._validar_temporario()
 
 	def after_insert(self):
@@ -16,6 +17,12 @@ class PostoDeVigilancia(Document):
 		self._tratar_vagas(before)
 		self._tratar_estado(before)
 		self._propagar_cliente_projecto(before)
+
+	def _preencher_nome_financeiro(self):
+		"""Nome Financeiro defaults to Nome do Posto on creation, but is then
+		independently editable (finance may want a different label than ops)."""
+		if not self.nome_financeiro:
+			self.nome_financeiro = self.nome_do_posto
 
 	# ─── Temporary posts ────────────────────────────────────────────────────────
 

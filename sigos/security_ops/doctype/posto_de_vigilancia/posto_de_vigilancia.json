@@ -1,14 +1,18 @@
 {
  "actions": [],
- "allow_rename": 1,
- "autoname": "prompt",
+ "allow_rename": 0,
+ "autoname": "format:PT-{indicativo}-{##}",
  "creation": "2026-06-02 00:00:00.000000",
  "doctype": "DocType",
  "document_type": "Document",
  "editable_grid": 1,
  "engine": "InnoDB",
+ "search_fields": "indicativo,nome_do_posto",
+ "show_title_field_in_link": 1,
  "field_order": [
+  "indicativo",
   "nome_do_posto",
+  "nome_financeiro",
   "col_break_1",
   "estado",
   "tipo_de_posto",
@@ -35,14 +39,32 @@
  ],
  "fields": [
   {
+   "fieldname": "indicativo",
+   "fieldtype": "Data",
+   "label": "Indicativo",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "in_global_search": 1,
+   "search_index": 1,
+   "description": "Indicativo/código do posto (ex.: BC-59, H10) — usado no ID gerado automaticamente (PT-<indicativo>-##) e como título do posto."
+  },
+  {
    "fieldname": "nome_do_posto",
    "fieldtype": "Data",
    "label": "Nome do Posto",
    "reqd": 1,
    "in_list_view": 1,
    "in_standard_filter": 1,
+   "in_global_search": 1,
    "search_index": 1,
-   "description": "Nome descritivo do posto. O identificador (ID) do posto é o código que digita ao criar — ex.: BC-59, H10."
+   "description": "Nome descritivo do posto."
+  },
+  {
+   "fieldname": "nome_financeiro",
+   "fieldtype": "Data",
+   "label": "Nome Financeiro",
+   "description": "Nome usado para efeitos financeiros/facturação. Por omissão copia o Nome do Posto na criação, mas pode depois ser alterado independentemente."
   },
   {
    "fieldname": "col_break_1",
@@ -220,7 +242,7 @@
  "modified_by": "Administrator",
  "module": "Security Ops",
  "name": "Posto De Vigilancia",
- "naming_rule": "Set by user",
+ "naming_rule": "Expression (old style)",
  "owner": "Administrator",
  "permissions": [
   {
@@ -284,7 +306,7 @@
    "title": "Inactivo"
   }
  ],
- "title_field": "nome_do_posto",
+ "title_field": "indicativo",
  "track_changes": 1,
  "app": "sigos"
 }
