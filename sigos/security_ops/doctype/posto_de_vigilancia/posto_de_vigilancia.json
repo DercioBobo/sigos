@@ -47,7 +47,7 @@
    "in_standard_filter": 1,
    "in_global_search": 1,
    "search_index": 1,
-   "description": "Indicativo/código do posto (ex.: BC-59, H10) — usado no ID gerado automaticamente (PT-<indicativo>-##) e como título do posto."
+   "description": "Indicativo/código do posto (ex.: BC-59, H10)."
   },
   {
    "fieldname": "nome_do_posto",
