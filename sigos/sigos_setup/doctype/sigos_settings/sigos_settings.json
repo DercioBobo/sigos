@@ -61,7 +61,12 @@
   "empresa_padrao",
   "col_ss_sis1",
   "aprovador_rh",
-  "aprovador_operacoes"
+  "aprovador_operacoes",
+  "tab_ss_custom",
+  "personalizacao_activa",
+  "sec_ss_custom",
+  "faltas_normal_vermelha_activo",
+  "painel_rh_360_activo"
  ],
  "fields": [
   {
@@ -417,6 +422,38 @@
    "label": "Role — Aprovador Operações",
    "options": "Role",
    "default": "Aprovador Operações"
+  },
+  {
+   "fieldname": "tab_ss_custom",
+   "fieldtype": "Tab Break",
+   "label": "Personalização de Cliente"
+  },
+  {
+   "fieldname": "personalizacao_activa",
+   "fieldtype": "Check",
+   "label": "Activar Personalização de Cliente",
+   "default": "0",
+   "description": "Por omissão o SIGOS usa o comportamento padrão em todo o lado. Active esta opção só para mostrar a secção abaixo onde pode configurar regras específicas deste cliente — cada regra tem o seu próprio valor por omissão (igual ao SIGOS padrão), por isso desligar esta opção não desactiva nada por si só, só esconde a secção."
+  },
+  {
+   "fieldname": "sec_ss_custom",
+   "fieldtype": "Section Break",
+   "label": "Regras Deste Cliente",
+   "depends_on": "eval:doc.personalizacao_activa"
+  },
+  {
+   "fieldname": "faltas_normal_vermelha_activo",
+   "fieldtype": "Check",
+   "label": "Faltas: Distinguir Normal vs Vermelha",
+   "default": "0",
+   "description": "Quando activo: (1) o Subtipo de Falta (Normal/Vermelha) torna-se obrigatório em cada linha de Falta nas Ausências; (2) Faltas Vermelhas não justificadas também abatem o saldo de férias, além do desconto salarial normal."
+  },
+  {
+   "fieldname": "painel_rh_360_activo",
+   "fieldtype": "Check",
+   "label": "Painel RH 360 no Employee",
+   "default": "0",
+   "description": "Quando activo, mostra um painel no formulário do Employee com faltas, saldo de férias e salário/deduções/empréstimos do colaborador, com atalhos para criar Outras Deduções, Empréstimo, Outras Remunerações, Reclamação de Salário e para Definir Salário — tudo sem sair do Employee."
   }
  ],
  "issingle": 1,

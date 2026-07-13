@@ -519,6 +519,26 @@
  },
  {
   "doctype": "Custom Field",
+  "dt": "Employee",
+  "module": "SIGOS Setup",
+  "fieldname": "custom_rh360_tab",
+  "fieldtype": "Tab Break",
+  "label": "Painel RH 360",
+  "hidden": 1,
+  "insert_after": "custom_ultima_acumulacao_ferias"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Employee",
+  "module": "SIGOS Setup",
+  "fieldname": "custom_rh360_panel",
+  "fieldtype": "HTML",
+  "label": "Painel RH 360",
+  "hidden": 1,
+  "insert_after": "custom_rh360_tab"
+ },
+ {
+  "doctype": "Custom Field",
   "dt": "Leave Type",
   "module": "SIGOS Setup",
   "fieldname": "custom_allocation_end_date",

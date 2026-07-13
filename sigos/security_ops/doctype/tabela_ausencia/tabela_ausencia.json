@@ -15,6 +15,7 @@
   "turno",
   "periodo",
   "tipo_de_ausencia",
+  "subtipo_falta",
   "tipo_justificacao",
   "n_de_faltas",
   "proxima_accao",
@@ -101,6 +102,14 @@
    "options": "\nFalta\nAtraso\nSaída Antecipada\nSuspensão\nLicença\nOutro",
    "default": "Falta",
    "reqd": 1
+  },
+  {
+   "fieldname": "subtipo_falta",
+   "fieldtype": "Select",
+   "label": "Subtipo de Falta",
+   "options": "\nNormal\nVermelha",
+   "depends_on": "eval:doc.tipo_de_ausencia=='Falta'",
+   "description": "Vermelha também abate o saldo de férias, além do desconto salarial (activável em SIGOS Settings)."
   },
   {
    "fieldname": "tipo_justificacao",

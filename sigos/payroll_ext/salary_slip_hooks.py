@@ -8,6 +8,9 @@ Payroll model:
   - The faltas deduction method is configurable in SIGOS Settings:
         "Proporcional ao Salário" → (base / dias_de_trabalho) × faltas_nao_justificadas
         "Valor Fixo por Falta"     → faltas_nao_justificadas × valor_fixo_por_falta
+  - Customer-specific (SIGOS Settings.faltas_normal_vermelha_activo, default OFF):
+    unjustified "Vermelha" faltas ALSO withhold days from the férias ledger, on top
+    of the normal salary deduction above — see _deduzir_ferias_faltas_vermelhas.
 
 Wire-up (hooks.py):
     doc_events = {
@@ -15,13 +18,14 @@ Wire-up (hooks.py):
             "before_insert":   "sigos.payroll_ext.salary_slip_hooks.before_insert",
             "before_validate": "sigos.payroll_ext.salary_slip_hooks.before_validate",
             "before_submit":   "sigos.payroll_ext.salary_slip_hooks.before_submit",
+            "on_cancel":       "sigos.payroll_ext.salary_slip_hooks.on_cancel",
         }
     }
 """
 
 import frappe
-from frappe.utils import getdate, add_days, date_diff
-from sigos.utils import calcular_faltas_vigilante, calcular_dobras_vigilante
+from frappe.utils import getdate, add_days, date_diff, flt
+from sigos.utils import calcular_faltas_vigilante, calcular_dobras_vigilante, calcular_faltas_vermelhas_vigilante
 
 
 def _aprovado_filter(doctype):
@@ -628,3 +632,107 @@ def _compute_dias_trabalhados(doc):
 def before_submit(doc, method):
 	"""Finalise dias_trabalhados before submit."""
 	_compute_dias_trabalhados(doc)
+	_deduzir_ferias_faltas_vermelhas(doc)
+
+
+# ─── on_cancel ─────────────────────────────────────────────────────────────────
+
+def on_cancel(doc, method):
+	_reverter_ferias_faltas_vermelhas(doc)
+
+
+def _deduzir_ferias_faltas_vermelhas(doc):
+	"""
+	Customer-specific (SIGOS Settings.faltas_normal_vermelha_activo, default OFF):
+	unjustified 'Vermelha' faltas also withhold days from the férias ledger, on top
+	of the normal salary deduction. Approximation: vermelhas_nao_justificadas =
+	min(vermelhas no período, faltas_nao_justificadas total) — a Justificacao De
+	Faltas doesn't say WHICH subtipo it covers, so this assumes a justification
+	clears the guard's faltas as a whole, not per-subtipo.
+
+	Fires once, at final submit — unlike the salary/dobra lines above (which just
+	live inside the slip and are naturally undone by cancelling it), this writes a
+	real submitted Leave Ledger Entry, so it needs its own idempotency guard and
+	its own reversal on cancel (see on_cancel above).
+	"""
+	settings = frappe.get_single("SIGOS Settings")
+	if not settings.faltas_normal_vermelha_activo:
+		return
+	if not doc.custom_vigilante or not doc.employee or not doc.start_date or not doc.end_date:
+		return
+
+	if frappe.db.exists("Leave Ledger Entry", {
+		"transaction_type": "Salary Slip", "transaction_name": doc.name, "docstatus": 1,
+	}):
+		return
+
+	try:
+		vermelhas = calcular_faltas_vermelhas_vigilante(doc.custom_vigilante, doc.start_date, doc.end_date)
+		nao_justificadas = min(vermelhas, doc.custom_faltas_nao_justificadas or 0)
+		if nao_justificadas <= 0:
+			return
+
+		leave_type = settings.leave_type_ferias or "Ferias"
+		from sigos.ferias import _buscar_alocacao
+		alloc = _buscar_alocacao(doc.employee, leave_type)
+		if not alloc:
+			frappe.log_error(
+				f"SalarySlip {doc.name}: sem Leave Allocation de '{leave_type}' para "
+				f"{doc.employee} — não foi possível abater faltas vermelhas das férias.",
+				"SIGOS Faltas Vermelhas",
+			)
+			return
+
+		lle = frappe.get_doc({
+			"doctype": "Leave Ledger Entry",
+			"employee": doc.employee,
+			"employee_name": doc.employee_name,
+			"leave_type": leave_type,
+			"transaction_type": "Salary Slip",
+			"transaction_name": doc.name,
+			"leaves": -flt(nao_justificadas),
+			"from_date": alloc["from_date"],
+			"to_date": alloc["to_date"],
+			"is_carry_forward": 0,
+			"is_expired": 0,
+			"is_lwp": 0,
+			"company": alloc.get("company") or doc.company,
+		})
+		lle.flags.ignore_permissions = True
+		lle.insert()
+		lle.submit()
+
+		# Mirror the display fields, same as ferias.py's own ledger writes.
+		frappe.db.set_value(
+			"Leave Allocation", alloc["name"],
+			{
+				"new_leaves_allocated": flt(alloc.get("new_leaves_allocated")) - nao_justificadas,
+				"total_leaves_allocated": flt(alloc.get("total_leaves_allocated")) - nao_justificadas,
+			},
+			update_modified=False,
+		)
+	except Exception as e:
+		frappe.log_error(
+			f"SalarySlip {doc.name}: erro ao abater férias por faltas vermelhas: {e}",
+			"SIGOS Faltas Vermelhas",
+		)
+
+
+def _reverter_ferias_faltas_vermelhas(doc):
+	"""Cancel the Leave Ledger Entry (if any) this slip created for Vermelha
+	faltas, so cancelling/correcting a payroll run doesn't leave a stale férias
+	deduction behind."""
+	nome = frappe.db.get_value("Leave Ledger Entry", {
+		"transaction_type": "Salary Slip", "transaction_name": doc.name, "docstatus": 1,
+	})
+	if not nome:
+		return
+	try:
+		lle = frappe.get_doc("Leave Ledger Entry", nome)
+		lle.flags.ignore_permissions = True
+		lle.cancel()
+	except Exception as e:
+		frappe.log_error(
+			f"SalarySlip {doc.name}: erro ao reverter abatimento de férias (faltas vermelhas): {e}",
+			"SIGOS Faltas Vermelhas",
+		)

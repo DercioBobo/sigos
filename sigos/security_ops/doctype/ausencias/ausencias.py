@@ -24,6 +24,7 @@ class Ausencias(Document):
 		self._validar_grupo_delegacao()
 		self._validar_duplicados_na_tabela()
 		self._validar_tipo_ausencia()
+		self._validar_subtipo_falta()
 		self._validar_proxima_accao()
 		self._validar_estado_substitutos()
 		self._validar_conflitos_de_substituicao()
@@ -201,6 +202,18 @@ class Ausencias(Document):
 				title=_("Possível Falta Indevida"),
 				indicator="orange",
 			)
+
+	def _validar_subtipo_falta(self):
+		"""Customer-specific (SIGOS Settings.faltas_normal_vermelha_activo, default
+		OFF): when on, every Falta row must say Normal or Vermelha — Vermelha also
+		abates férias (see salary_slip_hooks._deduzir_ferias_faltas_vermelhas)."""
+		if not frappe.db.get_single_value("SIGOS Settings", "faltas_normal_vermelha_activo"):
+			return
+		for i, row in enumerate(self.tabela_ausencia or [], start=1):
+			if row.tipo_de_ausencia == "Falta" and not row.subtipo_falta:
+				frappe.throw(
+					_("Linha {0}: defina o <b>Subtipo de Falta</b> (Normal ou Vermelha).").format(i)
+				)
 
 	def _validar_proxima_accao(self):
 		accao_campo = {

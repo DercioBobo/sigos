@@ -22,6 +22,7 @@ app_include_js = [
 # Form scripts attached to standard (non-SIGOS) doctypes
 doctype_js = {
 	"Project": "public/js/project.js",
+	"Employee": "public/js/employee_hr360.js",
 }
 
 # Show all Postos of a contract under the Project's Connections tab
@@ -96,6 +97,7 @@ doc_events = {
 		"before_insert": "sigos.payroll_ext.salary_slip_hooks.before_insert",
 		"before_validate": "sigos.payroll_ext.salary_slip_hooks.before_validate",
 		"before_submit": "sigos.payroll_ext.salary_slip_hooks.before_submit",
+		"on_cancel": "sigos.payroll_ext.salary_slip_hooks.on_cancel",
 	},
 	"Payroll Entry": {
 		"before_validate": "sigos.payroll_ext.payroll_entry_hooks.before_validate",

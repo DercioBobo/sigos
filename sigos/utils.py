@@ -107,7 +107,8 @@ def calcular_faltas_detalhado(vigilante: str, start_date, end_date) -> list:
 	absences = frappe.db.sql(
 		"""
 		SELECT a.name AS ausencia, a.data AS data, ta.turno, ta.regime, ta.posto,
-		       ta.nome_do_vigilante, ta.tipo_de_ausencia, ta.tipo_justificacao, ta.n_de_faltas
+		       ta.nome_do_vigilante, ta.tipo_de_ausencia, ta.subtipo_falta,
+		       ta.tipo_justificacao, ta.n_de_faltas
 		FROM `tabTabela Ausencia` ta
 		JOIN `tabAusencias` a ON a.name = ta.parent
 		WHERE a.docstatus = 1 AND ta.vigilante = %(vig)s AND a.data <= %(end)s
@@ -141,6 +142,7 @@ def calcular_faltas_detalhado(vigilante: str, start_date, end_date) -> list:
 				"posto": a.posto,
 				"turno": a.turno,
 				"tipo_de_ausencia": a.tipo_de_ausencia,
+				"subtipo_falta": a.subtipo_falta,
 				"tipo_justificacao": a.tipo_justificacao,
 				"n_de_faltas": efetivo,
 				"cumulativo_de_faltas": cumul,
@@ -159,6 +161,20 @@ def calcular_faltas_vigilante(vigilante: str, start_date, end_date) -> int:
 	if not vigilante:
 		return 0
 	return sum(r["n_de_faltas"] for r in calcular_faltas_detalhado(vigilante, start_date, end_date))
+
+
+def calcular_faltas_vermelhas_vigilante(vigilante: str, start_date, end_date) -> int:
+	"""
+	Same escala-aware weighting as calcular_faltas_vigilante, counting only rows
+	tagged subtipo_falta == 'Vermelha' — feeds the customer-specific férias
+	withholding in salary_slip_hooks (SIGOS Settings.faltas_normal_vermelha_activo).
+	"""
+	if not vigilante:
+		return 0
+	return sum(
+		r["n_de_faltas"] for r in calcular_faltas_detalhado(vigilante, start_date, end_date)
+		if r.get("subtipo_falta") == "Vermelha"
+	)
 
 
 def calcular_dobras_vigilante(vigilante: str, start_date, end_date) -> int:

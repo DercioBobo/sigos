@@ -1573,6 +1573,120 @@ def definir_salario_base(vigilante, valor=None, usar_contrato=0, confirmar_reduc
 
 
 @frappe.whitelist()
+def get_employee_hr360(employee):
+	"""
+	Aggregator for the customer-specific "Painel RH 360" on the Employee form
+	(SIGOS Settings.painel_rh_360_activo). Reuses the same canonical sources as the
+	rest of SIGOS instead of recomputing anything:
+	  - faltas: sigos.utils.calcular_faltas_vigilante / calcular_faltas_detalhado
+	    (Vigilante-keyed — same source as the Cumulativo de Faltas report and payroll);
+	  - férias: sigos.ferias._saldo, ledger-summed per Leave Type (same source as
+	    Pedido De Licenca's consultar_saldo) — never new_leaves_allocated;
+	  - salário: resolver_salario_base + the latest submitted Salary Structure
+	    Assignment + recent Salary Slips (all core HRMS, keyed on `employee`);
+	  - money docs: Outras Deducoes / Emprestimo / Outras Remuneracoes /
+	    Reclamacao De Salario — already keyed on Employee via `funcionario`, no
+	    vigilante resolution needed for these.
+	"""
+	from frappe.utils import add_months, flt, get_first_day, get_last_day, getdate, nowdate
+	from sigos.ferias import _saldo
+	from sigos.utils import calcular_faltas_detalhado, calcular_faltas_vigilante
+
+	emp = frappe.db.get_value(
+		"Employee", employee,
+		["employee_name", "custom_vigilante", "status"],
+		as_dict=True,
+	)
+	if not emp:
+		frappe.throw(_("Employee {0} não encontrado.").format(employee))
+
+	vigilante = emp.custom_vigilante
+	today = getdate(nowdate())
+	inicio_mes, fim_mes = get_first_day(today), get_last_day(today)
+
+	# ─── Faltas (Vigilante-keyed) ──────────────────────────────────────────────
+	faltas = {"mes_atual": 0, "recentes": []}
+	if vigilante:
+		faltas["mes_atual"] = calcular_faltas_vigilante(vigilante, inicio_mes, fim_mes)
+		detalhe = calcular_faltas_detalhado(vigilante, add_months(today, -3), today)
+		faltas["recentes"] = list(reversed(detalhe))[:15]
+
+	# ─── Férias (ledger-correct, per Leave Type the employee actually holds) ───
+	ferias = []
+	for a in frappe.get_all(
+		"Leave Allocation",
+		filters={"employee": employee, "docstatus": 1, "to_date": [">=", today]},
+		fields=["leave_type"],
+		distinct=True,
+	):
+		ferias.append({"leave_type": a.leave_type, "saldo": flt(_saldo(employee, a.leave_type, today))})
+
+	# ─── Salário ────────────────────────────────────────────────────────────────
+	ssa_atual = frappe.get_all(
+		"Salary Structure Assignment",
+		filters={"employee": employee, "docstatus": 1},
+		fields=["name", "salary_structure", "base", "from_date"],
+		order_by="from_date desc",
+		limit=1,
+	)
+	salario = {
+		"base_resolvida": flt(resolver_salario_base(vigilante)) if vigilante else 0,
+		"ssa_atual": ssa_atual[0] if ssa_atual else None,
+		"slips_recentes": frappe.get_all(
+			"Salary Slip",
+			filters={"employee": employee, "docstatus": 1},
+			fields=["name", "start_date", "end_date", "gross_pay", "total_deduction", "net_pay"],
+			order_by="start_date desc",
+			limit=6,
+		),
+	}
+
+	# ─── Money docs (already Employee-keyed via `funcionario`) ─────────────────
+	deducoes = frappe.get_all(
+		"Outras Deducoes",
+		filters={"funcionario": employee, "docstatus": ["<", 2], "estado": "Activo"},
+		fields=["name", "tipo", "valor_a_pagar", "valor_mensal", "meses_a_pagar",
+				"data_de_inicio", "data_de_fim", "estado", "docstatus"],
+		order_by="data_de_inicio desc",
+	)
+	emprestimos = frappe.get_all(
+		"Emprestimo",
+		filters={"funcionario": employee, "docstatus": ["<", 2], "estado": "Activo"},
+		fields=["name", "valor_a_pagar", "valor_mensal", "meses_a_pagar",
+				"data_de_inicio", "data_de_fim", "estado", "docstatus"],
+		order_by="data_de_inicio desc",
+	)
+	remuneracoes = frappe.get_all(
+		"Outras Remuneracoes",
+		filters={"funcionario": employee, "docstatus": ["<", 2]},
+		fields=["name", "tipo_de_subsidios", "valor_a_pagar", "valor_mensal",
+				"mes_referencia", "workflow_state", "docstatus"],
+		order_by="creation desc",
+		limit=10,
+	)
+	reclamacoes = frappe.get_all(
+		"Reclamacao De Salario",
+		filters={"funcionario": employee, "docstatus": ["<", 2]},
+		fields=["name", "mes_a_ser_pago", "valor_a_reclamar", "motivo", "workflow_state", "docstatus"],
+		order_by="creation desc",
+		limit=10,
+	)
+
+	return {
+		"employee": employee,
+		"employee_name": emp.employee_name,
+		"vigilante": vigilante,
+		"faltas": faltas,
+		"ferias": ferias,
+		"salario": salario,
+		"deducoes": deducoes,
+		"emprestimos": emprestimos,
+		"remuneracoes": remuneracoes,
+		"reclamacoes": reclamacoes,
+	}
+
+
+@frappe.whitelist()
 def enviar_posto_para_reserva(posto, motivo):
 	"""
 	Bench every Activo guard at a (closing) posto: creates + submits a RES rotatividade
