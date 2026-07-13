@@ -1771,14 +1771,16 @@ def get_employee_hr360(employee):
 		"Outras Remuneracoes",
 		filters={"funcionario": employee, "docstatus": ["<", 2]},
 		fields=["name", "tipo_de_subsidios", "valor_a_pagar", "valor_mensal",
-				"mes_referencia", "workflow_state", "docstatus"],
+				"mes_referencia", "docstatus"]
+				+ (["workflow_state"] if frappe.get_meta("Outras Remuneracoes").has_field("workflow_state") else []),
 		order_by="creation desc",
 		limit=10,
 	)
 	reclamacoes = frappe.get_all(
 		"Reclamacao De Salario",
 		filters={"funcionario": employee, "docstatus": ["<", 2]},
-		fields=["name", "mes_a_ser_pago", "valor_a_reclamar", "motivo", "workflow_state", "docstatus"],
+		fields=["name", "mes_a_ser_pago", "valor_a_reclamar", "motivo", "docstatus"]
+				+ (["workflow_state"] if frappe.get_meta("Reclamacao De Salario").has_field("workflow_state") else []),
 		order_by="creation desc",
 		limit=10,
 	)
