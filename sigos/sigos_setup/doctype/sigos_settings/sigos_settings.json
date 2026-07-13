@@ -187,8 +187,7 @@
    "fieldtype": "Link",
    "label": "Tipo de Licença — Férias",
    "options": "Leave Type",
-   "default": "Ferias",
-   "description": "Leave Type usado para as férias. Padrão: \"Ferias\"."
+   "description": "Leave Type usado para as férias. Padrão: \"Ferias\" — atribuído automaticamente após a instalação (sigos.install), quando o Leave Type já existe."
   },
   {
    "fieldname": "col_ss_ferias",
@@ -460,14 +459,14 @@
    "fieldtype": "Link",
    "label": "Role — Aprovador RH",
    "options": "Role",
-   "default": "Aprovador RH"
+   "description": "Padrão: \"Aprovador RH\" — atribuído automaticamente após a instalação (sigos.install), quando a Role já existe."
   },
   {
    "fieldname": "aprovador_operacoes",
    "fieldtype": "Link",
    "label": "Role — Aprovador Operações",
    "options": "Role",
-   "default": "Aprovador Operações"
+   "description": "Padrão: \"Aprovador Operações\" — atribuído automaticamente após a instalação (sigos.install), quando a Role já existe."
   },
   {
    "fieldname": "tab_ss_custom",

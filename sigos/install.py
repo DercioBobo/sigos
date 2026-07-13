@@ -12,6 +12,7 @@ def after_install():
 	_seccionar_contrato()
 	_set_employee_naming()
 	_ensure_ferias_leave_type()
+	_seed_settings_defaults()
 
 
 def after_migrate():
@@ -28,6 +29,38 @@ def after_migrate():
 	_seccionar_contrato()
 	_set_employee_naming()
 	_ensure_ferias_leave_type()
+	_seed_settings_defaults()
+
+
+def _seed_settings_defaults():
+	"""
+	Set SIGOS Settings' Link defaults PROGRAMMATICALLY, once their targets are known
+	to exist — not as schema-level `default` values on the field. A Single doctype's
+	default row is validated (Link targets included) during doctype sync, which runs
+	BEFORE after_install/fixtures — so a schema default pointing at a record this app
+	itself creates (the "Ferias" Leave Type) or a fixture-seeded Role blocks
+	`bench install-app sigos` on every fresh site with a LinkValidationError. Doing it
+	here instead, after those exist, sidesteps the ordering problem entirely. Never
+	overwrites a value someone already configured; safe to call from after_migrate too
+	(fixtures may not have landed yet on the very first install pass).
+	"""
+	valores = {
+		"leave_type_ferias": ("Leave Type", "Ferias"),
+		"aprovador_rh": ("Role", "Aprovador RH"),
+		"aprovador_operacoes": ("Role", "Aprovador Operações"),
+	}
+	try:
+		settings = frappe.get_single("SIGOS Settings")
+		dirty = False
+		for fieldname, (doctype, valor) in valores.items():
+			if not settings.get(fieldname) and frappe.db.exists(doctype, valor):
+				settings.set(fieldname, valor)
+				dirty = True
+		if dirty:
+			settings.save(ignore_permissions=True)
+			frappe.db.commit()
+	except Exception as e:
+		frappe.log_error(f"SIGOS: seed Settings defaults failed: {e}", "SIGOS Install")
 
 
 def _ensure_ferias_leave_type():
