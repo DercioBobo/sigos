@@ -62,7 +62,7 @@ sigos.AjusteDeSalarios = class AjusteDeSalarios {
 				<div class="as-toolbar">
 					<div class="as-search">
 						${_as_icon_search()}
-						<input type="text" data-search placeholder="${__("Pesquisar por nome ou nº mecanográfico…")}" />
+						<input type="text" data-search placeholder="${__("Pesquisar por nome…")}" />
 					</div>
 					<select class="as-select" data-filter="status">
 						<option value="Activo" selected>${__("Activos")}</option>
@@ -173,7 +173,6 @@ sigos.AjusteDeSalarios = class AjusteDeSalarios {
 				<thead><tr>
 					<th class="as-chk"><input type="checkbox" data-select-all /></th>
 					<th>${__("Nome")}</th>
-					<th>${__("Mecanográfico")}</th>
 					<th>${__("Delegação")}</th>
 					<th>${__("Categoria")}</th>
 					<th>${__("Regime")}</th>
@@ -205,7 +204,6 @@ sigos.AjusteDeSalarios = class AjusteDeSalarios {
 			<tr>
 				<td class="as-chk"><input type="checkbox" data-row-chk="${frappe.utils.escape_html(r.name)}" ${this.selected.has(r.name) ? "checked" : ""} /></td>
 				<td><a href="javascript:void(0)" data-open="${frappe.utils.escape_html(r.name)}">${frappe.utils.escape_html(r.nome_completo || r.name)}</a>${r.tem_override ? ` <span class="as-badge">${__("override")}</span>` : ""}</td>
-				<td class="as-mono">${frappe.utils.escape_html(r.mecanografico || "—")}</td>
 				<td>${frappe.utils.escape_html(r.delegacao || "—")}</td>
 				<td>${frappe.utils.escape_html(r.categoria || "—")}</td>
 				<td>${frappe.utils.escape_html(r.regime_do_vigilante || "—")}</td>

@@ -28,9 +28,11 @@ VERIFICAR EM PRODUÇÃO (erpnext-site): confirmar que o saldo (get_leave_balance
 / relatório) cresce após uma corrida — i.e. que as Leave Ledger Entries criadas
 aqui são somadas no saldo reservável desta versão do HRMS.
 """
+from calendar import isleap as is_leap_year
+
 import frappe
 from frappe.utils import (
-	getdate, nowdate, add_months, date_diff, get_last_day, flt, is_leap_year,
+	getdate, nowdate, add_months, date_diff, get_last_day, flt,
 )
 
 HORIZONTE_PADRAO = "2099-12-31"

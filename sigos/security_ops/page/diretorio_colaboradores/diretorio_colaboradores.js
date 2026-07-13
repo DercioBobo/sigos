@@ -58,7 +58,7 @@ sigos.DiretorioColaboradores = class DiretorioColaboradores {
 					<div class="dc-list">
 						<div class="dc-search">
 							${_dc_icon_search()}
-							<input type="text" data-search placeholder="${__("Pesquisar por nome ou nº mecanográfico…")}" />
+							<input type="text" data-search placeholder="${__("Pesquisar por nome…")}" />
 						</div>
 						<div class="dc-filters">
 							<select class="dc-select" data-filter="status">
@@ -145,7 +145,7 @@ sigos.DiretorioColaboradores = class DiretorioColaboradores {
 				<span class="dc-ava dc-ring-${tone}">${_dc_iniciais(e.employee_name)}</span>
 				<span class="dc-row-txt">
 					<span class="dc-row-name">${frappe.utils.escape_html(e.employee_name || e.name)}</span>
-					<span class="dc-row-meta">${frappe.utils.escape_html(e.custom_mecanografico || e.name)}${e.custom_posto ? " · " + frappe.utils.escape_html(e.custom_posto) : ""}</span>
+					<span class="dc-row-meta">${frappe.utils.escape_html(e.custom_posto || "—")}</span>
 				</span>
 				<span class="dc-row-dot dc-ring-${tone}"></span>
 			</button>`;

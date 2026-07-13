@@ -365,12 +365,10 @@ sigos.PainelOperacional = class PainelOperacional {
 	_guard_row(g) {
 		const sub = g.cobre_nome
 			? `<span class="po-cover">&#8594; ${frappe.utils.escape_html(g.cobre_nome)}</span>` : "";
-		const mec = g.mecanografico ? `<span class="po-mec">${frappe.utils.escape_html(g.mecanografico)}</span>` : "";
 		return `
 			<div class="po-guard st-${g.estado}" data-vig="${frappe.utils.escape_html(g.vigilante)}" title="${this._estado_label(g.estado)}">
 				<span class="po-gdot"></span>
 				<span class="po-gname">${frappe.utils.escape_html(g.nome || g.vigilante)}</span>
-				${mec}
 				${g.turno ? `<span class="po-turno">${frappe.utils.escape_html(g.turno)}</span>` : ""}
 				${sub}
 			</div>`;
@@ -528,7 +526,7 @@ sigos.PainelOperacional = class PainelOperacional {
 		const foto = v.foto
 			? `<img class="po-vphoto" src="${frappe.utils.escape_html(v.foto)}"/>`
 			: `<div class="po-vphoto po-vph-ph">${frappe.utils.escape_html(ini)}</div>`;
-		const sub = [v.name, v.codename, v.mecanografico].filter(Boolean)
+		const sub = [v.name, v.codename].filter(Boolean)
 			.map((x) => frappe.utils.escape_html(x)).join(" &middot; ");
 		this.$modal.find(".po-modal-title").html(`
 			${foto}
@@ -691,7 +689,7 @@ sigos.PainelOperacional = class PainelOperacional {
   --shadow:0 1px 2px rgba(16,23,38,.04), 0 14px 34px -20px rgba(16,23,38,.22);
   color:var(--ink); font-family:var(--body); font-feature-settings:"tnum" 1; padding:8px 4px 60px; -webkit-font-smoothing:antialiased;
 }
-.po-root .po-code, .po-root .po-mec, .po-root .po-mini-code, .po-root .po-mt-code, .po-root .po-wday-h span { font-family:var(--mono); }
+.po-root .po-code, .po-root .po-mini-code, .po-root .po-mt-code, .po-root .po-wday-h span { font-family:var(--mono); }
 .po-root .po-tile-val, .po-root .po-ring-hole span, .po-root .po-badge, .po-root .po-mini-badge { font-family:var(--display); }
 
 /* Toolbar */
@@ -805,7 +803,6 @@ sigos.PainelOperacional = class PainelOperacional {
 .po-gdot.st-reserva { background:var(--teal); }
 .po-gname { color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1; min-width:0; font-weight:500; }
 .st-falta .po-gname { color:var(--bad); }
-.po-mec { font-size:10.5px; color:var(--ink3); }
 .po-turno { font-size:10px; color:var(--ink2); background:var(--paper3); border-radius:5px; padding:1px 7px; font-weight:500; }
 .po-cover { font-size:11px; color:var(--violet); white-space:nowrap; font-weight:500; }
 
