@@ -49,6 +49,7 @@ _OPS_MIRROR = [
 	("regime_do_vigilante", "custom_regime"),
 	("posto_de_vigilancia", "custom_posto"),
 	("delegacao",           "custom_delegacao"),
+	("cliente",             "custom_cliente"),
 	("tipo_de_vigilante",   "custom_tipo_de_vigilante"),
 	("idade",               "custom_idade"),
 ]

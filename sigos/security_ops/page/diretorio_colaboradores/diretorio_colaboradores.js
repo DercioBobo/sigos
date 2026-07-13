@@ -23,7 +23,7 @@ sigos.DiretorioColaboradores = class DiretorioColaboradores {
 	constructor(page, wrapper) {
 		this.page = page;
 		this.wrapper = wrapper;
-		this.state = { search: "", status: "Active", posto: null, regime: null, categoria: null };
+		this.state = { search: "", status: "Active", posto: null, regime: null, categoria: null, cliente: null };
 		this.selected = null;
 		this.activeTab = "faltas";
 		this.employees = [];
@@ -71,6 +71,7 @@ sigos.DiretorioColaboradores = class DiretorioColaboradores {
 							<div data-ctrl="posto"></div>
 							<div data-ctrl="regime"></div>
 							<div data-ctrl="categoria"></div>
+							<div data-ctrl="cliente"></div>
 						</div>
 						<div class="dc-rows" data-rows></div>
 					</div>
@@ -103,6 +104,7 @@ sigos.DiretorioColaboradores = class DiretorioColaboradores {
 		build("posto", "Posto De Vigilancia", __("Posto…"));
 		build("regime", "Regime", __("Regime…"));
 		build("categoria", "Categoria Vigilante", __("Categoria…"));
+		build("cliente", "Customer", __("Cliente…"));
 	}
 
 	_wire() {
@@ -145,7 +147,7 @@ sigos.DiretorioColaboradores = class DiretorioColaboradores {
 				<span class="dc-ava dc-ring-${tone}">${_dc_iniciais(e.employee_name)}</span>
 				<span class="dc-row-txt">
 					<span class="dc-row-name">${frappe.utils.escape_html(e.employee_name || e.name)}</span>
-					<span class="dc-row-meta">${frappe.utils.escape_html(e.custom_posto || "—")}</span>
+					<span class="dc-row-meta">${frappe.utils.escape_html(e.custom_posto || "—")}${e.custom_cliente ? " · " + frappe.utils.escape_html(e.custom_cliente) : ""}</span>
 				</span>
 				<span class="dc-row-dot dc-ring-${tone}"></span>
 			</button>`;

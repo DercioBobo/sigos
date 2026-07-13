@@ -1845,7 +1845,7 @@ def get_employee_directory(filters=None):
 	filters = filters or {}
 
 	conds = {}
-	for campo in ("status", "custom_posto", "custom_regime", "custom_categoria"):
+	for campo in ("status", "custom_posto", "custom_regime", "custom_categoria", "custom_cliente"):
 		valor = filters.get(campo.replace("custom_", ""))
 		if valor:
 			conds[campo] = valor
@@ -1863,7 +1863,7 @@ def get_employee_directory(filters=None):
 		filters=conds,
 		or_filters=or_filters,
 		fields=["name", "employee_name", "status",
-				"custom_posto", "custom_regime", "custom_categoria", "image"],
+				"custom_posto", "custom_regime", "custom_categoria", "custom_cliente", "image"],
 		order_by="employee_name asc",
 		limit_page_length=500,
 	)

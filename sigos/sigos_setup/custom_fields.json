@@ -77,11 +77,22 @@
   "doctype": "Custom Field",
   "dt": "Employee",
   "module": "SIGOS Setup",
+  "fieldname": "custom_cliente",
+  "fieldtype": "Link",
+  "options": "Customer",
+  "label": "Cliente (SIGOS)",
+  "insert_after": "custom_posto",
+  "read_only": 1
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Employee",
+  "module": "SIGOS Setup",
   "fieldname": "custom_tipo_de_vigilante",
   "fieldtype": "Select",
   "label": "Tipo de Vigilante",
   "options": "\nVigilante\nSupervisor\nChefe de Grupo\nChefe de Posto",
-  "insert_after": "custom_posto",
+  "insert_after": "custom_cliente",
   "read_only": 1
  },
  {
