@@ -30,6 +30,8 @@
   "reprimendas_media_pd",
   "col_break_disc",
   "reprimendas_alta_pd",
+  "sec_ss_rh360",
+  "painel_rh_360_activo",
   "tab_ss_pay",
   "sec_ss_falt",
   "metodo_calculo_faltas",
@@ -71,7 +73,6 @@
   "personalizacao_activa",
   "sec_ss_custom",
   "faltas_normal_vermelha_activo",
-  "painel_rh_360_activo",
   "posicao_no_posto_activo",
   "subsidios_categoria_funcao_activo",
   "componente_subsidio_chefia_turno",
@@ -238,6 +239,18 @@
    "label": "Participações Alta → Processo Disciplinar",
    "default": "1",
    "depends_on": "acumulacao_pd_activa"
+  },
+  {
+   "fieldname": "sec_ss_rh360",
+   "fieldtype": "Section Break",
+   "label": "Painel RH 360"
+  },
+  {
+   "fieldname": "painel_rh_360_activo",
+   "fieldtype": "Check",
+   "label": "Painel RH 360 no Employee",
+   "default": "1",
+   "description": "Mostra um painel no formulário do Employee com faltas, saldo de férias e salário/deduções/empréstimos do colaborador, com atalhos para criar Outras Deduções, Empréstimo, Outras Remunerações, Reclamação de Salário e para Definir Salário — tudo sem sair do Employee. Activo por omissão em todos os clientes; desligue apenas se preferir usar só o Diretório de Colaboradores."
   },
   {
    "fieldname": "tab_ss_pay",
@@ -492,13 +505,6 @@
    "label": "Faltas: Distinguir Normal vs Vermelha",
    "default": "0",
    "description": "Quando activo: (1) o Subtipo de Falta (Normal/Vermelha) torna-se obrigatório em cada linha de Falta nas Ausências; (2) Faltas Vermelhas não justificadas também abatem o saldo de férias, além do desconto salarial normal."
-  },
-  {
-   "fieldname": "painel_rh_360_activo",
-   "fieldtype": "Check",
-   "label": "Painel RH 360 no Employee",
-   "default": "0",
-   "description": "Quando activo, mostra um painel no formulário do Employee com faltas, saldo de férias e salário/deduções/empréstimos do colaborador, com atalhos para criar Outras Deduções, Empréstimo, Outras Remunerações, Reclamação de Salário e para Definir Salário — tudo sem sair do Employee."
   },
   {
    "fieldname": "posicao_no_posto_activo",

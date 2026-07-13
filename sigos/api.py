@@ -1446,13 +1446,15 @@ def _aplicar_salario_base_vigilante(v, estrutura, from_date):
 
 
 @frappe.whitelist()
-def aplicar_salario_base(project=None, vigilante=None, silent=False):
+def aplicar_salario_base(project=None, vigilante=None, vigilantes=None, silent=False):
 	"""
 	Assign the resolved base salary to the Salary Structure Assignment of every
-	active vigilante on a contract (Project) — or a single vigilante. Used by the
-	Project button (bulk) and by onboarding (single, silent). Idempotent.
+	active vigilante on a contract (Project), a single vigilante, or an explicit
+	list of vigilantes. Used by the Project button (bulk), onboarding (single,
+	silent), and the Ajuste de Salários page (filtered bulk). Idempotent.
 	"""
 	from frappe.utils import today
+	import json as _json
 
 	estrutura = frappe.db.get_single_value("SIGOS Settings", "estrutura_salarial_padrao")
 	if not estrutura:
@@ -1463,12 +1465,17 @@ def aplicar_salario_base(project=None, vigilante=None, silent=False):
 			"atribuir o salário base."
 		), title=_("Estrutura Salarial em Falta"))
 
-	if vigilante:
+	if isinstance(vigilantes, str):
+		vigilantes = _json.loads(vigilantes) if vigilantes else None
+
+	if vigilantes:
+		filters = {"name": ["in", vigilantes]}
+	elif vigilante:
 		filters = {"name": vigilante}
 	elif project:
 		filters = {"projecto": project, "status": "Activo"}
 	else:
-		frappe.throw(_("Indique um contrato (Projecto) ou um vigilante."))
+		frappe.throw(_("Indique um contrato (Projecto), um vigilante, ou uma lista de vigilantes."))
 
 	vigs = frappe.get_all(
 		"Vigilante",
@@ -1500,6 +1507,110 @@ def aplicar_salario_base(project=None, vigilante=None, silent=False):
 		frappe.msgprint(msg, title=_("Atribuição de Salário Base"), indicator="blue")
 
 	return resumo
+
+
+@frappe.whitelist()
+def get_ajuste_salarios(filters=None):
+	"""
+	Filterable/searchable salary-adjustment worklist for HR (Ajuste de Salários
+	page): every matching vigilante's CURRENT (latest submitted SSA) base side by
+	side with the RESOLVED base (contract/regime + override + floor), so HR can
+	see the picture before bulk-applying via `aplicar_salario_base(vigilantes=...)`.
+
+	`stats` are computed over the full status/delegação/regime/etc.-filtered scope
+	BEFORE the three so_* view toggles narrow `rows` — so a stat tile's count
+	doesn't move when the user clicks it to filter the table by that same tile.
+	"""
+	import json as _json
+	from frappe.utils import flt
+
+	if isinstance(filters, str):
+		filters = _json.loads(filters) if filters else {}
+	filters = filters or {}
+
+	status = filters.get("status") or "Activo"
+	conds = {} if status == "Todos" else {"status": status}
+	for campo in ("delegacao", "categoria", "regime_do_vigilante", "posto_de_vigilancia", "projecto"):
+		valor = filters.get(campo)
+		if valor:
+			conds[campo] = valor
+
+	or_filters = None
+	texto = (filters.get("search") or "").strip()
+	if texto:
+		or_filters = [
+			["nome_completo", "like", f"%{texto}%"],
+			["mecanografico", "like", f"%{texto}%"],
+		]
+
+	vigs = frappe.get_all(
+		"Vigilante",
+		filters=conds,
+		or_filters=or_filters,
+		fields=["name", "nome_completo", "mecanografico", "status", "delegacao", "categoria",
+				"regime_do_vigilante", "posto_de_vigilancia", "projecto", "cliente",
+				"funcionario", "salario_base_manual"],
+		order_by="nome_completo asc",
+		limit_page_length=2000,
+	)
+
+	funcionarios = [v.funcionario for v in vigs if v.funcionario]
+	atual_by_emp = {}
+	if funcionarios:
+		ssa_rows = frappe.db.sql(
+			"""
+			SELECT s.employee, s.base
+			FROM `tabSalary Structure Assignment` s
+			INNER JOIN (
+				SELECT employee, MAX(from_date) AS max_date
+				FROM `tabSalary Structure Assignment`
+				WHERE docstatus = 1 AND employee IN %(funcionarios)s
+				GROUP BY employee
+			) latest ON latest.employee = s.employee AND latest.max_date = s.from_date
+			WHERE s.docstatus = 1
+			""",
+			{"funcionarios": funcionarios},
+			as_dict=True,
+		)
+		atual_by_emp = {r.employee: flt(r.base) for r in ssa_rows}
+
+	rows = []
+	stats = {"total": 0, "sem_salario": 0, "sem_ssa": 0, "com_override": 0, "divergentes": 0}
+	for v in vigs:
+		atual = atual_by_emp.get(v.funcionario, 0) if v.funcionario else 0
+		resolvido = flt(resolver_salario_base(v))
+		diferenca = resolvido - atual
+		tem_ssa = bool(v.funcionario) and v.funcionario in atual_by_emp
+		tem_override = flt(v.salario_base_manual) > 0
+
+		stats["total"] += 1
+		if resolvido <= 0:
+			stats["sem_salario"] += 1
+		if not tem_ssa:
+			stats["sem_ssa"] += 1
+		if tem_override:
+			stats["com_override"] += 1
+		if diferenca:
+			stats["divergentes"] += 1
+
+		row = dict(v)
+		row.update({
+			"salario_atual": atual,
+			"salario_resolvido": resolvido,
+			"diferenca": diferenca,
+			"tem_ssa": tem_ssa,
+			"tem_override": tem_override,
+		})
+		rows.append(row)
+
+	if filters.get("so_sem_ssa"):
+		rows = [r for r in rows if not r["tem_ssa"]]
+	if filters.get("so_com_override"):
+		rows = [r for r in rows if r["tem_override"]]
+	if filters.get("so_divergentes"):
+		rows = [r for r in rows if r["diferenca"]]
+
+	return {"rows": rows, "stats": stats}
 
 
 @frappe.whitelist()
@@ -1575,9 +1686,9 @@ def definir_salario_base(vigilante, valor=None, usar_contrato=0, confirmar_reduc
 @frappe.whitelist()
 def get_employee_hr360(employee):
 	"""
-	Aggregator for the customer-specific "Painel RH 360" on the Employee form
-	(SIGOS Settings.painel_rh_360_activo). Reuses the same canonical sources as the
-	rest of SIGOS instead of recomputing anything:
+	Aggregator for the "Painel RH 360" on the Employee form — default-on for every
+	customer (SIGOS Settings.painel_rh_360_activo). Reuses the same canonical
+	sources as the rest of SIGOS instead of recomputing anything:
 	  - faltas: sigos.utils.calcular_faltas_vigilante / calcular_faltas_detalhado
 	    (Vigilante-keyed — same source as the Cumulativo de Faltas report and payroll);
 	  - férias: sigos.ferias._saldo, ledger-summed per Leave Type (same source as

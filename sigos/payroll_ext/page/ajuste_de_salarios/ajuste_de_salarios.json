@@ -1,0 +1,15 @@
+{
+ "content": null,
+ "doctype": "Page",
+ "module": "Payroll Ext",
+ "name": "ajuste-de-salarios",
+ "page_name": "ajuste-de-salarios",
+ "standard": "Yes",
+ "system_page": 0,
+ "title": "Ajuste de Salários",
+ "roles": [
+  { "role": "System Manager" },
+  { "role": "SIGOS Manager" },
+  { "role": "Aprovador RH" }
+ ]
+}

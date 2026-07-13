@@ -1,10 +1,12 @@
-// EMPLOYEE — "Painel RH 360" (customer-specific, SIGOS Settings.painel_rh_360_activo).
-// Single-pane HR view: faltas, saldo de férias, salário/SSA e folhas recentes, e
-// deduções/empréstimos/proventos/reclamações — com atalhos para criar esses
-// documentos e para "Definir Salário", tudo sem sair do Employee. Reuses the
-// existing sigos.api endpoints (get_employee_hr360, resolver_salario_base,
-// definir_salario_base) and the sigos.quick_docs dialogs (sigos_quick_docs.js) —
-// no duplicate calculation or dialog logic here.
+// EMPLOYEE — "Painel RH 360". Default-on for every customer (SIGOS Settings.
+// painel_rh_360_activo, default 1 — still a real toggle, e.g. for a customer who
+// prefers to only use the Diretório de Colaboradores). Single-pane HR view:
+// faltas, saldo de férias, salário/SSA e folhas recentes, e deduções/empréstimos/
+// proventos/reclamações — com atalhos para criar esses documentos e para "Definir
+// Salário", tudo sem sair do Employee. Reuses the existing sigos.api endpoints
+// (get_employee_hr360, resolver_salario_base, definir_salario_base) and the
+// sigos.quick_docs dialogs (sigos_quick_docs.js) — no duplicate calculation or
+// dialog logic here.
 
 let _rh360_activo = null;   // null = not fetched yet this session, else bool
 let _rh360_data = {};       // employee name -> last fetched payload
@@ -16,7 +18,7 @@ frappe.ui.form.on("Employee", {
 	},
 });
 
-// ─── Gate: only render for customers with the flag on (fetched once per session) ──
+// ─── Gate: default-on, still togglable per SIGOS Settings (fetched once per session) ──
 function _rh360_setup(frm) {
 	if (frm.is_new()) return;
 	if (_rh360_activo === null) {
