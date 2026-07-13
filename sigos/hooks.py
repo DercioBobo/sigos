@@ -15,6 +15,7 @@ after_migrate = "sigos.install.after_migrate"
 app_include_css = ["/assets/sigos/css/sigos.css"]
 app_include_js = [
 	"/assets/sigos/js/sigos.js",
+	"/assets/sigos/js/sigos_quick_docs.js",
 	"/assets/sigos/js/escala_wizard.js",
 	"/assets/sigos/js/rotatividade_wizard.js",
 ]

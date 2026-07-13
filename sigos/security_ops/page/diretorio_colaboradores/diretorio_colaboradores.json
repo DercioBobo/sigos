@@ -1,0 +1,17 @@
+{
+ "content": null,
+ "doctype": "Page",
+ "module": "Security Ops",
+ "name": "diretorio-colaboradores",
+ "page_name": "diretorio-colaboradores",
+ "standard": "Yes",
+ "system_page": 0,
+ "title": "Diretório de Colaboradores",
+ "roles": [
+  { "role": "System Manager" },
+  { "role": "SIGOS Manager" },
+  { "role": "Aprovador RH" },
+  { "role": "Aprovador Operações" },
+  { "role": "Operações SIGOS" }
+ ]
+}

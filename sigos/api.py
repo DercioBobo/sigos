@@ -1687,6 +1687,76 @@ def get_employee_hr360(employee):
 
 
 @frappe.whitelist()
+def get_employee_disciplinar(employee):
+	"""
+	Disciplinar summary for the Diretório de Colaboradores page — Processo
+	Disciplinar + Participação, both Vigilante-keyed, resolved through the
+	Employee's linked Vigilante (same resolution as get_employee_hr360). Kept as
+	a separate call so get_employee_hr360's contract (already used by the
+	shipped Employee "Painel RH 360" panel) doesn't change.
+	"""
+	vigilante = frappe.db.get_value("Employee", employee, "custom_vigilante")
+	if not vigilante:
+		return {"vigilante": None, "processos": [], "participacoes": []}
+
+	processos = frappe.get_all(
+		"Processo Disciplinar",
+		filters={"vigilante": vigilante, "docstatus": ["<", 2]},
+		fields=["name", "data", "gravidade", "motivo", "decisao", "valor_a_pagar", "docstatus"],
+		order_by="data desc",
+		limit=15,
+	)
+	participacoes = frappe.get_all(
+		"Participacao",
+		filters={"vigilante": vigilante, "docstatus": ["<", 2]},
+		fields=["name", "data", "gravidade", "tipo_de_infracao", "relato", "docstatus"],
+		order_by="data desc",
+		limit=15,
+	)
+	return {"vigilante": vigilante, "processos": processos, "participacoes": participacoes}
+
+
+@frappe.whitelist()
+def get_employee_directory(filters=None):
+	"""
+	Lightweight, filterable/searchable Employee list for the Diretório de
+	Colaboradores page. Deliberately does NO per-row aggregation — faltas/férias/
+	salário/disciplinar are fetched only for the SELECTED employee (via
+	get_employee_hr360 / get_employee_disciplinar), so this stays fast at any
+	headcount instead of running N queries for N employees.
+	"""
+	import json as _json
+
+	if isinstance(filters, str):
+		filters = _json.loads(filters) if filters else {}
+	filters = filters or {}
+
+	conds = {}
+	for campo in ("status", "custom_posto", "custom_regime", "custom_categoria"):
+		valor = filters.get(campo.replace("custom_", ""))
+		if valor:
+			conds[campo] = valor
+
+	or_filters = None
+	texto = (filters.get("search") or "").strip()
+	if texto:
+		or_filters = [
+			["employee_name", "like", f"%{texto}%"],
+			["custom_mecanografico", "like", f"%{texto}%"],
+		]
+
+	return frappe.get_all(
+		"Employee",
+		filters=conds,
+		or_filters=or_filters,
+		fields=["name", "employee_name", "custom_mecanografico", "status",
+				"custom_posto", "custom_regime", "custom_categoria", "image"],
+		order_by="employee_name asc",
+		limit_page_length=500,
+	)
+
+
+@frappe.whitelist()
 def enviar_posto_para_reserva(posto, motivo):
 	"""
 	Bench every Activo guard at a (closing) posto: creates + submits a RES rotatividade

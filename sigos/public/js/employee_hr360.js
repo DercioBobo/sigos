@@ -3,17 +3,12 @@
 // deduções/empréstimos/proventos/reclamações — com atalhos para criar esses
 // documentos e para "Definir Salário", tudo sem sair do Employee. Reuses the
 // existing sigos.api endpoints (get_employee_hr360, resolver_salario_base,
-// definir_salario_base) — no duplicate calculation logic here.
+// definir_salario_base) and the sigos.quick_docs dialogs (sigos_quick_docs.js) —
+// no duplicate calculation or dialog logic here.
 
 let _rh360_activo = null;   // null = not fetched yet this session, else bool
 let _rh360_data = {};       // employee name -> last fetched payload
 let _rh360_tab = {};        // employee name -> active tab key
-
-const RH360_MESES = [
-	"Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-	"Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
-];
-const RH360_MES_OPTS = "\n" + RH360_MESES.join("\n");
 
 frappe.ui.form.on("Employee", {
 	refresh(frm) {
@@ -234,106 +229,22 @@ function _rh360_tab_acoes(frm, w, data, $b) {
 	});
 }
 
-function _rh360_insert_doc(doctype, values, frm) {
-	frappe.call({
-		method: "frappe.client.insert",
-		args: { doc: Object.assign({ doctype }, values) },
-		freeze: true,
-		freeze_message: __("A criar…"),
-	}).then((r) => {
-		if (r && r.message) {
-			frappe.show_alert({ message: __("{0} criado: {1}", [doctype, r.message.name]), indicator: "green" }, 6);
-			_rh360_render(frm);
-		}
-	});
-}
-
+// Thin wrappers: the actual dialogs live in sigos.quick_docs (sigos_quick_docs.js),
+// shared with Vigilante's "Definir Salário" and the Diretório de Colaboradores page.
 function _rh360_novo_deducao(frm) {
-	const d = new frappe.ui.Dialog({
-		title: __("Nova Dedução"),
-		fields: [
-			{ fieldname: "tipo", fieldtype: "Link", options: "Salary Component", label: __("Tipo (Componente de Dedução)"), reqd: 1 },
-			{ fieldname: "tipo_de_pagamento", fieldtype: "Select", options: "\nDeterminado\nEm Prestações", label: __("Tipo de Pagamento") },
-			{ fieldname: "col_1", fieldtype: "Column Break" },
-			{ fieldname: "valor_a_pagar", fieldtype: "Currency", label: __("Valor a Pagar"), reqd: 1 },
-			{ fieldname: "meses_a_pagar", fieldtype: "Int", label: __("Meses a Pagar"), default: 1 },
-			{ fieldname: "mes_referencia", fieldtype: "Select", options: RH360_MES_OPTS, label: __("Mês de Referência") },
-			{ fieldname: "descricao", fieldtype: "Small Text", label: __("Descrição") },
-		],
-		primary_action_label: __("Criar Rascunho"),
-		primary_action(vals) {
-			d.hide();
-			_rh360_insert_doc("Outras Deducoes", {
-				funcionario: frm.doc.name, funcionario_nome: frm.doc.employee_name, ...vals,
-			}, frm);
-		},
-	});
-	d.show();
+	sigos.quick_docs.novo_deducao(frm.doc.name, frm.doc.employee_name, () => _rh360_render(frm));
 }
 
 function _rh360_novo_emprestimo(frm) {
-	const d = new frappe.ui.Dialog({
-		title: __("Novo Empréstimo"),
-		fields: [
-			{ fieldname: "valor_a_pagar", fieldtype: "Currency", label: __("Valor do Empréstimo"), reqd: 1 },
-			{ fieldname: "meses_a_pagar", fieldtype: "Int", label: __("Meses a Pagar"), default: 1 },
-			{ fieldname: "col_1", fieldtype: "Column Break" },
-			{ fieldname: "mes_referencia", fieldtype: "Select", options: RH360_MES_OPTS, label: __("Mês de Referência") },
-			{ fieldname: "descricao", fieldtype: "Small Text", label: __("Descrição") },
-		],
-		primary_action_label: __("Criar Rascunho"),
-		primary_action(vals) {
-			d.hide();
-			_rh360_insert_doc("Emprestimo", {
-				funcionario: frm.doc.name, funcionario_nome: frm.doc.employee_name, ...vals,
-			}, frm);
-		},
-	});
-	d.show();
+	sigos.quick_docs.novo_emprestimo(frm.doc.name, frm.doc.employee_name, () => _rh360_render(frm));
 }
 
 function _rh360_novo_remuneracao(frm) {
-	const d = new frappe.ui.Dialog({
-		title: __("Novo Provento"),
-		fields: [
-			{ fieldname: "tipo_de_subsidios", fieldtype: "Link", options: "Salary Component", label: __("Tipo de Subsídio") },
-			{ fieldname: "tipo_de_pagamento", fieldtype: "Select", options: "\nDeterminado\nEm Prestações", label: __("Tipo de Pagamento"), reqd: 1 },
-			{ fieldname: "col_1", fieldtype: "Column Break" },
-			{ fieldname: "valor_a_pagar", fieldtype: "Currency", label: __("Valor a Pagar"), reqd: 1 },
-			{ fieldname: "meses_a_pagar", fieldtype: "Int", label: __("Meses a Pagar"), default: 1 },
-			{ fieldname: "mes_referencia", fieldtype: "Select", options: RH360_MES_OPTS, label: __("Mês de Referência") },
-		],
-		primary_action_label: __("Criar Rascunho"),
-		primary_action(vals) {
-			d.hide();
-			_rh360_insert_doc("Outras Remuneracoes", {
-				funcionario: frm.doc.name, funcionario_nome: frm.doc.employee_name, ...vals,
-			}, frm);
-		},
-	});
-	d.show();
+	sigos.quick_docs.novo_remuneracao(frm.doc.name, frm.doc.employee_name, () => _rh360_render(frm));
 }
 
 function _rh360_novo_reclamacao(frm) {
-	const d = new frappe.ui.Dialog({
-		title: __("Nova Reclamação de Salário"),
-		fields: [
-			{ fieldname: "mes_a_ser_pago", fieldtype: "Select", options: RH360_MES_OPTS, label: __("Mês a Ser Pago"), reqd: 1 },
-			{ fieldname: "valor_a_reclamar", fieldtype: "Currency", label: __("Valor a Reclamar"), reqd: 1 },
-			{ fieldname: "col_1", fieldtype: "Column Break" },
-			{ fieldname: "mes_de_reclamacao", fieldtype: "Select", options: RH360_MES_OPTS, label: __("Mês em Reclamação (o que foi pago)") },
-			{ fieldname: "ano_de_reclamacao", fieldtype: "Int", label: __("Ano de Reclamação"), default: new Date().getFullYear() },
-			{ fieldname: "motivo", fieldtype: "Small Text", label: __("Motivo"), reqd: 1 },
-		],
-		primary_action_label: __("Criar Rascunho"),
-		primary_action(vals) {
-			d.hide();
-			_rh360_insert_doc("Reclamacao De Salario", {
-				funcionario: frm.doc.name, funcionario_nome: frm.doc.employee_name, ...vals,
-			}, frm);
-		},
-	});
-	d.show();
+	sigos.quick_docs.nova_reclamacao(frm.doc.name, frm.doc.employee_name, () => _rh360_render(frm));
 }
 
 // ─── Definir Salário — same server calls/flow as Vigilante's button, resolved
@@ -344,44 +255,7 @@ function _rh360_definir_salario(frm) {
 		frappe.msgprint(__("Este Employee não tem um Vigilante (SIGOS) associado — não é possível definir o salário por aqui."));
 		return;
 	}
-	frappe.xcall("sigos.api.resolver_salario_base", { vigilante }).then((atual) => {
-		const d = new frappe.ui.Dialog({
-			title: __("Definir Salário Base"),
-			fields: [
-				{ fieldtype: "HTML", options: `<p class="text-muted" style="margin-bottom:10px">${__(
-					"Salário base actual resolvido: <b>{0}</b>. Defina um valor manual para este colaborador ou opte por herdar o salário do contrato (por regime).",
-					[format_currency(atual)])}</p>` },
-				{ fieldname: "usar_contrato", fieldtype: "Check", label: __("Herdar salário do contrato (sem override manual)"), default: 0 },
-				{ fieldname: "valor", fieldtype: "Currency", label: __("Salário Base (manual)"), default: atual, depends_on: "eval:!doc.usar_contrato" },
-			],
-			primary_action_label: __("Aplicar"),
-			primary_action(vals) {
-				d.hide();
-				_rh360_aplicar_salario(frm, vigilante, vals, 0);
-			},
-		});
-		d.show();
-	});
-}
-
-function _rh360_aplicar_salario(frm, vigilante, vals, confirmar_reducao) {
-	frappe.xcall("sigos.api.definir_salario_base", {
-		vigilante,
-		valor: vals.valor,
-		usar_contrato: vals.usar_contrato ? 1 : 0,
-		confirmar_reducao,
-	}).then((r) => {
-		if (r && r.requires_confirm) {
-			frappe.confirm(
-				__("Está a <b>reduzir</b> o salário base de <b>{0}</b> para <b>{1}</b>. Confirmar a redução?",
-					[format_currency(r.atual), format_currency(r.novo)]),
-				() => _rh360_aplicar_salario(frm, vigilante, vals, 1),
-			);
-			return;
-		}
-		frappe.show_alert({ message: __("Salário base aplicado: {0}", [format_currency((r && r.base) || 0)]), indicator: "green" }, 6);
-		_rh360_render(frm);
-	});
+	sigos.quick_docs.definir_salario(vigilante, () => _rh360_render(frm));
 }
 
 // ─── Self-injected CSS (ASCII only) — same dark-deck language as the Ausências

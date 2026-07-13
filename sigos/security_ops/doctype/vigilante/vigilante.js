@@ -169,57 +169,10 @@ function _mudar_estado_op(frm, metodo, titulo, aviso) {
 }
 
 // ─── Definir Salário ──────────────────────────────────────────────────────────
-// Pre-fills the guard's CURRENT resolved base, lets RH set a manual override (or
-// revert to the contract/regime base). Calls the server, which writes a fresh
-// Salary Structure Assignment immediately — works for any employed guard.
+// Shared dialog/flow (sigos.quick_docs, sigos/public/js/sigos_quick_docs.js) — also
+// used by the Employee "Painel RH 360" deck and the Diretório de Colaboradores page.
 function _definir_salario(frm) {
-	frappe.xcall("sigos.api.resolver_salario_base", { vigilante: frm.doc.name }).then((atual) => {
-		const tem_override = !!(frm.doc.salario_base_manual && frm.doc.salario_base_manual > 0);
-		const d = new frappe.ui.Dialog({
-			title: __("Definir Salário Base"),
-			fields: [
-				{ fieldtype: "HTML", options: `<p class="text-muted" style="margin-bottom:10px">${__(
-					"Salário base actual resolvido: <b>{0}</b>. Defina um valor manual para este vigilante ou opte por herdar o salário do contrato (por regime).",
-					[format_currency(atual)])}</p>` },
-				{ fieldname: "usar_contrato", fieldtype: "Check", label: __("Herdar salário do contrato (sem override manual)"),
-					default: tem_override ? 0 : 1 },
-				{ fieldname: "valor", fieldtype: "Currency", label: __("Salário Base (manual)"),
-					default: frm.doc.salario_base_manual || atual,
-					depends_on: "eval:!doc.usar_contrato" },
-			],
-			primary_action_label: __("Aplicar"),
-			primary_action(vals) {
-				d.hide();
-				_aplicar_salario(frm, vals, 0);
-			},
-		});
-		d.show();
-	});
-}
-
-// Applies the salary. The server refuses a pay CUT unless confirmar_reducao=1 —
-// when it signals requires_confirm, we ask HR to confirm the reduction and re-call.
-function _aplicar_salario(frm, vals, confirmar_reducao) {
-	frappe.xcall("sigos.api.definir_salario_base", {
-		vigilante: frm.doc.name,
-		valor: vals.valor,
-		usar_contrato: vals.usar_contrato ? 1 : 0,
-		confirmar_reducao: confirmar_reducao,
-	}).then((r) => {
-		if (r && r.requires_confirm) {
-			frappe.confirm(
-				__("Está a <b>reduzir</b> o salário base de <b>{0}</b> para <b>{1}</b>. Confirmar a redução?",
-					[format_currency(r.atual), format_currency(r.novo)]),
-				() => _aplicar_salario(frm, vals, 1),   // confirmed — re-apply allowing the cut
-			);
-			return;
-		}
-		frappe.show_alert({
-			message: __("Salário base aplicado: {0}", [format_currency((r && r.base) || 0)]),
-			indicator: "green",
-		}, 6);
-		frm.reload_doc();
-	});
+	sigos.quick_docs.definir_salario(frm.doc.name, () => frm.reload_doc(), frm.doc.salario_base_manual);
 }
 
 // ─── Mini-dash: operational readiness at a glance, above the tabs ──────────────
