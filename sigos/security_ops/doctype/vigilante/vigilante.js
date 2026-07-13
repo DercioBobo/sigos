@@ -21,6 +21,8 @@ frappe.ui.form.on("Vigilante", {
 		_colorir_tabs(frm);
 		_setup_proximo_btn(frm);
 		_render_mini_dash(frm);
+		_toggle_posicao(frm);
+		_toggle_subsidios_comb(frm);
 
 		// Ver Escala — only for active guards already assigned to a posto
 		if (!frm.is_new() && frm.doc.status === "Activo" && frm.doc.posto_de_vigilancia) {
@@ -147,6 +149,39 @@ frappe.ui.form.on("Vigilante", {
 		}
 	},
 });
+
+// ─── Posição (customer-specific, SIGOS Settings.posicao_no_posto_activo) ──────
+// Hidden by default — most customers don't track a per-posto position, so the
+// field only shows once the flag is on. Fetched once per session, then cached.
+let _posicao_activo = null;
+function _toggle_posicao(frm) {
+	if (_posicao_activo === null) {
+		frappe.db.get_single_value("SIGOS Settings", "posicao_no_posto_activo").then((v) => {
+			_posicao_activo = !!v;
+			frm.set_df_property("posicao", "hidden", _posicao_activo ? 0 : 1);
+		});
+	} else {
+		frm.set_df_property("posicao", "hidden", _posicao_activo ? 0 : 1);
+	}
+}
+
+// ─── Subsídios Combináveis (customer-specific, SIGOS Settings.subsidios_categoria_funcao_activo) ──
+// Chefe de Turno / Chefe de Posto / Canino — three independent flags, NOT mutually
+// exclusive (a guard can have all three on at once); each drives its own stackable
+// earning on the Salary Slip (sigos/payroll_ext/salary_slip_hooks.py). Hidden by
+// default like Posição — most customers don't use this.
+let _subsidios_comb_activo = null;
+const _CAMPOS_SUBSIDIOS_COMB = ["sec_subsidios_comb", "chefe_de_turno", "chefe_de_posto", "col_break_subsidios_comb", "com_cao"];
+function _toggle_subsidios_comb(frm) {
+	if (_subsidios_comb_activo === null) {
+		frappe.db.get_single_value("SIGOS Settings", "subsidios_categoria_funcao_activo").then((v) => {
+			_subsidios_comb_activo = !!v;
+			_CAMPOS_SUBSIDIOS_COMB.forEach((f) => frm.set_df_property(f, "hidden", _subsidios_comb_activo ? 0 : 1));
+		});
+	} else {
+		_CAMPOS_SUBSIDIOS_COMB.forEach((f) => frm.set_df_property(f, "hidden", _subsidios_comb_activo ? 0 : 1));
+	}
+}
 
 // ─── Operational state change (Reserva / Inactivo) ────────────────────────────
 // Single dialog: shows the consequence + an optional reason, then calls the

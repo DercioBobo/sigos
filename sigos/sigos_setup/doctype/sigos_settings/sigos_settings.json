@@ -66,7 +66,16 @@
   "personalizacao_activa",
   "sec_ss_custom",
   "faltas_normal_vermelha_activo",
-  "painel_rh_360_activo"
+  "painel_rh_360_activo",
+  "posicao_no_posto_activo",
+  "subsidios_categoria_funcao_activo",
+  "componente_subsidio_chefia_turno",
+  "componente_subsidio_chefia_posto",
+  "componente_subsidio_canino",
+  "col_ss_subsf",
+  "valor_subsidio_chefia_turno",
+  "valor_subsidio_chefia_posto",
+  "valor_subsidio_canino"
  ],
  "fields": [
   {
@@ -454,6 +463,63 @@
    "label": "Painel RH 360 no Employee",
    "default": "0",
    "description": "Quando activo, mostra um painel no formulário do Employee com faltas, saldo de férias e salário/deduções/empréstimos do colaborador, com atalhos para criar Outras Deduções, Empréstimo, Outras Remunerações, Reclamação de Salário e para Definir Salário — tudo sem sair do Employee."
+  },
+  {
+   "fieldname": "posicao_no_posto_activo",
+   "fieldtype": "Check",
+   "label": "Vigilante: Campo Posição",
+   "default": "0",
+   "description": "Quando activo, mostra o campo Posição (texto livre) no Vigilante, na secção Alocação — a função/posição do vigilante dentro do posto (ex: Chefe de Equipa, Motorista). Campo opcional, sem lista fixa de valores."
+  },
+  {
+   "fieldname": "subsidios_categoria_funcao_activo",
+   "fieldtype": "Check",
+   "label": "Subsídios por Categoria e Função (Combináveis)",
+   "default": "0",
+   "description": "Quando activo, a Salary Slip soma automaticamente: (1) o subsídio configurado na Categoria do vigilante (Categoria Vigilante — quando definido); (2) os subsídios de Chefia de Turno, Chefia de Posto e Canino — três campos independentes no Vigilante que podem estar todos activos ao mesmo tempo, cada um com o seu próprio componente/valor abaixo. Um vigilante pode acumular vários destes numa única folha."
+  },
+  {
+   "fieldname": "componente_subsidio_chefia_turno",
+   "fieldtype": "Link",
+   "label": "Componente — Chefia de Turno",
+   "options": "Salary Component",
+   "depends_on": "eval:doc.subsidios_categoria_funcao_activo"
+  },
+  {
+   "fieldname": "componente_subsidio_chefia_posto",
+   "fieldtype": "Link",
+   "label": "Componente — Chefia de Posto",
+   "options": "Salary Component",
+   "depends_on": "eval:doc.subsidios_categoria_funcao_activo"
+  },
+  {
+   "fieldname": "componente_subsidio_canino",
+   "fieldtype": "Link",
+   "label": "Componente — Canino (Com Cão)",
+   "options": "Salary Component",
+   "depends_on": "eval:doc.subsidios_categoria_funcao_activo"
+  },
+  {
+   "fieldname": "col_ss_subsf",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "valor_subsidio_chefia_turno",
+   "fieldtype": "Currency",
+   "label": "Valor — Chefia de Turno",
+   "depends_on": "eval:doc.subsidios_categoria_funcao_activo"
+  },
+  {
+   "fieldname": "valor_subsidio_chefia_posto",
+   "fieldtype": "Currency",
+   "label": "Valor — Chefia de Posto",
+   "depends_on": "eval:doc.subsidios_categoria_funcao_activo"
+  },
+  {
+   "fieldname": "valor_subsidio_canino",
+   "fieldtype": "Currency",
+   "label": "Valor — Canino (Com Cão)",
+   "depends_on": "eval:doc.subsidios_categoria_funcao_activo"
   }
  ],
  "issingle": 1,

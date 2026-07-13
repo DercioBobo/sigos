@@ -43,10 +43,16 @@
   "posto_de_vigilancia",
   "nome_do_posto",
   "tipo_de_posto",
+  "posicao",
   "col_break_aloc",
   "cliente",
   "projecto",
   "nome_do_projecto",
+  "sec_subsidios_comb",
+  "chefe_de_turno",
+  "chefe_de_posto",
+  "col_break_subsidios_comb",
+  "com_cao",
   "sec_anexos",
   "anexar_documento",
   "tab_rh",
@@ -320,6 +326,14 @@
    "permlevel": 1
   },
   {
+   "fieldname": "posicao",
+   "fieldtype": "Data",
+   "label": "Posição",
+   "hidden": 1,
+   "permlevel": 1,
+   "description": "Função/posição do vigilante dentro do posto (ex: Chefe de Equipa, Motorista)."
+  },
+  {
    "fieldname": "col_break_aloc",
    "fieldtype": "Column Break",
    "permlevel": 1
@@ -348,6 +362,41 @@
    "label": "Nome do Projecto",
    "fetch_from": "projecto.project_name",
    "read_only": 1,
+   "permlevel": 1
+  },
+  {
+   "fieldname": "sec_subsidios_comb",
+   "fieldtype": "Section Break",
+   "label": "Subsídios Combináveis",
+   "hidden": 1,
+   "permlevel": 1,
+   "description": "Personalização de cliente — funções que dão direito a subsídio e que podem ocorrer em simultâneo (um vigilante pode acumular mais do que uma)."
+  },
+  {
+   "fieldname": "chefe_de_turno",
+   "fieldtype": "Check",
+   "label": "Chefe de Turno",
+   "hidden": 1,
+   "permlevel": 1
+  },
+  {
+   "fieldname": "chefe_de_posto",
+   "fieldtype": "Check",
+   "label": "Chefe de Posto",
+   "hidden": 1,
+   "permlevel": 1
+  },
+  {
+   "fieldname": "col_break_subsidios_comb",
+   "fieldtype": "Column Break",
+   "hidden": 1,
+   "permlevel": 1
+  },
+  {
+   "fieldname": "com_cao",
+   "fieldtype": "Check",
+   "label": "Canino (Com Cão)",
+   "hidden": 1,
    "permlevel": 1
   },
   {
@@ -401,7 +450,8 @@
   },
   {
    "fieldname": "banco",
-   "fieldtype": "Data",
+   "fieldtype": "Link",
+   "options": "Banco",
    "label": "Banco",
    "permlevel": 2
   },

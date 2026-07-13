@@ -98,7 +98,8 @@
   "dt": "Employee",
   "module": "SIGOS Setup",
   "fieldname": "custom_banco",
-  "fieldtype": "Data",
+  "fieldtype": "Link",
+  "options": "Banco",
   "label": "Banco",
   "insert_after": "custom_inss"
  },

@@ -206,6 +206,7 @@ sigos.DiretorioColaboradores = class DiretorioColaboradores {
 					<button type="button" class="dc-act" data-act="reclamacao">${__("Nova Reclamação")}</button>
 					<button type="button" class="dc-act dc-act-ghost" data-act="participacao">${__("Nova Participação")}</button>
 					<button type="button" class="dc-act dc-act-ghost" data-act="processo">${__("Novo Processo Disciplinar")}</button>
+					<button type="button" class="dc-act dc-act-ghost" data-act="rotatividade">${__("Nova Rotatividade")}</button>
 				</div>
 				<div class="dc-tabs">
 					${tabs.map(([k, l]) => `<button type="button" class="dc-tab ${k === this.activeTab ? "is-active" : ""}" data-tab="${k}">${l}</button>`).join("")}
@@ -254,6 +255,10 @@ sigos.DiretorioColaboradores = class DiretorioColaboradores {
 		if (act === "processo") {
 			if (!vigilante) return frappe.msgprint(__("Este colaborador não tem um Vigilante (SIGOS) associado."));
 			return frappe.new_doc("Processo Disciplinar", { vigilante });
+		}
+		if (act === "rotatividade") {
+			if (!vigilante) return frappe.msgprint(__("Este colaborador não tem um Vigilante (SIGOS) associado."));
+			return sigos.rotatividade_wizard({ vigilante });
 		}
 	}
 
