@@ -21,6 +21,7 @@
   "proxima_accao",
   "vigilante_substituto",
   "vigilante_a_dobrar",
+  "vigilante_a_meia_dobra",
   "vigilante_a_adiantar",
   "jutificativo",
   "data_justificativo"
@@ -133,7 +134,7 @@
    "fieldname": "proxima_accao",
    "fieldtype": "Select",
    "label": "Acção",
-   "options": "\nSem Ação\nSubstituto\nDobra de Turno\nAdiantamento de Turno",
+   "options": "\nSem Ação\nSubstituto\nDobra de Turno\nMeia Dobra\nAdiantamento de Turno",
    "in_list_view": 1,
    "in_grid_view": 1,
    "columns": 2
@@ -156,6 +157,16 @@
    "in_grid_view": 1,
    "columns": 2,
    "depends_on": "eval: doc.proxima_accao === 'Dobra de Turno'",
+   "link_filters": "[[\"Vigilante\",\"status\",\"!=\",\"Demitido\"]]"
+  },
+  {
+   "fieldname": "vigilante_a_meia_dobra",
+   "fieldtype": "Link",
+   "label": "Meia Dobra",
+   "options": "Vigilante",
+   "in_grid_view": 1,
+   "columns": 2,
+   "depends_on": "eval: doc.proxima_accao === 'Meia Dobra'",
    "link_filters": "[[\"Vigilante\",\"status\",\"!=\",\"Demitido\"]]"
   },
   {

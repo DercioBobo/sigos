@@ -16,6 +16,7 @@ frappe.ui.form.on("Escala Do Vigilante", {
 		_estado_buttons(frm);
 		_snapshot_slots(frm);
 		_load_and_render(frm);
+		_toggle_turno_equipa(frm);
 		if (frm.doc.estado === "Arquivado") frm.disable_save();
 	},
 
@@ -43,6 +44,28 @@ frappe.ui.form.on("Escala Do Vigilante", {
 
 	btn_limpar_futuro(frm) { _limpar_futuro(frm); },
 });
+
+// ─── Turno da Equipa (customer-specific, SIGOS Settings.turno_equipa_activo) ──────
+// Label/grouping column on both the roster grid and the generated schedule grid —
+// never affects the rotation itself (sigos/security_ops/doctype/escala_do_vigilante/
+// escala_do_vigilante.py reconciliar_escala carries it through unchanged). Hidden by
+// default, same session-cached toggle pattern as Vigilante's Posição/Subsídios fields.
+let _turno_equipa_activo = null;
+function _toggle_turno_equipa(frm) {
+	const aplicar = () => {
+		const show = !!_turno_equipa_activo;
+		frm.fields_dict.tab_vigilante_do_posto?.grid.toggle_display("turno_equipa", show);
+		frm.fields_dict.tabela_de_escala?.grid.toggle_display("turno_equipa", show);
+	};
+	if (_turno_equipa_activo === null) {
+		frappe.db.get_single_value("SIGOS Settings", "turno_equipa_activo").then((v) => {
+			_turno_equipa_activo = !!v;
+			aplicar();
+		});
+	} else {
+		aplicar();
+	}
+}
 
 function _gerar_escala(frm) {
 	if (frm.is_dirty() || frm.is_new()) {

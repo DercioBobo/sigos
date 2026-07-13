@@ -10,6 +10,7 @@
   "nome_completo",
   "tipo_de_vigilante",
   "regime_do_vigilante",
+  "turno_equipa",
   "turno_inicial",
   "data"
  ],
@@ -46,6 +47,17 @@
    "label": "Regime",
    "fetch_from": "vigilante.regime_do_vigilante",
    "read_only": 1
+  },
+  {
+   "fieldname": "turno_equipa",
+   "fieldtype": "Link",
+   "label": "Turno da Equipa",
+   "options": "Turno Da Equipa",
+   "hidden": 1,
+   "in_list_view": 1,
+   "in_grid_view": 1,
+   "link_filters": "[[\"Turno Da Equipa\",\"activo\",\"=\",1]]",
+   "description": "Agrupamento/etiqueta (ex: Equipa A, B, C) — não altera a rotação, apenas organiza os vigilantes por equipa."
   },
   {
    "fieldname": "turno_inicial",

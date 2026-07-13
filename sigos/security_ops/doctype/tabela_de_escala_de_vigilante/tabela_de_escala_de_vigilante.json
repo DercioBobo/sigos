@@ -10,6 +10,7 @@
   "posto",
   "data",
   "turno",
+  "turno_equipa",
   "regime",
   "periodo",
   "override"
@@ -49,6 +50,15 @@
    "options": "Turno",
    "in_list_view": 1,
    "in_grid_view": 1
+  },
+  {
+   "fieldname": "turno_equipa",
+   "fieldtype": "Link",
+   "label": "Turno da Equipa",
+   "options": "Turno Da Equipa",
+   "read_only": 1,
+   "hidden": 1,
+   "in_list_view": 1
   },
   {
    "fieldname": "regime",

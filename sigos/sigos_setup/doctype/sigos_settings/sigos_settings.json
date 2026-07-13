@@ -32,24 +32,29 @@
   "reprimendas_alta_pd",
   "tab_ss_pay",
   "sec_ss_falt",
-  "valor_subsidio_arma",
   "metodo_calculo_faltas",
+  "componente_faltas",
   "col_ss_pay1",
   "valor_fixo_por_falta",
+  "valor_fixo_por_falta_vermelha",
   "base_dias_de_trabalho",
+  "sec_ss_arma",
+  "componente_subsidio_arma",
+  "col_ss_arma",
+  "valor_subsidio_arma",
   "sec_ss_dobra",
   "dobras_activo",
   "metodo_calculo_dobra",
+  "componente_dobra",
+  "componente_meia_dobra",
   "col_ss_dobra",
   "valor_fixo_por_dobra",
+  "valor_fixo_por_meia_dobra",
   "sec_ss_comp",
-  "componente_faltas",
   "componente_retroativo",
   "componente_emprestimo",
-  "componente_dobra",
-  "col_ss_pay2",
-  "componente_subsidio_arma",
   "componente_deducoes_diversas",
+  "col_ss_pay2",
   "componente_uniforme",
   "componente_processo_disciplinar",
   "componente_proporcional",
@@ -75,7 +80,8 @@
   "col_ss_subsf",
   "valor_subsidio_chefia_turno",
   "valor_subsidio_chefia_posto",
-  "valor_subsidio_canino"
+  "valor_subsidio_canino",
+  "turno_equipa_activo"
  ],
  "fields": [
   {
@@ -245,12 +251,6 @@
    "label": "Cálculo de Faltas"
   },
   {
-   "fieldname": "valor_subsidio_arma",
-   "fieldtype": "Currency",
-   "label": "Valor Subsídio de Arma",
-   "default": "300"
-  },
-  {
    "fieldname": "metodo_calculo_faltas",
    "fieldtype": "Select",
    "label": "Método de Cálculo de Faltas",
@@ -267,7 +267,14 @@
    "fieldtype": "Currency",
    "label": "Valor Fixo por Falta",
    "depends_on": "eval: doc.metodo_calculo_faltas == 'Valor Fixo por Falta'",
-   "description": "Valor deduzido por cada falta não justificada (apenas para o método Valor Fixo)"
+   "description": "Valor deduzido por cada falta não justificada (apenas para o método Valor Fixo). Usado para faltas Normais, e também para todas as faltas quando a distinção Normal/Vermelha (Personalização de Cliente) está desactivada."
+  },
+  {
+   "fieldname": "valor_fixo_por_falta_vermelha",
+   "fieldtype": "Currency",
+   "label": "Valor Fixo por Falta Vermelha",
+   "depends_on": "eval: doc.metodo_calculo_faltas == 'Valor Fixo por Falta' && doc.faltas_normal_vermelha_activo",
+   "description": "Valor deduzido por cada falta VERMELHA não justificada — só se aplica com o método Valor Fixo e a distinção Normal/Vermelha activa (Personalização de Cliente). Em branco usa o mesmo valor da Falta Normal."
   },
   {
    "fieldname": "base_dias_de_trabalho",
@@ -276,6 +283,21 @@
    "options": "Dias do Mês\nDias Úteis (HRMS)",
    "default": "Dias do Mês",
    "description": "Dias do Mês: total de dias do período (ex: 30). Dias Úteis: usa o total_working_days do HRMS."
+  },
+  {
+   "fieldname": "sec_ss_arma",
+   "fieldtype": "Section Break",
+   "label": "Subsídio de Arma"
+  },
+  {
+   "fieldname": "col_ss_arma",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "valor_subsidio_arma",
+   "fieldtype": "Currency",
+   "label": "Valor Subsídio de Arma",
+   "default": "300"
   },
   {
    "fieldname": "sec_ss_dobra",
@@ -287,7 +309,7 @@
    "fieldtype": "Check",
    "label": "Activar Pagamento de Dobras/Adiantamentos",
    "default": "0",
-   "description": "Quando activo, o vigilante que cobre turnos de ausentes (Dobra de Turno ou Adiantamento de Turno na Tabela de Ausências) recebe um pagamento extra na Salary Slip. Substitutos não são pagos por aqui."
+   "description": "Quando activo, o vigilante que cobre turnos de ausentes (Dobra de Turno, Meia Dobra ou Adiantamento de Turno na Tabela de Ausências) recebe um pagamento extra na Salary Slip. Substitutos não são pagos por aqui."
   },
   {
    "fieldname": "metodo_calculo_dobra",
@@ -309,9 +331,17 @@
    "description": "Valor pago por cada turno coberto (apenas para o método Valor Fixo)."
   },
   {
+   "fieldname": "valor_fixo_por_meia_dobra",
+   "fieldtype": "Currency",
+   "label": "Valor Fixo por Meia Dobra",
+   "depends_on": "eval: doc.metodo_calculo_dobra == 'Valor Fixo por Dobra'",
+   "description": "Valor pago por cada MEIA dobra (turno de meio-dia coberto), apenas para o método Valor Fixo. No método Proporcional, a meia dobra usa metade do valor de uma dobra inteira automaticamente."
+  },
+  {
    "fieldname": "sec_ss_comp",
    "fieldtype": "Section Break",
-   "label": "Componentes Salariais"
+   "label": "Outros Componentes Salariais",
+   "description": "Componentes sem secção própria — os restantes (Faltas, Subsídio de Arma, Dobra/Meia Dobra) já têm o componente ao lado do respectivo método/valor, acima."
   },
   {
    "fieldname": "componente_faltas",
@@ -339,6 +369,13 @@
    "label": "Salary Component — Dobra/Adiantamento",
    "options": "Salary Component",
    "description": "Provento (tipo Earning) pago pela cobertura de turnos. Padrão: \"Dobra\""
+  },
+  {
+   "fieldname": "componente_meia_dobra",
+   "fieldtype": "Link",
+   "label": "Salary Component — Meia Dobra",
+   "options": "Salary Component",
+   "description": "Provento (tipo Earning) pago pela cobertura de MEIO turno — linha própria, separada da Dobra inteira. Padrão: \"Meia Dobra\""
   },
   {
    "fieldname": "col_ss_pay2",
@@ -520,6 +557,13 @@
    "fieldtype": "Currency",
    "label": "Valor — Canino (Com Cão)",
    "depends_on": "eval:doc.subsidios_categoria_funcao_activo"
+  },
+  {
+   "fieldname": "turno_equipa_activo",
+   "fieldtype": "Check",
+   "label": "Escala: Turno da Equipa",
+   "default": "0",
+   "description": "Quando activo, mostra a coluna Turno da Equipa (Link) na tabela de vigilantes do posto e na escala gerada, dentro de Escala do Vigilante. É apenas um agrupamento/etiqueta (ex: Equipa A, B, C) — não altera a rotação, que continua definida pelo Turno Inicial de cada vigilante."
   }
  ],
  "issingle": 1,

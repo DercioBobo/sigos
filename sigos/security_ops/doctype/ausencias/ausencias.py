@@ -55,6 +55,7 @@ class Ausencias(Document):
 		campo_accao = {
 			"Substituto": "vigilante_substituto",
 			"Dobra de Turno": "vigilante_a_dobrar",
+			"Meia Dobra": "vigilante_a_meia_dobra",
 			"Adiantamento de Turno": "vigilante_a_adiantar",
 		}
 		for row in self.tabela_ausencia or []:
@@ -219,6 +220,7 @@ class Ausencias(Document):
 		accao_campo = {
 			"Substituto":        "vigilante_substituto",
 			"Dobra de Turno":    "vigilante_a_dobrar",
+			"Meia Dobra":        "vigilante_a_meia_dobra",
 			"Adiantamento de Turno": "vigilante_a_adiantar",
 		}
 		for i, row in enumerate(self.tabela_ausencia or [], start=1):
@@ -227,6 +229,7 @@ class Ausencias(Document):
 				label_map = {
 					"vigilante_substituto": "Vigilante Substituto",
 					"vigilante_a_dobrar":   "Vigilante a Dobrar",
+					"vigilante_a_meia_dobra": "Vigilante a Meia Dobrar",
 					"vigilante_a_adiantar": "Vigilante a Adiantar",
 				}
 				frappe.throw(
@@ -260,7 +263,7 @@ class Ausencias(Document):
 		"""A guard cannot be absent AND covering an absence on the same day.
 		Checks both directions: within this doc, and against SUBMITTED docs of the
 		same date (the pickers filter most of this out, this is the hard fence)."""
-		campos = ("vigilante_substituto", "vigilante_a_dobrar", "vigilante_a_adiantar")
+		campos = ("vigilante_substituto", "vigilante_a_dobrar", "vigilante_a_meia_dobra", "vigilante_a_adiantar")
 		rows = self.tabela_ausencia or []
 		ausentes = {r.vigilante for r in rows if r.vigilante}
 		cobrem = {r.get(c) for r in rows for c in campos if r.get(c)}
@@ -305,12 +308,13 @@ class Ausencias(Document):
 			cobrindo = frappe.db.sql(
 				f"""
 				SELECT a.name AS doc,
-				       ta.vigilante_substituto, ta.vigilante_a_dobrar, ta.vigilante_a_adiantar
+				       ta.vigilante_substituto, ta.vigilante_a_dobrar, ta.vigilante_a_meia_dobra, ta.vigilante_a_adiantar
 				FROM `tabTabela Ausencia` ta
 				JOIN `tabAusencias` a ON a.name = ta.parent
 				WHERE a.docstatus = 1 AND a.data = %(d)s AND a.name != %(eu)s
 				  AND (ta.vigilante_substituto IN %(aus)s
 				       OR ta.vigilante_a_dobrar IN %(aus)s
+				       OR ta.vigilante_a_meia_dobra IN %(aus)s
 				       OR ta.vigilante_a_adiantar IN %(aus)s)
 				""",
 				{"d": self.data, "eu": self.name or "", "aus": tuple(ausentes)},

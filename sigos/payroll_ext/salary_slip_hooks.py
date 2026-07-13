@@ -25,7 +25,12 @@ Wire-up (hooks.py):
 
 import frappe
 from frappe.utils import getdate, add_days, date_diff, flt
-from sigos.utils import calcular_faltas_vigilante, calcular_dobras_vigilante, calcular_faltas_vermelhas_vigilante
+from sigos.utils import (
+	calcular_faltas_vigilante,
+	calcular_dobras_vigilante,
+	calcular_meias_dobras_vigilante,
+	calcular_faltas_vermelhas_vigilante,
+)
 
 
 def _aprovado_filter(doctype):
@@ -109,6 +114,7 @@ def before_validate(doc, method):
 	_compute_faltas_nao_justificadas(doc)
 	_add_faltas_deduction(doc)          # uses the configured method
 	_add_dobras(doc)                    # extra pay for covered shifts (earning)
+	_add_meia_dobra(doc)                # extra pay for HALF covered shifts (earning)
 	_add_proporcional_admissao_demissao(doc)   # prorate base for partial-month employment
 	_compute_dias_trabalhados(doc)
 
@@ -511,6 +517,28 @@ def _get_salario_base(doc):
 	return 0
 
 
+def _valor_fixo_faltas(doc, settings, faltas_nao):
+	"""
+	Valor Fixo method, split by subtipo: Vermelhas price at their own rate when the
+	customer-specific Normal/Vermelha distinction is active (SIGOS Settings.
+	faltas_normal_vermelha_activo); otherwise (or when no rate is configured for
+	Vermelha) everything prices at valor_fixo_por_falta, same as before this split
+	existed. Reuses the exact same "a justification clears the pool as a whole"
+	approximation _deduzir_ferias_faltas_vermelhas already uses — a Justificacao De
+	Faltas doesn't say which subtipo it covers, so both stay consistent with each
+	other.
+	"""
+	valor_normal = settings.valor_fixo_por_falta or 0
+	if not settings.faltas_normal_vermelha_activo or not doc.custom_vigilante:
+		return faltas_nao * valor_normal
+
+	vermelhas = calcular_faltas_vermelhas_vigilante(doc.custom_vigilante, doc.start_date, doc.end_date)
+	vermelhas_nao = min(vermelhas, faltas_nao)
+	normais_nao = faltas_nao - vermelhas_nao
+	valor_vermelha = settings.valor_fixo_por_falta_vermelha or valor_normal
+	return (normais_nao * valor_normal) + (vermelhas_nao * valor_vermelha)
+
+
 def _add_faltas_deduction(doc):
 	"""
 	Add/update the Faltas deduction using the method configured in SIGOS Settings.
@@ -526,7 +554,7 @@ def _add_faltas_deduction(doc):
 	if faltas_nao <= 0:
 		amount = 0
 	elif (settings.metodo_calculo_faltas or "Proporcional ao Salário") == "Valor Fixo por Falta":
-		amount = faltas_nao * (settings.valor_fixo_por_falta or 0)
+		amount = _valor_fixo_faltas(doc, settings, faltas_nao)
 	else:
 		base = _get_salario_base(doc)
 		dias = doc.custom_dias_de_trabalho or 0
@@ -595,6 +623,58 @@ def _add_dobras(doc):
 	except Exception as e:
 		frappe.log_error(
 			f"SalarySlip {doc.name}: erro ao adicionar dobras: {e}",
+			"SIGOS Salary Slip Hooks",
+		)
+
+
+def _add_meia_dobra(doc):
+	"""
+	Credit a guard for HALF shifts covered — Meia Dobra — a separate earnings line from
+	the full Dobra above (own Salary Component, own count), same 'dobras_activo' gate
+	and same método (Proporcional/Valor Fixo) as the full dobra, just priced for half a
+	day:
+	  Proporcional ao Salário → (base / dias_de_trabalho) × nº meias dobras × 0.5
+	  Valor Fixo por Dobra     → nº meias dobras × valor_fixo_por_meia_dobra
+	"""
+	if not doc.custom_vigilante or not doc.start_date or not doc.end_date:
+		return
+	try:
+		settings = frappe.get_single("SIGOS Settings")
+		if not settings.dobras_activo:
+			doc.custom_meias_dobras_no_mes = 0
+			return
+
+		componente = settings.componente_meia_dobra or "Meia Dobra"
+		if not frappe.db.exists("Salary Component", componente):
+			return
+
+		n_meias = calcular_meias_dobras_vigilante(doc.custom_vigilante, doc.start_date, doc.end_date)
+		doc.custom_meias_dobras_no_mes = n_meias
+		if n_meias <= 0:
+			return
+
+		if (settings.metodo_calculo_dobra or "Proporcional ao Salário") == "Valor Fixo por Dobra":
+			amount = n_meias * (settings.valor_fixo_por_meia_dobra or 0)
+		else:
+			base = _get_salario_base(doc)
+			dias = doc.custom_dias_de_trabalho or 0
+			amount = (base / dias) * n_meias * 0.5 if dias > 0 else 0
+
+		amount = round(amount, 2)
+		if amount <= 0:
+			return
+
+		for e in doc.earnings:
+			if e.salary_component == componente:
+				e.amount = amount
+				return
+		doc.append("earnings", {
+			"salary_component": componente,
+			"amount": amount,
+		})
+	except Exception as e:
+		frappe.log_error(
+			f"SalarySlip {doc.name}: erro ao adicionar meia dobra: {e}",
 			"SIGOS Salary Slip Hooks",
 		)
 

@@ -273,6 +273,16 @@
   "doctype": "Custom Field",
   "dt": "Salary Slip",
   "module": "SIGOS Setup",
+  "fieldname": "custom_meias_dobras_no_mes",
+  "fieldtype": "Int",
+  "label": "Meias Dobras no Mês",
+  "read_only": 1,
+  "insert_after": "custom_dobras_no_mes"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Salary Slip",
+  "module": "SIGOS Setup",
   "fieldname": "custom_dia_da_falta_inicio",
   "fieldtype": "Date",
   "label": "Início Período Faltas",

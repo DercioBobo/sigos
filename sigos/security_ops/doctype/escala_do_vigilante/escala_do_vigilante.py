@@ -130,14 +130,21 @@ class EscalaDoVigilante(Document):
 			g.vigilante: g.turno_inicial
 			for g in self.tab_vigilante_do_posto if g.vigilante
 		}
+		# Turno da Equipa (customer-specific, SIGOS Settings.turno_equipa_activo): a
+		# label/grouping only — carried onto generated rows below, never affects which
+		# turno/periodo a guard is assigned.
+		equipas = {
+			g.vigilante: g.turno_equipa
+			for g in self.tab_vigilante_do_posto if g.vigilante
+		}
 
-		# Detect turno_inicial changes
+		# Detect turno_inicial / turno_equipa changes
 		forcar = set()
 		before = self.get_doc_before_save()
 		if before:
-			antes = {g.vigilante: g.turno_inicial for g in before.tab_vigilante_do_posto}
+			antes = {g.vigilante: (g.turno_inicial, g.turno_equipa) for g in before.tab_vigilante_do_posto}
 			for v, t in guards.items():
-				if antes.get(v) != t:
+				if antes.get(v) != (t, equipas.get(v)):
 					forcar.add(v)
 
 		# Prune future rows that must be dropped
@@ -168,6 +175,7 @@ class EscalaDoVigilante(Document):
 							"posto": self.posto_de_vigilancia,
 							"data": str(d),
 							"turno": item["turno"],
+							"turno_equipa": equipas.get(vig),
 							"periodo": item["periodo"],
 							"regime": self.regime_do_vigilante,
 							"override": 0,

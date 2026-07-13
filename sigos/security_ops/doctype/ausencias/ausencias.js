@@ -15,15 +15,16 @@ let _nomes_cache = {};            // vigilante docname -> nome_completo (compact
 let _atraso_restam = null;        // minutes until the cutoff (null when n/a or already late)
 let _limites_cache = {};          // SIGOS Settings hora_limite_* (fetched once per session)
 
-const ACCOES = ["Sem Ação", "Substituto", "Dobra de Turno", "Adiantamento de Turno"];
+const ACCOES = ["Sem Ação", "Substituto", "Dobra de Turno", "Meia Dobra", "Adiantamento de Turno"];
 const PERIODO_CLASSE = { "Manhã": "per-manha", "Noite": "per-noite", "Tarde": "per-tarde" };
 const ACCAO_FIELD = {
 	"Substituto":             "vigilante_substituto",
 	"Dobra de Turno":         "vigilante_a_dobrar",
+	"Meia Dobra":             "vigilante_a_meia_dobra",
 	"Adiantamento de Turno":  "vigilante_a_adiantar",
 };
-const ACCAO_LABEL = { "Substituto": "Substituto", "Dobra de Turno": "A dobrar", "Adiantamento de Turno": "A adiantar" };
-const PICKER_FIELDS = ["vigilante_substituto", "vigilante_a_dobrar", "vigilante_a_adiantar"];
+const ACCAO_LABEL = { "Substituto": "Substituto", "Dobra de Turno": "A dobrar", "Meia Dobra": "Meia dobra", "Adiantamento de Turno": "A adiantar" };
+const PICKER_FIELDS = ["vigilante_substituto", "vigilante_a_dobrar", "vigilante_a_meia_dobra", "vigilante_a_adiantar"];
 
 // ─── Main form events ─────────────────────────────────────────────────────────
 frappe.ui.form.on("Ausencias", {
@@ -72,6 +73,7 @@ frappe.ui.form.on("Ausencias", {
 frappe.ui.form.on("Tabela Ausencia", {
 	vigilante_substituto(frm, cdt, cdn) { _check_duplicate(frm, cdt, cdn, "vigilante_substituto", __("Este substituto já foi usado noutra linha.")); },
 	vigilante_a_dobrar(frm, cdt, cdn)   { _check_duplicate(frm, cdt, cdn, "vigilante_a_dobrar", __("Este vigilante a dobrar já foi usado.")); },
+	vigilante_a_meia_dobra(frm, cdt, cdn) { _check_duplicate(frm, cdt, cdn, "vigilante_a_meia_dobra", __("Este vigilante a meia dobrar já foi usado.")); },
 	vigilante_a_adiantar(frm, cdt, cdn) { _check_duplicate(frm, cdt, cdn, "vigilante_a_adiantar", __("Este vigilante a adiantar já foi usado.")); },
 	regime(frm, cdt, cdn)               { _set_n_faltas(frm, cdt, cdn); },
 	turno(frm, cdt, cdn)                { _set_n_faltas(frm, cdt, cdn); },
@@ -648,9 +650,11 @@ function _mount_picker(frm, w, row, $card, accao, formEditable) {
 						data: frm.doc.data || "", periodo: frm.doc.periodo || "",
 						excluir_doc: frm.is_new() ? "" : frm.doc.name,
 					} };
-				if (field === "vigilante_a_dobrar")
+				if (field === "vigilante_a_dobrar" || field === "vigilante_a_meia_dobra")
 					// only guards SCHEDULED at this posto on this day can double up —
 					// minus this sheet's absentees/replacements and submitted absentees
+					// (Meia Dobra reuses the same pool as a full Dobra — same real-world
+					// situation, just priced for half a shift in payroll)
 					return { query: "sigos.api.get_escalados_no_posto_dia", filters: {
 						posto: row.posto || "", data: frm.doc.data,
 						excluir: row.vigilante || "",
@@ -695,6 +699,7 @@ function _update_stats(frm, w) {
 	const faltas = rows.reduce((s, r) => s + (r.n_de_faltas || 0), 0);
 	const subs   = rows.filter(r => r.proxima_accao === "Substituto").length;
 	const dobras = rows.filter(r => r.proxima_accao === "Dobra de Turno").length;
+	const meias  = rows.filter(r => r.proxima_accao === "Meia Dobra").length;
 	const adiant = rows.filter(r => r.proxima_accao === "Adiantamento de Turno").length;
 	const tile = (n, l, c) => `<div class="ausd-tile ${c || ""}"><span class="n">${n}</span><span class="lbl">${l}</span></div>`;
 	const tiles = [
@@ -702,6 +707,7 @@ function _update_stats(frm, w) {
 		tile(faltas, __("faltas"), "t-falta"),
 		subs   ? tile(subs,   __("substitutos"), "t-sub") : "",
 		dobras ? tile(dobras, __("dobras"),      "t-dob") : "",
+		meias  ? tile(meias,  __("meias dobras"), "t-mdb") : "",
 		adiant ? tile(adiant, __("adiantam."),   "t-adi") : "",
 	].join("");
 	const warn = (_atraso_estado === "tardia" && frm.doc.docstatus !== 1)
@@ -1041,6 +1047,7 @@ function _inject_css() {
 .ausd-tile.t-aus .n { color: #ff9d9d; }
 .ausd-tile.t-sub .n { color: #8fd0ff; }
 .ausd-tile.t-dob .n { color: #f4cd84; }
+.ausd-tile.t-mdb .n { color: #8fe6b8; }
 .ausd-tile.t-adi .n { color: #c6b6ff; }
 .ausd-warn { margin-top: 14px; padding: 9px 13px; border-radius: 9px; font-size: .82em; font-weight: 600; background: rgba(224,92,92,.16); border: 1px solid rgba(224,92,92,.4); color: #ffd0d0; }
 .ausd-warn b { color: #fff; }

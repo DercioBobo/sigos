@@ -203,6 +203,28 @@ def calcular_dobras_vigilante(vigilante: str, start_date, end_date) -> int:
 	return int(row[0][0]) if row and row[0] else 0
 
 
+def calcular_meias_dobras_vigilante(vigilante: str, start_date, end_date) -> int:
+	"""
+	Number of HALF shifts a guard covered (Meia Dobra) in [start, end], from SUBMITTED
+	Ausencias — same source/shape as calcular_dobras_vigilante, kept as its own count
+	(not folded into it) so the slip can price a half-covered shift differently from a
+	full one and show its own earnings line.
+	"""
+	if not vigilante:
+		return 0
+	row = frappe.db.sql(
+		"""
+		SELECT COUNT(*)
+		FROM `tabTabela Ausencia` ta
+		JOIN `tabAusencias` a ON a.name = ta.parent
+		WHERE a.docstatus = 1 AND a.data BETWEEN %(s)s AND %(e)s
+		  AND ta.proxima_accao = 'Meia Dobra' AND ta.vigilante_a_meia_dobra = %(v)s
+		""",
+		{"v": vigilante, "s": getdate(start_date), "e": getdate(end_date)},
+	)
+	return int(row[0][0]) if row and row[0] else 0
+
+
 def _existe_falta(vigilante: str, data, excluir_ausencia: str = None) -> bool:
 	"""True if a SUBMITTED absence exists for the guard on `data`."""
 	cond = ""
