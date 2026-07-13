@@ -98,6 +98,7 @@ def _set_dia_da_falta_inicio(doc):
 def before_validate(doc, method):
 	_add_project_subsidios(doc)
 	_add_subsidio_arma(doc)
+	_add_subsidios_categoria_funcao(doc)
 	_add_remuneracoes(doc)              # Outras Remuneracoes → earnings
 	_set_dias_de_trabalho(doc)          # divisor — must run before the deduction
 	_compute_faltas(doc)                # from Ausencias only
@@ -186,6 +187,62 @@ def _add_subsidio_arma(doc):
 	except Exception as e:
 		frappe.log_error(
 			f"SalarySlip {doc.name}: erro ao adicionar Subsidio de Arma: {e}",
+			"SIGOS Salary Slip Hooks",
+		)
+
+
+def _add_subsidios_categoria_funcao(doc):
+	"""
+	Customer-specific (SIGOS Settings.subsidios_categoria_funcao_activo, default OFF):
+	stackable earnings on top of the default Subsídio de Arma above —
+	  (a) one subsídio driven by the guard's Categoria (Categoria Vigilante.componente_subsidio
+	      / valor_subsidio, when configured) — categoria is single-valued, so at most one
+	      line comes from here;
+	  (b) up to three INDEPENDENT role subsídios — Chefe de Turno / Chefe de Posto / Canino
+	      (Vigilante Check fields), each with its own componente/valor in SIGOS Settings.
+	      These are NOT mutually exclusive: a guard can have all three active at once, and
+	      every applicable one is added.
+	Every line is de-duped by Salary Component against what's already on the slip, so this
+	never doubles up with _add_subsidio_arma if a customer points a categoria's componente at
+	the same "Subsidio De Arma" component.
+	"""
+	settings = frappe.get_single("SIGOS Settings")
+	if not settings.subsidios_categoria_funcao_activo:
+		return
+	try:
+		existentes = {e.salary_component for e in doc.earnings}
+
+		def _adicionar(componente, valor):
+			if not componente or not valor:
+				return
+			if componente in existentes or not frappe.db.exists("Salary Component", componente):
+				return
+			doc.append("earnings", {"salary_component": componente, "amount": valor})
+			existentes.add(componente)
+
+		if doc.custom_categoria:
+			componente, valor = frappe.db.get_value(
+				"Categoria Vigilante", doc.custom_categoria,
+				["componente_subsidio", "valor_subsidio"],
+			) or (None, None)
+			_adicionar(componente, valor)
+
+		if doc.custom_vigilante:
+			vig = frappe.db.get_value(
+				"Vigilante", doc.custom_vigilante,
+				["chefe_de_turno", "chefe_de_posto", "com_cao"],
+				as_dict=True,
+			)
+			if vig:
+				if vig.chefe_de_turno:
+					_adicionar(settings.componente_subsidio_chefia_turno, settings.valor_subsidio_chefia_turno)
+				if vig.chefe_de_posto:
+					_adicionar(settings.componente_subsidio_chefia_posto, settings.valor_subsidio_chefia_posto)
+				if vig.com_cao:
+					_adicionar(settings.componente_subsidio_canino, settings.valor_subsidio_canino)
+	except Exception as e:
+		frappe.log_error(
+			f"SalarySlip {doc.name}: erro ao adicionar subsídios de categoria/função: {e}",
 			"SIGOS Salary Slip Hooks",
 		)
 

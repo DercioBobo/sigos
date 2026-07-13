@@ -11,7 +11,11 @@
   "nome",
   "descricao",
   "col_break_1",
-  "bloqueada"
+  "bloqueada",
+  "sec_subsidio",
+  "componente_subsidio",
+  "col_break_subsidio",
+  "valor_subsidio"
  ],
  "fields": [
   {
@@ -38,6 +42,27 @@
    "default": "0",
    "in_list_view": 1,
    "description": "Categorias bloqueadas não podem ser eliminadas"
+  },
+  {
+   "fieldname": "sec_subsidio",
+   "fieldtype": "Section Break",
+   "label": "Subsídio Automático (Personalização de Cliente)",
+   "description": "Opcional — usado apenas por clientes com SIGOS Settings.subsidios_categoria_funcao_activo activo. Quando definido, todo o vigilante nesta categoria recebe este subsídio na Salary Slip."
+  },
+  {
+   "fieldname": "componente_subsidio",
+   "fieldtype": "Link",
+   "label": "Componente do Subsídio",
+   "options": "Salary Component"
+  },
+  {
+   "fieldname": "col_break_subsidio",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "valor_subsidio",
+   "fieldtype": "Currency",
+   "label": "Valor do Subsídio"
   }
  ],
  "links": [],
