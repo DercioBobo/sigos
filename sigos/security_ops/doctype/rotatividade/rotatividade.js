@@ -91,28 +91,13 @@ function _wizard_mode(frm) {
 	});
 }
 
-// ─── summary mode (pending approval OR applied) ───────────────────────────────
+// ─── summary mode (pending approval OR applied) ────────────────────────────────
+// Same level of detail in both states — approval only gates whether it's applied,
+// it shouldn't hide what was proposed. Only the wizard's CTA/navigation disappears;
+// everything else (changes, escala, ocupação, substituto, motivo) stays visible.
 function _summary_mode(frm, mode) {
 	const d = frm.doc;
 	const applied = mode === "applied";
-	const cell = (label, from, to) => `
-		<div class="rotw-change">
-			<span class="rotw-cfield">${label}</span>
-			<span class="rotw-cflow">
-				<span class="rotw-cfrom">${frappe.utils.escape_html(from || "—")}</span>
-				<span class="rotw-carrow">→</span>
-				<span class="rotw-cto">${frappe.utils.escape_html(to || "—")}</span>
-			</span>
-		</div>`;
-
-	const rows = [];
-	if (d.novo_posto) rows.push(cell(__("Posto"), d.antigo_posto, d.novo_posto));
-	if (d.novo_regime) rows.push(cell(__("Regime"), d.regime, d.novo_regime));
-	if (d.motivo === "Demissão") rows.push(cell(__("Estado"), __("Activo"), __("Demitido")));
-
-	const sub = d.novo_vigilante ? `<div class="rotw-block"><div class="rotw-block-h">${__("Substituto")}</div>
-		<div class="rotw-sub">${frappe.utils.escape_html(d.novo_vigilante)} ${__("assumiu")}
-		<b>${frappe.utils.escape_html(d.alocado_ao_posto || "—")}</b></div></div>` : "";
 
 	// Header badge reflects the state: applied vs. out for approval (with the workflow state).
 	const nodeClass = applied ? "done" : "pending";
@@ -121,7 +106,13 @@ function _summary_mode(frm, mode) {
 		? `${__("Aplicada em")} ${frappe.datetime.str_to_user(d.data) || ""}`
 		: (d.workflow_state || __("Pendente de Aprovação"));
 
-	const html = `
+	const extras = `
+		${d.motivo ? `<div class="rotw-block"><div class="rotw-block-h">${__("Motivo")}</div>
+			<div class="rotw-sub">${frappe.utils.escape_html(d.motivo)}${d.motiv_demi ? " · " + frappe.utils.escape_html(d.motiv_demi) : ""}${d.data_de_demissao ? " · " + __("Demissão em") + " " + (frappe.datetime.str_to_user(d.data_de_demissao) || "") : ""}</div></div>` : ""}
+		${d.motivo_rotatividade ? `<div class="rotw-block"><div class="rotw-block-h">${__("Justificação")}</div>
+			<div class="rotw-sub">${frappe.utils.escape_html(d.motivo_rotatividade)}</div></div>` : ""}`;
+
+	const shell = (bodyHtml) => `
 		<div class="rotw-summary">
 			<div class="rotw-head">
 				<div class="rotw-op">${frappe.utils.escape_html((d.abreviatura_op || "") + " · " + (d.vigilante || ""))}</div>
@@ -129,24 +120,58 @@ function _summary_mode(frm, mode) {
 					<span class="rotw-nlabel">${frappe.utils.escape_html(stateLabel)}</span></div></div>
 			</div>
 			${applied ? "" : `<div class="rotw-pending-note">${__("Esta rotatividade aguarda aprovação — só será aplicada ao vigilante depois de aprovada.")}</div>`}
-			<div class="rotw-preview">
-				<div class="rotw-block"><div class="rotw-block-h">${applied ? __("Alterações") : __("Alterações Propostas")}</div>
-					${rows.join("") || `<div class="rotw-none">${__("Sem alterações directas ao vigilante.")}</div>`}</div>
-				${sub}
-				${d.motivo ? `<div class="rotw-block"><div class="rotw-block-h">${__("Motivo")}</div>
-					<div class="rotw-sub">${frappe.utils.escape_html(d.motivo)}${d.motiv_demi ? " · " + frappe.utils.escape_html(d.motiv_demi) : ""}${d.data_de_demissao ? " · " + __("Demissão em") + " " + (frappe.datetime.str_to_user(d.data_de_demissao) || "") : ""}</div></div>` : ""}
-				${d.motivo_rotatividade ? `<div class="rotw-block"><div class="rotw-block-h">${__("Justificação")}</div>
-					<div class="rotw-sub">${frappe.utils.escape_html(d.motivo_rotatividade)}</div></div>` : ""}
-			</div>
+			${bodyHtml}
 		</div>`;
 
-	frm.fields_dict.wizard_canvas.$wrapper.addClass("sigos-rotw2").html(html);
+	const $wrapper = frm.fields_dict.wizard_canvas.$wrapper.addClass("sigos-rotw2");
 
-	// Reverter only makes sense once the rotatividade has actually been applied.
 	if (applied) {
+		// Historical record: the vigilante has already moved, so a fresh dry-run
+		// preview would diff "before" against the NOW-current (already new) state
+		// and show nothing. Render from the doc's own stored values instead.
+		const cell = (label, from, to) => `
+			<div class="rotw-change">
+				<span class="rotw-cfield">${label}</span>
+				<span class="rotw-cflow">
+					<span class="rotw-cfrom">${frappe.utils.escape_html(from || "—")}</span>
+					<span class="rotw-carrow">→</span>
+					<span class="rotw-cto">${frappe.utils.escape_html(to || "—")}</span>
+				</span>
+			</div>`;
+		const rows = [];
+		if (d.novo_posto) rows.push(cell(__("Posto"), d.antigo_posto, d.novo_posto));
+		if (d.novo_regime) rows.push(cell(__("Regime"), d.regime, d.novo_regime));
+		if (d.motivo === "Demissão") rows.push(cell(__("Estado"), __("Activo"), __("Demitido")));
+		const sub = d.novo_vigilante ? `<div class="rotw-block"><div class="rotw-block-h">${__("Substituto")}</div>
+			<div class="rotw-sub">${frappe.utils.escape_html(d.novo_vigilante)} ${__("assumiu")}
+			<b>${frappe.utils.escape_html(d.alocado_ao_posto || "—")}</b></div></div>` : "";
+		const body = `<div class="rotw-preview">
+			<div class="rotw-block"><div class="rotw-block-h">${__("Alterações")}</div>
+				${rows.join("") || `<div class="rotw-none">${__("Sem alterações directas ao vigilante.")}</div>`}</div>
+			${sub}${extras}
+		</div>`;
+		$wrapper.html(shell(body));
 		frm.add_custom_button(__("Reverter (Nova Rotatividade)"), () => {
 			frappe.route_options = { vigilante: d.vigilante };
 			frappe.new_doc("Rotatividade");
 		});
+		return;
 	}
+
+	// Pending: dry-run the same preview the wizard showed on confirmation (escala
+	// movement, ocupação deltas, substituto, warnings) — full detail stays visible
+	// while it awaits approval, only the wizard's own CTA is gone.
+	$wrapper.html(shell(`<div class="rotw-prev-loading">${__("A calcular efeitos…")}</div>`));
+	frappe.call({
+		method: "sigos.api.preview_rotatividade",
+		args: {
+			vigilante: d.vigilante, abreviatura_op: d.abreviatura_op,
+			novo_posto: d.novo_posto, novo_regime: d.novo_regime,
+			novo_vigilante: d.novo_vigilante, motivo: d.motivo, motivo_3meses: d.motivo_3meses,
+		},
+		callback: (r) => {
+			const body = sigos.render_rotatividade_preview(r.message || {}) + extras;
+			frm.fields_dict.wizard_canvas.$wrapper.html(shell(body));
+		},
+	});
 }

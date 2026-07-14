@@ -135,6 +135,44 @@ frappe.provide("sigos");
 	document.head.appendChild(s);
 })();
 
+// ════════ Shared: renders a preview_rotatividade() response as rich HTML ═══════
+// Used by the wizard's own confirmation step AND the Rotatividade form's
+// pending-approval summary, so both show the exact same level of detail.
+sigos.render_rotatividade_preview = function (p) {
+	const chips = (p.mudancas || []).map((m) => `
+		<div class="rotw-change"><span class="rotw-cfield">${frappe.utils.escape_html(m.campo)}</span>
+			<span class="rotw-cflow"><span class="rotw-cfrom">${frappe.utils.escape_html(m.de || "—")}</span>
+			<span class="rotw-carrow">→</span><span class="rotw-cto">${frappe.utils.escape_html(m.para || "—")}</span></span></div>`
+	).join("") || `<div class="rotw-none">${__("Sem alterações directas ao vigilante.")}</div>`;
+
+	let escala = "";
+	if (p.escala) {
+		const sai = p.escala.sai ? `<span class="rotw-esc-out">${p.escala.sai}</span>` : `<span class="rotw-none-inline">${__("nenhuma")}</span>`;
+		const entra = p.escala.entra
+			? `<span class="rotw-esc-in">${p.escala.entra}${p.escala.entra_criada ? ` <em>(${__("será criada")})</em>` : ""}</span>`
+			: (p.demite ? `<span class="rotw-none-inline">${__("removido de serviço")}</span>` : `<span class="rotw-none-inline">—</span>`);
+		escala = `<div class="rotw-block"><div class="rotw-block-h">${__("Escala")}</div>
+			<div class="rotw-esc-flow">${__("Sai de")} ${sai} <span class="rotw-carrow">→</span> ${__("Entra em")} ${entra}</div></div>`;
+	}
+	const occ = (p.ocupacao || []).map((o) => {
+		const up = o.para > o.de, dn = o.para < o.de;
+		return `<div class="rotw-occ"><span class="rotw-occ-posto">${frappe.utils.escape_html(o.posto)}</span>
+			<span class="rotw-occ-num">${o.de} <span class="rotw-carrow">→</span>
+			<b class="${up ? "occ-up" : dn ? "occ-dn" : ""}">${o.para}</b></span></div>`;
+	}).join("");
+	const occB = occ ? `<div class="rotw-block"><div class="rotw-block-h">${__("Ocupação")}</div>${occ}</div>` : "";
+	const sub = p.substituto ? `<div class="rotw-block"><div class="rotw-block-h">${__("Substituto")}</div>
+		<div class="rotw-sub">${frappe.utils.escape_html(p.substituto.nome)} ${__("assume")} <b>${frappe.utils.escape_html(p.substituto.assume_posto || "—")}</b></div></div>` : "";
+	const dem = p.demite ? `<div class="rotw-warn rotw-warn-dem">⚑ ${__("Demissão automática será criada.")}</div>` : "";
+	const warns = (p.avisos || []).map((w) => `<div class="rotw-warn">⚠️ ${frappe.utils.escape_html(w)}</div>`).join("");
+
+	return `<div class="rotw-preview">
+		<div class="rotw-prev-head"><div class="rotw-prev-vig">${frappe.utils.escape_html(p.nome || "")}</div>
+			<div class="rotw-prev-op">${frappe.utils.escape_html(p.operacao || "")}</div></div>
+		<div class="rotw-block"><div class="rotw-block-h">${__("Alterações")}</div>${chips}</div>
+		${escala}${occB}${sub}${dem}${warns}</div>`;
+};
+
 // ════════ Engine: renders the wizard into any container ($mount) ════════
 // opts: { $mount, prefill, onConfirm(docData)->Promise, onCancel, cancelLabel }
 sigos.build_rotatividade_wizard = function (opts) {
@@ -513,40 +551,7 @@ sigos.build_rotatividade_wizard = function (opts) {
 		ctrl.set_value(S[fieldname] || frappe.datetime.get_today());
 		controls[fieldname] = ctrl;
 	}
-	function _previewHtml(p) {
-		const chips = (p.mudancas || []).map((m) => `
-			<div class="rotw-change"><span class="rotw-cfield">${frappe.utils.escape_html(m.campo)}</span>
-				<span class="rotw-cflow"><span class="rotw-cfrom">${frappe.utils.escape_html(m.de || "—")}</span>
-				<span class="rotw-carrow">→</span><span class="rotw-cto">${frappe.utils.escape_html(m.para || "—")}</span></span></div>`
-		).join("") || `<div class="rotw-none">${__("Sem alterações directas ao vigilante.")}</div>`;
-
-		let escala = "";
-		if (p.escala) {
-			const sai = p.escala.sai ? `<span class="rotw-esc-out">${p.escala.sai}</span>` : `<span class="rotw-none-inline">${__("nenhuma")}</span>`;
-			const entra = p.escala.entra
-				? `<span class="rotw-esc-in">${p.escala.entra}${p.escala.entra_criada ? ` <em>(${__("será criada")})</em>` : ""}</span>`
-				: (p.demite ? `<span class="rotw-none-inline">${__("removido de serviço")}</span>` : `<span class="rotw-none-inline">—</span>`);
-			escala = `<div class="rotw-block"><div class="rotw-block-h">${__("Escala")}</div>
-				<div class="rotw-esc-flow">${__("Sai de")} ${sai} <span class="rotw-carrow">→</span> ${__("Entra em")} ${entra}</div></div>`;
-		}
-		const occ = (p.ocupacao || []).map((o) => {
-			const up = o.para > o.de, dn = o.para < o.de;
-			return `<div class="rotw-occ"><span class="rotw-occ-posto">${frappe.utils.escape_html(o.posto)}</span>
-				<span class="rotw-occ-num">${o.de} <span class="rotw-carrow">→</span>
-				<b class="${up ? "occ-up" : dn ? "occ-dn" : ""}">${o.para}</b></span></div>`;
-		}).join("");
-		const occB = occ ? `<div class="rotw-block"><div class="rotw-block-h">${__("Ocupação")}</div>${occ}</div>` : "";
-		const sub = p.substituto ? `<div class="rotw-block"><div class="rotw-block-h">${__("Substituto")}</div>
-			<div class="rotw-sub">${frappe.utils.escape_html(p.substituto.nome)} ${__("assume")} <b>${frappe.utils.escape_html(p.substituto.assume_posto || "—")}</b></div></div>` : "";
-		const dem = p.demite ? `<div class="rotw-warn rotw-warn-dem">⚑ ${__("Demissão automática será criada.")}</div>` : "";
-		const warns = (p.avisos || []).map((w) => `<div class="rotw-warn">⚠️ ${frappe.utils.escape_html(w)}</div>`).join("");
-
-		return `<div class="rotw-preview">
-			<div class="rotw-prev-head"><div class="rotw-prev-vig">${frappe.utils.escape_html(p.nome || "")}</div>
-				<div class="rotw-prev-op">${frappe.utils.escape_html(p.operacao || "")}</div></div>
-			<div class="rotw-block"><div class="rotw-block-h">${__("Alterações")}</div>${chips}</div>
-			${escala}${occB}${sub}${dem}${warns}</div>`;
-	}
+	function _previewHtml(p) { return sigos.render_rotatividade_preview(p); }
 
 	// ── confirm: hand the assembled doc to the caller's persistence ──
 	function _confirm() {
