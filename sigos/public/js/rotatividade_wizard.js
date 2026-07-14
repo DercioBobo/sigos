@@ -317,7 +317,7 @@ sigos.build_rotatividade_wizard = function (opts) {
 			<div class="rotw2-search">
 				<span class="rotw2-search-ic">🔍</span>
 				<input type="text" class="rotw2-search-in" id="rotw-vsearch"
-					placeholder="${__("Procurar por nome ou mecanográfico…")}" autocomplete="off">
+					placeholder="${__("Procurar por nome ou ID…")}" autocomplete="off">
 			</div>
 			<div class="rotw2-results" id="rotw-vresults"></div>
 			<div id="rotw-vchosen">${S.vig ? _guardChosen(S.vig) : ""}</div>`;
