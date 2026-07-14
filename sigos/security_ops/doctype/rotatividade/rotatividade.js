@@ -36,11 +36,17 @@ function _has_workflow(frm) {
 
 function _mode(frm) {
 	if (frm.doc.docstatus === 1) return "applied";           // Aprovado + submitted
+	// A brand-new, unsaved doc is always the wizard — regardless of whatever value
+	// workflow_state happens to carry (its configured initial state may not be the
+	// literal string "Rascunho", or the client-side default may not have landed
+	// yet on first refresh). Without this, a new doc could get misread as "pending"
+	// and try to preview a rotatividade with no vigilante/operação chosen yet.
+	if (frm.is_new()) return "wizard";
 	if (_has_workflow(frm)) {
 		const st = frm.doc.workflow_state;
 		if (st && st !== "Rascunho") return "pending";       // out for approval / decided
 	}
-	return "wizard";                                          // new / Rascunho / no workflow
+	return "wizard";                                          // Rascunho / no workflow
 }
 
 // ─── hide the native field area, keep only the canvas ─────────────────────────
@@ -161,6 +167,11 @@ function _summary_mode(frm, mode) {
 	// Pending: dry-run the same preview the wizard showed on confirmation (escala
 	// movement, ocupação deltas, substituto, warnings) — full detail stays visible
 	// while it awaits approval, only the wizard's own CTA is gone.
+	if (!d.vigilante || !d.abreviatura_op) {
+		// Defensive only — a "pending" doc should always have both by now.
+		$wrapper.html(shell(`<div class="rotw-none">${__("Sem alterações directas ao vigilante.")}</div>${extras}`));
+		return;
+	}
 	$wrapper.html(shell(`<div class="rotw-prev-loading">${__("A calcular efeitos…")}</div>`));
 	frappe.call({
 		method: "sigos.api.preview_rotatividade",
