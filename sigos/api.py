@@ -1157,6 +1157,74 @@ def has_active_workflow(doctype):
 
 
 @frappe.whitelist()
+def resumo_aplicado_rotatividade(name):
+	"""
+	Reconstruct the 'what changed' breakdown for an ALREADY-APPLIED Rotatividade,
+	from ITS OWN stored values — never from the vigilante's current live state,
+	which by now already reflects the change (a fresh dry-run would diff the new
+	state against itself and show nothing). Mirrors on_submit's exact rules for
+	which operações produce which changes (Posto/Contrato/Cliente/Regime/Estado),
+	instead of special-casing only Demissão — every operação gets a real resumo,
+	same output shape as preview_rotatividade so the client can render both with
+	the same renderer. Escala/ocupação are deliberately omitted: those reflect
+	CURRENT state, which may have moved on since via later rotations, so replaying
+	them here would risk showing something that never actually happened.
+	"""
+	out = {
+		"vigilante": None, "nome": None, "operacao": None,
+		"mudancas": [], "escala": None, "ocupacao": [], "substituto": None,
+		"demite": False, "avisos": [],
+	}
+	doc = frappe.get_doc("Rotatividade", name)
+	out["vigilante"] = doc.vigilante
+	out["nome"] = doc.vigilante
+
+	op = None
+	if doc.abreviatura_op and frappe.db.exists("Operacao De Rotatividade", doc.abreviatura_op):
+		op = frappe.get_doc("Operacao De Rotatividade", doc.abreviatura_op)
+		out["operacao"] = op.operacao
+
+	cur_posto, cur_regime = doc.antigo_posto, doc.regime
+	new_posto = doc.novo_posto if (op and op.muda_posto and doc.novo_posto) else cur_posto
+	new_regime = doc.novo_regime if (op and op.muda_regime and doc.novo_regime) else cur_regime
+
+	demite = bool(op and op.demite) or doc.motivo == "Demissão"
+	reserva = bool(op and op.get("enviar_reserva")) and not demite
+	out["demite"] = demite
+
+	def _nome_posto(p):
+		return frappe.db.get_value("Posto De Vigilancia", p, "nome_do_posto") or p if p else None
+
+	if new_posto != cur_posto:
+		out["mudancas"].append({"campo": "Posto", "de": _nome_posto(cur_posto), "para": _nome_posto(new_posto)})
+		old_proj = frappe.db.get_value("Posto De Vigilancia", cur_posto, "project") if cur_posto else None
+		new_proj = frappe.db.get_value("Posto De Vigilancia", new_posto, "project") if new_posto else None
+		if old_proj != new_proj:
+			old_cust = frappe.db.get_value("Project", old_proj, "customer") if old_proj else None
+			new_cust = frappe.db.get_value("Project", new_proj, "customer") if new_proj else None
+			out["mudancas"].append({"campo": "Contrato", "de": old_proj or "—", "para": new_proj or "—"})
+			if old_cust != new_cust:
+				out["mudancas"].append({"campo": "Cliente", "de": old_cust or "—", "para": new_cust or "—"})
+	if new_regime != cur_regime:
+		out["mudancas"].append({"campo": "Regime", "de": cur_regime, "para": new_regime})
+	if demite:
+		out["mudancas"].append({"campo": "Estado", "de": "Activo", "para": "Demitido"})
+	elif reserva:
+		out["mudancas"].append({"campo": "Estado", "de": "Activo", "para": "Reserva"})
+		if cur_posto:
+			out["mudancas"].append({"campo": "Posto", "de": _nome_posto(cur_posto), "para": "— (saiu do posto)"})
+
+	if op and op.requer_substituto and doc.novo_vigilante:
+		out["substituto"] = {
+			"vigilante": doc.novo_vigilante,
+			"nome": frappe.db.get_value("Vigilante", doc.novo_vigilante, "nome_completo") or doc.novo_vigilante,
+			"assume_posto": _nome_posto(cur_posto),
+		}
+
+	return out
+
+
+@frappe.whitelist()
 def preview_rotatividade(vigilante, abreviatura_op=None, novo_posto=None, novo_regime=None,
                          nova_categoria=None, novo_vigilante=None, motivo=None, data=None,
                          motivo_3meses=None):
