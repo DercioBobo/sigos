@@ -24,12 +24,19 @@ frappe.ui.form.on("Rotatividade", {
 		}
 		_hide_native(frm);
 
-		const mode = _mode(frm);
-		if (mode === "wizard") {
-			_wizard_mode(frm);
-		} else {
-			frm._rotw_mounted = false;     // if it ever becomes editable again, remount fresh
-			_summary_mode(frm, mode);      // "applied" | "pending"
+		try {
+			const mode = _mode(frm);
+			if (mode === "wizard") {
+				_wizard_mode(frm);
+			} else {
+				frm._rotw_mounted = false;     // if it ever becomes editable again, remount fresh
+				_summary_mode(frm, mode);      // "applied" | "pending"
+			}
+		} catch (e) {
+			// Whatever broke, a visible error beats a silently blank canvas.
+			console.error(e);
+			frm.fields_dict.wizard_canvas.$wrapper.html(
+				`<div style="padding:24px;color:#b02a37">${__("Erro ao desenhar a rotatividade — veja a consola (F12) e reporte.")}</div>`);
 		}
 	},
 });
@@ -119,9 +126,19 @@ function _summary_mode(frm, mode) {
 		: (d.workflow_state || __("Pendente de Aprovação"));
 	// The very first save (still at the workflow's own starting state) hasn't
 	// actually been sent for approval yet — say so, instead of implying it's
-	// already out for review when it's just sitting as a draft.
-	const isDraftState = !applied && _has_workflow(frm)
-		&& d.workflow_state === frappe.workflow.get_default_state(frm.doctype, 0);
+	// already out for review when it's just sitting as a draft. Guarded: if the
+	// Workflow was disabled/removed after this doc was created, its client-side
+	// state registry can be gone even though the workflow_state FIELD lingers on
+	// the doctype — get_default_state() throws in that case, which must not take
+	// the whole render down with it.
+	let isDraftState = false;
+	if (!applied && _has_workflow(frm)) {
+		try {
+			isDraftState = d.workflow_state === frappe.workflow.get_default_state(frm.doctype, 0);
+		} catch (e) {
+			console.error(e);
+		}
+	}
 	const pendingNote = isDraftState
 		? __("Rascunho guardado — use o botão de acções no topo para enviar para aprovação.")
 		: __("Esta rotatividade aguarda aprovação — só será aplicada ao vigilante depois de aprovada.");
