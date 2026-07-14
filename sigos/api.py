@@ -1177,7 +1177,7 @@ def resumo_aplicado_rotatividade(name):
 	}
 	doc = frappe.get_doc("Rotatividade", name)
 	out["vigilante"] = doc.vigilante
-	out["nome"] = doc.vigilante
+	out["nome"] = frappe.db.get_value("Vigilante", doc.vigilante, "nome_completo") or doc.vigilante
 
 	op = None
 	if doc.abreviatura_op and frappe.db.exists("Operacao De Rotatividade", doc.abreviatura_op):
@@ -1185,8 +1185,13 @@ def resumo_aplicado_rotatividade(name):
 		out["operacao"] = op.operacao
 
 	cur_posto, cur_regime = doc.antigo_posto, doc.regime
-	new_posto = doc.novo_posto if (op and op.muda_posto and doc.novo_posto) else cur_posto
-	new_regime = doc.novo_regime if (op and op.muda_regime and doc.novo_regime) else cur_regime
+	# The wizard only ever writes novo_posto/novo_regime when the chosen operação
+	# actually has muda_posto/muda_regime — so trust the stored value directly
+	# rather than re-checking op.muda_posto here too. That re-check would silently
+	# under-report a real, already-applied change if the operação record was since
+	# deleted (renamed/disabled ones are unaffected — they still exist to check).
+	new_posto = doc.novo_posto or cur_posto
+	new_regime = doc.novo_regime or cur_regime
 
 	demite = bool(op and op.demite) or doc.motivo == "Demissão"
 	reserva = bool(op and op.get("enviar_reserva")) and not demite

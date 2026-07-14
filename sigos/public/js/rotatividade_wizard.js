@@ -555,16 +555,28 @@ sigos.build_rotatividade_wizard = function (opts) {
 
 	// ── confirm: hand the assembled doc to the caller's persistence ──
 	function _confirm() {
+		// novo_posto/novo_regime/motiv_demi/uniforme/data_de_demissao are only ever
+		// meaningful for the CURRENTLY selected operação — but their controls stay
+		// mounted with whatever value was last typed even after the user goes back
+		// and picks a different operação that doesn't use them. Null them out here
+		// rather than leaving stale leftovers in the saved record (which would then
+		// misreport as a real change in the resumo).
+		const demite = S.flags.demite || S.motivo === "Demissão";
 		const docData = {
 			doctype: "Rotatividade", data: S.data || frappe.datetime.get_today(),
 			vigilante: S.vig.name, abreviatura_op: S.op.name,
 			delegacao: S.vig.delegacao, mecanografico: S.vig.mecanografico,
 			regime: S.vig.regime, categoria_vigilante: S.vig.categoria,
-			novo_posto: S.novo_posto, novo_regime: S.novo_regime,
+			novo_posto: S.flags.muda_posto ? S.novo_posto : null,
+			novo_regime: S.flags.muda_regime ? S.novo_regime : null,
 			novo_vigilante: S.sub ? S.sub.name : null, alocado_ao_posto: S.vig.posto,
 			alocar_vigilante_substituto: S.sub ? "Sim" : "Não",
-			motivo: S.motivo, motiv_demi: S.motiv_demi, uniforme: S.uniforme, motivo_3meses: S.motivo_3meses,
-			data_de_demissao: S.data_de_demissao, motivo_rotatividade: S.motivo_rotatividade,
+			motivo: S.motivo,
+			motiv_demi: demite ? S.motiv_demi : null,
+			uniforme: demite ? S.uniforme : null,
+			motivo_3meses: S.motivo_3meses,
+			data_de_demissao: demite ? S.data_de_demissao : null,
+			motivo_rotatividade: S.motivo_rotatividade,
 		};
 		const $next = $body().find(".rotw-next");
 		$next.prop("disabled", true);

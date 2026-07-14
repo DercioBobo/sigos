@@ -23,6 +23,7 @@ frappe.ui.form.on("Rotatividade", {
 			return;
 		}
 		_hide_native(frm);
+		frm.page.clear_custom_buttons();   // _summary_mode re-adds its button(s) on every call
 
 		try {
 			const mode = _mode(frm);
@@ -70,9 +71,15 @@ function _has_workflow(frm) {
 		frm._rotw_workflow_check_inflight = true;
 		frappe.call({ method: "sigos.api.has_active_workflow", args: { doctype: frm.doctype } })
 			.then((r) => {
-				frm._rotw_active_workflow = !!r.message;
+				const active = !!r.message;
 				frm._rotw_workflow_check_inflight = false;
-				frm.refresh();
+				frm._rotw_active_workflow = active;
+				// Only worth a second refresh (re-fetching the preview, re-rendering
+				// everything) if the real answer actually differs from the optimistic
+				// "true" this function returned below while it was unresolved —
+				// otherwise every single page load would silently double-fetch for
+				// nothing, on top of risking duplicate custom buttons.
+				if (!active) frm.refresh();
 			});
 	}
 	return true;
@@ -122,8 +129,12 @@ function _wizard_mode(frm) {
 		cancelLabel: __("Recomeçar"),
 		onCancel: () => { frm._rotw_mounted = false; _wizard_mode(frm); },   // reset fresh
 		onConfirm: (docData) => {
+			// docData now deliberately carries explicit nulls (e.g. motiv_demi when
+			// the chosen operação isn't a demissão) to clear stale leftovers — don't
+			// filter those out, or a value from an earlier abandoned choice could
+			// survive on frm.doc untouched.
 			Object.entries(docData).forEach(([k, v]) => {
-				if (k !== "doctype" && v != null) frm.doc[k] = v;
+				if (k !== "doctype") frm.doc[k] = v;
 			});
 			frm.dirty();
 
@@ -185,11 +196,25 @@ function _summary_mode(frm, mode) {
 		? __("Rascunho guardado — use o botão de acções no topo para enviar para aprovação.")
 		: __("Esta rotatividade aguarda aprovação — só será aplicada ao vigilante depois de aprovada.");
 
-	const extras = `
-		${d.motivo ? `<div class="rotw-block"><div class="rotw-block-h">${__("Motivo")}</div>
-			<div class="rotw-sub">${frappe.utils.escape_html(d.motivo)}${d.motiv_demi ? " · " + frappe.utils.escape_html(d.motiv_demi) : ""}${d.data_de_demissao ? " · " + __("Demissão em") + " " + (frappe.datetime.str_to_user(d.data_de_demissao) || "") : ""}</div></div>` : ""}
-		${d.motivo_rotatividade ? `<div class="rotw-block"><div class="rotw-block-h">${__("Justificação")}</div>
-			<div class="rotw-sub">${frappe.utils.escape_html(d.motivo_rotatividade)}</div></div>` : ""}`;
+	// The wizard's step-4 state always carries a data_de_demissao default (today),
+	// even for operations that never touch demissão — so its mere presence can't
+	// decide whether to show "Demissão em ...". Gate that on the authoritative
+	// `demite` flag the server computes (op.demite OR motivo === "Demissão"),
+	// known once the async preview/resumo call below resolves; `null` (unknown,
+	// e.g. while still loading) falls back to the synchronous motivo-only check.
+	const buildExtras = (demite) => {
+		const souDemissao = demite === null ? d.motivo === "Demissão" : demite;
+		// motiv_demi has the same leftover risk as data_de_demissao — its control is
+		// always mounted in the wizard's Mudanças step regardless of the chosen
+		// operação, so a value picked while a demissão-flagged op was selected can
+		// still be sitting in docData even after backing up and picking a different,
+		// non-demissão op. Only show it when this really was a demissão.
+		return `
+			${d.motivo ? `<div class="rotw-block"><div class="rotw-block-h">${__("Motivo")}</div>
+				<div class="rotw-sub">${frappe.utils.escape_html(d.motivo)}${(souDemissao && d.motiv_demi) ? " · " + frappe.utils.escape_html(d.motiv_demi) : ""}${(souDemissao && d.data_de_demissao) ? " · " + __("Demissão em") + " " + (frappe.datetime.str_to_user(d.data_de_demissao) || "") : ""}</div></div>` : ""}
+			${d.motivo_rotatividade ? `<div class="rotw-block"><div class="rotw-block-h">${__("Justificação")}</div>
+				<div class="rotw-sub">${frappe.utils.escape_html(d.motivo_rotatividade)}</div></div>` : ""}`;
+	};
 
 	const shell = (bodyHtml) => `
 		<div class="rotw-summary">
@@ -223,18 +248,19 @@ function _summary_mode(frm, mode) {
 			args: { name: d.name },
 			callback: (r) => {
 				if (frm._rotw_summary_gen !== gen) return;   // a newer render already won
+				const p = r.message || {};
 				let body;
 				try {
-					body = sigos.render_rotatividade_preview(r.message || {}) + extras;
+					body = sigos.render_rotatividade_preview(p) + buildExtras(!!p.demite);
 				} catch (e) {
 					console.error(e);
-					body = `<div class="rotw-none">${__("Não foi possível calcular o resumo.")}</div>${extras}`;
+					body = `<div class="rotw-none">${__("Não foi possível calcular o resumo.")}</div>${buildExtras(null)}`;
 				}
 				$wrapper.html(shell(body));
 			},
 			error: () => {
 				if (frm._rotw_summary_gen !== gen) return;
-				$wrapper.html(shell(`<div class="rotw-none">${__("Não foi possível calcular o resumo.")}</div>${extras}`));
+				$wrapper.html(shell(`<div class="rotw-none">${__("Não foi possível calcular o resumo.")}</div>${buildExtras(null)}`));
 			},
 		});
 		return;
@@ -253,7 +279,7 @@ function _summary_mode(frm, mode) {
 	// while it awaits approval, only the wizard's own CTA is gone.
 	if (!d.vigilante || !d.abreviatura_op) {
 		// Defensive only — a "pending" doc should always have both by now.
-		$wrapper.html(shell(`<div class="rotw-none">${__("Sem alterações directas ao vigilante.")}</div>${extras}`));
+		$wrapper.html(shell(`<div class="rotw-none">${__("Sem alterações directas ao vigilante.")}</div>${buildExtras(null)}`));
 		return;
 	}
 	$wrapper.html(shell(`<div class="rotw-prev-loading">${__("A calcular efeitos…")}</div>`));
@@ -262,7 +288,7 @@ function _summary_mode(frm, mode) {
 		// signal as the "asset not loaded" guard in refresh(), but this one can
 		// only be caught once we're already inside pending mode.
 		$wrapper.html(shell(
-			`<div style="padding:16px;color:#888">${__("A carregar assistente… actualize a página (Ctrl+Shift+R).")}</div>${extras}`));
+			`<div style="padding:16px;color:#888">${__("A carregar assistente… actualize a página (Ctrl+Shift+R).")}</div>${buildExtras(null)}`));
 		return;
 	}
 	frappe.call({
@@ -274,18 +300,19 @@ function _summary_mode(frm, mode) {
 		},
 		callback: (r) => {
 			if (frm._rotw_summary_gen !== gen) return;   // a newer render already won
+			const p = r.message || {};
 			let body;
 			try {
-				body = sigos.render_rotatividade_preview(r.message || {}) + extras;
+				body = sigos.render_rotatividade_preview(p) + buildExtras(!!p.demite);
 			} catch (e) {
 				console.error(e);
-				body = `<div class="rotw-none">${__("Não foi possível calcular a pré-visualização.")}</div>${extras}`;
+				body = `<div class="rotw-none">${__("Não foi possível calcular a pré-visualização.")}</div>${buildExtras(null)}`;
 			}
 			frm.fields_dict.wizard_canvas.$wrapper.html(shell(body));
 		},
 		error: () => {
 			if (frm._rotw_summary_gen !== gen) return;
-			$wrapper.html(shell(`<div class="rotw-none">${__("Não foi possível calcular a pré-visualização.")}</div>${extras}`));
+			$wrapper.html(shell(`<div class="rotw-none">${__("Não foi possível calcular a pré-visualização.")}</div>${buildExtras(null)}`));
 		},
 	});
 }
