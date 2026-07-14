@@ -12,9 +12,34 @@ frappe.ui.form.on("Ocorrencia", {
 	},
 
 	delegacao(frm) {
+		// Skip the reset when this change came from the posto handler below —
+		// it already knows posto/delegação are consistent.
+		if (frm.__syncing_delegacao) return;
 		if (frm.doc.posto) frm.set_value("posto", "");
 		if (frm.doc.vigilante) frm.set_value("vigilante", "");
 		_filtros(frm);
+	},
+
+	// Users often pick Posto before Delegação. Mirror the server-side
+	// _validar_posto_na_delegacao derivation client-side so the Vigilante
+	// picker is scoped right away instead of only after save.
+	posto(frm) {
+		if (!frm.doc.posto) {
+			_filtros(frm);
+			return;
+		}
+		frappe.db.get_value("Posto De Vigilancia", frm.doc.posto, "delegacao").then((r) => {
+			const deleg = r.message && r.message.delegacao;
+			if (deleg && frm.doc.delegacao !== deleg) {
+				frm.__syncing_delegacao = true;
+				frm.set_value("delegacao", deleg).then(() => {
+					frm.__syncing_delegacao = false;
+					_filtros(frm);
+				});
+			} else {
+				_filtros(frm);
+			}
+		});
 	},
 });
 
