@@ -13,6 +13,14 @@
 	font-feature-settings: "tnum" 1;
 }
 
+/* Any SIGOS "deck/canvas" HTML field (Ausencias, Rotatividade, ...) creates its
+   own CSS stacking context (position: sticky/relative + background). Force
+   Frappe's page-head Actions/workflow dropdown to always paint above it, or
+   its menu opens invisible/unclickable behind an opaque deck panel. */
+.page-head .dropdown-menu {
+	z-index: 1071 !important;
+}
+
 /* -- Form chrome - scoped to SIGOS doctypes ------------------------------ */
 body[data-route*="Vigilante"] .frappe-section,
 body[data-route*="Posto"] .frappe-section,

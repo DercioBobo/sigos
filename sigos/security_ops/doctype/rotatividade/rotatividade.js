@@ -72,10 +72,16 @@ function _wizard_mode(frm) {
 			frm.dirty();
 
 			if (_has_workflow(frm)) {
-				// Save the Rascunho draft, then send it up for approval in one go.
-				// The server gate (on_submit: workflow_state == "Aprovado") guarantees the
-				// rotatividade only takes effect once the approver signs off.
-				return frm.save().then(() => _enviar_para_aprovacao(frm));
+				// Save the Rascunho draft only -- the transition itself (e.g. "Submeter
+				// para Aprovação") is a native workflow action, listed on the page's
+				// own Actions button, so it is not duplicated here.
+				return frm.save().then(() => {
+					frm.refresh();
+					frappe.show_alert({
+						message: __("Guardado como Rascunho. Use o botão de acções no topo para enviar para aprovação."),
+						indicator: "blue",
+					}, 7);
+				});
 			}
 			// No workflow: apply immediately (direct submit).
 			return frm.save("Submit").then(() => {
@@ -83,31 +89,6 @@ function _wizard_mode(frm) {
 			});
 		},
 	});
-}
-
-// Fire the first workflow transition from Rascunho (e.g. "Submeter para Aprovação").
-function _enviar_para_aprovacao(frm) {
-	return frappe.xcall("frappe.model.workflow.get_transitions", { doc: frm.doc })
-		.then((transitions) => {
-			if (!transitions || !transitions.length) {
-				frappe.show_alert({
-					message: __("Guardado como Rascunho. Use o botão do fluxo para submeter para aprovação."),
-					indicator: "blue",
-				}, 7);
-				frm.refresh();
-				return;
-			}
-			const action = transitions[0].action;   // first transition = submit for approval
-			return frappe.xcall("frappe.model.workflow.apply_workflow", { doc: frm.doc, action })
-				.then((doc) => {
-					frappe.model.sync(doc);
-					frm.refresh();
-					frappe.show_alert({
-						message: __("Enviado para aprovação ({0}).", [doc.workflow_state || action]),
-						indicator: "green",
-					}, 6);
-				});
-		});
 }
 
 // ─── summary mode (pending approval OR applied) ───────────────────────────────

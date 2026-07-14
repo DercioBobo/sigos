@@ -739,7 +739,8 @@ function _update_footer(frm, w) {
 
 	const locked = frm.doc.workflow_state === "Pendente De Aprovação";
 	const tardia = _atraso_estado === "tardia" && frm.doc.docstatus === 0 && !locked;
-	const sig = `${frm.doc.docstatus}|${locked}|${tardia}`;
+	const mostrar = _mostrar_cta(frm);
+	const sig = `${frm.doc.docstatus}|${locked}|${tardia}|${mostrar}`;
 
 	if ($f.attr("data-sig") !== sig) {
 		$f.attr("data-sig", sig).empty();
@@ -766,9 +767,14 @@ function _update_footer(frm, w) {
 				});
 				cm.set_value(frm.doc.motivo_atraso || "");
 			}
-			const $row = $(`<div class="ausd-cta-row"><button type="button" class="ausd-cta" data-cta></button></div>`)
-				.appendTo($f);
-			$row.find("[data-cta]").on("click", () => _cta_click(frm));
+			// Once a workflow-governed doc is saved & clean there is nothing left
+			// for this button to do — the actual transition (Enviar para Aprovação)
+			// lives on the native Actions button, not duplicated here.
+			if (mostrar) {
+				const $row = $(`<div class="ausd-cta-row"><button type="button" class="ausd-cta" data-cta></button></div>`)
+					.appendTo($f);
+				$row.find("[data-cta]").on("click", () => _cta_click(frm));
+			}
 		}
 	}
 
@@ -781,26 +787,22 @@ function _tem_workflow(frm) {
 	return frappe.meta.has_field("Ausencias", "workflow_state");
 }
 
+// With a workflow attached, the CTA only ever saves the Rascunho draft — once
+// the doc is clean there's nothing more it can do, so it's hidden entirely.
+function _mostrar_cta(frm) {
+	if (_tem_workflow(frm)) return frm.is_new() || frm.is_dirty();
+	return true;
+}
+
 function _cta_label(frm) {
 	if (frm.is_new() || frm.is_dirty()) return __("Gravar");
-	return _tem_workflow(frm) ? __("Enviar para Aprovação") : __("Submeter");
+	return __("Submeter");
 }
 
 function _cta_click(frm) {
 	if (frm.is_new() || frm.is_dirty()) { frm.save(); return; }
-	if (frm.doc.docstatus !== 0) return;
-	if (_tem_workflow(frm)) {
-		frappe.xcall("frappe.model.workflow.get_transitions", { doc: frm.doc }).then(ts => {
-			if (!ts || !ts.length) {
-				frappe.show_alert({ message: __("Sem acções de workflow disponíveis para si."), indicator: "orange" }, 5);
-				return;
-			}
-			frappe.xcall("frappe.model.workflow.apply_workflow", { doc: frm.doc, action: ts[0].action })
-				.then(() => frm.reload_doc());
-		});
-	} else {
-		frm.savesubmit();
-	}
+	if (frm.doc.docstatus !== 0 || _tem_workflow(frm)) return;
+	frm.savesubmit();
 }
 
 // ─── Visual helpers: avatar initials + periodo-coloured turno chip ────────────
@@ -916,7 +918,7 @@ function _inject_css() {
 	if (document.getElementById("sigos-aus-deck-css")) return;
 	const css = `
 #sigos-aus-deck {
-	position: sticky; top: 8px; z-index: 6; margin: 0 0 14px; padding: 16px 18px;
+	position: sticky; top: 8px; z-index: 1; margin: 0 0 14px; padding: 16px 18px;
 	border-radius: 14px; color: #fff;
 	background: linear-gradient(135deg, #234a73 0%, #1a3a5c 60%, #14304c 100%);
 	box-shadow: 0 8px 24px rgba(20,48,76,.28), inset 0 1px 0 rgba(255,255,255,.08);
