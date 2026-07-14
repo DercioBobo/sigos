@@ -195,6 +195,14 @@ function _summary_mode(frm, mode) {
 		return;
 	}
 	$wrapper.html(shell(`<div class="rotw-prev-loading">${__("A calcular efeitos…")}</div>`));
+	if (typeof sigos.render_rotatividade_preview !== "function") {
+		// Stale JS bundle (asset rebuilt since this page was last loaded) — same
+		// signal as the "asset not loaded" guard in refresh(), but this one can
+		// only be caught once we're already inside pending mode.
+		$wrapper.html(shell(
+			`<div style="padding:16px;color:#888">${__("A carregar assistente… actualize a página (Ctrl+Shift+R).")}</div>${extras}`));
+		return;
+	}
 	frappe.call({
 		method: "sigos.api.preview_rotatividade",
 		args: {
@@ -203,8 +211,17 @@ function _summary_mode(frm, mode) {
 			novo_vigilante: d.novo_vigilante, motivo: d.motivo, motivo_3meses: d.motivo_3meses,
 		},
 		callback: (r) => {
-			const body = sigos.render_rotatividade_preview(r.message || {}) + extras;
+			let body;
+			try {
+				body = sigos.render_rotatividade_preview(r.message || {}) + extras;
+			} catch (e) {
+				console.error(e);
+				body = `<div class="rotw-none">${__("Não foi possível calcular a pré-visualização.")}</div>${extras}`;
+			}
 			frm.fields_dict.wizard_canvas.$wrapper.html(shell(body));
+		},
+		error: () => {
+			$wrapper.html(shell(`<div class="rotw-none">${__("Não foi possível calcular a pré-visualização.")}</div>${extras}`));
 		},
 	});
 }
