@@ -23,7 +23,7 @@ frappe.ui.form.on("Rotatividade", {
 			return;
 		}
 		_hide_native(frm);
-		frm.page.clear_custom_buttons();   // _summary_mode re-adds its button(s) on every call
+		frm.clear_custom_buttons();   // _summary_mode re-adds its button(s) on every call
 
 		try {
 			const mode = _mode(frm);
