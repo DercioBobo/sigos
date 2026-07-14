@@ -42,9 +42,25 @@ frappe.ui.form.on("Rotatividade", {
 });
 
 // ─── mode resolution (workflow-aware) ─────────────────────────────────────────
+// The workflow_state FIELD lingers on the doctype even after its Workflow is
+// disabled (Frappe never removes it just for that) — so field presence alone
+// isn't "is a workflow currently governing this doc". Resolve (and cache) the
+// real answer once per form load via the server's own is_active-aware check;
+// until it resolves, assume active (today's behaviour, the safe default for
+// existing workflow-governed docs) and re-render once the real answer is known.
 function _has_workflow(frm) {
-	// The workflow_state field only exists once a Workflow governs the doctype.
-	return !!frm.fields_dict.workflow_state;
+	if (!frm.fields_dict.workflow_state) return false;
+	if (frm._rotw_active_workflow !== undefined) return frm._rotw_active_workflow;
+	if (!frm._rotw_workflow_check_inflight) {
+		frm._rotw_workflow_check_inflight = true;
+		frappe.call({ method: "sigos.api.has_active_workflow", args: { doctype: frm.doctype } })
+			.then((r) => {
+				frm._rotw_active_workflow = !!r.message;
+				frm._rotw_workflow_check_inflight = false;
+				frm.refresh();
+			});
+	}
+	return true;
 }
 
 function _mode(frm) {

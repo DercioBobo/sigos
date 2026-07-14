@@ -1148,6 +1148,15 @@ def get_escala_preview_posto(posto, dias=7):
 
 
 @frappe.whitelist()
+def has_active_workflow(doctype):
+	"""Whether an ACTIVE Workflow currently governs doctype — unlike checking for
+	the workflow_state field client-side, this doesn't false-positive once a
+	Workflow has been disabled (Frappe never removes the field just for that)."""
+	from frappe.model.workflow import get_workflow_name
+	return bool(get_workflow_name(doctype))
+
+
+@frappe.whitelist()
 def preview_rotatividade(vigilante, abreviatura_op=None, novo_posto=None, novo_regime=None,
                          nova_categoria=None, novo_vigilante=None, motivo=None, data=None,
                          motivo_3meses=None):
