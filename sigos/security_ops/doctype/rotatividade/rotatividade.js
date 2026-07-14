@@ -207,7 +207,13 @@ function _summary_mode(frm, mode) {
 	if (applied) {
 		// Historical record: the vigilante has already moved, so a fresh dry-run
 		// preview would diff "before" against the NOW-current (already new) state
-		// and show nothing. Render from the doc's own stored values instead.
+		// and show nothing. Render from the doc's own stored values instead — but
+		// "was this a demissão" is NOT just self.motivo === "Demissão": on_submit
+		// (rotatividade.py) also demite whenever the chosen OPERAÇÃO itself carries
+		// demite=1 (independent of motivo), and separately benches the guard to
+		// Reserva when the operação has enviar_reserva=1. Get those flags from the
+		// operação record so this matches on_submit's actual behaviour exactly,
+		// instead of silently under-reporting real outcomes as "no changes".
 		const cell = (label, from, to) => `
 			<div class="rotw-change">
 				<span class="rotw-cfield">${label}</span>
@@ -217,23 +223,42 @@ function _summary_mode(frm, mode) {
 					<span class="rotw-cto">${frappe.utils.escape_html(to || "—")}</span>
 				</span>
 			</div>`;
-		const rows = [];
-		if (d.novo_posto) rows.push(cell(__("Posto"), d.antigo_posto, d.novo_posto));
-		if (d.novo_regime) rows.push(cell(__("Regime"), d.regime, d.novo_regime));
-		if (d.motivo === "Demissão") rows.push(cell(__("Estado"), __("Activo"), __("Demitido")));
-		const sub = d.novo_vigilante ? `<div class="rotw-block"><div class="rotw-block-h">${__("Substituto")}</div>
-			<div class="rotw-sub">${frappe.utils.escape_html(d.novo_vigilante)} ${__("assumiu")}
-			<b>${frappe.utils.escape_html(d.alocado_ao_posto || "—")}</b></div></div>` : "";
-		const body = `<div class="rotw-preview">
-			<div class="rotw-block"><div class="rotw-block-h">${__("Alterações")}</div>
-				${rows.join("") || `<div class="rotw-none">${__("Sem alterações directas ao vigilante.")}</div>`}</div>
-			${sub}${extras}
-		</div>`;
-		$wrapper.html(shell(body));
+		const renderApplied = (op) => {
+			if (frm._rotw_summary_gen !== gen) return;   // a newer render already won
+			const demite = !!(op && op.demite) || d.motivo === "Demissão";
+			const reserva = !demite && !!(op && op.enviar_reserva);
+			const rows = [];
+			if (d.novo_posto) rows.push(cell(__("Posto"), d.antigo_posto, d.novo_posto));
+			if (d.novo_regime) rows.push(cell(__("Regime"), d.regime, d.novo_regime));
+			if (demite) {
+				rows.push(cell(__("Estado"), __("Activo"), __("Demitido")));
+			} else if (reserva) {
+				rows.push(cell(__("Estado"), __("Activo"), __("Reserva")));
+				if (d.antigo_posto) rows.push(cell(__("Posto"), d.antigo_posto, __("— (saiu do posto)")));
+			}
+			const sub = d.novo_vigilante ? `<div class="rotw-block"><div class="rotw-block-h">${__("Substituto")}</div>
+				<div class="rotw-sub">${frappe.utils.escape_html(d.novo_vigilante)} ${__("assumiu")}
+				<b>${frappe.utils.escape_html(d.alocado_ao_posto || "—")}</b></div></div>` : "";
+			const body = `<div class="rotw-preview">
+				<div class="rotw-block"><div class="rotw-block-h">${__("Alterações")}</div>
+					${rows.join("") || `<div class="rotw-none">${__("Sem alterações directas ao vigilante.")}</div>`}</div>
+				${sub}${extras}
+			</div>`;
+			$wrapper.html(shell(body));
+		};
+
 		frm.add_custom_button(__("Reverter (Nova Rotatividade)"), () => {
 			frappe.route_options = { vigilante: d.vigilante };
 			frappe.new_doc("Rotatividade");
 		});
+
+		if (d.abreviatura_op) {
+			frappe.db.get_value("Operacao De Rotatividade", d.abreviatura_op, ["demite", "enviar_reserva"])
+				.then((r) => renderApplied(r && r.message))
+				.catch(() => renderApplied(null));
+		} else {
+			renderApplied(null);
+		}
 		return;
 	}
 
