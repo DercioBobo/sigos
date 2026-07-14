@@ -1,13 +1,13 @@
 // The Rotatividade form IS the wizard (Option A), and it is WORKFLOW-AWARE.
-//   - new, or any state the workflow lets the current user edit  -> wizard canvas
-//   - any state the workflow makes read-only for this user       -> summary; native
-//     workflow Actions button drives the transitions
-//   - submitted / docstatus 1 (applied)                          -> summary + "Reverter"
-// Editability is never inferred from a hardcoded workflow_state name (e.g.
-// "Rascunho") or from generic doc write permission — an approver reviewing a
-// later step may well have doctype-level write access without the Workflow's
-// own per-state "allow_edit" roles covering them. frappe.workflow.is_read_only()
-// is the one native check that reflects that distinction; we just read its verdict.
+//   - new / unsaved doc                    -> wizard canvas (nothing captured yet)
+//   - saved, workflow-governed, docstatus 0 -> resumo; native workflow Actions
+//     button drives the transitions (Enviar p/ Aprovação / Aprovar / Rejeitar)
+//   - submitted / docstatus 1 (applied)    -> resumo + "Reverter"
+// The wizard is ONLY ever shown for a brand-new doc. It has no memory of a saved
+// record (it only ever pre-fills vigilante, nothing else it captured), so once
+// something is saved the resumo is the only view that can be trusted to show what
+// was actually proposed — which matters most for an approver reviewing a later
+// step, who must never see a blank wizard in place of the other person's work.
 // Native fields are hidden in every mode; the canvas is the whole experience.
 //
 // Confirmar behaviour adapts automatically:
@@ -42,13 +42,16 @@ function _has_workflow(frm) {
 
 function _mode(frm) {
 	if (frm.doc.docstatus === 1) return "applied";           // Aprovado + submitted
-	// A brand-new, unsaved doc is always the wizard, before the Workflow has had
-	// any state (and hence any permission verdict) to apply.
+	// A brand-new, unsaved doc is always the wizard — nothing has been captured yet.
 	if (frm.is_new()) return "wizard";
-	// Beyond that, defer entirely to the Workflow's own per-state edit-role
-	// verdict for the current user — no state-name guessing, and no reliance on
-	// generic doc write permission (which an approver may also happen to have).
-	if (_has_workflow(frm) && frappe.workflow.is_read_only(frm.doctype, frm.doc.name)) return "pending";
+	// Once a workflow-governed doc has been SAVED, always show the resumo — never
+	// the wizard again. The wizard has no memory of a saved doc (it only ever
+	// pre-fills vigilante, nothing else), so re-entering it for an existing
+	// record silently discards the view of everything already captured — exactly
+	// what an approver reviewing a later step must NOT see. There is no in-place
+	// edit: corrections happen via a fresh Rotatividade (see "Nova Rotatividade"
+	// in _summary_mode), same pattern as "Reverter" on an applied doc.
+	if (_has_workflow(frm)) return "pending";
 	return "wizard";
 }
 
@@ -114,6 +117,14 @@ function _summary_mode(frm, mode) {
 	const stateLabel = applied
 		? `${__("Aplicada em")} ${frappe.datetime.str_to_user(d.data) || ""}`
 		: (d.workflow_state || __("Pendente de Aprovação"));
+	// The very first save (still at the workflow's own starting state) hasn't
+	// actually been sent for approval yet — say so, instead of implying it's
+	// already out for review when it's just sitting as a draft.
+	const isDraftState = !applied && _has_workflow(frm)
+		&& d.workflow_state === frappe.workflow.get_default_state(frm.doctype, 0);
+	const pendingNote = isDraftState
+		? __("Rascunho guardado — use o botão de acções no topo para enviar para aprovação.")
+		: __("Esta rotatividade aguarda aprovação — só será aplicada ao vigilante depois de aprovada.");
 
 	const extras = `
 		${d.motivo ? `<div class="rotw-block"><div class="rotw-block-h">${__("Motivo")}</div>
@@ -128,7 +139,7 @@ function _summary_mode(frm, mode) {
 				<div class="rotw-stepper"><div class="rotw-node ${nodeClass}"><span class="rotw-dot">${dot}</span>
 					<span class="rotw-nlabel">${frappe.utils.escape_html(stateLabel)}</span></div></div>
 			</div>
-			${applied ? "" : `<div class="rotw-pending-note">${__("Esta rotatividade aguarda aprovação — só será aplicada ao vigilante depois de aprovada.")}</div>`}
+			${applied ? "" : `<div class="rotw-pending-note">${pendingNote}</div>`}
 			${bodyHtml}
 		</div>`;
 
@@ -166,6 +177,14 @@ function _summary_mode(frm, mode) {
 		});
 		return;
 	}
+
+	// Corrections always happen via a fresh Rotatividade (same pattern as
+	// "Reverter" once applied) — there's no in-place edit, so make sure that
+	// path is just as reachable here as it is once applied.
+	frm.add_custom_button(__("Nova Rotatividade"), () => {
+		frappe.route_options = { vigilante: d.vigilante };
+		frappe.new_doc("Rotatividade");
+	});
 
 	// Pending: dry-run the same preview the wizard showed on confirmation (escala
 	// movement, ocupação deltas, substituto, warnings) — full detail stays visible
