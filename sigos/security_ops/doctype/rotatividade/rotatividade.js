@@ -1,11 +1,15 @@
 // The Rotatividade form IS the wizard (Option A), and it is WORKFLOW-AWARE.
-//   - new / Rascunho (editable)        -> inline wizard rendered into the canvas
-//   - Pendente / Rejeitado (locked)    -> read-only summary; native workflow buttons drive it
-//   - submitted / Aprovado (applied)   -> read-only summary + "Reverter"
+//   - new, or any state the workflow lets the current user edit  -> wizard canvas
+//   - any state the workflow makes read-only for this user       -> summary; native
+//     workflow Actions button drives the transitions
+//   - submitted / docstatus 1 (applied)                          -> summary + "Reverter"
+// Editability is never inferred from a hardcoded workflow_state name (e.g.
+// "Rascunho") — that's the Workflow doctype's job (its per-state "allow_edit"
+// role rules already drive frm.perm). We just read the verdict.
 // Native fields are hidden in every mode; the canvas is the whole experience.
 //
 // Confirmar behaviour adapts automatically:
-//   - workflow attached  -> save Rascunho draft + fire the 1st transition (send for approval)
+//   - workflow attached  -> save draft + fire the 1st transition (send for approval)
 //   - no workflow        -> save + submit (applies immediately, gated server-side anyway)
 
 frappe.ui.form.on("Rotatividade", {
@@ -22,7 +26,7 @@ frappe.ui.form.on("Rotatividade", {
 		if (mode === "wizard") {
 			_wizard_mode(frm);
 		} else {
-			frm._rotw_mounted = false;     // if it ever returns to Rascunho, remount fresh
+			frm._rotw_mounted = false;     // if it ever becomes editable again, remount fresh
 			_summary_mode(frm, mode);      // "applied" | "pending"
 		}
 	},
@@ -36,17 +40,14 @@ function _has_workflow(frm) {
 
 function _mode(frm) {
 	if (frm.doc.docstatus === 1) return "applied";           // Aprovado + submitted
-	// A brand-new, unsaved doc is always the wizard — regardless of whatever value
-	// workflow_state happens to carry (its configured initial state may not be the
-	// literal string "Rascunho", or the client-side default may not have landed
-	// yet on first refresh). Without this, a new doc could get misread as "pending"
-	// and try to preview a rotatividade with no vigilante/operação chosen yet.
+	// A brand-new, unsaved doc is always the wizard, before the Workflow has had
+	// any state (and hence any permission verdict) to apply.
 	if (frm.is_new()) return "wizard";
-	if (_has_workflow(frm)) {
-		const st = frm.doc.workflow_state;
-		if (st && st !== "Rascunho") return "pending";       // out for approval / decided
-	}
-	return "wizard";                                          // Rascunho / no workflow
+	// Beyond that, defer entirely to the native permission the Workflow computed
+	// for the current user at this document's current state — no state-name
+	// guessing. If they can write to it, it's the wizard; if not, it's locked.
+	if (_has_workflow(frm) && !(frm.perm[0] && frm.perm[0].write)) return "pending";
+	return "wizard";
 }
 
 // ─── hide the native field area, keep only the canvas ─────────────────────────
