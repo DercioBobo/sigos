@@ -43,11 +43,16 @@ frappe.ui.form.on("Ocorrencia", {
 	},
 });
 
-// Scope posto and vigilante pickers to the chosen delegação.
+// Scope posto and vigilante pickers to the chosen delegação. The doctype JSON's own
+// field-level link_filters (status != Demitido) takes priority over frm.set_query
+// when both are present — it wins silently, dropping delegação scoping entirely —
+// so that condition is folded in here instead of living in the JSON.
 function _filtros(frm) {
 	const deleg = frm.doc.delegacao;
 	frm.set_query("posto", () => ({ filters: deleg ? { delegacao: deleg } : {} }));
-	frm.set_query("vigilante", () => ({ filters: deleg ? { delegacao: deleg } : {} }));
+	frm.set_query("vigilante", () => ({
+		filters: deleg ? { status: ["!=", "Demitido"], delegacao: deleg } : { status: ["!=", "Demitido"] },
+	}));
 }
 
 // A red/orange headline for the worst incidents so they stand out on the form.
