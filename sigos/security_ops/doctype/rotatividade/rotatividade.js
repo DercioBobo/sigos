@@ -39,6 +39,21 @@ frappe.ui.form.on("Rotatividade", {
 				`<div style="padding:24px;color:#b02a37">${__("Erro ao desenhar a rotatividade — veja a consola (F12) e reporte.")}</div>`);
 		}
 	},
+
+	// The wizard only writes into frm.doc at the very end (Confirmar), so a save
+	// firing before that (Ctrl+S, or anything else reaching for the native save
+	// path) hits Frappe's raw "Mandatory fields required" dialog against fields
+	// the user never got a chance to fill via the canvas — confusing, and it can
+	// also leave the canvas visually wiped. Head it off with a clearer message.
+	validate(frm) {
+		if (frm.is_new() && !frm.doc.vigilante && !frm.doc.abreviatura_op) {
+			frappe.show_alert({
+				message: __("Use o assistente para preencher e confirmar a rotatividade."),
+				indicator: "orange",
+			}, 5);
+			frappe.validated = false;
+		}
+	},
 });
 
 // ─── mode resolution (workflow-aware) ─────────────────────────────────────────
@@ -89,7 +104,13 @@ function _hide_native(frm) {
 // ─── wizard mode (new / Rascunho) ─────────────────────────────────────────────
 function _wizard_mode(frm) {
 	const $canvas = frm.fields_dict.wizard_canvas.$wrapper;
-	if (frm._rotw_mounted) return;          // mount once; keep wizard state across refreshes
+	// Mount once; keep wizard state across refreshes — BUT don't trust the flag
+	// blindly. Frappe can reset an HTML field's DOM out from under us (e.g. while
+	// highlighting missing mandatory fields after a stray native save, or during
+	// its own reload/refresh_fields cycle) without ever telling this controller.
+	// If that happened, the flag would say "mounted" while the canvas is actually
+	// empty — check the DOM itself, not just the flag.
+	if (frm._rotw_mounted && $canvas.find(".rotw-inline").length) return;
 	frm._rotw_mounted = true;
 
 	$canvas.addClass("sigos-rotw2");
@@ -133,6 +154,11 @@ function _wizard_mode(frm) {
 function _summary_mode(frm, mode) {
 	const d = frm.doc;
 	const applied = mode === "applied";
+	// Async preview fetch below can outlive this call (e.g. a "pending" render
+	// firing right before a workflow transition lands and re-refreshes as
+	// "applied"). Stamp a generation so a late response from an earlier call
+	// can never overwrite whatever the most recent call already painted.
+	const gen = (frm._rotw_summary_gen = (frm._rotw_summary_gen || 0) + 1);
 
 	// Header badge reflects the state: applied vs. out for approval (with the workflow state).
 	const nodeClass = applied ? "done" : "pending";
@@ -244,6 +270,7 @@ function _summary_mode(frm, mode) {
 			novo_vigilante: d.novo_vigilante, motivo: d.motivo, motivo_3meses: d.motivo_3meses,
 		},
 		callback: (r) => {
+			if (frm._rotw_summary_gen !== gen) return;   // a newer render already won
 			let body;
 			try {
 				body = sigos.render_rotatividade_preview(r.message || {}) + extras;
@@ -254,6 +281,7 @@ function _summary_mode(frm, mode) {
 			frm.fields_dict.wizard_canvas.$wrapper.html(shell(body));
 		},
 		error: () => {
+			if (frm._rotw_summary_gen !== gen) return;
 			$wrapper.html(shell(`<div class="rotw-none">${__("Não foi possível calcular a pré-visualização.")}</div>${extras}`));
 		},
 	});
