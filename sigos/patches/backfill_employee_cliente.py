@@ -1,5 +1,7 @@
 import frappe
 
+from sigos.install import _load_custom_fields
+
 
 def execute():
 	"""One-time backfill for the new Employee.custom_cliente ops-mirror field
@@ -7,7 +9,13 @@ def execute():
 	filter by Cliente without joining through Vigilante on every request. New
 	saves are kept in sync going forward by vigilante_to_employee(); this just
 	seeds existing rows from their linked Vigilante's cliente.
+
+	Runs as a post_model_sync patch, which fires BEFORE the after_migrate hook
+	that normally creates custom_fields.json fields — so custom_cliente may not
+	exist yet on this site. Load custom fields here first to guarantee it does.
 	"""
+	_load_custom_fields()
+
 	frappe.db.sql(
 		"""
 		UPDATE `tabEmployee` e
