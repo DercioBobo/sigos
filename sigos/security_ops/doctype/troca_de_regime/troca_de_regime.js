@@ -8,9 +8,12 @@ frappe.ui.form.on("Troca De Regime", {
 	},
 
 	onload(frm) {
-		frm.set_query("vigilante", () => ({
-			filters: { status: "Activo" },
-		}));
+		_filtro_vigilante(frm);
+	},
+
+	delegacao(frm) {
+		if (frm.doc.vigilante) frm.set_value("vigilante", "");
+		_filtro_vigilante(frm);
 	},
 
 	vigilante(frm) {
@@ -21,6 +24,14 @@ frappe.ui.form.on("Troca De Regime", {
 		_sugerir_accao_escala(frm);
 	},
 });
+
+// Scope the vigilante picker to Activo status, and to the chosen delegação if any.
+function _filtro_vigilante(frm) {
+	const deleg = frm.doc.delegacao;
+	frm.set_query("vigilante", () => ({
+		filters: deleg ? { status: "Activo", delegacao: deleg } : { status: "Activo" },
+	}));
+}
 
 // Look at the guard's posto + chosen new regime and steer "Acção na Escala":
 //  - posto exists & escala already exists for (posto, novo_regime) → allocate existing / leave
