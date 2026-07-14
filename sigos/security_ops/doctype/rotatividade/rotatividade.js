@@ -4,8 +4,10 @@
 //     workflow Actions button drives the transitions
 //   - submitted / docstatus 1 (applied)                          -> summary + "Reverter"
 // Editability is never inferred from a hardcoded workflow_state name (e.g.
-// "Rascunho") — that's the Workflow doctype's job (its per-state "allow_edit"
-// role rules already drive frm.perm). We just read the verdict.
+// "Rascunho") or from generic doc write permission — an approver reviewing a
+// later step may well have doctype-level write access without the Workflow's
+// own per-state "allow_edit" roles covering them. frappe.workflow.is_read_only()
+// is the one native check that reflects that distinction; we just read its verdict.
 // Native fields are hidden in every mode; the canvas is the whole experience.
 //
 // Confirmar behaviour adapts automatically:
@@ -43,10 +45,10 @@ function _mode(frm) {
 	// A brand-new, unsaved doc is always the wizard, before the Workflow has had
 	// any state (and hence any permission verdict) to apply.
 	if (frm.is_new()) return "wizard";
-	// Beyond that, defer entirely to the native permission the Workflow computed
-	// for the current user at this document's current state — no state-name
-	// guessing. If they can write to it, it's the wizard; if not, it's locked.
-	if (_has_workflow(frm) && !(frm.perm[0] && frm.perm[0].write)) return "pending";
+	// Beyond that, defer entirely to the Workflow's own per-state edit-role
+	// verdict for the current user — no state-name guessing, and no reliance on
+	// generic doc write permission (which an approver may also happen to have).
+	if (_has_workflow(frm) && frappe.workflow.is_read_only(frm.doctype, frm.doc.name)) return "pending";
 	return "wizard";
 }
 
