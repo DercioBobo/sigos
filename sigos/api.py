@@ -221,6 +221,66 @@ def get_escalados_no_posto_dia(doctype, txt, searchfield, start, page_len, filte
 
 
 @frappe.whitelist()
+def get_vigilantes_de_folga_no_posto_dia(doctype, txt, searchfield, start, page_len, filters):
+	"""
+	Link search for 'Horas Extras': only Vigilantes on FOLGA (day off) at the given
+	posto on the given day — called in for an unplanned extra shift. Mirrors
+	get_escalados_no_posto_dia's shape/exclusions but sources from the opposite pool
+	(t.e_folga=1) and additionally requires an Activo escala, since folga rows are
+	more likely to be stale future rows an archived Escala never pruned.
+	"""
+	import json
+	if isinstance(filters, str):
+		filters = json.loads(filters)
+
+	posto       = filters.get("posto")   or ""
+	data        = filters.get("data")    or ""
+	excluir     = filters.get("excluir") or ""
+	excluir_doc = filters.get("excluir_doc") or ""
+	excluir_lista = filters.get("excluir_lista") or []
+	if isinstance(excluir_lista, str):
+		excluir_lista = json.loads(excluir_lista)
+	if not (posto and data):
+		return []
+
+	lista = [v for v in excluir_lista if v]
+	if excluir:
+		lista.append(excluir)
+	excluir_sql = "AND te.vigilante NOT IN %(lista)s" if lista else ""
+	excl_doc_sql = "AND ax.name != %(excluir_doc)s" if excluir_doc else ""
+
+	return frappe.db.sql(
+		f"""
+		SELECT DISTINCT te.vigilante, v.nome_completo, te.turno
+		FROM `tabTabela De Escala De Vigilante` te
+		JOIN `tabVigilante` v ON v.name = te.vigilante
+		JOIN `tabEscala Do Vigilante` e ON e.name = te.parent AND e.estado = 'Activo'
+		JOIN `tabTurno` t ON t.name = te.turno
+		WHERE te.posto = %(posto)s AND te.data = %(data)s AND t.e_folga = 1
+		  AND (te.vigilante LIKE %(txt)s OR v.nome_completo LIKE %(txt)s)
+		  {excluir_sql}
+		  AND NOT EXISTS (
+			SELECT 1 FROM `tabTabela Ausencia` tax
+			JOIN `tabAusencias` ax ON ax.name = tax.parent
+			WHERE ax.docstatus = 1 AND ax.data = %(data)s {excl_doc_sql}
+			  AND tax.vigilante = te.vigilante
+		  )
+		ORDER BY v.nome_completo
+		LIMIT %(start)s, %(page_len)s
+		""",
+		{
+			"posto":       posto,
+			"data":        data,
+			"lista":       tuple(lista) or ("",),
+			"excluir_doc": excluir_doc,
+			"txt":         f"%{txt}%",
+			"start":       start,
+			"page_len":    page_len,
+		},
+	)
+
+
+@frappe.whitelist()
 def get_substitutos_para_wizard(doctype, txt, searchfield, start, page_len, filters):
 	"""
 	Wizard substituto search: benched reserve guards (status = Reserva) AND not in another

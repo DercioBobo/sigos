@@ -15,16 +15,17 @@ let _nomes_cache = {};            // vigilante docname -> nome_completo (compact
 let _atraso_restam = null;        // minutes until the cutoff (null when n/a or already late)
 let _limites_cache = {};          // SIGOS Settings hora_limite_* (fetched once per session)
 
-const ACCOES = ["Sem Ação", "Substituto", "Dobra de Turno", "Meia Dobra", "Adiantamento de Turno"];
+const ACCOES = ["Sem Ação", "Substituto", "Dobra de Turno", "Meia Dobra", "Adiantamento de Turno", "Horas Extras"];
 const PERIODO_CLASSE = { "Manhã": "per-manha", "Noite": "per-noite", "Tarde": "per-tarde" };
 const ACCAO_FIELD = {
 	"Substituto":             "vigilante_substituto",
 	"Dobra de Turno":         "vigilante_a_dobrar",
 	"Meia Dobra":             "vigilante_a_meia_dobra",
 	"Adiantamento de Turno":  "vigilante_a_adiantar",
+	"Horas Extras":           "vigilante_a_horas_extras",
 };
-const ACCAO_LABEL = { "Substituto": "Substituto", "Dobra de Turno": "A dobrar", "Meia Dobra": "Meia dobra", "Adiantamento de Turno": "A adiantar" };
-const PICKER_FIELDS = ["vigilante_substituto", "vigilante_a_dobrar", "vigilante_a_meia_dobra", "vigilante_a_adiantar"];
+const ACCAO_LABEL = { "Substituto": "Substituto", "Dobra de Turno": "A dobrar", "Meia Dobra": "Meia dobra", "Adiantamento de Turno": "A adiantar", "Horas Extras": "Horas extras" };
+const PICKER_FIELDS = ["vigilante_substituto", "vigilante_a_dobrar", "vigilante_a_meia_dobra", "vigilante_a_adiantar", "vigilante_a_horas_extras"];
 
 // ─── Main form events ─────────────────────────────────────────────────────────
 frappe.ui.form.on("Ausencias", {
@@ -39,7 +40,7 @@ frappe.ui.form.on("Ausencias", {
 		// the header fields are mounted as controls inside the deck. The atraso section
 		// is deck-handled too (inline motivo + footer note), so it stays hidden.
 		["btn_adicionar_ausencia", "resumo_ausencias", "tabela_ausencia",
-		 "data", "periodo", "grupo_delegados", "col_break_1",
+		 "data", "periodo", "grupo_delegados", "col_break_1", "e_abandono_de_posto",
 		 "sec_atraso", "alerta_atraso", "motivo_atraso", "col_break_atraso", "hora_submissao_tardia"]
 			.forEach(f => frm.set_df_property(f, "hidden", 1));
 
@@ -75,6 +76,7 @@ frappe.ui.form.on("Tabela Ausencia", {
 	vigilante_a_dobrar(frm, cdt, cdn)   { _check_duplicate(frm, cdt, cdn, "vigilante_a_dobrar", __("Este vigilante a dobrar já foi usado.")); },
 	vigilante_a_meia_dobra(frm, cdt, cdn) { _check_duplicate(frm, cdt, cdn, "vigilante_a_meia_dobra", __("Este vigilante a meia dobrar já foi usado.")); },
 	vigilante_a_adiantar(frm, cdt, cdn) { _check_duplicate(frm, cdt, cdn, "vigilante_a_adiantar", __("Este vigilante a adiantar já foi usado.")); },
+	vigilante_a_horas_extras(frm, cdt, cdn) { _check_duplicate(frm, cdt, cdn, "vigilante_a_horas_extras", __("Este vigilante em horas extras já foi usado.")); },
 	regime(frm, cdt, cdn)               { _set_n_faltas(frm, cdt, cdn); },
 	turno(frm, cdt, cdn)                { _set_n_faltas(frm, cdt, cdn); },
 });
@@ -117,6 +119,7 @@ function _build_shell(frm, w, formEditable, locked) {
 				<div class="ausd-field"><label>${__("Data")}</label><div id="ausd-ctrl-data"></div></div>
 				<div class="ausd-field"><label>${__("Período")}</label><div id="ausd-ctrl-periodo"></div></div>
 				<div class="ausd-field"><label>${__("Grupo De Delegados")}</label><div id="ausd-ctrl-grupo"></div></div>
+				<div class="ausd-field ausd-field-check"><label>${__("Abandono de Posto")}</label><div id="ausd-ctrl-abandono"></div></div>
 			</div>
 			${formEditable ? `
 			<div class="ausb-search">
@@ -199,7 +202,15 @@ function _mount_header_controls(frm, w, formEditable) {
 	});
 	if (frm.doc.grupo_delegados) c_grupo.set_value(frm.doc.grupo_delegados);
 
-	frm._ausd_controls = { data: c_data, periodo: c_periodo, grupo: c_grupo };
+	const c_abandono = frappe.ui.form.make_control({
+		df: { fieldtype: "Check", fieldname: "e_abandono_de_posto", read_only: ro,
+			description: __("Registo independente para um vigilante que abandonou o posto depois de já estar presente."),
+			onchange: () => { const v = c_abandono.get_value(); if (v !== frm.doc.e_abandono_de_posto) frm.set_value("e_abandono_de_posto", v); } },
+		parent: w.find("#ausd-ctrl-abandono"), render_input: true,
+	});
+	c_abandono.set_value(frm.doc.e_abandono_de_posto || 0);
+
+	frm._ausd_controls = { data: c_data, periodo: c_periodo, grupo: c_grupo, abandono: c_abandono };
 }
 
 // ─── Search → add absentees ───────────────────────────────────────────────────
@@ -368,7 +379,7 @@ function _add_absent(frm, w, vd) {
 	row.periodo           = vd.periodo;
 	row.delegacao         = vd.delegacao;
 	row.n_de_faltas       = vd.n_de_faltas ?? 1;
-	row.tipo_de_ausencia  = "Falta";
+	row.tipo_de_ausencia  = frm.doc.e_abandono_de_posto ? "Abandono de Posto" : "Falta";
 	row.proxima_accao     = "Sem Ação";
 
 	frm.dirty();
@@ -423,7 +434,9 @@ function _rerender_card(frm, w, row, formEditable) {
 // A card is complete when its action doesn't need a replacement guard, or has one.
 function _card_completa(row) {
 	const campo = ACCAO_FIELD[row.proxima_accao];
-	return !campo || !!row[campo];
+	if (campo && !row[campo]) return false;
+	if (row.tipo_de_ausencia === "Abandono de Posto" && !row.jutificativo) return false;
+	return true;
 }
 
 function _abrir_card(frm, w, row) {
@@ -436,8 +449,12 @@ function _confirmar_card(frm, w, row) {
 	if (!_card_completa(row)) {
 		const $c = w.find(`[data-aus-cards] [data-cdn="${row.name}"]`);
 		$c.addClass("is-incompleta");
+		const campo = ACCAO_FIELD[row.proxima_accao];
+		const falta_motivo = row.tipo_de_ausencia === "Abandono de Posto" && !row.jutificativo;
 		$c.find("[data-hint-inc]")
-			.text(__("Falta escolher o vigilante para a acção \"{0}\".", [row.proxima_accao]))
+			.text(falta_motivo && !(campo && !row[campo])
+				? __("Falta preencher o Motivo do Abandono de Posto.")
+				: __("Falta escolher o vigilante para a acção \"{0}\".", [row.proxima_accao]))
 			.show();
 		return false;
 	}
@@ -523,6 +540,10 @@ function _card_aberta(frm, w, row) {
 				<button type="button" class="ausb-confirm" title="${__("Confirmar")}">&#10003;</button>
 				<button type="button" class="ausb-remove" title="${__("Remover")}">×</button>
 			</div>
+			${row.tipo_de_ausencia === "Abandono de Posto" ? `
+			<label class="ausb-f ausb-motivo${row.jutificativo ? "" : " is-incompleta"}">
+				<span>${__("Motivo (obrigatório)")}</span><div data-motivo></div>
+			</label>` : ""}
 			<div class="ausb-picker" data-picker></div>
 			<div class="ausb-hint-inc" data-hint-inc style="display:none"></div>
 		</div>`);
@@ -541,6 +562,23 @@ function _card_aberta(frm, w, row) {
 		parent: $card.find("[data-justif]"), render_input: true,
 	});
 	if (row.tipo_justificacao) cj.set_value(row.tipo_justificacao);
+
+	// Motivo (jutificativo) — free-text, required only for Abandono de Posto rows.
+	if (row.tipo_de_ausencia === "Abandono de Posto") {
+		const cm = frappe.ui.form.make_control({
+			df: {
+				fieldtype: "Data", fieldname: "jutificativo",
+				placeholder: __("Porque motivo o vigilante abandonou o posto…"),
+				onchange: () => {
+					const v = cm.get_value();
+					if ((v || "") !== (row.jutificativo || "")) frappe.model.set_value(row.doctype, row.name, "jutificativo", v || null);
+					$card.find(".ausb-motivo").toggleClass("is-incompleta", !v);
+				},
+			},
+			parent: $card.find("[data-motivo]"), render_input: true,
+		});
+		if (row.jutificativo) cm.set_value(row.jutificativo);
+	}
 
 	$card.find('[data-f="proxima_accao"]').on("change", function () {
 		const accao = this.value;
@@ -661,6 +699,15 @@ function _mount_picker(frm, w, row, $card, accao, formEditable) {
 						excluir_lista: JSON.stringify(fora),
 						excluir_doc: frm.is_new() ? "" : frm.doc.name,
 					} };
+				if (field === "vigilante_a_horas_extras")
+					// the OPPOSITE pool of Dobra/Meia Dobra — only guards on FOLGA at this
+					// posto on this day, called in for an unplanned extra shift
+					return { query: "sigos.api.get_vigilantes_de_folga_no_posto_dia", filters: {
+						posto: row.posto || "", data: frm.doc.data,
+						excluir: row.vigilante || "",
+						excluir_lista: JSON.stringify(fora),
+						excluir_doc: frm.is_new() ? "" : frm.doc.name,
+					} };
 				// vigilante_a_adiantar — a guard of the SAME posto brings their shift forward
 				return { filters: {
 					posto_de_vigilancia: row.posto || "", status: "Activo",
@@ -701,6 +748,7 @@ function _update_stats(frm, w) {
 	const dobras = rows.filter(r => r.proxima_accao === "Dobra de Turno").length;
 	const meias  = rows.filter(r => r.proxima_accao === "Meia Dobra").length;
 	const adiant = rows.filter(r => r.proxima_accao === "Adiantamento de Turno").length;
+	const horasExtras = rows.filter(r => r.proxima_accao === "Horas Extras").length;
 	const tile = (n, l, c) => `<div class="ausd-tile ${c || ""}"><span class="n">${n}</span><span class="lbl">${l}</span></div>`;
 	const tiles = [
 		tile(rows.length, __("ausentes"), "t-aus"),
@@ -709,6 +757,7 @@ function _update_stats(frm, w) {
 		dobras ? tile(dobras, __("dobras"),      "t-dob") : "",
 		meias  ? tile(meias,  __("meias dobras"), "t-mdb") : "",
 		adiant ? tile(adiant, __("adiantam."),   "t-adi") : "",
+		horasExtras ? tile(horasExtras, __("horas extras"), "t-he") : "",
 	].join("");
 	const warn = (_atraso_estado === "tardia" && frm.doc.docstatus !== 1)
 		? `<div class="ausd-warn">${__("Submissão fora do horário — preencha o <b>Motivo do Atraso</b> abaixo antes de gravar.")}</div>` : "";
@@ -937,6 +986,8 @@ function _inject_css() {
 .ausd-controls { display: flex; flex-direction: row; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
 .ausd-field { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 150px; }
 .ausd-field > label { font-size: .7em; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: rgba(255,255,255,.65); margin: 0; }
+.ausd-field-check { flex: 0 0 auto; min-width: 0; justify-content: flex-end; }
+.ausd-field-check .control-input-wrapper { display: flex; align-items: center; height: 32px; }
 #sigos-aus-deck .frappe-control { margin: 0 !important; }
 #sigos-aus-deck .control-label, #sigos-aus-deck .help-box { display: none !important; }
 #sigos-aus-deck .control-input input, #sigos-aus-deck .control-input select, #sigos-aus-deck .control-input .input-with-feedback {
@@ -1036,6 +1087,9 @@ function _inject_css() {
 .ausb-confirm:hover { background: #2fa56a; }
 .ausb-card.is-incompleta { border-left-color: #e8a020; box-shadow: 0 0 0 1px rgba(232,160,32,.55); }
 .ausb-hint-inc { margin-top: 8px; font-size: .78em; font-weight: 600; color: #f4cd84; }
+.ausb-motivo { margin-top: 10px; max-width: 420px; }
+.ausb-motivo.is-incompleta > span { color: #f4cd84; }
+.ausb-motivo.is-incompleta .control-input input { box-shadow: 0 0 0 1px rgba(232,160,32,.55); }
 .ausb-pick { display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,.16); border-radius: 8px; padding: 7px 10px; }
 .ausb-pick-arrow { color: #f4cd84; font-weight: 700; }
 .ausb-pick-label { font-size: .76em; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: rgba(255,255,255,.7); white-space: nowrap; }
@@ -1051,6 +1105,7 @@ function _inject_css() {
 .ausd-tile.t-dob .n { color: #f4cd84; }
 .ausd-tile.t-mdb .n { color: #8fe6b8; }
 .ausd-tile.t-adi .n { color: #c6b6ff; }
+.ausd-tile.t-he .n { color: #ffb27a; }
 .ausd-warn { margin-top: 14px; padding: 9px 13px; border-radius: 9px; font-size: .82em; font-weight: 600; background: rgba(224,92,92,.16); border: 1px solid rgba(224,92,92,.4); color: #ffd0d0; }
 .ausd-warn b { color: #fff; }
 

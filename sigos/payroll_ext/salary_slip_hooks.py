@@ -29,6 +29,7 @@ from sigos.utils import (
 	calcular_faltas_pendentes_vigilante,
 	calcular_dobras_vigilante,
 	calcular_meias_dobras_vigilante,
+	calcular_horas_extras_vigilante,
 	calcular_faltas_vermelhas_vigilante,
 )
 
@@ -150,6 +151,7 @@ def before_validate(doc, method):
 	_add_faltas_deduction(doc)          # uses the configured method
 	_add_dobras(doc)                    # extra pay for covered shifts (earning)
 	_add_meia_dobra(doc)                # extra pay for HALF covered shifts (earning)
+	_add_horas_extras(doc)              # extra pay for folga guard called in (earning)
 	_add_proporcional_admissao_demissao(doc)   # prorate base for partial-month employment
 	_compute_dias_trabalhados(doc)
 
@@ -797,6 +799,56 @@ def _add_meia_dobra(doc):
 	except Exception as e:
 		frappe.log_error(
 			f"SalarySlip {doc.name}: erro ao adicionar meia dobra: {e}",
+			"SIGOS Salary Slip Hooks",
+		)
+
+
+def _add_horas_extras(doc):
+	"""
+	Credit a guard for Horas Extras — an off-duty (folga) guard called in to cover an
+	absence at their posto. Own gate/método/componente from SIGOS Settings, independent
+	of dobras_activo — a materially different real-world event from Dobra (already
+	present guard doubling up), priced like a full shift (no 0.5 factor).
+	"""
+	if not doc.custom_vigilante or not doc.start_date or not doc.end_date:
+		return
+	try:
+		settings = frappe.get_single("SIGOS Settings")
+		if not settings.horas_extras_activo:
+			doc.custom_horas_extras_no_mes = 0
+			return
+
+		componente = settings.componente_horas_extras or "Horas Extras"
+		if not frappe.db.exists("Salary Component", componente):
+			return
+
+		n_he = calcular_horas_extras_vigilante(doc.custom_vigilante, doc.start_date, doc.end_date)
+		doc.custom_horas_extras_no_mes = n_he
+		if n_he <= 0:
+			return
+
+		if (settings.metodo_calculo_horas_extras or "Proporcional ao Salário") == "Valor Fixo por Horas Extras":
+			amount = n_he * (settings.valor_fixo_por_horas_extras or 0)
+		else:
+			base = _get_salario_base(doc)
+			dias = doc.custom_dias_de_trabalho or 0
+			amount = (base / dias) * n_he if dias > 0 else 0
+
+		amount = round(amount, 2)
+		if amount <= 0:
+			return
+
+		for e in doc.earnings:
+			if e.salary_component == componente:
+				e.amount = amount
+				return
+		doc.append("earnings", {
+			"salary_component": componente,
+			"amount": amount,
+		})
+	except Exception as e:
+		frappe.log_error(
+			f"SalarySlip {doc.name}: erro ao adicionar horas extras: {e}",
 			"SIGOS Salary Slip Hooks",
 		)
 

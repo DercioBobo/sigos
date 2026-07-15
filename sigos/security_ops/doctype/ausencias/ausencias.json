@@ -15,6 +15,7 @@
   "periodo",
   "col_break_1",
   "grupo_delegados",
+  "e_abandono_de_posto",
   "sec_atraso",
   "alerta_atraso",
   "motivo_atraso",
@@ -70,6 +71,13 @@
    "reqd": 1,
    "in_list_view": 1,
    "in_standard_filter": 1
+  },
+  {
+   "fieldname": "e_abandono_de_posto",
+   "fieldtype": "Check",
+   "label": "Registo de Abandono de Posto",
+   "default": "0",
+   "description": "Registo independente para um vigilante que abandonou o posto depois de já estar presente — descoberto tarde, mesmo que a folha normal deste período já tenha sido submetida."
   },
   {
    "fieldname": "sec_atraso",

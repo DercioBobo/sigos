@@ -42,6 +42,7 @@
   "valor_fixo_por_falta",
   "valor_fixo_por_falta_vermelha",
   "base_dias_de_trabalho",
+  "n_faltas_abandono_posto",
   "sec_ss_arma",
   "componente_subsidio_arma",
   "col_ss_arma",
@@ -54,6 +55,12 @@
   "col_ss_dobra",
   "valor_fixo_por_dobra",
   "valor_fixo_por_meia_dobra",
+  "sec_ss_horas_extras",
+  "horas_extras_activo",
+  "metodo_calculo_horas_extras",
+  "componente_horas_extras",
+  "col_ss_horas_extras",
+  "valor_fixo_por_horas_extras",
   "sec_ss_comp",
   "componente_retroativo",
   "componente_emprestimo",
@@ -311,6 +318,13 @@
    "description": "Dias do Mês: total de dias do período (ex: 30). Dias Úteis: usa o total_working_days do HRMS."
   },
   {
+   "fieldname": "n_faltas_abandono_posto",
+   "fieldtype": "Int",
+   "label": "Nº de Faltas por Abandono de Posto",
+   "default": "1",
+   "description": "Número de faltas debitado automaticamente quando um vigilante é registado como Abandono de Posto — valor fixo, não passa pelo cálculo de peso de regime/turno usado nas faltas normais."
+  },
+  {
    "fieldname": "sec_ss_arma",
    "fieldtype": "Section Break",
    "label": "Subsídio de Arma"
@@ -364,6 +378,37 @@
    "description": "Valor pago por cada MEIA dobra (turno de meio-dia coberto), apenas para o método Valor Fixo. No método Proporcional, a meia dobra usa metade do valor de uma dobra inteira automaticamente."
   },
   {
+   "fieldname": "sec_ss_horas_extras",
+   "fieldtype": "Section Break",
+   "label": "Horas Extras (Pagamento Extra)"
+  },
+  {
+   "fieldname": "horas_extras_activo",
+   "fieldtype": "Check",
+   "label": "Activar Pagamento de Horas Extras",
+   "default": "0",
+   "description": "Quando activo, o vigilante de folga chamado para cobrir uma ausência (Horas Extras na Tabela de Ausências) recebe um pagamento extra na Salary Slip."
+  },
+  {
+   "fieldname": "metodo_calculo_horas_extras",
+   "fieldtype": "Select",
+   "label": "Método de Cálculo de Horas Extras",
+   "options": "Proporcional ao Salário\nValor Fixo por Horas Extras",
+   "default": "Proporcional ao Salário",
+   "description": "Proporcional: (Salário Base ÷ Dias de Trabalho) × Nº de Horas Extras. Valor Fixo: Nº de Horas Extras × Valor por Horas Extras."
+  },
+  {
+   "fieldname": "col_ss_horas_extras",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "valor_fixo_por_horas_extras",
+   "fieldtype": "Currency",
+   "label": "Valor Fixo por Horas Extras",
+   "depends_on": "eval: doc.metodo_calculo_horas_extras == 'Valor Fixo por Horas Extras'",
+   "description": "Valor pago por cada turno de horas extras coberto (apenas para o método Valor Fixo)."
+  },
+  {
    "fieldname": "sec_ss_comp",
    "fieldtype": "Section Break",
    "label": "Outros Componentes Salariais",
@@ -402,6 +447,13 @@
    "label": "Salary Component — Meia Dobra",
    "options": "Salary Component",
    "description": "Provento (tipo Earning) pago pela cobertura de MEIO turno — linha própria, separada da Dobra inteira. Padrão: \"Meia Dobra\""
+  },
+  {
+   "fieldname": "componente_horas_extras",
+   "fieldtype": "Link",
+   "label": "Salary Component — Horas Extras",
+   "options": "Salary Component",
+   "description": "Provento (tipo Earning) pago por chamar um vigilante de folga para cobrir uma ausência. Padrão: \"Horas Extras\""
   },
   {
    "fieldname": "col_ss_pay2",

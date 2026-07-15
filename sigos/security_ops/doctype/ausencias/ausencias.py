@@ -1,6 +1,7 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
+from frappe.model.naming import make_autoname
 from frappe.utils import now_datetime
 from sigos.utils import calcular_n_faltas_efetivo
 
@@ -12,11 +13,18 @@ class Ausencias(Document):
 		# The unique name blocks a duplicate sheet at insert; _validar_unicidade is
 		# the friendlier belt-and-suspenders. (Amended docs are named by Frappe as
 		# <original>-1 before this runs.)
+		# Abandono de Posto is a DIFFERENT identity: a late-discovered post-departure,
+		# filed independently of (and possibly alongside) the normal roster sheet for
+		# the same data/período/grupo — so it can't share that sheet's name, and gets
+		# its own series instead.
 		if not (self.data and self.periodo and self.grupo_delegados):
 			frappe.throw(
 				_("Defina <b>Data</b>, <b>Período</b> e <b>Grupo De Delegados</b> antes de gravar.")
 			)
-		self.name = f"{self.periodo}-{self.data}-{self.grupo_delegados}"
+		if self.e_abandono_de_posto:
+			self.name = make_autoname("AUS-ABD-.YY.-.##")
+		else:
+			self.name = f"{self.periodo}-{self.data}-{self.grupo_delegados}"
 
 	def validate(self):
 		self._validar_campos_imutaveis()
@@ -25,6 +33,7 @@ class Ausencias(Document):
 		self._validar_duplicados_na_tabela()
 		self._validar_tipo_ausencia()
 		self._validar_subtipo_falta()
+		self._validar_abandono_de_posto()
 		self._validar_proxima_accao()
 		self._validar_estado_substitutos()
 		self._validar_conflitos_de_substituicao()
@@ -57,6 +66,7 @@ class Ausencias(Document):
 			"Dobra de Turno": "vigilante_a_dobrar",
 			"Meia Dobra": "vigilante_a_meia_dobra",
 			"Adiantamento de Turno": "vigilante_a_adiantar",
+			"Horas Extras": "vigilante_a_horas_extras",
 		}
 		for row in self.tabela_ausencia or []:
 			if not row.vigilante:
@@ -90,6 +100,7 @@ class Ausencias(Document):
 			return
 		for campo, label in (
 			("data", "Data"), ("periodo", "Período"), ("grupo_delegados", "Grupo De Delegados"),
+			("e_abandono_de_posto", "Registo de Abandono de Posto"),
 		):
 			valor_antes = str(antes.get(campo) or "")
 			# fill-once: legacy drafts may have the field empty — allow setting it
@@ -101,6 +112,10 @@ class Ausencias(Document):
 				)
 
 	def _validar_unicidade(self):
+		if self.e_abandono_de_posto:
+			# Multiple correction records may exist for the same data/período/grupo —
+			# each one a separate, later-discovered post-departure. Not a duplicate sheet.
+			return
 		existe = frappe.db.exists("Ausencias", {
 			"data": self.data,
 			"periodo": self.periodo,
@@ -216,12 +231,31 @@ class Ausencias(Document):
 					_("Linha {0}: defina o <b>Subtipo de Falta</b> (Normal ou Vermelha).").format(i)
 				)
 
+	def _validar_abandono_de_posto(self):
+		"""Every row on an Abandono de Posto document must actually be that tipo (not
+		a mix), and must carry a motivo (jutificativo) — the whole point of this record
+		type is a justified, late-discovered post-departure, never a silent one."""
+		if not self.e_abandono_de_posto:
+			return
+		for i, row in enumerate(self.tabela_ausencia or [], start=1):
+			if row.tipo_de_ausencia != "Abandono de Posto":
+				frappe.throw(
+					_("Linha {0}: o Tipo de Ausência deve ser <b>Abandono de Posto</b> "
+					  "neste tipo de registo.").format(i)
+				)
+			if not row.jutificativo:
+				frappe.throw(
+					_("Linha {0}: o <b>Motivo</b> é obrigatório para um registo de "
+					  "Abandono de Posto.").format(i)
+				)
+
 	def _validar_proxima_accao(self):
 		accao_campo = {
 			"Substituto":        "vigilante_substituto",
 			"Dobra de Turno":    "vigilante_a_dobrar",
 			"Meia Dobra":        "vigilante_a_meia_dobra",
 			"Adiantamento de Turno": "vigilante_a_adiantar",
+			"Horas Extras":      "vigilante_a_horas_extras",
 		}
 		for i, row in enumerate(self.tabela_ausencia or [], start=1):
 			campo = accao_campo.get(row.proxima_accao)
@@ -231,6 +265,7 @@ class Ausencias(Document):
 					"vigilante_a_dobrar":   "Vigilante a Dobrar",
 					"vigilante_a_meia_dobra": "Vigilante a Meia Dobrar",
 					"vigilante_a_adiantar": "Vigilante a Adiantar",
+					"vigilante_a_horas_extras": "Vigilante a Horas Extras",
 				}
 				frappe.throw(
 					_("Linha {0}: acção <b>{1}</b> selecionada mas <b>{2}</b> não foi preenchido.").format(
@@ -263,7 +298,7 @@ class Ausencias(Document):
 		"""A guard cannot be absent AND covering an absence on the same day.
 		Checks both directions: within this doc, and against SUBMITTED docs of the
 		same date (the pickers filter most of this out, this is the hard fence)."""
-		campos = ("vigilante_substituto", "vigilante_a_dobrar", "vigilante_a_meia_dobra", "vigilante_a_adiantar")
+		campos = ("vigilante_substituto", "vigilante_a_dobrar", "vigilante_a_meia_dobra", "vigilante_a_adiantar", "vigilante_a_horas_extras")
 		rows = self.tabela_ausencia or []
 		ausentes = {r.vigilante for r in rows if r.vigilante}
 		cobrem = {r.get(c) for r in rows for c in campos if r.get(c)}
@@ -308,14 +343,16 @@ class Ausencias(Document):
 			cobrindo = frappe.db.sql(
 				f"""
 				SELECT a.name AS doc,
-				       ta.vigilante_substituto, ta.vigilante_a_dobrar, ta.vigilante_a_meia_dobra, ta.vigilante_a_adiantar
+				       ta.vigilante_substituto, ta.vigilante_a_dobrar, ta.vigilante_a_meia_dobra,
+				       ta.vigilante_a_adiantar, ta.vigilante_a_horas_extras
 				FROM `tabTabela Ausencia` ta
 				JOIN `tabAusencias` a ON a.name = ta.parent
 				WHERE a.docstatus = 1 AND a.data = %(d)s AND a.name != %(eu)s
 				  AND (ta.vigilante_substituto IN %(aus)s
 				       OR ta.vigilante_a_dobrar IN %(aus)s
 				       OR ta.vigilante_a_meia_dobra IN %(aus)s
-				       OR ta.vigilante_a_adiantar IN %(aus)s)
+				       OR ta.vigilante_a_adiantar IN %(aus)s
+				       OR ta.vigilante_a_horas_extras IN %(aus)s)
 				""",
 				{"d": self.data, "eu": self.name or "", "aus": tuple(ausentes)},
 				as_dict=True,
@@ -425,9 +462,17 @@ class Ausencias(Document):
 		absence, this one counts 1. Cross-document, so it reads the other absences.
 		"""
 		for row in self.tabela_ausencia or []:
-			row.n_de_faltas = calcular_n_faltas_efetivo(
-				row.vigilante, row.regime, row.turno, self.data
-			)
+			if row.tipo_de_ausencia == "Abandono de Posto":
+				# Flat, directly-configurable count — deliberately bypasses the regime/
+				# turno weight + escala de-dup engine below, which is about DIDN'T-show-up
+				# faltas, not a guard who worked most of the shift then left.
+				row.n_de_faltas = frappe.db.get_single_value(
+					"SIGOS Settings", "n_faltas_abandono_posto"
+				) or 1
+			else:
+				row.n_de_faltas = calcular_n_faltas_efetivo(
+					row.vigilante, row.regime, row.turno, self.data
+				)
 
 	def _recalcular_turno_seguinte(self):
 		"""

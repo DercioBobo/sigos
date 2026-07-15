@@ -287,6 +287,28 @@ def calcular_meias_dobras_vigilante(vigilante: str, start_date, end_date) -> int
 	return int(row[0][0]) if row and row[0] else 0
 
 
+def calcular_horas_extras_vigilante(vigilante: str, start_date, end_date) -> int:
+	"""
+	Number of Horas Extras shifts a guard covered (an off-duty/folga guard called in)
+	in [start, end], from SUBMITTED Ausencias. Own counter (not folded into dobras)
+	because the covering pool and the real-world event are different — see
+	tabela_ausencia.vigilante_a_horas_extras.
+	"""
+	if not vigilante:
+		return 0
+	row = frappe.db.sql(
+		"""
+		SELECT COUNT(*)
+		FROM `tabTabela Ausencia` ta
+		JOIN `tabAusencias` a ON a.name = ta.parent
+		WHERE a.docstatus = 1 AND a.data BETWEEN %(s)s AND %(e)s
+		  AND ta.proxima_accao = 'Horas Extras' AND ta.vigilante_a_horas_extras = %(v)s
+		""",
+		{"v": vigilante, "s": getdate(start_date), "e": getdate(end_date)},
+	)
+	return int(row[0][0]) if row and row[0] else 0
+
+
 def _existe_falta(vigilante: str, data, excluir_ausencia: str = None) -> bool:
 	"""True if a SUBMITTED absence exists for the guard on `data`."""
 	cond = ""
