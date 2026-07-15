@@ -205,11 +205,38 @@ function _mount_header_controls(frm, w, formEditable) {
 
 	const c_tipo_registo = frappe.ui.form.make_control({
 		df: { fieldtype: "Select", fieldname: "tipo_de_registo",
-			options: "\nAbandono de Posto\nFalta de Reserva", read_only: ro,
-			onchange: () => { const v = c_tipo_registo.get_value(); if ((v || "") !== (frm.doc.tipo_de_registo || "")) frm.set_value("tipo_de_registo", v || null); } },
+			options: "Normal\nAbandono de Posto\nFalta de Reserva", read_only: ro,
+			onchange: () => {
+				const v = c_tipo_registo.get_value() || "Normal";
+				const atual = frm.doc.tipo_de_registo || "Normal";
+				if (v === atual) return;
+				const aplicar = () => {
+					frm.set_value("tipo_de_registo", v);
+					if ((frm.doc.tabela_ausencia || []).length) {
+						frm.doc.tabela_ausencia = [];
+						frm.refresh_field("tabela_ausencia");
+						_abertos.clear();
+						frm.dirty();
+					}
+					_invalidar_cache();
+					_render_deck(frm);
+					_refresh_results(frm);
+				};
+				// Rows added under one mode (different search source / tipo_de_ausencia)
+				// don't carry over cleanly to another — confirm before wiping them.
+				if ((frm.doc.tabela_ausencia || []).length) {
+					frappe.confirm(
+						__("Mudar o Tipo de Registo vai limpar os vigilantes já adicionados. Continuar?"),
+						aplicar,
+						() => c_tipo_registo.set_value(atual),
+					);
+				} else {
+					aplicar();
+				}
+			} },
 		parent: w.find("#ausd-ctrl-tipo-registo"), render_input: true,
 	});
-	c_tipo_registo.set_value(frm.doc.tipo_de_registo || "");
+	c_tipo_registo.set_value(frm.doc.tipo_de_registo || "Normal");
 
 	frm._ausd_controls = { data: c_data, periodo: c_periodo, grupo: c_grupo, tipo_registo: c_tipo_registo };
 }
@@ -618,10 +645,12 @@ function _render_badges(frm, $card, row, ctx) {
 	if (!$b.length) return;
 	const n = (ctx ? ctx.efetivo : row.n_de_faltas) ?? 1;
 	const dedup = !!(ctx && ctx.dedup);
-	let html = `<span class="ausb-bdg ${dedup ? "bdg-dedup" : "bdg-peso"}"
-		title="${dedup
-			? __("Turno consecutivo — as folgas já foram contadas na falta anterior")
-			: __("Peso desta falta no regime")}">
+	const titulo = dedup
+		? __("Turno consecutivo — as folgas já foram contadas na falta anterior")
+		: row.tipo_de_ausencia === "Falta de Reserva"
+			? __("Nº de faltas configurado em SIGOS Settings para Falta de Reserva")
+			: __("Peso desta falta no regime");
+	let html = `<span class="ausb-bdg ${dedup ? "bdg-dedup" : "bdg-peso"}" title="${titulo}">
 		${__("conta")} <b>${n}</b> ${n === 1 ? __("falta") : __("faltas")}${dedup ? " · " + __("consecutiva") : ""}</span>`;
 	if (ctx && ctx.acum != null) {
 		html += `<span class="ausb-bdg bdg-mes" title="${__("Faltas acumuladas no mês, incluindo esta")}">
@@ -632,8 +661,11 @@ function _render_badges(frm, $card, row, ctx) {
 
 function _fetch_contextos(frm, w) {
 	// Batch-fetch effective weight + month cumulative for cards that lack it.
+	// Falta de Reserva rows have no regime/turno context (no escala for a Reserva
+	// guard) — their n_de_faltas comes from SIGOS Settings, not the regime weight
+	// engine, so skip them here (the badge falls back to row.n_de_faltas below).
 	if (frm.doc.docstatus === 2 || !frm.doc.data) return;
-	const rows = (frm.doc.tabela_ausencia || []).filter(r => r.vigilante);
+	const rows = (frm.doc.tabela_ausencia || []).filter(r => r.vigilante && r.tipo_de_ausencia !== "Falta de Reserva");
 	const render_all = () => rows.forEach(r => {
 		const ctx = _ctx_cache[`${r.vigilante}|${frm.doc.data}`];
 		const $card = w.find(`[data-cdn="${r.name}"]`);
@@ -1007,7 +1039,11 @@ function _inject_css() {
 #sigos-aus-deck .control-input input:not([type="checkbox"]), #sigos-aus-deck .control-input select, #sigos-aus-deck .control-input .input-with-feedback {
 	background: rgba(255,255,255,.96); border: 1px solid rgba(255,255,255,.25); border-radius: 8px; color: #1a3a5c; font-weight: 600; height: 32px;
 }
-#sigos-aus-deck .control-value, #sigos-aus-deck .like-disabled-input { color: #fff; background: rgba(255,255,255,.08); border-radius: 8px; border-color: rgba(255,255,255,.15); }
+#sigos-aus-deck .control-value, #sigos-aus-deck .like-disabled-input {
+	color: #fff !important; background: rgba(255,255,255,.08); border-radius: 8px; border-color: rgba(255,255,255,.15);
+	padding: 5px 10px; min-height: 32px; box-sizing: border-box; display: flex; align-items: center;
+}
+#sigos-aus-deck .control-value a, #sigos-aus-deck .like-disabled-input a { color: #fff !important; text-decoration: none; }
 
 /* Search-to-add */
 .ausb-search { margin-top: 16px; position: relative; }

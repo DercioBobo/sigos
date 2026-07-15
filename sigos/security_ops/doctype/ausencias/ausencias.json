@@ -76,8 +76,9 @@
    "fieldname": "tipo_de_registo",
    "fieldtype": "Select",
    "label": "Tipo de Registo",
-   "options": "\nAbandono de Posto\nFalta de Reserva",
-   "description": "Em branco: folha normal de ausências. Abandono de Posto: vigilante que abandonou o posto depois de já estar presente — descoberto tarde, mesmo que a folha normal já tenha sido submetida. Falta de Reserva: vigilante em Reserva que faltou, sem posto a cobrir."
+   "options": "Normal\nAbandono de Posto\nFalta de Reserva",
+   "default": "Normal",
+   "description": "Normal: folha normal de ausências. Abandono de Posto: vigilante que abandonou o posto depois de já estar presente — descoberto tarde, mesmo que a folha normal já tenha sido submetida. Falta de Reserva: vigilante em Reserva que faltou, sem posto a cobrir."
   },
   {
    "fieldname": "sec_atraso",

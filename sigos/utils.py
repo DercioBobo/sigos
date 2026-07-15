@@ -44,6 +44,8 @@ _regime_cache: dict = {}
 
 def _get_regime(regime_nome: str):
 	"""Return the Regime document, cached within the current request."""
+	if not regime_nome:
+		return None
 	if regime_nome not in _regime_cache:
 		try:
 			_regime_cache[regime_nome] = frappe.get_doc("Regime", regime_nome)
@@ -81,6 +83,8 @@ def get_regime_turno_sequence(regime_nome: str) -> list:
 
 def _folga_turnos(regime_nome: str) -> set:
 	"""Turno names that are folgas (days off) for a regime — from Regime Turno Item."""
+	if not regime_nome:
+		return set()
 	regime = _get_regime(regime_nome)
 	if not regime:
 		return set()
@@ -89,6 +93,8 @@ def _folga_turnos(regime_nome: str) -> set:
 
 def _regime_deduz_consecutivas(regime_nome: str) -> bool:
 	"""Whether this regime applies the consecutive-falta de-dup (opt-in, per regime)."""
+	if not regime_nome:
+		return False
 	regime = _get_regime(regime_nome)
 	return bool(regime and regime.get("faltas_consecutivas_contam_um"))
 

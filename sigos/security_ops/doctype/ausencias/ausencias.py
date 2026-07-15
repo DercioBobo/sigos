@@ -5,6 +5,8 @@ from frappe.model.naming import make_autoname
 from frappe.utils import now_datetime
 from sigos.utils import calcular_n_faltas_efetivo
 
+TIPOS_DE_REGISTO_ESPECIAIS = ("Abandono de Posto", "Falta de Reserva")
+
 
 class Ausencias(Document):
 
@@ -114,7 +116,7 @@ class Ausencias(Document):
 				)
 
 	def _validar_unicidade(self):
-		if self.tipo_de_registo:
+		if self.tipo_de_registo in TIPOS_DE_REGISTO_ESPECIAIS:
 			# Multiple special records (Abandono de Posto, Falta de Reserva) may exist
 			# for the same data/período/grupo, alongside the normal roster sheet — each
 			# one a separate, independently-filed record. Not a duplicate sheet.
@@ -240,7 +242,7 @@ class Ausencias(Document):
 		additionally requires a motivo (jutificativo) — the whole point of that record
 		type is a justified, late-discovered post-departure, never a silent one; Falta
 		de Reserva has no such requirement."""
-		if not self.tipo_de_registo:
+		if self.tipo_de_registo not in TIPOS_DE_REGISTO_ESPECIAIS:
 			return
 		for i, row in enumerate(self.tabela_ausencia or [], start=1):
 			if row.tipo_de_ausencia != self.tipo_de_registo:
