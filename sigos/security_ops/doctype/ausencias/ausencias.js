@@ -40,7 +40,7 @@ frappe.ui.form.on("Ausencias", {
 		// the header fields are mounted as controls inside the deck. The atraso section
 		// is deck-handled too (inline motivo + footer note), so it stays hidden.
 		["btn_adicionar_ausencia", "resumo_ausencias", "tabela_ausencia",
-		 "data", "periodo", "grupo_delegados", "col_break_1", "e_abandono_de_posto",
+		 "data", "periodo", "grupo_delegados", "col_break_1", "tipo_de_registo",
 		 "sec_atraso", "alerta_atraso", "motivo_atraso", "col_break_atraso", "hora_submissao_tardia"]
 			.forEach(f => frm.set_df_property(f, "hidden", 1));
 
@@ -60,6 +60,7 @@ frappe.ui.form.on("Ausencias", {
 	data(frm)            { _invalidar_cache(); _verificar_horario(frm); _render_deck(frm); _refresh_results(frm); },
 	periodo(frm)         { _invalidar_cache(); _verificar_horario(frm); _render_deck(frm); _refresh_results(frm); },
 	grupo_delegados(frm) { _invalidar_cache(); _render_deck(frm); _refresh_results(frm); },
+	tipo_de_registo(frm) { _invalidar_cache(); _render_deck(frm); _refresh_results(frm); },
 
 	before_save(frm) {
 		// Stamp the hora ONLY on actually-late saves — on-time docs keep it empty.
@@ -119,7 +120,7 @@ function _build_shell(frm, w, formEditable, locked) {
 				<div class="ausd-field"><label>${__("Data")}</label><div id="ausd-ctrl-data"></div></div>
 				<div class="ausd-field"><label>${__("Período")}</label><div id="ausd-ctrl-periodo"></div></div>
 				<div class="ausd-field"><label>${__("Grupo De Delegados")}</label><div id="ausd-ctrl-grupo"></div></div>
-				<div class="ausd-field ausd-field-check"><label>${__("Abandono de Posto")}</label><div id="ausd-ctrl-abandono"></div></div>
+				<div class="ausd-field"><label>${__("Tipo de Registo")}</label><div id="ausd-ctrl-tipo-registo"></div></div>
 			</div>
 			${formEditable ? `
 			<div class="ausb-search">
@@ -202,27 +203,31 @@ function _mount_header_controls(frm, w, formEditable) {
 	});
 	if (frm.doc.grupo_delegados) c_grupo.set_value(frm.doc.grupo_delegados);
 
-	const c_abandono = frappe.ui.form.make_control({
-		df: { fieldtype: "Check", fieldname: "e_abandono_de_posto", read_only: ro,
-			description: __("Registo independente para um vigilante que abandonou o posto depois de já estar presente."),
-			onchange: () => { const v = c_abandono.get_value(); if (v !== frm.doc.e_abandono_de_posto) frm.set_value("e_abandono_de_posto", v); } },
-		parent: w.find("#ausd-ctrl-abandono"), render_input: true,
+	const c_tipo_registo = frappe.ui.form.make_control({
+		df: { fieldtype: "Select", fieldname: "tipo_de_registo",
+			options: "\nAbandono de Posto\nFalta de Reserva", read_only: ro,
+			onchange: () => { const v = c_tipo_registo.get_value(); if ((v || "") !== (frm.doc.tipo_de_registo || "")) frm.set_value("tipo_de_registo", v || null); } },
+		parent: w.find("#ausd-ctrl-tipo-registo"), render_input: true,
 	});
-	c_abandono.set_value(frm.doc.e_abandono_de_posto || 0);
+	c_tipo_registo.set_value(frm.doc.tipo_de_registo || "");
 
-	frm._ausd_controls = { data: c_data, periodo: c_periodo, grupo: c_grupo, abandono: c_abandono };
+	frm._ausd_controls = { data: c_data, periodo: c_periodo, grupo: c_grupo, tipo_registo: c_tipo_registo };
 }
 
 // ─── Search → add absentees ───────────────────────────────────────────────────
 function _ensure_roster(frm) {
 	const excluir_doc = frm.is_new() ? null : frm.doc.name;
-	const key = `${frm.doc.data}|${frm.doc.periodo}|${frm.doc.grupo_delegados || ""}|${excluir_doc || ""}`;
+	const key = `${frm.doc.data}|${frm.doc.periodo}|${frm.doc.grupo_delegados || ""}|${excluir_doc || ""}|${frm.doc.tipo_de_registo || ""}`;
 	if (_escala_cache && _escala_cache_key === key) return Promise.resolve(_escala_cache);
 	// grupo is mandatory — the roster is ALWAYS scoped to it (a grupo never sees
 	// another grupo's guards, so it can never register or block them).
 	if (!frm.doc.data || !frm.doc.periodo || !frm.doc.grupo_delegados) return Promise.resolve(null);
+	// Falta de Reserva: Reserva guards have no escala row for any day, so they need
+	// their own source — bench guards, not the day's schedule.
+	const metodo = frm.doc.tipo_de_registo === "Falta de Reserva"
+		? "sigos.api.get_vigilantes_reserva" : "sigos.api.get_vigilantes_da_escala";
 	return frappe.call({
-		method: "sigos.api.get_vigilantes_da_escala",
+		method: metodo,
 		args: {
 			data: frm.doc.data, periodo: frm.doc.periodo,
 			grupo_delegados: frm.doc.grupo_delegados || null,
@@ -249,14 +254,20 @@ function _render_results(frm, w, filtro) {
 	const q = (filtro || "").trim().toLowerCase();
 
 	if (!frm.doc.data || !frm.doc.periodo || !frm.doc.grupo_delegados) {
-		$res.html(`<div class="ausb-res-hint">${__("Defina Data, Período e Grupo De Delegados para carregar a escala.")}</div>`);
+		const hint = frm.doc.tipo_de_registo === "Falta de Reserva"
+			? __("Defina Data, Período e Grupo De Delegados para carregar os vigilantes em Reserva.")
+			: __("Defina Data, Período e Grupo De Delegados para carregar a escala.");
+		$res.html(`<div class="ausb-res-hint">${hint}</div>`);
 		return;
 	}
 
 	_ensure_roster(frm).then(roster => {
 		roster = roster || [];
 		if (!roster.length) {
-			$res.html(`<div class="ausb-res-hint">${__("Sem escala para esta data/período.")}</div>`);
+			const msg = frm.doc.tipo_de_registo === "Falta de Reserva"
+				? __("Sem vigilantes em Reserva neste grupo.")
+				: __("Sem escala para esta data/período.");
+			$res.html(`<div class="ausb-res-hint">${msg}</div>`);
 			return;
 		}
 		const ja = new Set((frm.doc.tabela_ausencia || []).map(r => r.vigilante));
@@ -281,9 +292,10 @@ function _render_results(frm, w, filtro) {
 			visiveis += items.length;
 
 			const ausentes = todos.filter(v => ja.has(v.vigilante) || v.ja_registado_em).length;
+			const rotulo = frm.doc.tipo_de_registo === "Falta de Reserva" ? __("em reserva") : __("escalados");
 			const resumo = ausentes
-				? `${todos.length} ${__("escalados")} · ${ausentes} ${__("ausente(s)")}`
-				: `${todos.length} ${__("escalados")}`;
+				? `${todos.length} ${rotulo} · ${ausentes} ${__("ausente(s)")}`
+				: `${todos.length} ${rotulo}`;
 
 			const linhas = items.map(v => {
 				const neste = ja.has(v.vigilante);
@@ -376,10 +388,12 @@ function _add_absent(frm, w, vd) {
 	row.posto             = vd.posto;
 	row.regime            = vd.regime;
 	row.turno             = vd.turno;
-	row.periodo           = vd.periodo;
+	row.periodo           = vd.periodo || frm.doc.periodo;
 	row.delegacao         = vd.delegacao;
 	row.n_de_faltas       = vd.n_de_faltas ?? 1;
-	row.tipo_de_ausencia  = frm.doc.e_abandono_de_posto ? "Abandono de Posto" : "Falta";
+	row.tipo_de_ausencia  = frm.doc.tipo_de_registo === "Abandono de Posto" ? "Abandono de Posto"
+		: frm.doc.tipo_de_registo === "Falta de Reserva" ? "Falta de Reserva"
+		: "Falta";
 	row.proxima_accao     = "Sem Ação";
 
 	frm.dirty();
@@ -496,6 +510,7 @@ function _card_compacta(frm, w, row, formEditable) {
 			<span class="ausb-c-extra">
 				<span class="ausb-badges" data-badges></span>
 				${row.tipo_justificacao ? `<span class="ausb-bdg bdg-justif">${frappe.utils.escape_html(row.tipo_justificacao)}</span>` : ""}
+				${row.tipo_de_ausencia === "Abandono de Posto" && row.jutificativo ? `<span class="ausb-bdg bdg-motivo" title="${__("Motivo")}">${frappe.utils.escape_html(row.jutificativo)}</span>` : ""}
 				${campo && row[campo] ? `<span class="ausb-c-accao">&#8627; ${ACCAO_LABEL[accao]}: <b data-accao-nome>${frappe.utils.escape_html(row[campo])}</b></span>` : ""}
 			</span>
 			${formEditable ? `
@@ -534,8 +549,9 @@ function _card_aberta(frm, w, row) {
 				</div>
 				<div class="ausb-inline">
 					<label class="ausb-f"><span>${__("Justificação")}</span><div class="ausb-justif" data-justif></div></label>
+					${row.tipo_de_ausencia === "Falta de Reserva" ? "" : `
 					<label class="ausb-f"><span>${__("Acção")}</span>
-						<select class="ausb-sel" data-f="proxima_accao">${accaoOpts}</select></label>
+						<select class="ausb-sel" data-f="proxima_accao">${accaoOpts}</select></label>`}
 				</div>
 				<button type="button" class="ausb-confirm" title="${__("Confirmar")}">&#10003;</button>
 				<button type="button" class="ausb-remove" title="${__("Remover")}">×</button>
@@ -986,11 +1002,9 @@ function _inject_css() {
 .ausd-controls { display: flex; flex-direction: row; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
 .ausd-field { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 150px; }
 .ausd-field > label { font-size: .7em; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: rgba(255,255,255,.65); margin: 0; }
-.ausd-field-check { flex: 0 0 auto; min-width: 0; justify-content: flex-end; }
-.ausd-field-check .control-input-wrapper { display: flex; align-items: center; height: 32px; }
 #sigos-aus-deck .frappe-control { margin: 0 !important; }
 #sigos-aus-deck .control-label, #sigos-aus-deck .help-box { display: none !important; }
-#sigos-aus-deck .control-input input, #sigos-aus-deck .control-input select, #sigos-aus-deck .control-input .input-with-feedback {
+#sigos-aus-deck .control-input input:not([type="checkbox"]), #sigos-aus-deck .control-input select, #sigos-aus-deck .control-input .input-with-feedback {
 	background: rgba(255,255,255,.96); border: 1px solid rgba(255,255,255,.25); border-radius: 8px; color: #1a3a5c; font-weight: 600; height: 32px;
 }
 #sigos-aus-deck .control-value, #sigos-aus-deck .like-disabled-input { color: #fff; background: rgba(255,255,255,.08); border-radius: 8px; border-color: rgba(255,255,255,.15); }
@@ -1078,6 +1092,7 @@ function _inject_css() {
 .ausb-card-c .ausb-badges { margin-top: 0; display: inline-flex; gap: 5px; flex-wrap: nowrap; }
 .ausb-card-c .ausb-bdg { font-size: .58em; padding: 1px 6px; }
 .bdg-justif { background: rgba(47,165,106,.16); color: #8fe6b8; border: 1px solid rgba(47,165,106,.4); font-size: .68em; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.bdg-motivo { background: rgba(232,160,32,.16); color: #f4cd84; border: 1px solid rgba(232,160,32,.4); font-size: .68em; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
 .ausb-c-accao { font-size: .62em; color: #f4cd84; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; }
 .ausb-pencil { background: rgba(255,255,255,.1); border: none; color: #8fd0ff; width: 26px; height: 26px; border-radius: 7px; font-size: .95em; line-height: 1; cursor: pointer; flex: none; }
 .ausb-pencil:hover { background: rgba(143,208,255,.25); }

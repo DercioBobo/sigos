@@ -665,6 +665,52 @@ def get_vigilantes_da_escala(data, periodo, grupo_delegados=None, excluir_doc=No
 	return rows
 
 
+@frappe.whitelist()
+def get_vigilantes_reserva(grupo_delegados=None, excluir_doc=None, data=None, periodo=None):
+	"""
+	Return every vigilante in Reserva (bench, not assigned to any posto) — the
+	roster source for 'Falta de Reserva'. Unlike get_vigilantes_da_escala, these
+	guards have no escala row for any day, so there's no posto/turno to report and
+	no Regime Turno Item weight to look up (n_de_faltas for this tipo comes from
+	SIGOS Settings at validate time instead, not from this search).
+	Optionally scoped to the delegacoes in grupo_delegados; annotated the same way
+	as the escala roster so already-registered guards grey out at add-time.
+	"""
+	base_sql = """
+		SELECT
+			v.name AS vigilante,
+			v.nome_completo,
+			v.mecanografico,
+			v.delegacao,
+			v.regime_do_vigilante AS regime,
+			NULL AS posto,
+			NULL AS turno
+		FROM `tabVigilante` v
+		WHERE v.status = 'Reserva'
+		{extra}
+		ORDER BY v.delegacao, v.nome_completo
+	"""
+	params = {}
+
+	extra = ""
+	if grupo_delegados:
+		delegacoes = frappe.get_all(
+			"Grupo Delegados Item",
+			filters={"parent": grupo_delegados},
+			fields=["delegacao"],
+			pluck="delegacao",
+		)
+		if delegacoes:
+			params["delegacoes"] = tuple(delegacoes)
+			extra = "AND v.delegacao IN %(delegacoes)s"
+
+	rows = frappe.db.sql(base_sql.format(extra=extra), params, as_dict=True)
+	if data and periodo:
+		_marcar_ja_registados(rows, data, periodo, excluir_doc)
+		_marcar_licencas(rows, data)
+	return rows
+
+
 def _marcar_ja_registados(rows, data, periodo, excluir_doc=None):
 	"""
 	Annotate roster rows whose guard already has an absence registered in another

@@ -15,7 +15,7 @@
   "periodo",
   "col_break_1",
   "grupo_delegados",
-  "e_abandono_de_posto",
+  "tipo_de_registo",
   "sec_atraso",
   "alerta_atraso",
   "motivo_atraso",
@@ -73,11 +73,11 @@
    "in_standard_filter": 1
   },
   {
-   "fieldname": "e_abandono_de_posto",
-   "fieldtype": "Check",
-   "label": "Registo de Abandono de Posto",
-   "default": "0",
-   "description": "Registo independente para um vigilante que abandonou o posto depois de já estar presente — descoberto tarde, mesmo que a folha normal deste período já tenha sido submetida."
+   "fieldname": "tipo_de_registo",
+   "fieldtype": "Select",
+   "label": "Tipo de Registo",
+   "options": "\nAbandono de Posto\nFalta de Reserva",
+   "description": "Em branco: folha normal de ausências. Abandono de Posto: vigilante que abandonou o posto depois de já estar presente — descoberto tarde, mesmo que a folha normal já tenha sido submetida. Falta de Reserva: vigilante em Reserva que faltou, sem posto a cobrir."
   },
   {
    "fieldname": "sec_atraso",

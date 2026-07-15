@@ -21,8 +21,10 @@ class Ausencias(Document):
 			frappe.throw(
 				_("Defina <b>Data</b>, <b>Período</b> e <b>Grupo De Delegados</b> antes de gravar.")
 			)
-		if self.e_abandono_de_posto:
+		if self.tipo_de_registo == "Abandono de Posto":
 			self.name = make_autoname("AUS-ABD-.YY.-.##")
+		elif self.tipo_de_registo == "Falta de Reserva":
+			self.name = make_autoname("AUS-RES-.YY.-.##")
 		else:
 			self.name = f"{self.periodo}-{self.data}-{self.grupo_delegados}"
 
@@ -33,7 +35,7 @@ class Ausencias(Document):
 		self._validar_duplicados_na_tabela()
 		self._validar_tipo_ausencia()
 		self._validar_subtipo_falta()
-		self._validar_abandono_de_posto()
+		self._validar_tipo_de_registo()
 		self._validar_proxima_accao()
 		self._validar_estado_substitutos()
 		self._validar_conflitos_de_substituicao()
@@ -100,7 +102,7 @@ class Ausencias(Document):
 			return
 		for campo, label in (
 			("data", "Data"), ("periodo", "Período"), ("grupo_delegados", "Grupo De Delegados"),
-			("e_abandono_de_posto", "Registo de Abandono de Posto"),
+			("tipo_de_registo", "Tipo de Registo"),
 		):
 			valor_antes = str(antes.get(campo) or "")
 			# fill-once: legacy drafts may have the field empty — allow setting it
@@ -112,9 +114,10 @@ class Ausencias(Document):
 				)
 
 	def _validar_unicidade(self):
-		if self.e_abandono_de_posto:
-			# Multiple correction records may exist for the same data/período/grupo —
-			# each one a separate, later-discovered post-departure. Not a duplicate sheet.
+		if self.tipo_de_registo:
+			# Multiple special records (Abandono de Posto, Falta de Reserva) may exist
+			# for the same data/período/grupo, alongside the normal roster sheet — each
+			# one a separate, independently-filed record. Not a duplicate sheet.
 			return
 		existe = frappe.db.exists("Ausencias", {
 			"data": self.data,
@@ -231,19 +234,21 @@ class Ausencias(Document):
 					_("Linha {0}: defina o <b>Subtipo de Falta</b> (Normal ou Vermelha).").format(i)
 				)
 
-	def _validar_abandono_de_posto(self):
-		"""Every row on an Abandono de Posto document must actually be that tipo (not
-		a mix), and must carry a motivo (jutificativo) — the whole point of this record
-		type is a justified, late-discovered post-departure, never a silent one."""
-		if not self.e_abandono_de_posto:
+	def _validar_tipo_de_registo(self):
+		"""Every row on a special-type document (Abandono de Posto / Falta de Reserva)
+		must actually be that tipo, not a mix with normal rows. Only Abandono de Posto
+		additionally requires a motivo (jutificativo) — the whole point of that record
+		type is a justified, late-discovered post-departure, never a silent one; Falta
+		de Reserva has no such requirement."""
+		if not self.tipo_de_registo:
 			return
 		for i, row in enumerate(self.tabela_ausencia or [], start=1):
-			if row.tipo_de_ausencia != "Abandono de Posto":
+			if row.tipo_de_ausencia != self.tipo_de_registo:
 				frappe.throw(
-					_("Linha {0}: o Tipo de Ausência deve ser <b>Abandono de Posto</b> "
-					  "neste tipo de registo.").format(i)
+					_("Linha {0}: o Tipo de Ausência deve ser <b>{1}</b> "
+					  "neste tipo de registo.").format(i, self.tipo_de_registo)
 				)
-			if not row.jutificativo:
+			if self.tipo_de_registo == "Abandono de Posto" and not row.jutificativo:
 				frappe.throw(
 					_("Linha {0}: o <b>Motivo</b> é obrigatório para um registo de "
 					  "Abandono de Posto.").format(i)
@@ -468,6 +473,12 @@ class Ausencias(Document):
 				# faltas, not a guard who worked most of the shift then left.
 				row.n_de_faltas = frappe.db.get_single_value(
 					"SIGOS Settings", "n_faltas_abandono_posto"
+				) or 1
+			elif row.tipo_de_ausencia == "Falta de Reserva":
+				# Same flat-count rationale — a Reserva guard has no turno for that day,
+				# so the regime/turno weight lookup below doesn't apply.
+				row.n_de_faltas = frappe.db.get_single_value(
+					"SIGOS Settings", "n_faltas_reserva"
 				) or 1
 			else:
 				row.n_de_faltas = calcular_n_faltas_efetivo(

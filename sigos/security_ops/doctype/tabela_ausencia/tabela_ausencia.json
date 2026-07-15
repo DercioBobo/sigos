@@ -102,7 +102,7 @@
    "fieldname": "tipo_de_ausencia",
    "fieldtype": "Select",
    "label": "Tipo",
-   "options": "\nFalta\nAtraso\nSaída Antecipada\nSuspensão\nLicença\nAbandono de Posto\nOutro",
+   "options": "\nFalta\nAtraso\nSaída Antecipada\nSuspensão\nLicença\nAbandono de Posto\nFalta de Reserva\nOutro",
    "default": "Falta",
    "reqd": 1
   },

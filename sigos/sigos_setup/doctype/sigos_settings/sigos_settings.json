@@ -43,6 +43,7 @@
   "valor_fixo_por_falta_vermelha",
   "base_dias_de_trabalho",
   "n_faltas_abandono_posto",
+  "n_faltas_reserva",
   "sec_ss_arma",
   "componente_subsidio_arma",
   "col_ss_arma",
@@ -323,6 +324,13 @@
    "label": "Nº de Faltas por Abandono de Posto",
    "default": "1",
    "description": "Número de faltas debitado automaticamente quando um vigilante é registado como Abandono de Posto — valor fixo, não passa pelo cálculo de peso de regime/turno usado nas faltas normais."
+  },
+  {
+   "fieldname": "n_faltas_reserva",
+   "fieldtype": "Int",
+   "label": "Nº de Faltas por Falta de Reserva",
+   "default": "1",
+   "description": "Número de faltas debitado automaticamente quando um vigilante em Reserva falta — valor fixo, não passa pelo cálculo de peso de regime/turno (não há turno atribuído para um vigilante em Reserva)."
   },
   {
    "fieldname": "sec_ss_arma",
