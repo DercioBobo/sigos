@@ -221,26 +221,28 @@ def get_escalados_no_posto_dia(doctype, txt, searchfield, start, page_len, filte
 
 
 @frappe.whitelist()
-def get_vigilantes_de_folga_no_posto_dia(doctype, txt, searchfield, start, page_len, filters):
+def get_vigilantes_de_folga_na_delegacao_dia(doctype, txt, searchfield, start, page_len, filters):
 	"""
-	Link search for 'Horas Extras': only Vigilantes on FOLGA (day off) at the given
-	posto on the given day — called in for an unplanned extra shift. Mirrors
-	get_escalados_no_posto_dia's shape/exclusions but sources from the opposite pool
-	(t.e_folga=1) and additionally requires an Activo escala, since folga rows are
-	more likely to be stale future rows an archived Escala never pruned.
+	Link search for 'Horas Extras': every Vigilante on FOLGA (day off) that day,
+	scoped to the ABSENT guard's delegação — NOT the posto. A folga guard from any
+	posto in the same delegação can be called in for an unplanned extra shift, so
+	unlike get_escalados_no_posto_dia (Dobra/Meia Dobra — must be already AT that
+	posto), this deliberately doesn't filter by posto. Requires an Activo escala,
+	since folga rows are more likely to be stale future rows an archived Escala
+	never pruned.
 	"""
 	import json
 	if isinstance(filters, str):
 		filters = json.loads(filters)
 
-	posto       = filters.get("posto")   or ""
+	delegacao   = filters.get("delegacao") or ""
 	data        = filters.get("data")    or ""
 	excluir     = filters.get("excluir") or ""
 	excluir_doc = filters.get("excluir_doc") or ""
 	excluir_lista = filters.get("excluir_lista") or []
 	if isinstance(excluir_lista, str):
 		excluir_lista = json.loads(excluir_lista)
-	if not (posto and data):
+	if not (delegacao and data):
 		return []
 
 	lista = [v for v in excluir_lista if v]
@@ -256,7 +258,7 @@ def get_vigilantes_de_folga_no_posto_dia(doctype, txt, searchfield, start, page_
 		JOIN `tabVigilante` v ON v.name = te.vigilante
 		JOIN `tabEscala Do Vigilante` e ON e.name = te.parent AND e.estado = 'Activo'
 		JOIN `tabTurno` t ON t.name = te.turno
-		WHERE te.posto = %(posto)s AND te.data = %(data)s AND t.e_folga = 1
+		WHERE v.delegacao = %(delegacao)s AND te.data = %(data)s AND t.e_folga = 1
 		  AND (te.vigilante LIKE %(txt)s OR v.nome_completo LIKE %(txt)s)
 		  {excluir_sql}
 		  AND NOT EXISTS (
@@ -269,7 +271,7 @@ def get_vigilantes_de_folga_no_posto_dia(doctype, txt, searchfield, start, page_
 		LIMIT %(start)s, %(page_len)s
 		""",
 		{
-			"posto":       posto,
+			"delegacao":   delegacao,
 			"data":        data,
 			"lista":       tuple(lista) or ("",),
 			"excluir_doc": excluir_doc,

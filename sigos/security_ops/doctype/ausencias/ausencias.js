@@ -748,10 +748,11 @@ function _mount_picker(frm, w, row, $card, accao, formEditable) {
 						excluir_doc: frm.is_new() ? "" : frm.doc.name,
 					} };
 				if (field === "vigilante_a_horas_extras")
-					// the OPPOSITE pool of Dobra/Meia Dobra — only guards on FOLGA at this
-					// posto on this day, called in for an unplanned extra shift
-					return { query: "sigos.api.get_vigilantes_de_folga_no_posto_dia", filters: {
-						posto: row.posto || "", data: frm.doc.data,
+					// the OPPOSITE pool of Dobra/Meia Dobra — every guard on FOLGA that day
+					// in the absent guard's DELEGAÇÃO, regardless of posto (called in for an
+					// unplanned extra shift, not necessarily to their own usual posto)
+					return { query: "sigos.api.get_vigilantes_de_folga_na_delegacao_dia", filters: {
+						delegacao: row.delegacao || "", data: frm.doc.data,
 						excluir: row.vigilante || "",
 						excluir_lista: JSON.stringify(fora),
 						excluir_doc: frm.is_new() ? "" : frm.doc.name,
