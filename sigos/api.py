@@ -1157,6 +1157,17 @@ def has_active_workflow(doctype):
 
 
 @frappe.whitelist()
+def sugerir_periodo_folha(ano, mes):
+	"""Thin wrapper over sigos.utils.resolver_periodo_folha for the Payroll Entry
+	client-side date suggestion (see public/js/payroll_entry.js) — a proposal
+	the user can still freely edit, never a forced server-side rewrite."""
+	from frappe.utils import cint
+	from sigos.utils import resolver_periodo_folha
+	inicio, fim = resolver_periodo_folha(cint(mes), cint(ano))
+	return {"data_de_inicio": inicio, "data_de_fim": fim}
+
+
+@frappe.whitelist()
 def resumo_aplicado_rotatividade(name):
 	"""
 	Reconstruct the 'what changed' breakdown for an ALREADY-APPLIED Rotatividade,

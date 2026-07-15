@@ -3,7 +3,38 @@ SIGOS shared utilities — imported by ausencias.py, salary_slip_hooks.py, and A
 Single source of truth for all business calculations.
 """
 import frappe
-from frappe.utils import getdate
+from frappe.utils import getdate, add_months, add_days, get_last_day
+
+
+# ─── Payroll period (dia de corte) ─────────────────────────────────────────────
+
+def resolver_periodo_folha(mes_num: int, ano: int) -> tuple:
+	"""
+	(data_inicio, data_fim) for a payroll period identified by month/year,
+	honouring SIGOS Settings.dia_corte_folha — the day of month a period starts
+	on, such that it ends the day before that same day the following month.
+
+	dia_corte=1 (default) reproduces today's exact calendar-month behaviour
+	byte-for-byte — special-cased below, because "1st of month" and the general
+	"day D of month M, ends day D-1 of month M+1" formula only coincide at D=1
+	as a degenerate case, not as a smooth limit (plugging D=1 into the general
+	formula gives day 0 of month M+1, i.e. the last day of the PREVIOUS month —
+	wrong for what dia_corte=1 must mean).
+
+	A period is filed under the month it ENDS in — e.g. dia_corte=25,
+	mes_num=7 (Julho) → 25 Junho a 24 Julho. Single source of truth: every
+	payroll_ext doctype (Outras Deduções/Remunerações/Empréstimo/Reclamação De
+	Salário) and the Payroll Entry date-suggestion API derive from this.
+	"""
+	dia_corte = frappe.db.get_single_value("SIGOS Settings", "dia_corte_folha") or 1
+	ref = getdate(f"{ano}-{mes_num:02d}-01")
+
+	if dia_corte == 1:
+		return ref, get_last_day(ref)
+
+	fim = add_days(ref.replace(day=dia_corte), -1)
+	inicio = add_months(ref, -1).replace(day=dia_corte)
+	return inicio, fim
 
 
 # ─── Regime cache (per request) ───────────────────────────────────────────────
@@ -106,9 +137,10 @@ def calcular_faltas_detalhado(vigilante: str, start_date, end_date) -> list:
 
 	absences = frappe.db.sql(
 		"""
-		SELECT a.name AS ausencia, a.data AS data, ta.turno, ta.regime, ta.posto,
+		SELECT a.name AS ausencia, a.data AS data, ta.name AS tabela_ausencia_row,
+		       ta.turno, ta.regime, ta.posto,
 		       ta.nome_do_vigilante, ta.tipo_de_ausencia, ta.subtipo_falta,
-		       ta.tipo_justificacao, ta.n_de_faltas
+		       ta.tipo_justificacao, ta.n_de_faltas, ta.processado_em_folha
 		FROM `tabTabela Ausencia` ta
 		JOIN `tabAusencias` a ON a.name = ta.parent
 		WHERE a.docstatus = 1 AND ta.vigilante = %(vig)s AND a.data <= %(end)s
@@ -148,6 +180,10 @@ def calcular_faltas_detalhado(vigilante: str, start_date, end_date) -> list:
 				"cumulativo_de_faltas": cumul,
 				"data": d,
 				"ausencia": a.ausencia,
+				# Payroll-consumption bookkeeping — additive only, ignored by callers
+				# (e.g. the Cumulativo de Faltas report) that don't reference them.
+				"tabela_ausencia_row": a.tabela_ausencia_row,
+				"processado_em_folha": a.processado_em_folha,
 			})
 	return rows
 
@@ -161,6 +197,32 @@ def calcular_faltas_vigilante(vigilante: str, start_date, end_date) -> int:
 	if not vigilante:
 		return 0
 	return sum(r["n_de_faltas"] for r in calcular_faltas_detalhado(vigilante, start_date, end_date))
+
+
+def calcular_faltas_pendentes_vigilante(vigilante: str, end_date, piso_data=None) -> list:
+	"""
+	Payroll consumption ONLY: every faltas row for a guard not yet stamped
+	processado_em_folha, up to end_date — no correctness-relevant lower bound
+	(a late Ausencias row dated inside an already-CLOSED/submitted period was
+	never stamped by that period's slip, so it must still surface here and roll
+	onto whichever slip processes it next — a pure date-range filter would
+	silently drop it instead; see salary_slip_hooks._compute_faltas for the
+	caller and the before_submit stamping that keeps this idempotent).
+
+	`piso_data` is an EFFICIENCY-only floor for the underlying scan (pass the
+	guard's last-slip boundary if known) — never load-bearing for correctness,
+	since the processado_em_folha filter is what actually prevents loss/dupes.
+	Falls back to a very early date so a first-ever call still works.
+
+	Wraps calcular_faltas_detalhado (its own query/escala-dedup logic is
+	untouched — still the single source for the Cumulativo de Faltas report)
+	and only adds the "not yet processed" filter on top, so the report's
+	behaviour is completely unaffected by this function's existence.
+	"""
+	if not vigilante:
+		return []
+	todas = calcular_faltas_detalhado(vigilante, piso_data or "1900-01-01", end_date)
+	return [r for r in todas if not r.get("processado_em_folha")]
 
 
 def calcular_faltas_vermelhas_vigilante(vigilante: str, start_date, end_date) -> int:

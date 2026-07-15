@@ -95,7 +95,8 @@ class Emprestimo(Document):
 			mes_num = MESES.get(self.mes_referencia)
 			if mes_num:
 				from frappe.utils import getdate
-				self.data_de_inicio = f"{getdate().year}-{mes_num}-01"
+				from sigos.utils import resolver_periodo_folha
+				self.data_de_inicio = resolver_periodo_folha(int(mes_num), getdate().year)[0]
 
 	def _calcular_valor_mensal(self):
 		if self.valor_a_pagar and self.meses_a_pagar and self.meses_a_pagar > 0:

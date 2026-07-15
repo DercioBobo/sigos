@@ -36,15 +36,17 @@ class OutrasDeducoes(Document):
 	# ─── Computed fields ──────────────────────────────────────────────────────
 
 	def _aplicar_mes_referencia(self):
-		"""Derive data_de_inicio from mes_referencia (1st of the resolved month) when
-		it isn't already set, so a manual date is never clobbered. Year follows the
-		Dez→Jan wrap rule in ano_para_mes."""
+		"""Derive data_de_inicio from mes_referencia (start of the resolved payroll
+		period, per SIGOS Settings.dia_corte_folha) when it isn't already set, so a
+		manual date is never clobbered. Year follows the Dez→Jan wrap rule in
+		ano_para_mes."""
 		if self.data_de_inicio or not self.mes_referencia:
 			return
 		mes_num = MESES.get(self.mes_referencia)
 		if not mes_num:
 			return
-		self.data_de_inicio = f"{ano_para_mes(int(mes_num))}-{mes_num}-01"
+		from sigos.utils import resolver_periodo_folha
+		self.data_de_inicio = resolver_periodo_folha(int(mes_num), ano_para_mes(int(mes_num)))[0]
 
 	def _validar_mes_nao_passado(self):
 		"""Reject a month already past (e.g. Março quando estamos em Junho). The Dez→Jan

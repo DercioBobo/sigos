@@ -87,16 +87,14 @@ class ReclamacaoDeSalario(Document):
 		if not mes_num:
 			return
 
-		import calendar
 		hoje = getdate()
 		mes = int(mes_num)
 		# Resolve to the nearest current/future occurrence: a month-name already behind
 		# us this year means next year (e.g. "Janeiro" chosen in Dezembro → next Jan).
 		ano = hoje.year if mes >= hoje.month else hoje.year + 1
-		ultimo_dia = calendar.monthrange(ano, mes)[1]
 
-		self.data_de_inicio = f"{ano}-{mes_num}-01"
-		self.data_de_fim    = f"{ano}-{mes_num}-{ultimo_dia:02d}"
+		from sigos.utils import resolver_periodo_folha
+		self.data_de_inicio, self.data_de_fim = resolver_periodo_folha(mes, ano)
 
 	def _calcular_dia_fim_falta(self):
 		if not self.dia_da_falta_inicio or not self.numero_faltas:
@@ -112,18 +110,15 @@ def resolver_folha_reclamacao(funcionario, mes=None, ano=None):
 	and return its processed amounts. Used both by the controller (authoritative, on
 	save) and by the form (live preview). Returns {} when inputs are incomplete or no
 	slip exists. Picks the most recent slip if more than one overlaps the month."""
-	import calendar
 	from frappe.utils import cint
+	from sigos.utils import resolver_periodo_folha
 
 	mes_num = MESES.get(mes)
 	ano = cint(ano)
 	if not (funcionario and mes_num and ano):
 		return {}
 
-	mnum = int(mes_num)
-	ultimo_dia = calendar.monthrange(ano, mnum)[1]
-	inicio = f"{ano}-{mes_num}-01"
-	fim = f"{ano}-{mes_num}-{ultimo_dia:02d}"
+	inicio, fim = resolver_periodo_folha(int(mes_num), ano)
 
 	slips = frappe.get_all(
 		"Salary Slip",

@@ -24,7 +24,8 @@
   "vigilante_a_meia_dobra",
   "vigilante_a_adiantar",
   "jutificativo",
-  "data_justificativo"
+  "data_justificativo",
+  "processado_em_folha"
  ],
  "fields": [
   {
@@ -188,6 +189,14 @@
    "fieldname": "data_justificativo",
    "fieldtype": "Date",
    "label": "Data do Justificativo"
+  },
+  {
+   "fieldname": "processado_em_folha",
+   "fieldtype": "Link",
+   "label": "Processado na Folha",
+   "options": "Salary Slip",
+   "read_only": 1,
+   "description": "Preenchido automaticamente quando esta falta é contabilizada numa Salary Slip submetida — impede que a mesma falta seja contada duas vezes, e permite que uma falta registada tardiamente (já com o período fechado) seja incluída automaticamente na folha seguinte."
   }
  ],
  "istable": 1,

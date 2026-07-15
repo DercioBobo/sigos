@@ -24,6 +24,7 @@ app_include_js = [
 doctype_js = {
 	"Project": "public/js/project.js",
 	"Employee": "public/js/employee_hr360.js",
+	"Payroll Entry": "public/js/payroll_entry.js",
 }
 
 # Show all Postos of a contract under the Project's Connections tab

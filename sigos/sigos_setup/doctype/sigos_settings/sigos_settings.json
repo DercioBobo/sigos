@@ -33,6 +33,8 @@
   "sec_ss_rh360",
   "painel_rh_360_activo",
   "tab_ss_pay",
+  "sec_ss_periodo",
+  "dia_corte_folha",
   "sec_ss_falt",
   "metodo_calculo_faltas",
   "componente_faltas",
@@ -256,6 +258,18 @@
    "fieldname": "tab_ss_pay",
    "fieldtype": "Tab Break",
    "label": "Payroll"
+  },
+  {
+   "fieldname": "sec_ss_periodo",
+   "fieldtype": "Section Break",
+   "label": "Período de Folha"
+  },
+  {
+   "fieldname": "dia_corte_folha",
+   "fieldtype": "Int",
+   "label": "Dia de Corte",
+   "default": "1",
+   "description": "Dia do mês em que o período de folha começa. 1 = mês civil (1º ao último dia do mês — comportamento actual). Ex.: 25 → período de 25 do mês anterior a 24 do mês actual, arquivado no mês em que termina (ex.: 25 Jun–24 Jul = Julho)."
   },
   {
    "fieldname": "sec_ss_falt",

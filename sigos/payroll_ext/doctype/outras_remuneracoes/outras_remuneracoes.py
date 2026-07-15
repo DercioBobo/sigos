@@ -46,7 +46,8 @@ class OutrasRemuneracoes(Document):
 		if not mes_num:
 			return
 
-		self.data_de_inicio = f"{ano_para_mes(int(mes_num))}-{mes_num}-01"
+		from sigos.utils import resolver_periodo_folha
+		self.data_de_inicio = resolver_periodo_folha(int(mes_num), ano_para_mes(int(mes_num)))[0]
 
 		if self.tipo_de_pagamento == "Determinado":
 			self.meses_a_pagar = 1

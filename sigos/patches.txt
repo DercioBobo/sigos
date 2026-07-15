@@ -13,3 +13,4 @@ sigos.patches.remover_repreensao_disciplinar
 sigos.patches.backfill_posto_indicativo
 sigos.patches.migrate_banco_para_doctype
 sigos.patches.backfill_employee_cliente
+sigos.patches.backfill_processado_em_folha

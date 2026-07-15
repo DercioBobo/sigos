@@ -24,9 +24,9 @@ Wire-up (hooks.py):
 """
 
 import frappe
-from frappe.utils import getdate, add_days, date_diff, flt
+from frappe.utils import getdate, add_days, date_diff, flt, formatdate
 from sigos.utils import (
-	calcular_faltas_vigilante,
+	calcular_faltas_pendentes_vigilante,
 	calcular_dobras_vigilante,
 	calcular_meias_dobras_vigilante,
 	calcular_faltas_vermelhas_vigilante,
@@ -100,7 +100,42 @@ def _set_dia_da_falta_inicio(doc):
 
 # ─── before_validate ───────────────────────────────────────────────────────────
 
+def _validar_periodo_sem_sobreposicao(doc):
+	"""
+	Guard against two Salary Slips for the same employee covering overlapping
+	periods — a cheap safety net now that periods aren't necessarily calendar-
+	month aligned (a hand-typed date range can easily overlap a neighbouring
+	period by mistake, e.g. running a plain calendar month against a company
+	configured with a cutoff day). Only checks against SUBMITTED slips: two
+	drafts overlapping isn't yet a real problem, and HRMS itself lets drafts be
+	freely edited/discarded.
+	"""
+	if not doc.employee or not doc.start_date or not doc.end_date:
+		return
+	conflito = frappe.get_all(
+		"Salary Slip",
+		filters=[
+			["employee", "=", doc.employee],
+			["docstatus", "=", 1],
+			["name", "!=", doc.name or "___"],
+			["start_date", "<=", doc.end_date],
+			["end_date", ">=", doc.start_date],
+		],
+		fields=["name", "start_date", "end_date"],
+		limit=1,
+	)
+	if conflito:
+		c = conflito[0]
+		frappe.throw(
+			f"Já existe a Salary Slip submetida <b>{c.name}</b> para {doc.employee} "
+			f"cobrindo um período que se sobrepõe ({formatdate(c.start_date)} a "
+			f"{formatdate(c.end_date)}). Ajuste o período desta folha.",
+			title="Período Sobreposto",
+		)
+
+
 def before_validate(doc, method):
+	_validar_periodo_sem_sobreposicao(doc)     # fail fast, before any computation
 	_add_project_subsidios(doc)
 	_add_subsidio_arma(doc)
 	_add_subsidios_categoria_funcao(doc)
@@ -435,7 +470,14 @@ def _add_reclamacao(doc):
 # ─── Faltas (from Ausencias only) ────────────────────────────────────────────────
 
 def _compute_faltas(doc):
-	"""Sum n_de_faltas from submitted Ausencias for this vigilante in the slip period."""
+	"""
+	Sum n_de_faltas from Ausencias not yet processado_em_folha for this vigilante,
+	up to the slip's end_date. Deliberately NOT a simple start/end date-range filter
+	(see calcular_faltas_pendentes_vigilante): a falta dated inside an already-
+	SUBMITTED prior period rolls forward and is counted HERE instead of being lost —
+	before_submit stamps whatever this ends up including so it can never be counted
+	twice, and warns if anything rolled in from before doc.start_date.
+	"""
 	if not doc.employee or not doc.start_date or not doc.end_date:
 		return
 
@@ -445,15 +487,95 @@ def _compute_faltas(doc):
 		return
 
 	try:
-		doc.custom_faltas_no_mes = calcular_faltas_vigilante(
+		pendentes = calcular_faltas_pendentes_vigilante(
 			vigilante=custom_vigilante,
-			start_date=doc.start_date,
 			end_date=doc.end_date,
+			piso_data=doc.custom_dia_da_falta_inicio,
 		)
+		doc.custom_faltas_no_mes = sum(r["n_de_faltas"] for r in pendentes)
 	except Exception as e:
 		frappe.log_error(
 			f"SalarySlip {doc.name}: erro ao computar faltas: {e}",
 			"SIGOS Salary Slip Hooks",
+		)
+
+
+def _marcar_faltas_processadas(doc):
+	"""
+	Stamp every Tabela Ausencia row counted into custom_faltas_no_mes with THIS
+	slip's name (processado_em_folha) — the idempotency guard that lets
+	calcular_faltas_pendentes_vigilante safely have no lower date bound. Fires
+	once, at final submit, and is reversed in on_cancel (see
+	_desmarcar_faltas_processadas) — mirrors the Leave Ledger Entry pattern in
+	_deduzir_ferias_faltas_vermelhas just above.
+
+	Recomputes fresh here rather than trusting whatever before_validate last saw,
+	since the doc can be edited/re-validated multiple times before the eventual
+	submit — only what's true AT submit time should ever get stamped.
+
+	Anything included here whose data falls BEFORE doc.start_date rolled forward
+	from an already-closed prior period (it was filed too late for that period's
+	own, already-submitted slip) — flagged with a clear, non-blocking message.
+	"""
+	if not doc.custom_vigilante or not doc.end_date:
+		return
+	try:
+		pendentes = calcular_faltas_pendentes_vigilante(
+			vigilante=doc.custom_vigilante,
+			end_date=doc.end_date,
+			piso_data=doc.custom_dia_da_falta_inicio,
+		)
+		if not pendentes:
+			return
+
+		atrasadas = []
+		for r in pendentes:
+			row_name = r.get("tabela_ausencia_row")
+			if not row_name:
+				continue
+			frappe.db.set_value(
+				"Tabela Ausencia", row_name, "processado_em_folha", doc.name,
+				update_modified=False,
+			)
+			if doc.start_date and getdate(r["data"]) < getdate(doc.start_date):
+				atrasadas.append(r)
+
+		if atrasadas:
+			linhas = "".join(
+				f"<li>{getdate(r['data']).strftime('%d-%m-%Y')} — {r.get('ausencia') or ''} "
+				f"({r['n_de_faltas']} falta(s))</li>"
+				for r in atrasadas
+			)
+			frappe.msgprint(
+				"As seguintes faltas de períodos anteriores foram incluídas nesta "
+				f"folha por terem sido registadas tardiamente (o período onde "
+				f"ocorreram já tinha sido processado): <ul>{linhas}</ul>",
+				title="Faltas Tardias Incluídas",
+				indicator="orange",
+			)
+	except Exception as e:
+		frappe.log_error(
+			f"SalarySlip {doc.name}: erro ao marcar faltas como processadas: {e}",
+			"SIGOS Faltas Pendentes",
+		)
+
+
+def _desmarcar_faltas_processadas(doc):
+	"""Undo the processado_em_folha stamp this slip made, so cancelling/amending
+	doesn't permanently lock those faltas out of ever being processed again."""
+	try:
+		linhas = frappe.get_all(
+			"Tabela Ausencia", filters={"processado_em_folha": doc.name}, pluck="name",
+		)
+		for row_name in linhas:
+			frappe.db.set_value(
+				"Tabela Ausencia", row_name, "processado_em_folha", None,
+				update_modified=False,
+			)
+	except Exception as e:
+		frappe.log_error(
+			f"SalarySlip {doc.name}: erro ao reverter faltas processadas: {e}",
+			"SIGOS Faltas Pendentes",
 		)
 
 
@@ -770,12 +892,14 @@ def before_submit(doc, method):
 	"""Finalise dias_trabalhados before submit."""
 	_compute_dias_trabalhados(doc)
 	_deduzir_ferias_faltas_vermelhas(doc)
+	_marcar_faltas_processadas(doc)
 
 
 # ─── on_cancel ─────────────────────────────────────────────────────────────────
 
 def on_cancel(doc, method):
 	_reverter_ferias_faltas_vermelhas(doc)
+	_desmarcar_faltas_processadas(doc)
 
 
 def _deduzir_ferias_faltas_vermelhas(doc):
