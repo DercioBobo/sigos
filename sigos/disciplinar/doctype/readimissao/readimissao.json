@@ -52,8 +52,7 @@
    "label": "Vigilante",
    "options": "Vigilante",
    "reqd": 1,
-   "in_list_view": 1,
-   "link_filters": "[[\"Vigilante\",\"status\",\"=\",\"Demitido\"]]"
+   "in_list_view": 1
   },
   {
    "fieldname": "nome_do_vigilante",
