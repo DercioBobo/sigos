@@ -1,0 +1,58 @@
+{
+ "actions": [],
+ "creation": "2026-07-16 00:00:00.000000",
+ "doctype": "DocType",
+ "document_type": "Other",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "vigilante",
+  "nome_completo",
+  "posto"
+ ],
+ "fields": [
+  {
+   "fieldname": "vigilante",
+   "fieldtype": "Link",
+   "label": "Vigilante",
+   "options": "Vigilante",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_grid_view": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "nome_completo",
+   "fieldtype": "Data",
+   "label": "Nome",
+   "fetch_from": "vigilante.nome_completo",
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_grid_view": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "posto",
+   "fieldtype": "Data",
+   "label": "Posto",
+   "fetch_from": "vigilante.posto_de_vigilancia",
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_grid_view": 1,
+   "columns": 2,
+   "description": "Informativo — este vigilante pode ser de um posto diferente do registado na ocorrência."
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-07-16 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Security Ops",
+ "name": "Ocorrencia Vigilante",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "app": "sigos"
+}

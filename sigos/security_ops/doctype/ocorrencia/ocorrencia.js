@@ -8,7 +8,10 @@ frappe.ui.form.on("Ocorrencia", {
 		_filtros(frm);
 		_destaque_gravidade(frm);
 		_botoes(frm);
-		_botao_participacao(frm);
+		// Ocorrência ↔ Participação linkage is unresolved for multi-vigilante
+		// incidents (see criar_participacao in ocorrencia.py) — button hidden
+		// until that's settled; the underlying whitelisted method still works.
+		// _botao_participacao(frm);
 	},
 
 	delegacao(frm) {
@@ -16,7 +19,6 @@ frappe.ui.form.on("Ocorrencia", {
 		// it already knows posto/delegação are consistent.
 		if (frm.__syncing_delegacao) return;
 		if (frm.doc.posto) frm.set_value("posto", "");
-		if (frm.doc.vigilante) frm.set_value("vigilante", "");
 		_filtros(frm);
 	},
 
@@ -50,7 +52,9 @@ frappe.ui.form.on("Ocorrencia", {
 function _filtros(frm) {
 	const deleg = frm.doc.delegacao;
 	frm.set_query("posto", () => ({ filters: deleg ? { delegacao: deleg } : {} }));
-	frm.set_query("vigilante", () => ({
+	// Delegação-scoped only — deliberately NOT posto-scoped, since guards from
+	// different postos of the same delegação can be involved in one incident.
+	frm.set_query("vigilante", "vigilantes_envolvidos", () => ({
 		filters: deleg ? { status: ["!=", "Demitido"], delegacao: deleg } : { status: ["!=", "Demitido"] },
 	}));
 }
@@ -130,11 +134,18 @@ function _dialog_resolver(frm) {
 				default: frm.doc.accao_tomada || "",
 				description: __("Descreva o que foi feito para resolver a ocorrência."),
 			},
+			{
+				fieldname: "resolvido_por",
+				fieldtype: "Data",
+				label: __("Resolvido Por"),
+				default: frm.doc.resolvido_por || "",
+				description: __("Nome de quem resolveu — texto livre."),
+			},
 		],
 		primary_action_label: __("Marcar como Resolvida"),
 		primary_action(vals) {
 			d.hide();
-			frm.call("resolver", { accao: vals.accao }).then(() => frm.reload_doc());
+			frm.call("resolver", { accao: vals.accao, resolvido_por: vals.resolvido_por }).then(() => frm.reload_doc());
 		},
 	});
 	d.show();

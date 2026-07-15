@@ -24,7 +24,7 @@
   "tipo",
   "gravidade",
   "col_class",
-  "vigilante",
+  "vigilantes_envolvidos",
   "sec_desc",
   "descricao",
   "foto",
@@ -154,12 +154,11 @@
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "vigilante",
-   "fieldtype": "Link",
-   "label": "Vigilante (em serviço / envolvido)",
-   "options": "Vigilante",
-   "in_standard_filter": 1,
-   "description": "Vigilante de serviço no momento, ou envolvido na ocorrência."
+   "fieldname": "vigilantes_envolvidos",
+   "fieldtype": "Table",
+   "label": "Vigilantes (em serviço / envolvidos)",
+   "options": "Ocorrencia Vigilante",
+   "description": "Um ou mais vigilantes de serviço no momento, ou envolvidos na ocorrência — podem ser de postos diferentes."
   },
   {
    "fieldname": "sec_desc",
@@ -201,11 +200,10 @@
   },
   {
    "fieldname": "resolvido_por",
-   "fieldtype": "Link",
+   "fieldtype": "Data",
    "label": "Resolvido Por",
-   "options": "User",
-   "read_only": 1,
-   "no_copy": 1
+   "no_copy": 1,
+   "description": "Nome de quem resolveu a ocorrência — texto livre, não precisa de ser um utilizador do sistema."
   },
   {
    "fieldname": "data_resolucao",

@@ -45,17 +45,16 @@ class Ocorrencia(Document):
 		return self._mudar_estado("Em Investigação")
 
 	@frappe.whitelist()
-	def resolver(self, accao=None):
+	def resolver(self, accao=None, resolvido_por=None):
 		if accao:
 			self.accao_tomada = accao
-		self.resolvido_por = frappe.session.user
+		if resolvido_por:
+			self.resolvido_por = resolvido_por
 		self.data_resolucao = today()
 		return self._mudar_estado("Resolvida")
 
 	@frappe.whitelist()
 	def fechar(self):
-		if not self.resolvido_por:
-			self.resolvido_por = frappe.session.user
 		if not self.data_resolucao:
 			self.data_resolucao = today()
 		return self._mudar_estado("Fechada")
@@ -96,8 +95,16 @@ class Ocorrencia(Document):
 	@frappe.whitelist()
 	def criar_participacao(self):
 		"""Open a draft Participação pre-filled from this ocorrência.
-		Returns the (existing or new) participação name so the UI can route to it."""
-		if not self.vigilante:
+		Returns the (existing or new) participação name so the UI can route to it.
+
+		NOT surfaced in the UI right now (button hidden in ocorrencia.js) — with
+		multiple vigilantes possibly involved, a single Participação (one guard's
+		misconduct report) doesn't obviously map to "everyone on the list", and
+		that's undecided. Kept working (picks the first guard) rather than broken,
+		so it's a small step to re-enable once that's settled.
+		"""
+		primeiro = self.vigilantes_envolvidos[0].vigilante if self.vigilantes_envolvidos else None
+		if not primeiro:
 			frappe.throw(_("Defina o Vigilante envolvido antes de abrir uma Participação."))
 
 		existente = frappe.db.exists("Participacao", {"ocorrencia_referente": self.name})
@@ -114,7 +121,7 @@ class Ocorrencia(Document):
 			"doctype": "Participacao",
 			"data": self.data,
 			"delegacao": self.delegacao,
-			"vigilante": self.vigilante,
+			"vigilante": primeiro,
 			"posto": self.posto,
 			"gravidade": mapa_gravidade.get(self.gravidade, "Média"),
 			"relato": self.descricao,
@@ -133,8 +140,8 @@ class Ocorrencia(Document):
 	# ─── Timeline ────────────────────────────────────────────────────────────────
 
 	def _registar_timeline(self, texto):
-		"""Log the incident on the involved guard's timeline (if any)."""
-		if not self.vigilante:
+		"""Log the incident on every involved guard's timeline (if any)."""
+		if not self.vigilantes_envolvidos:
 			return
 		from sigos.timeline import registar
 		contexto = texto
@@ -142,4 +149,6 @@ class Ocorrencia(Document):
 			contexto += _(" · posto <b>{0}</b>").format(self.posto)
 		if self.data:
 			contexto += _(" · {0}").format(formatdate(self.data))
-		registar(self.vigilante, contexto, self)
+		for row in self.vigilantes_envolvidos:
+			if row.vigilante:
+				registar(row.vigilante, contexto, self)

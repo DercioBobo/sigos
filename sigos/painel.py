@@ -317,7 +317,7 @@ def _ocorrencias(d, delegacao, posto):
 		"Ocorrencia",
 		filters=filters,
 		fields=["name", "assunto", "tipo", "gravidade", "estado", "posto",
-		        "posto_nome", "hora", "vigilante", "delegacao"],
+		        "posto_nome", "hora", "delegacao"],
 		order_by="hora desc",
 		limit_page_length=200,
 	)

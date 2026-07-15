@@ -282,10 +282,13 @@ def _ocorrencias(de_d, ate_d, scope, resumo=False):
 		    GROUP BY posto ORDER BY n DESC LIMIT 10""", params, as_dict=True
 	)
 	top_vig = frappe.db.sql(
-		f"""SELECT o.vigilante AS vigilante, COALESCE(v.nome_completo, o.vigilante) AS nome, COUNT(*) AS n
-		    FROM `tabOcorrencia` o LEFT JOIN `tabVigilante` v ON v.name = o.vigilante
-		    WHERE {where.replace('data', 'o.data')} AND o.vigilante IS NOT NULL AND o.vigilante <> ''
-		    GROUP BY o.vigilante ORDER BY n DESC LIMIT 10""", params, as_dict=True
+		f"""SELECT ov.vigilante AS vigilante, COALESCE(v.nome_completo, ov.vigilante) AS nome,
+		           COUNT(DISTINCT o.name) AS n
+		    FROM `tabOcorrencia` o
+		    JOIN `tabOcorrencia Vigilante` ov ON ov.parent = o.name
+		    LEFT JOIN `tabVigilante` v ON v.name = ov.vigilante
+		    WHERE {where.replace('data', 'o.data')} AND ov.vigilante IS NOT NULL AND ov.vigilante <> ''
+		    GROUP BY ov.vigilante ORDER BY n DESC LIMIT 10""", params, as_dict=True
 	)
 
 	return {
