@@ -29,6 +29,17 @@ class Rotatividade(Document):
 		vig = frappe.get_doc("Vigilante", self.vigilante)
 		posto_vago = vig.posto_de_vigilancia   # captured before any change
 
+		# The guard's CURRENT rotation slot at the vacated posto — captured now, before
+		# vig.save() below cascades their removal from that escala. If a substituto takes
+		# over, they inherit this exact slot (see step 2) instead of restarting the
+		# rotation from scratch (e.g. always "1ª Manhã").
+		turno_vago = None
+		if posto_vago and vig.regime_do_vigilante:
+			from sigos.security_ops.doctype.escala_do_vigilante.escala_do_vigilante import (
+				obter_turno_inicial_actual,
+			)
+			turno_vago = obter_turno_inicial_actual(self.vigilante, posto_vago, vig.regime_do_vigilante)
+
 		if op and op.muda_posto:
 			vig.posto_de_vigilancia = self.novo_posto
 			# Contract (project) + customer FOLLOW the posto — derived, not independent.
@@ -68,6 +79,8 @@ class Rotatividade(Document):
 			if self.regime and sub.regime_do_vigilante != self.regime:
 				sub.regime_do_vigilante = self.regime
 				sub.flags.via_troca_regime = True
+			if turno_vago:
+				sub.flags.turno_inicial_preferido = turno_vago
 			sub.save(ignore_permissions=True)
 
 		# 3. Create the Demissão record

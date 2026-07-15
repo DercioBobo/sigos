@@ -203,7 +203,7 @@
    "fieldtype": "Data",
    "label": "Resolvido Por",
    "no_copy": 1,
-   "description": "Nome de quem resolveu a ocorrência — texto livre, não precisa de ser um utilizador do sistema."
+   "description": "Nome de quem resolveu a ocorrência"
   },
   {
    "fieldname": "data_resolucao",

@@ -11,6 +11,7 @@
   "naming_series",
   "descricao",
   "numero_serie",
+  "numero_da_arma",
   "col_break_1",
   "tipo",
   "estado",
@@ -41,6 +42,12 @@
    "fieldname": "numero_serie",
    "fieldtype": "Data",
    "label": "Número de Série",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "numero_da_arma",
+   "fieldtype": "Data",
+   "label": "Número da Arma",
    "in_list_view": 1
   },
   {

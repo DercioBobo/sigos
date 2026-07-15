@@ -105,7 +105,13 @@ class Vigilante(Document):
 		from sigos.security_ops.doctype.escala_do_vigilante.escala_do_vigilante import (
 			migrar_escala_vigilante,
 		)
-		migrar_escala_vigilante(self.name, old_posto, old_regime, destino[0], destino[1])
+		# Optional carry-forward slot (e.g. Rotatividade handing a substitute the exact
+		# rotation position vacated by the guard they're replacing) — see
+		# escala_do_vigilante.obter_turno_inicial_actual.
+		turno_inicial = self.flags.get("turno_inicial_preferido")
+		migrar_escala_vigilante(
+			self.name, old_posto, old_regime, destino[0], destino[1], turno_inicial=turno_inicial
+		)
 
 	# ─── Auto-activation ─────────────────────────────────────────────────────────
 

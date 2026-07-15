@@ -310,7 +310,23 @@ def _remover_vigilante_da_escala(vigilante, posto, regime):
 	return nome
 
 
-def _adicionar_vigilante_a_escala(vigilante, posto, regime):
+def obter_turno_inicial_actual(vigilante, posto, regime):
+	"""
+	Current turno_inicial (rotation slot) of a guard on the (posto, regime) escala,
+	or None if they're not on it / no such escala exists. Callers capture this
+	BEFORE removing the guard (e.g. Rotatividade, before vig.save() cascades their
+	removal) so it can be carried forward to whoever replaces them — see
+	migrar_escala_vigilante's turno_inicial param.
+	"""
+	nome = _escala_do_par(posto, regime)
+	if not nome:
+		return None
+	return frappe.db.get_value(
+		"Tab Vigilante Do Posto", {"parent": nome, "vigilante": vigilante}, "turno_inicial"
+	)
+
+
+def _adicionar_vigilante_a_escala(vigilante, posto, regime, turno_inicial=None):
 	nome = _escala_do_par(posto, regime)
 	criada = False
 	if nome:
@@ -327,18 +343,33 @@ def _adicionar_vigilante_a_escala(vigilante, posto, regime):
 		criada = True
 
 	if not any(g.vigilante == vigilante for g in esc.tab_vigilante_do_posto):
+		if turno_inicial:
+			# Explicit slot (typically a vacated one carried forward from whoever this
+			# guard is replacing) — trusted as-is, NOT restricted to non-folga turnos
+			# like _turno_inicial_livre: a guard can legitimately inherit a folga slot.
+			turno = turno_inicial
+			colidente = next(
+				(g for g in esc.tab_vigilante_do_posto if g.turno_inicial == turno), None
+			)
+			if colidente:
+				colidente.turno_inicial = _turno_inicial_livre(esc, regime)
+		else:
+			turno = _turno_inicial_livre(esc, regime)
 		esc.append("tab_vigilante_do_posto", {
 			"vigilante": vigilante,
-			"turno_inicial": _turno_inicial_livre(esc, regime),
+			"turno_inicial": turno,
 		})
 	esc.save(ignore_permissions=True)  # reconcile generates their rows
 	return esc.name, criada
 
 
-def migrar_escala_vigilante(vigilante, old_posto, old_regime, new_posto, new_regime):
+def migrar_escala_vigilante(vigilante, old_posto, old_regime, new_posto, new_regime, turno_inicial=None):
 	"""
 	Move a guard from the (old_posto, old_regime) escala to the (new_posto, new_regime)
 	escala. Pass new_posto/new_regime as None to only remove (e.g. demissão / inactive).
+	turno_inicial (optional): a specific rotation slot to give them on arrival — e.g. the
+	slot vacated by whoever they're replacing (see obter_turno_inicial_actual) — instead
+	of the generic "first free working turno" pick.
 	Returns {removido_de, adicionado_a, criada} or None when nothing changed.
 	"""
 	if (old_posto, old_regime) == (new_posto, new_regime):
@@ -347,7 +378,9 @@ def migrar_escala_vigilante(vigilante, old_posto, old_regime, new_posto, new_reg
 	removido = _remover_vigilante_da_escala(vigilante, old_posto, old_regime)
 	adicionado, criada = (None, False)
 	if new_posto and new_regime:
-		adicionado, criada = _adicionar_vigilante_a_escala(vigilante, new_posto, new_regime)
+		adicionado, criada = _adicionar_vigilante_a_escala(
+			vigilante, new_posto, new_regime, turno_inicial=turno_inicial
+		)
 
 	if not (removido or adicionado):
 		return None
