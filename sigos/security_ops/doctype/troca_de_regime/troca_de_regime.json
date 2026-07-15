@@ -9,7 +9,9 @@
  "engine": "InnoDB",
  "field_order": [
   "naming_series",
+  "col_cab_1",
   "data",
+  "col_cab_2",
   "delegacao",
   "sec_vig",
   "vigilante",
@@ -31,11 +33,19 @@
    "set_only_once": 1
   },
   {
+   "fieldname": "col_cab_1",
+   "fieldtype": "Column Break"
+  },
+  {
    "fieldname": "data",
    "fieldtype": "Date",
    "label": "Data",
    "reqd": 1,
    "default": "Today"
+  },
+  {
+   "fieldname": "col_cab_2",
+   "fieldtype": "Column Break"
   },
   {
    "fieldname": "delegacao",

@@ -99,10 +99,18 @@
   "doctype": "Custom Field",
   "dt": "Employee",
   "module": "SIGOS Setup",
+  "fieldname": "custom_col_dados_sigos",
+  "fieldtype": "Column Break",
+  "insert_after": "custom_tipo_de_vigilante"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Employee",
+  "module": "SIGOS Setup",
   "fieldname": "custom_inss",
   "fieldtype": "Data",
   "label": "INSS",
-  "insert_after": "custom_tipo_de_vigilante"
+  "insert_after": "custom_col_dados_sigos"
  },
  {
   "doctype": "Custom Field",
@@ -136,11 +144,19 @@
   "doctype": "Custom Field",
   "dt": "Employee",
   "module": "SIGOS Setup",
+  "fieldname": "custom_col_bancario",
+  "fieldtype": "Column Break",
+  "insert_after": "custom_contanib"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Employee",
+  "module": "SIGOS Setup",
   "fieldname": "custom_tipo_documento",
   "fieldtype": "Select",
   "label": "Tipo de Documento",
   "options": "\nBI\nPassaporte\nDIRE\nOutro",
-  "insert_after": "custom_contanib"
+  "insert_after": "custom_col_bancario"
  },
  {
   "doctype": "Custom Field",
