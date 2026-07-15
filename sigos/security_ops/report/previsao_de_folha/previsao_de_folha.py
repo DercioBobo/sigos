@@ -16,6 +16,9 @@ thousands of employees this way is real per-employee DB work, not something to
 run synchronously inside a blocking request.
 """
 
+import re
+import unicodedata
+
 import frappe
 from frappe import _
 
@@ -44,10 +47,47 @@ def execute(filters=None):
 				  "ignorados (sem base para prever).").format(sem_estrutura),
 				alert=True, indicator="orange",
 			)
-		return _columns(), data
+		earning_cols, deduction_cols = _flatten_components(data)
+		return _columns(earning_cols, deduction_cols), data
 	finally:
 		# Whatever the simulation touched, none of it is real — never let it commit.
 		frappe.db.rollback(save_point=savepoint)
+
+
+# ─── Component flattening ──────────────────────────────────────────────────────
+
+def _slug(component_name):
+	ascii_name = unicodedata.normalize("NFKD", component_name).encode("ascii", "ignore").decode()
+	return re.sub(r"[^a-z0-9]+", "_", ascii_name.lower()).strip("_")
+
+
+def _flatten_components(data):
+	"""Turns each row's temp _earnings/_deductions dicts into earn_<slug>/ded_<slug>
+	fields, and returns the (label, fieldname) pairs to render as report columns —
+	in first-seen order, so the most common components lead."""
+	earning_cols = []
+	deduction_cols = []
+	seen_earn, seen_ded = set(), set()
+
+	for row in data:
+		for component in row.get("_earnings", {}):
+			if component not in seen_earn:
+				seen_earn.add(component)
+				earning_cols.append((component, "earn_" + _slug(component)))
+		for component in row.get("_deductions", {}):
+			if component not in seen_ded:
+				seen_ded.add(component)
+				deduction_cols.append((component, "ded_" + _slug(component)))
+
+	for row in data:
+		earnings = row.pop("_earnings", {})
+		deductions = row.pop("_deductions", {})
+		for label, fieldname in earning_cols:
+			row[fieldname] = earnings.get(label, 0)
+		for label, fieldname in deduction_cols:
+			row[fieldname] = deductions.get(label, 0)
+
+	return earning_cols, deduction_cols
 
 
 # ─── Employee resolution ───────────────────────────────────────────────────────
@@ -147,6 +187,8 @@ def _simular_funcionario(emp, start_date, end_date):
 			"total_deducoes": doc.get("total_deduction") or 0,
 			"valor_liquido": doc.get("net_pay") or 0,
 			"estado": "OK",
+			"_earnings": {e.salary_component: e.amount for e in doc.get("earnings") or []},
+			"_deductions": {d.salary_component: d.amount for d in doc.get("deductions") or []},
 		}
 	except Exception as e:
 		frappe.log_error(
@@ -158,7 +200,10 @@ def _simular_funcionario(emp, start_date, end_date):
 
 # ─── Columns ─────────────────────────────────────────────────────────────────
 
-def _columns():
+def _columns(earning_cols, deduction_cols):
+	component_col = lambda label, fieldname: {
+		"label": label, "fieldname": fieldname, "fieldtype": "Currency", "width": 120,
+	}
 	return [
 		{"label": _("Funcionário"), "fieldname": "employee", "fieldtype": "Link", "options": "Employee", "width": 110},
 		{"label": _("Nome"), "fieldname": "employee_name", "fieldtype": "Data", "width": 180},
@@ -170,7 +215,9 @@ def _columns():
 		{"label": _("Faltas"), "fieldname": "faltas", "fieldtype": "Int", "width": 80},
 		{"label": _("Faltas Não Just."), "fieldname": "faltas_nao_justificadas", "fieldtype": "Int", "width": 110},
 		{"label": _("Dias Trabalhados"), "fieldname": "dias_trabalhados", "fieldtype": "Int", "width": 110},
+		*[component_col(label, fieldname) for label, fieldname in earning_cols],
 		{"label": _("Total Rendimentos"), "fieldname": "total_rendimentos", "fieldtype": "Currency", "width": 130},
+		*[component_col(label, fieldname) for label, fieldname in deduction_cols],
 		{"label": _("Total Deduções"), "fieldname": "total_deducoes", "fieldtype": "Currency", "width": 130},
 		{"label": _("Valor Líquido a Receber"), "fieldname": "valor_liquido", "fieldtype": "Currency", "width": 150},
 		{"label": _("Estado"), "fieldname": "estado", "fieldtype": "Data", "width": 90},
