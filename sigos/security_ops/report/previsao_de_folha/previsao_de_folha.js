@@ -1,4 +1,4 @@
-frappe.query_reports["Previsão de Folha"] = {
+frappe.query_reports["Previsao de Folha"] = {
 	filters: [
 		{ fieldname: "start_date", label: __("Início do Período"), fieldtype: "Date", reqd: 1 },
 		{ fieldname: "end_date", label: __("Fim do Período"), fieldtype: "Date", reqd: 1 },
