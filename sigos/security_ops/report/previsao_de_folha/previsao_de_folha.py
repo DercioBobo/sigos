@@ -128,6 +128,7 @@ def _resolver_funcionarios(filters):
 		fields=[
 			"name", "employee_name", "company",
 			"custom_vigilante", "custom_delegacao", "custom_posto", "custom_cliente",
+			"custom_categoria",
 		],
 		order_by="employee_name asc",
 	)
@@ -166,6 +167,12 @@ def _simular_funcionario(emp, start_date, end_date):
 			"posting_date": end_date,
 			"start_date": start_date,
 			"end_date": end_date,
+			# custom_vigilante/custom_categoria are fetch_from: employee.* — Frappe
+			# only populates those as part of a real .insert(), which this never
+			# does. Set them by hand or the faltas/categoria-subsidy chain below
+			# (both keyed off these fields) silently no-ops on every row.
+			"custom_vigilante": emp.custom_vigilante,
+			"custom_categoria": emp.custom_categoria,
 		})
 		# Mirror exactly what a real .insert() fires, in the same order — but
 		# never actually inserted, so nothing is written. before_validate and
