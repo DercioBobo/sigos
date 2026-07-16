@@ -612,7 +612,7 @@ def get_turnos_do_regime_query(doctype, txt, searchfield, start, page_len, filte
 
 
 @frappe.whitelist()
-def get_vigilantes_da_escala(data, periodo, grupo_delegados=None, excluir_doc=None):
+def get_vigilantes_da_escala(data, periodo, grupo_delegados=None, excluir_doc=None, incluir_folga=0):
 	"""
 	Return every vigilante expected on shift for data+periodo,
 	enriched with posto, turno, regime, delegacao and nome_completo.
@@ -620,18 +620,34 @@ def get_vigilantes_da_escala(data, periodo, grupo_delegados=None, excluir_doc=No
 	Each row is annotated with ja_registado_em / ja_registado_estado when the guard
 	already has an absence in ANOTHER doc (draft or submitted) for this data+periodo —
 	the deck greys them out at add-time instead of erroring at save.
-	Used by the Ausencias quick-add dialog and set_query filter.
+	Used by the Ausencias quick-add dialog and set_query filter, and by the
+	Vigilantes de Hoje CCO board (incluir_folga=1).
+
+	incluir_folga: when true, ALSO returns the guard's folga (day-off) row for this
+	data, regardless of periodo — a folga turno has no periodo of its own (it covers
+	the whole day, see Turno fixtures), so it's included via an OR on the periodo
+	match rather than the periodo filter itself. Default 0 reproduces the exact
+	previous query (folga rows never match a real periodo, so they're excluded
+	exactly as before) — existing callers (Ausencias quick-add) are unaffected.
 	"""
+	folga_clause = "OR t.e_folga = 1" if int(incluir_folga or 0) else ""
 	base_sql = """
 		SELECT
+			te.name AS escala_row,
 			te.vigilante,
 			v.nome_completo,
 			v.mecanografico,
 			v.delegacao,
+			v.categoria,
+			v.contacto,
+			v.contacto_alternativo,
+			v.residencia,
 			te.posto,
+			p.nome_do_posto,
 			te.turno,
 			te.regime,
 			COALESCE(NULLIF(te.periodo, ''), t.periodo) AS periodo,
+			t.e_folga,
 			COALESCE(rti.n_de_faltas, 1) AS n_de_faltas
 		FROM `tabTabela De Escala De Vigilante` te
 		JOIN `tabEscala Do Vigilante` e ON e.name = te.parent
@@ -639,10 +655,10 @@ def get_vigilantes_da_escala(data, periodo, grupo_delegados=None, excluir_doc=No
 		JOIN `tabTurno` t ON t.name = te.turno
 		LEFT JOIN `tabRegime Turno Item` rti
 			ON rti.parent = te.regime AND rti.turno = te.turno
+		LEFT JOIN `tabPosto De Vigilancia` p ON p.name = te.posto
 		WHERE e.estado = 'Activo'
 		  AND te.data = %(data)s
-		  AND t.periodo = %(periodo)s
-		  AND (t.e_folga IS NULL OR t.e_folga = 0)
+		  AND (t.periodo = %(periodo)s {folga_clause})
 		{extra}
 		ORDER BY v.delegacao, v.nome_completo
 	"""
@@ -661,7 +677,7 @@ def get_vigilantes_da_escala(data, periodo, grupo_delegados=None, excluir_doc=No
 			params["delegacoes"] = tuple(delegacoes)
 			extra = "AND v.delegacao IN %(delegacoes)s"
 
-	rows = frappe.db.sql(base_sql.format(extra=extra), params, as_dict=True)
+	rows = frappe.db.sql(base_sql.format(extra=extra, folga_clause=folga_clause), params, as_dict=True)
 	_marcar_ja_registados(rows, data, periodo, excluir_doc)
 	_marcar_licencas(rows, data)
 	return rows
@@ -717,6 +733,11 @@ def _marcar_ja_registados(rows, data, periodo, excluir_doc=None):
 	"""
 	Annotate roster rows whose guard already has an absence registered in another
 	Ausencias doc (any grupo) for the same data+periodo. Submitted wins over draft.
+
+	Also stamps the full ja_* row detail (tipo, justificacao, proxima_accao, etc.)
+	so a caller (Vigilantes de Hoje) can pre-fill an edit form in one round trip —
+	purely additive, the Ausencias quick-add dialog only reads ja_registado_em/
+	ja_registado_estado and ignores the rest.
 	"""
 	vigs = [r.vigilante for r in rows if r.get("vigilante")]
 	if not vigs:
@@ -728,7 +749,11 @@ def _marcar_ja_registados(rows, data, periodo, excluir_doc=None):
 		params["excl"] = excluir_doc
 	conflitos = frappe.db.sql(
 		f"""
-		SELECT ta.vigilante, a.name AS doc, a.docstatus
+		SELECT ta.vigilante, a.name AS doc, a.docstatus,
+		       ta.name AS ja_ausencia_row, ta.tipo_de_ausencia, ta.subtipo_falta,
+		       ta.tipo_justificacao, ta.jutificativo, ta.proxima_accao,
+		       ta.vigilante_substituto, ta.vigilante_a_dobrar, ta.vigilante_a_meia_dobra,
+		       ta.vigilante_a_adiantar, ta.vigilante_a_horas_extras, ta.n_de_faltas
 		FROM `tabTabela Ausencia` ta
 		JOIN `tabAusencias` a ON a.name = ta.parent
 		WHERE a.docstatus < 2 AND a.data = %(d)s AND a.periodo = %(p)s
@@ -746,6 +771,19 @@ def _marcar_ja_registados(rows, data, periodo, excluir_doc=None):
 		if c:
 			r["ja_registado_em"] = c.doc
 			r["ja_registado_estado"] = "Submetido" if c.docstatus == 1 else "Rascunho"
+			r["ja_ausencia_doc"] = c.doc
+			r["ja_ausencia_row"] = c.ja_ausencia_row
+			r["ja_tipo_de_ausencia"] = c.tipo_de_ausencia
+			r["ja_subtipo_falta"] = c.subtipo_falta
+			r["ja_tipo_justificacao"] = c.tipo_justificacao
+			r["ja_jutificativo"] = c.jutificativo
+			r["ja_proxima_accao"] = c.proxima_accao
+			r["ja_vigilante_substituto"] = c.vigilante_substituto
+			r["ja_vigilante_a_dobrar"] = c.vigilante_a_dobrar
+			r["ja_vigilante_a_meia_dobra"] = c.vigilante_a_meia_dobra
+			r["ja_vigilante_a_adiantar"] = c.vigilante_a_adiantar
+			r["ja_vigilante_a_horas_extras"] = c.vigilante_a_horas_extras
+			r["ja_n_de_faltas"] = c.n_de_faltas
 
 	# Guards COVERING an absence (substituto/dobra/adiantamento) in a submitted doc
 	# of the same date can't be marked absent — grey them too.
@@ -808,6 +846,176 @@ def _marcar_licencas(rows, data):
 	for r in rows:
 		if r.vigilante in licenca_de_vig:
 			r["em_licenca"] = licenca_de_vig[r.vigilante]
+
+
+@frappe.whitelist()
+def get_sigos_settings_flags():
+	"""
+	Small, extensible bag of SIGOS Settings flags a client-side form needs to know
+	about BEFORE rendering (e.g. whether to show a conditional field) — the actual
+	enforcement always stays server-side in the doctype's own validate(). Started
+	for Vigilantes de Hoje's mark form (Subtipo de Falta visibility).
+	"""
+	return {
+		"faltas_normal_vermelha_activo": frappe.db.get_single_value(
+			"SIGOS Settings", "faltas_normal_vermelha_activo"
+		),
+	}
+
+
+_ACCAO_CAMPO = {
+	"Substituto": "vigilante_substituto",
+	"Dobra de Turno": "vigilante_a_dobrar",
+	"Meia Dobra": "vigilante_a_meia_dobra",
+	"Adiantamento de Turno": "vigilante_a_adiantar",
+	"Horas Extras": "vigilante_a_horas_extras",
+}
+
+
+def _resolver_grupo_delegados(vigilante):
+	"""
+	No User/Employee is tied to a "home" grupo anywhere in SIGOS — grupo_delegados
+	is always an explicit choice (see Ausencias.grupo_delegados). When the caller
+	(Vigilantes de Hoje browsing "Todos os Grupos") doesn't pass one, resolve it
+	from the guard's delegação — but only when that's unambiguous.
+	"""
+	delegacao = frappe.db.get_value("Vigilante", vigilante, "delegacao")
+	if not delegacao:
+		frappe.throw(
+			_("O vigilante <b>{0}</b> não tem Delegação definida — não é possível "
+			  "determinar o Grupo De Delegados.").format(vigilante),
+			title=_("Sem Delegação"),
+		)
+	grupos = frappe.get_all(
+		"Grupo Delegados Item", filters={"delegacao": delegacao}, pluck="parent"
+	)
+	grupos = list(dict.fromkeys(grupos))  # de-dup, preserve order
+	if not grupos:
+		frappe.throw(
+			_("A delegação <b>{0}</b> não pertence a nenhum Grupo De Delegados — "
+			  "configure um Grupo antes de marcar esta ausência.").format(delegacao),
+			title=_("Sem Grupo De Delegados"),
+		)
+	if len(grupos) > 1:
+		frappe.throw(
+			_("A delegação <b>{0}</b> pertence a mais do que um Grupo De Delegados "
+			  "({1}) — seleccione um Grupo no filtro da página antes de marcar "
+			  "esta ausência.").format(delegacao, ", ".join(grupos)),
+			title=_("Grupo Ambíguo"),
+		)
+	return grupos[0]
+
+
+@frappe.whitelist()
+def marcar_ausencia_rapida(
+	vigilante, data, periodo, tipo_de_ausencia, regime=None, turno=None,
+	grupo_delegados=None, ausencia_row=None,
+	subtipo_falta=None, tipo_justificacao=None, jutificativo=None,
+	proxima_accao=None,
+	vigilante_substituto=None, vigilante_a_dobrar=None, vigilante_a_meia_dobra=None,
+	vigilante_a_adiantar=None, vigilante_a_horas_extras=None,
+	motivo_atraso=None,
+):
+	"""
+	Find-or-create the day's Ausencias sheet (one per periodo+data+grupo, same
+	naming as Ausencias.autoname) and upsert one guard's absence row on it, saved
+	as a DRAFT (never submitted here — Operações SIGOS/CCO has write but not
+	submit on Ausencias; approval stays on the full form's workflow). Runs under
+	the caller's own permissions (no ignore_permissions) so the doctype's normal
+	role gate applies. Used by the Vigilantes de Hoje board's inline mark form.
+
+	Reuses Ausencias.validate() in full (grupo fencing, duplicate/conflict checks,
+	faltas calc, late-submission cutoff) by going through a plain doc.save() —
+	this function does no business-rule enforcement of its own beyond resolving
+	which sheet a row belongs to.
+	"""
+	if not grupo_delegados:
+		grupo_delegados = _resolver_grupo_delegados(vigilante)
+
+	nome = f"{periodo}-{data}-{grupo_delegados}"
+	if frappe.db.exists("Ausencias", nome):
+		existente_docstatus = frappe.db.get_value("Ausencias", nome, "docstatus")
+		if existente_docstatus == 1:
+			frappe.throw(
+				_("A folha <b>{0}</b> já foi submetida — use o formulário Ausencias "
+				  "para alterações a uma folha submetida.").format(nome),
+				title=_("Folha Já Submetida"),
+			)
+		doc = frappe.get_doc("Ausencias", nome)
+	else:
+		doc = frappe.new_doc("Ausencias")
+		doc.data = data
+		doc.periodo = periodo
+		doc.grupo_delegados = grupo_delegados
+
+	if motivo_atraso:
+		doc.motivo_atraso = motivo_atraso
+
+	linha = None
+	if ausencia_row:
+		linha = next((r for r in doc.tabela_ausencia if r.name == ausencia_row), None)
+	if not linha:
+		linha = next((r for r in doc.tabela_ausencia if r.vigilante == vigilante), None)
+	if not linha:
+		linha = doc.append("tabela_ausencia", {})
+
+	linha.vigilante = vigilante
+	if regime:
+		linha.regime = regime
+	if turno:
+		linha.turno = turno
+	linha.tipo_de_ausencia = tipo_de_ausencia
+	linha.subtipo_falta = subtipo_falta
+	linha.tipo_justificacao = tipo_justificacao
+	linha.jutificativo = jutificativo
+	linha.proxima_accao = proxima_accao
+
+	for campo in _ACCAO_CAMPO.values():
+		linha.set(campo, None)
+	campo_accao = _ACCAO_CAMPO.get(proxima_accao)
+	if campo_accao:
+		valores = {
+			"vigilante_substituto": vigilante_substituto,
+			"vigilante_a_dobrar": vigilante_a_dobrar,
+			"vigilante_a_meia_dobra": vigilante_a_meia_dobra,
+			"vigilante_a_adiantar": vigilante_a_adiantar,
+			"vigilante_a_horas_extras": vigilante_a_horas_extras,
+		}
+		linha.set(campo_accao, valores.get(campo_accao))
+
+	doc.save()
+
+	return {"doc": doc.name, "row": linha.name, "n_de_faltas": linha.n_de_faltas}
+
+
+@frappe.whitelist()
+def remover_marca_ausencia(ausencia_doc, ausencia_row):
+	"""
+	Undo one guard's mark from a draft Ausencias sheet (Vigilantes de Hoje's
+	"Remover marca"). Deletes the whole sheet if that was its last row, rather
+	than leaving an empty shell around. Submitted sheets are out of scope here —
+	same boundary as marcar_ausencia_rapida (cancelling a submitted doc has wider
+	consequences via on_cancel, left to the full Ausencias form).
+	"""
+	doc = frappe.get_doc("Ausencias", ausencia_doc)
+	if doc.docstatus == 1:
+		frappe.throw(
+			_("A folha <b>{0}</b> já foi submetida — use o formulário Ausencias "
+			  "para alterações a uma folha submetida.").format(ausencia_doc),
+			title=_("Folha Já Submetida"),
+		)
+
+	antes = len(doc.tabela_ausencia)
+	doc.tabela_ausencia = [r for r in doc.tabela_ausencia if r.name != ausencia_row]
+	if len(doc.tabela_ausencia) == antes:
+		frappe.throw(_("Linha de ausência não encontrada nesta folha."))
+
+	if not doc.tabela_ausencia:
+		doc.delete()
+		return {"removido": True, "doc_apagado": True}
+
+	doc.save()
+	return {"removido": True, "doc_apagado": False}
 
 
 @frappe.whitelist()

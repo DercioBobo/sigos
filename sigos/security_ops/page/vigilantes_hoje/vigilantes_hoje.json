@@ -1,0 +1,17 @@
+{
+ "content": null,
+ "creation": "2026-07-16 00:00:00.000000",
+ "doctype": "Page",
+ "module": "Security Ops",
+ "name": "vigilantes-hoje",
+ "page_name": "vigilantes-hoje",
+ "standard": "Yes",
+ "system_page": 0,
+ "title": "Vigilantes de Hoje",
+ "roles": [
+  { "role": "System Manager" },
+  { "role": "SIGOS Manager" },
+  { "role": "Aprovador Operações" },
+  { "role": "Operações SIGOS" }
+ ]
+}
