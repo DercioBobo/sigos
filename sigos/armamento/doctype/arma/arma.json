@@ -1,16 +1,13 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "naming_series:",
+ "autoname": "field:numero_da_arma",
  "creation": "2026-06-02 00:00:00.000000",
  "doctype": "DocType",
  "document_type": "Document",
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "naming_series",
-  "descricao",
-  "numero_serie",
   "numero_da_arma",
   "col_break_1",
   "tipo",
@@ -24,31 +21,12 @@
  ],
  "fields": [
   {
-   "fieldname": "naming_series",
-   "fieldtype": "Select",
-   "label": "Série",
-   "options": "ARM-.##",
-   "reqd": 1,
-   "set_only_once": 1
-  },
-  {
-   "fieldname": "descricao",
-   "fieldtype": "Data",
-   "label": "Descrição",
-   "reqd": 1,
-   "in_list_view": 1
-  },
-  {
-   "fieldname": "numero_serie",
-   "fieldtype": "Data",
-   "label": "Número de Série",
-   "in_list_view": 1
-  },
-  {
    "fieldname": "numero_da_arma",
    "fieldtype": "Data",
    "label": "Número da Arma",
-   "in_list_view": 1
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
   },
   {
    "fieldname": "col_break_1",
@@ -114,7 +92,7 @@
  "modified_by": "Administrator",
  "module": "Armamento",
  "name": "Arma",
- "naming_rule": "By \"Naming Series\" field",
+ "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
   {
@@ -168,7 +146,6 @@
  ],
  "sort_field": "modified",
  "sort_order": "DESC",
- "title_field": "descricao",
  "track_changes": 1,
  "app": "sigos"
 }
