@@ -1,4 +1,5 @@
 import frappe
+from frappe.model.rename_doc import rename_doc
 
 
 def execute():
@@ -8,7 +9,12 @@ def execute():
 	Série were removed — numero_da_arma is now the sole, mandatory identifier).
 
 	Movimentacao De Arma.referencia_da_arma is the only Link to Arma in the app,
-	so frappe.rename_doc cascades it automatically — nothing else to backfill.
+	so rename_doc cascades it automatically — nothing else to backfill.
+
+	Uses frappe.model.rename_doc.rename_doc directly (not the frappe.rename_doc
+	whitelisted wrapper) because the wrapper doesn't accept ignore_permissions —
+	it always runs under the caller's own permissions, which is fine for the UI
+	but not for an unattended patch.
 
 	Records with an empty or duplicate numero_da_arma can't be safely
 	auto-renamed (no identifier to rename to / would collide) — they're left
@@ -37,6 +43,6 @@ def execute():
 			)
 			continue
 		vistos.add(novo)
-		frappe.rename_doc("Arma", a.name, novo, ignore_permissions=True)
+		rename_doc(doctype="Arma", old=a.name, new=novo, ignore_permissions=True)
 
 	frappe.db.commit()
