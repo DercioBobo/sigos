@@ -170,6 +170,17 @@ function _sincronizar_vigilantes(frm) {
 			const guards = r.message || [];
 			if (!guards.length) { frappe.msgprint(__("Nenhum vigilante activo neste posto e regime.")); return; }
 
+			// Drop rows that no longer belong to this posto/regime (e.g. posto was
+			// changed on the doc) — otherwise sync only ever appends, leaving stale
+			// guards from a previous posto mixed in with the new ones.
+			const guardNames = new Set(guards.map(g => g.name));
+			const antes = (frm.doc.tab_vigilante_do_posto || []).length;
+			frm.doc.tab_vigilante_do_posto = (frm.doc.tab_vigilante_do_posto || [])
+				.filter(row => guardNames.has(row.vigilante));
+			frm.doc.tab_vigilante_do_posto.forEach((row, i) => { row.idx = i + 1; });
+			const removidos = antes - frm.doc.tab_vigilante_do_posto.length;
+			if (removidos) frm.dirty();
+
 			frappe.call({
 				method: "sigos.api.get_regime_turnos",
 				args: { regime: frm.doc.regime_do_vigilante },
@@ -201,9 +212,11 @@ function _sincronizar_vigilantes(frm) {
 
 					frm.refresh_field("tab_vigilante_do_posto");
 					_snapshot_slots(frm);
+					const partes = [`${adicionados} vigilante(s) adicionado(s)`];
+					if (removidos) partes.push(`${removidos} removido(s)`);
 					frappe.show_alert({
-						message: __(`${adicionados} vigilante(s) adicionado(s) com turnos escalonados. Reveja e guarde.`),
-						indicator: adicionados ? "green" : "blue",
+						message: __(`${partes.join(", ")} — turnos escalonados. Reveja e guarde.`),
+						indicator: (adicionados || removidos) ? "green" : "blue",
 					}, 5);
 				},
 			});
