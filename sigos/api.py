@@ -1548,16 +1548,19 @@ def get_regime_salary(project, regime):
 def resolver_salario_base(vigilante):
 	"""
 	A vigilante's base = manual override if set, else the contract's per-regime
-	salary — then floored at the Salário Mínimo Padrão (SIGOS Settings). The floor
-	doubles as the fallback: a vigilante with no override and no contract/regime base
-	still resolves to the minimum (when one is set). `vigilante` may be a name (str)
-	or a dict carrying the needed fields.
+	salary, else the guard's Categoria's own global default (Categoria
+	Vigilante.salario_base — contract-independent, for customers who don't price
+	salary per Project) — then floored at the Salário Mínimo Padrão (SIGOS
+	Settings). The floor doubles as the final fallback: a vigilante with no
+	override and no contract/categoria base still resolves to the minimum (when
+	one is set). `vigilante` may be a name (str) or a dict carrying the needed
+	fields.
 	"""
 	from frappe.utils import flt
 	if isinstance(vigilante, str):
 		v = frappe.db.get_value(
 			"Vigilante", vigilante,
-			["salario_base_manual", "projecto", "regime_do_vigilante"],
+			["salario_base_manual", "projecto", "regime_do_vigilante", "categoria"],
 			as_dict=True,
 		) or {}
 	else:
@@ -1565,6 +1568,8 @@ def resolver_salario_base(vigilante):
 
 	manual = flt(v.get("salario_base_manual"))
 	base = manual if manual > 0 else flt(get_regime_salary(v.get("projecto"), v.get("regime_do_vigilante")))
+	if base <= 0 and v.get("categoria"):
+		base = flt(frappe.db.get_value("Categoria Vigilante", v.get("categoria"), "salario_base")) or 0
 
 	minimo = flt(frappe.db.get_single_value("SIGOS Settings", "salario_minimo_padrao"))
 	if minimo > 0:
@@ -1681,7 +1686,7 @@ def aplicar_salario_base(project=None, vigilante=None, vigilantes=None, silent=F
 	vigs = frappe.get_all(
 		"Vigilante",
 		filters=filters,
-		fields=["name", "funcionario", "projecto", "cliente", "regime_do_vigilante", "salario_base_manual"],
+		fields=["name", "funcionario", "projecto", "cliente", "regime_do_vigilante", "salario_base_manual", "categoria"],
 	)
 
 	resumo = {"atribuido": 0, "actualizado": 0, "inalterado": 0, "ignorado": 0}
@@ -1856,13 +1861,14 @@ def definir_salario_base(vigilante, valor=None, usar_contrato=0, confirmar_reduc
 	# cut can be confirmed first. resolver_salario_base accepts a dict, so we mirror
 	# the guard's contract/regime with the proposed manual override.
 	atual = flt(resolver_salario_base(vigilante))
-	proj, regime = frappe.db.get_value(
-		"Vigilante", vigilante, ["projecto", "regime_do_vigilante"]
+	proj, regime, categoria = frappe.db.get_value(
+		"Vigilante", vigilante, ["projecto", "regime_do_vigilante", "categoria"]
 	)
 	novo = flt(resolver_salario_base({
 		"salario_base_manual": novo_manual,
 		"projecto": proj,
 		"regime_do_vigilante": regime,
+		"categoria": categoria,
 	}))
 
 	if novo < atual and not int(confirmar_reducao or 0):

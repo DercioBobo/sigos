@@ -92,7 +92,9 @@
   "valor_subsidio_chefia_turno",
   "valor_subsidio_chefia_posto",
   "valor_subsidio_canino",
-  "turno_equipa_activo"
+  "turno_equipa_activo",
+  "posto_interno_por_omissao",
+  "nao_herdar_salario_por_omissao"
  ],
  "fields": [
   {
@@ -643,6 +645,20 @@
    "label": "Escala: Turno da Equipa",
    "default": "0",
    "description": "Quando activo, mostra a coluna Turno da Equipa (Link) na tabela de vigilantes do posto e na escala gerada, dentro de Escala do Vigilante. É apenas um agrupamento/etiqueta (ex: Equipa A, B, C) — não altera a rotação, que continua definida pelo Turno Inicial de cada vigilante."
+  },
+  {
+   "fieldname": "posto_interno_por_omissao",
+   "fieldtype": "Check",
+   "label": "Postos: Interno por Omissão",
+   "default": "0",
+   "description": "Quando activo, novos Postos de Vigilância nascem já marcados como \"Posto Interno\" (sem Contrato/Cliente) — para clientes que operam só com efectivo próprio, sem facturar a terceiros. Pode sempre ser desmarcado posto a posto."
+  },
+  {
+   "fieldname": "nao_herdar_salario_por_omissao",
+   "fieldtype": "Check",
+   "label": "Salário: Não Herdar do Contrato por Omissão",
+   "default": "0",
+   "description": "Quando activo, o diálogo \"Definir Salário Base\" abre sempre com a opção \"Herdar salário do contrato\" DESMARCADA por omissão (mesmo quando o vigilante ainda não tem override manual) — para clientes que preferem definir o salário caso a caso em vez de herdar do contrato/regime/categoria."
   }
  ],
  "issingle": 1,

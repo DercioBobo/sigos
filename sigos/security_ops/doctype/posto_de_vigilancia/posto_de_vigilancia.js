@@ -3,6 +3,7 @@ frappe.ui.form.on("Posto De Vigilancia", {
 	onload(frm) {
 		// Project (contract) is the driver; Cliente is derived from project.customer.
 		frm.set_query("project", () => ({ filters: { is_active: "Yes" } }));
+		_aplicar_posto_interno_por_omissao(frm);
 	},
 
 	refresh(frm) {
@@ -58,6 +59,26 @@ frappe.ui.form.on("Posto De Vigilancia", {
 		if (frm.doc.posto_interno) frm.set_value("project", "");
 	},
 });
+
+// ─── Customer-specific: default new posts to "Interno" ────────────────────────
+// SIGOS Settings.posto_interno_por_omissao — for clients who operate only with
+// their own effective (no billable contracts). New posts start pre-checked;
+// still editable per-posto.
+let _posto_interno_por_omissao = null;
+function _aplicar_posto_interno_por_omissao(frm) {
+	if (!frm.is_new() || frm.doc.posto_interno) return;
+	const aplicar = () => {
+		if (_posto_interno_por_omissao) frm.set_value("posto_interno", 1);
+	};
+	if (_posto_interno_por_omissao === null) {
+		frappe.db.get_single_value("SIGOS Settings", "posto_interno_por_omissao").then(v => {
+			_posto_interno_por_omissao = !!v;
+			aplicar();
+		});
+	} else {
+		aplicar();
+	}
+}
 
 // ─── Bench the posto's whole team to Reserva (posto closing) ──────────────────
 function _enviar_reserva(frm) {

@@ -12,6 +12,8 @@
   "descricao",
   "col_break_1",
   "bloqueada",
+  "sec_salario_base",
+  "salario_base",
   "sec_subsidio",
   "componente_subsidio",
   "col_break_subsidio",
@@ -42,6 +44,17 @@
    "default": "0",
    "in_list_view": 1,
    "description": "Categorias bloqueadas não podem ser eliminadas"
+  },
+  {
+   "fieldname": "sec_salario_base",
+   "fieldtype": "Section Break",
+   "label": "Salário Base Padrão (Personalização de Cliente)",
+   "description": "Opcional — salário base por omissão para vigilantes nesta categoria, SEM depender de contrato. Usado quando o vigilante não tem salário manual definido e (não tem Projecto/Contrato, ou o contrato não tem uma tarifa própria para o seu regime). Deixe vazio se este cliente sempre define o salário por contrato ou manualmente."
+  },
+  {
+   "fieldname": "salario_base",
+   "fieldtype": "Currency",
+   "label": "Salário Base"
   },
   {
    "fieldname": "sec_subsidio",

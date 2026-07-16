@@ -35,9 +35,24 @@ function _qd_insert(doctype, values, on_done) {
 // contrato" checkbox defaults correctly; omit it when unknown (Employee-keyed
 // callers) and the dialog defaults to a manual value pre-filled with the
 // resolved base.
+// SIGOS Settings.nao_herdar_salario_por_omissao (Personalização de Cliente) — for
+// clients who'd rather set salary case-by-case than default to "herdar do
+// contrato". Fetched once per session, same cached-flag pattern used elsewhere.
+let _qd_nao_herdar_salario_promise = null;
+function _qd_nao_herdar_salario_por_omissao() {
+	if (_qd_nao_herdar_salario_promise === null) {
+		_qd_nao_herdar_salario_promise = frappe.db.get_single_value("SIGOS Settings", "nao_herdar_salario_por_omissao");
+	}
+	return _qd_nao_herdar_salario_promise;
+}
+
 sigos.quick_docs.definir_salario = function (vigilante, on_done, salario_base_manual) {
-	frappe.xcall("sigos.api.resolver_salario_base", { vigilante }).then((atual) => {
+	Promise.all([
+		frappe.xcall("sigos.api.resolver_salario_base", { vigilante }),
+		_qd_nao_herdar_salario_por_omissao(),
+	]).then(([atual, naoHerdarPorOmissao]) => {
 		const tem_override = !!(salario_base_manual && salario_base_manual > 0);
+		const herdar_default = (tem_override || naoHerdarPorOmissao) ? 0 : 1;
 		const d = new frappe.ui.Dialog({
 			title: __("Definir Salário Base"),
 			fields: [
@@ -45,7 +60,7 @@ sigos.quick_docs.definir_salario = function (vigilante, on_done, salario_base_ma
 					"Salário base actual resolvido: <b>{0}</b>. Defina um valor manual ou opte por herdar o salário do contrato (por regime).",
 					[format_currency(atual)])}</p>` },
 				{ fieldname: "usar_contrato", fieldtype: "Check", label: __("Herdar salário do contrato (sem override manual)"),
-					default: tem_override ? 0 : 1 },
+					default: herdar_default },
 				{ fieldname: "valor", fieldtype: "Currency", label: __("Salário Base (manual)"),
 					default: salario_base_manual || atual, depends_on: "eval:!doc.usar_contrato" },
 			],
