@@ -188,35 +188,53 @@ function _sincronizar_vigilantes(frm) {
 					const seq = res.message || [];
 					if (!seq.length) { frappe.msgprint(__("Regime sem turnos.")); return; }
 
-					// Slots already taken
-					const usados = new Set((frm.doc.tab_vigilante_do_posto || []).map(g => g.turno_inicial).filter(Boolean));
-					const existentes = new Set((frm.doc.tab_vigilante_do_posto || []).map(g => g.vigilante));
+					// Evenly space guards across the FULL cycle, not just the next slots
+					// in sequence order — e.g. 3 guards on a 6-slot H24 cycle (1a/2a Manhã,
+					// 1a/2a Noite, 1a/2a Folga) land on 1a Manhã / 1a Noite / 1a Folga
+					// (one of each type) instead of piling into the first 3 slots.
+					const L = seq.length;
+					const N = guards.length;
+					const alvo = Array.from({ length: N }, (_, i) => seq[Math.round(i * L / N) % L].turno);
 
-					// Free slots in cycle order (working turns come first in the sequence)
-					const livres = seq.map(t => t.turno).filter(t => !usados.has(t));
-					let li = 0;
-					let adicionados = 0;
+					// Keep already-placed guards in their current relative order (by where
+					// their existing slot sits in the cycle) so an unchanged roster is a
+					// no-op; newcomers are appended after, in server return order.
+					const rowsPorNome = new Map(
+						(frm.doc.tab_vigilante_do_posto || []).map(row => [row.vigilante, row])
+					);
+					const colocados = guards.map(g => g.name).filter(n => rowsPorNome.has(n));
+					colocados.sort((a, b) =>
+						seq.findIndex(t => t.turno === rowsPorNome.get(a).turno_inicial) -
+						seq.findIndex(t => t.turno === rowsPorNome.get(b).turno_inicial));
+					const ordem = colocados.concat(guards.map(g => g.name).filter(n => !rowsPorNome.has(n)));
 
-					guards.forEach(g => {
-						if (existentes.has(g.name)) return;
-						let slot = livres[li];
-						if (slot === undefined) slot = seq[(usados.size + li) % seq.length].turno; // overflow → wrap
-						li++;
-						const row = frm.add_child("tab_vigilante_do_posto");
-						row.vigilante     = g.name;
-						row.nome_completo = g.nome_completo;
-						row.turno_inicial = slot;
-						usados.add(slot);
-						adicionados++;
+					const porNome = new Map(guards.map(g => [g.name, g]));
+					let adicionados = 0, reequilibrados = 0;
+					ordem.forEach((nome, i) => {
+						const slot = alvo[i];
+						let row = rowsPorNome.get(nome);
+						if (!row) {
+							row = frm.add_child("tab_vigilante_do_posto");
+							row.vigilante     = nome;
+							row.nome_completo = porNome.get(nome).nome_completo;
+							row.turno_inicial = slot;
+							adicionados++;
+							return;
+						}
+						if (row.turno_inicial !== slot) {
+							row.turno_inicial = slot;
+							reequilibrados++;
+						}
 					});
 
 					frm.refresh_field("tab_vigilante_do_posto");
 					_snapshot_slots(frm);
 					const partes = [`${adicionados} vigilante(s) adicionado(s)`];
 					if (removidos) partes.push(`${removidos} removido(s)`);
+					if (reequilibrados) partes.push(`${reequilibrados} reequilibrado(s)`);
 					frappe.show_alert({
 						message: __(`${partes.join(", ")} — turnos escalonados. Reveja e guarde.`),
-						indicator: (adicionados || removidos) ? "green" : "blue",
+						indicator: (adicionados || removidos || reequilibrados) ? "green" : "blue",
 					}, 5);
 				},
 			});
