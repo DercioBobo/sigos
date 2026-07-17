@@ -236,44 +236,130 @@ sigos.VigilantesHoje = class VigilantesHoje {
 	}
 
 	// ============================================================ MARK DIALOG
-	// Same experience as the Ausencias deck's own guard editor: a focused,
-	// dedicated space to fill in — here a modal (Ausencias uses an inline
-	// "open card", same idea of "step out of the roster to fill this in").
+	// A modal (not inline) — but dressed in the same premium deck language as the
+	// rest of SIGOS (Ausencias/Rotatividade pill controls, guard-identity header),
+	// not bare default Dialog fields. Only the chrome (title bar, footer buttons)
+	// is native Frappe; the body is fully custom HTML/CSS, scoped to .vh-dialog-body
+	// so it carries its own copy of the page's design tokens (a Dialog mounts at
+	// document.body, outside .vh-root, so CSS var() inheritance can't reach it).
+	_avatar_html(nome) {
+		const limpo = (nome || "").trim();
+		const partes = limpo.split(/\s+/).filter(Boolean);
+		const ini = partes.length
+			? ((partes[0][0] || "") + (partes.length > 1 ? partes[partes.length - 1][0] : "")).toUpperCase()
+			: "?";
+		let h = 0;
+		for (let i = 0; i < limpo.length; i++) h = (h * 31 + limpo.charCodeAt(i)) % 360;
+		return `<span class="vh-dg-ava" style="background:hsl(${h},42%,38%)">${frappe.utils.escape_html(ini)}</span>`;
+	}
+
 	_abrir_marcar_dialog(row) {
 		const isEdit = !!row.ja_ausencia_row;
 		const showSubtipo = !!this.settingsFlags.faltas_normal_vermelha_activo;
+		const meta = [row.mecanografico, row.turno, row.regime, row.nome_do_posto || row.posto].filter(Boolean).join(" · ");
 
 		const d = new frappe.ui.Dialog({
-			title: isEdit
-				? __("Rever Marcação — {0}", [row.nome_completo || row.vigilante])
-				: __("Marcar Ausência — {0}", [row.nome_completo || row.vigilante]),
-			fields: [
-				{ fieldname: "tipo_de_ausencia", fieldtype: "Select", label: __("Tipo de Ausência"),
-					options: VH_TIPOS.join("\n"), reqd: 1, default: row.ja_tipo_de_ausencia || "Falta" },
-				{ fieldname: "subtipo_falta", fieldtype: "Select", label: __("Subtipo de Falta"),
-					options: "\nNormal\nVermelha", default: row.ja_subtipo_falta || "",
-					hidden: !showSubtipo, depends_on: "eval:doc.tipo_de_ausencia=='Falta'" },
-				{ fieldname: "col_vh_1", fieldtype: "Column Break" },
-				{ fieldname: "tipo_justificacao", fieldtype: "Link", options: "Tipo De Justificacao",
-					label: __("Tipo de Justificação"), default: row.ja_tipo_justificacao || "" },
-				{ fieldname: "jutificativo", fieldtype: "Data", label: __("Justificativo (nota)"),
-					default: row.ja_jutificativo || "" },
-				{ fieldname: "sec_vh_1", fieldtype: "Section Break" },
-				{ fieldname: "proxima_accao", fieldtype: "Select", label: __("Próxima Acção"),
-					options: VH_ACCOES.join("\n"), default: row.ja_proxima_accao || "Sem Ação" },
-				{ fieldname: "actor", fieldtype: "Link", options: "Vigilante",
-					label: __("Vigilante (em Reserva)"),
-					get_query: () => ({ filters: { status: "Reserva" } }),
-					depends_on: "eval:doc.proxima_accao && doc.proxima_accao!='Sem Ação'" },
-			],
+			title: isEdit ? __("Rever Marcação") : __("Marcar Ausência"),
+			size: "large",
+			fields: [{ fieldname: "vh_area", fieldtype: "HTML" }],
 			primary_action_label: __("Guardar"),
-			primary_action: (vals) => this._guardar_marcacao(d, row, vals),
+			primary_action: () => this._guardar_marcacao(d, row, state, controls),
 		});
 
-		if (isEdit) {
-			const campo = VH_ACCAO_CAMPO[row.ja_proxima_accao];
-			if (campo && row[`ja_${campo}`]) d.set_value("actor", row[`ja_${campo}`]);
+		const $body = d.fields_dict.vh_area.$wrapper;
+		$body.addClass("vh-dialog-body");
+		if (this.theme === "dark") $body.addClass("theme-dark");
+		$body.html(`
+			<div class="vh-dg-guard">
+				${this._avatar_html(row.nome_completo)}
+				<div class="vh-dg-guard-txt">
+					<span class="vh-dg-name">${frappe.utils.escape_html(row.nome_completo || row.vigilante)}</span>
+					<span class="vh-dg-meta">${frappe.utils.escape_html(meta)}</span>
+				</div>
+			</div>
+			<div>
+				<span class="vh-field-lbl">${__("Tipo de Ausência")}</span>
+				<div class="vh-pillrow" data-role="tipo"></div>
+			</div>
+			<div class="vh-sub-row" data-role="subtipo-wrap">
+				<span class="vh-field-lbl">${__("Subtipo de Falta")}</span>
+				<div class="vh-pillrow" data-role="subtipo"></div>
+			</div>
+			<div class="vh-2col">
+				<div id="vh-dg-justif"></div>
+				<div id="vh-dg-nota"></div>
+			</div>
+			<div>
+				<span class="vh-field-lbl">${__("Próxima Acção")}</span>
+				<div class="vh-pillrow" data-role="accao"></div>
+			</div>
+			<div class="vh-actor-row" data-role="actor-wrap">
+				<span class="vh-field-lbl" data-role="actor-lbl"></span>
+				<div id="vh-dg-actor"></div>
+			</div>
+		`);
 
+		const state = { tipo: row.ja_tipo_de_ausencia || "Falta", subtipo: row.ja_subtipo_falta || null, accao: row.ja_proxima_accao || "Sem Ação" };
+		const controls = {};
+
+		VH_TIPOS.forEach((t) => {
+			const $b = $(`<button type="button" class="vh-optbtn" data-tipo="${t}">${__(t)}</button>`).appendTo($body.find('[data-role="tipo"]'));
+			if (t === state.tipo) $b.addClass("on");
+			$b.on("click", () => {
+				$body.find('[data-role="tipo"] .vh-optbtn').removeClass("on");
+				$b.addClass("on");
+				state.tipo = t;
+				$body.find('[data-role="subtipo-wrap"]').toggleClass("show", t === "Falta" && showSubtipo);
+			});
+		});
+		$body.find('[data-role="subtipo-wrap"]').toggleClass("show", state.tipo === "Falta" && showSubtipo);
+		["Normal", "Vermelha"].forEach((s) => {
+			const $b = $(`<button type="button" class="vh-optbtn sm" data-sub="${s}">${__(s)}</button>`).appendTo($body.find('[data-role="subtipo"]'));
+			if (s === state.subtipo) $b.addClass("on");
+			$b.on("click", () => {
+				$body.find('[data-role="subtipo"] .vh-optbtn').removeClass("on");
+				$b.addClass("on");
+				state.subtipo = s;
+			});
+		});
+
+		controls.justif = frappe.ui.form.make_control({
+			df: { fieldtype: "Link", fieldname: "tipo_justificacao", options: "Tipo De Justificacao", label: __("Tipo de Justificação") },
+			parent: $body.find("#vh-dg-justif"), render_input: true,
+		});
+		if (row.ja_tipo_justificacao) controls.justif.set_value(row.ja_tipo_justificacao);
+
+		controls.nota = frappe.ui.form.make_control({
+			df: { fieldtype: "Data", fieldname: "jutificativo", label: __("Justificativo (nota)") },
+			parent: $body.find("#vh-dg-nota"), render_input: true,
+		});
+		if (row.ja_jutificativo) controls.nota.set_value(row.ja_jutificativo);
+
+		const renderActor = (campo) => {
+			$body.find("#vh-dg-actor").empty();
+			controls.actor = null;
+			if (!campo) { $body.find('[data-role="actor-wrap"]').removeClass("show"); return; }
+			$body.find('[data-role="actor-wrap"]').addClass("show");
+			$body.find('[data-role="actor-lbl"]').text(__("Vigilante (em Reserva)"));
+			controls.actor = frappe.ui.form.make_control({
+				df: { fieldtype: "Link", fieldname: campo, options: "Vigilante", get_query: () => ({ filters: { status: "Reserva" } }) },
+				parent: $body.find("#vh-dg-actor"), render_input: true,
+			});
+			if (row[`ja_${campo}`]) controls.actor.set_value(row[`ja_${campo}`]);
+		};
+		VH_ACCOES.forEach((a) => {
+			const $b = $(`<button type="button" class="vh-optbtn sm" data-accao="${a}">${__(a)}</button>`).appendTo($body.find('[data-role="accao"]'));
+			if (a === state.accao) $b.addClass("on");
+			$b.on("click", () => {
+				$body.find('[data-role="accao"] .vh-optbtn').removeClass("on");
+				$b.addClass("on");
+				state.accao = a;
+				renderActor(VH_ACCAO_CAMPO[a] || null);
+			});
+		});
+		renderActor(VH_ACCAO_CAMPO[state.accao] || null);
+
+		if (isEdit) {
 			d.set_secondary_action_label(__("Remover Marcação"));
 			d.set_secondary_action(() => {
 				frappe.confirm(
@@ -297,8 +383,9 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		d.show();
 	}
 
-	_guardar_marcacao(d, row, vals, motivo_atraso) {
-		const campoAccao = VH_ACCAO_CAMPO[vals.proxima_accao] || null;
+	_guardar_marcacao(d, row, state, controls, motivo_atraso) {
+		const campoAccao = VH_ACCAO_CAMPO[state.accao] || null;
+		const actorVal = controls.actor ? controls.actor.get_value() : null;
 
 		const args = {
 			vigilante: row.vigilante,
@@ -308,13 +395,13 @@ sigos.VigilantesHoje = class VigilantesHoje {
 			turno: row.turno,
 			grupo_delegados: this.state.grupo_delegados || null,
 			ausencia_row: row.ja_ausencia_row || null,
-			tipo_de_ausencia: vals.tipo_de_ausencia,
-			subtipo_falta: vals.subtipo_falta || null,
-			tipo_justificacao: vals.tipo_justificacao || null,
-			jutificativo: vals.jutificativo || null,
-			proxima_accao: !vals.proxima_accao || vals.proxima_accao === "Sem Ação" ? null : vals.proxima_accao,
+			tipo_de_ausencia: state.tipo,
+			subtipo_falta: state.subtipo || null,
+			tipo_justificacao: controls.justif.get_value() || null,
+			jutificativo: controls.nota.get_value() || null,
+			proxima_accao: state.accao === "Sem Ação" ? null : state.accao,
 		};
-		if (campoAccao) args[campoAccao] = vals.actor || null;
+		if (campoAccao) args[campoAccao] = actorVal;
 		if (motivo_atraso) args.motivo_atraso = motivo_atraso;
 
 		frappe.call({
@@ -336,7 +423,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 				if (msg.includes("Submissão Tardia") || msg.includes("Motivo do Atraso")) {
 					frappe.prompt(
 						{ fieldname: "motivo", fieldtype: "Small Text", label: __("Motivo do Atraso"), reqd: 1 },
-						(pv) => this._guardar_marcacao(d, row, vals, pv.motivo),
+						(pv) => this._guardar_marcacao(d, row, state, controls, pv.motivo),
 						__("Submissão Tardia")
 					);
 				}
@@ -601,6 +688,50 @@ sigos.VigilantesHoje = class VigilantesHoje {
 .vh-folga-note { display:inline-flex; align-items:center; gap:7px; font-size:12px; font-weight:600; color:var(--folga);
   background:var(--folga-soft); border:1px solid var(--line2); border-radius:999px; padding:7px 14px 7px 12px; }
 .vh-folga-note svg { width:14px; height:14px; flex:none; }
+
+/* Mark dialog body — a Dialog mounts at document.body, outside .vh-root, so the
+   design tokens are redefined here rather than inherited. .theme-dark is added
+   to this element directly (mirrors the page's own toggle, not a CSS media query). */
+.vh-dialog-body {
+  --paper:#F4F6FA; --paper2:#FFFFFF; --paper3:#EEF1F6;
+  --ink:#0E1726; --ink2:#5B6B82; --ink3:#93A1B5;
+  --line:#E6EAF2; --line2:#D5DCE8;
+  --accent:#4F46E5; --accentInk:#4338CA;
+  --mark:#E8A020; --falta:#C0392B; --folga:#6B7890;
+  --r-sm:9px;
+  --display:'Space Grotesk',system-ui,sans-serif; --body:'Inter',system-ui,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+  font-family:var(--body); display:flex; flex-direction:column; gap:14px; padding:2px 2px 6px;
+}
+.vh-dialog-body.theme-dark {
+  --paper:#151A24; --paper2:#1C2230; --paper3:#242B3B;
+  --ink:#EDF1F7; --ink2:#A7B3C6; --ink3:#76839A;
+  --line:#2C3444; --line2:#374155;
+  --accent:#7B76F0; --accentInk:#9490F5;
+  --mark:#F0AD4E; --falta:#E0574A; --folga:#8B97AC;
+}
+.vh-dg-guard { display:flex; align-items:center; gap:12px; padding:12px 14px; background:var(--paper3);
+  border:1px solid var(--line); border-radius:var(--r-sm); }
+.vh-dg-ava { width:38px; height:38px; border-radius:50%; flex:none; display:flex; align-items:center; justify-content:center;
+  color:#fff; font-family:var(--display); font-weight:600; font-size:14px; }
+.vh-dg-guard-txt { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.vh-dg-name { font-family:var(--display); font-weight:600; font-size:15px; color:var(--ink); }
+.vh-dg-meta { font-size:11.5px; color:var(--ink2); }
+.vh-field-lbl { font-size:10.5px; text-transform:uppercase; letter-spacing:.07em; color:var(--ink3); font-weight:700; margin-bottom:6px; display:block; }
+.vh-pillrow { display:flex; gap:6px; flex-wrap:wrap; }
+.vh-optbtn { font-family:var(--body); font-size:12px; font-weight:600; color:var(--ink2); background:var(--paper3);
+  border:1px solid var(--line2); border-radius:999px; padding:6px 13px; cursor:pointer; transition:.13s; }
+.vh-optbtn:hover { border-color:var(--accent); color:var(--accent); }
+.vh-optbtn.on { background:var(--ink); color:var(--paper2); border-color:var(--ink); }
+.vh-optbtn[data-tipo="Falta"].on { background:var(--falta); border-color:var(--falta); }
+.vh-optbtn[data-tipo="Atraso"].on, .vh-optbtn[data-tipo="Saída Antecipada"].on { background:var(--mark); border-color:var(--mark); color:#3a2c05; }
+.vh-optbtn[data-tipo="Licença"].on { background:var(--accentInk); border-color:var(--accentInk); }
+.vh-optbtn.sm { padding:5px 11px; font-size:11.5px; }
+.vh-2col { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.vh-sub-row, .vh-actor-row { display:none; }
+.vh-sub-row.show, .vh-actor-row.show { display:block; animation:vh-dg-fade .15s ease both; }
+@keyframes vh-dg-fade { from{ opacity:0; transform:translateY(-3px);} to{ opacity:1; transform:none;} }
+@media (max-width:600px) { .vh-2col { grid-template-columns:1fr; } }
 
 .vh-empty { display:none; padding:34px 16px; text-align:center; color:var(--ink3); font-size:12.5px; background:var(--paper2);
   border:1px solid var(--line); border-radius:var(--r); }
