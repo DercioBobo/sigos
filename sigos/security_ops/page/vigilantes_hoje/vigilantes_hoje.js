@@ -335,14 +335,52 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		});
 		if (row.ja_jutificativo) controls.nota.set_value(row.ja_jutificativo);
 
-		const renderActor = (campo) => {
+		// Same per-acção eligibility rules as the Ausencias deck's _mount_picker —
+		// NOT a uniform "status = Reserva" pool. Substituto draws from the bench;
+		// Dobra/Meia Dobra must already be scheduled at THIS posto today; Horas
+		// Extras is any folga guard in the same delegação (any posto); Adiantamento
+		// is any active guard already at this same posto.
+		const renderActor = (accao) => {
 			$body.find("#vh-dg-actor").empty();
 			controls.actor = null;
+			const campo = VH_ACCAO_CAMPO[accao] || null;
 			if (!campo) { $body.find('[data-role="actor-wrap"]').removeClass("show"); return; }
 			$body.find('[data-role="actor-wrap"]').addClass("show");
-			$body.find('[data-role="actor-lbl"]').text(__("Vigilante (em Reserva)"));
+			$body.find('[data-role="actor-lbl"]').text(__("Vigilante"));
 			controls.actor = frappe.ui.form.make_control({
-				df: { fieldtype: "Link", fieldname: campo, options: "Vigilante", get_query: () => ({ filters: { status: "Reserva" } }) },
+				df: {
+					fieldtype: "Link", fieldname: campo, options: "Vigilante",
+					placeholder: __("Escolher vigilante…"),
+					get_query: () => {
+						if (campo === "vigilante_substituto") {
+							return { query: "sigos.api.get_substitutos_disponiveis", filters: {
+								excluir: row.vigilante || "",
+								excluir_lista: JSON.stringify([]),
+								grupo_delegados: this.state.grupo_delegados || "",
+								data: this.state.data || "", periodo: this.state.periodo || "",
+								excluir_doc: row.ja_ausencia_doc || "",
+							} };
+						}
+						if (campo === "vigilante_a_dobrar" || campo === "vigilante_a_meia_dobra") {
+							return { query: "sigos.api.get_escalados_no_posto_dia", filters: {
+								posto: row.posto || "", data: this.state.data,
+								excluir: row.vigilante || "",
+								excluir_lista: JSON.stringify([]),
+								excluir_doc: row.ja_ausencia_doc || "",
+							} };
+						}
+						if (campo === "vigilante_a_horas_extras") {
+							return { query: "sigos.api.get_vigilantes_de_folga_na_delegacao_dia", filters: {
+								delegacao: row.delegacao || "", data: this.state.data,
+								excluir: row.vigilante || "",
+								excluir_lista: JSON.stringify([]),
+								excluir_doc: row.ja_ausencia_doc || "",
+							} };
+						}
+						// vigilante_a_adiantar — a guard of the same posto, currently active
+						return { filters: { posto_de_vigilancia: row.posto || "", status: "Activo", name: ["!=", row.vigilante || ""] } };
+					},
+				},
 				parent: $body.find("#vh-dg-actor"), render_input: true,
 			});
 			if (row[`ja_${campo}`]) controls.actor.set_value(row[`ja_${campo}`]);
@@ -354,10 +392,10 @@ sigos.VigilantesHoje = class VigilantesHoje {
 				$body.find('[data-role="accao"] .vh-optbtn').removeClass("on");
 				$b.addClass("on");
 				state.accao = a;
-				renderActor(VH_ACCAO_CAMPO[a] || null);
+				renderActor(a);
 			});
 		});
-		renderActor(VH_ACCAO_CAMPO[state.accao] || null);
+		renderActor(state.accao);
 
 		if (isEdit) {
 			d.set_secondary_action_label(__("Remover Marcação"));
