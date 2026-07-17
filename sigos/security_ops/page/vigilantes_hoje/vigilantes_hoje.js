@@ -748,6 +748,14 @@ sigos.VigilantesHoje = class VigilantesHoje {
   --accent:#7B76F0; --accentInk:#9490F5;
   --mark:#F0AD4E; --falta:#E0574A; --folga:#8B97AC;
 }
+/* Link-field dropdowns (awesomplete) are position:absolute and get clipped by
+   Frappe's own .modal-body { overflow-y:auto } once a field sits near the bottom
+   of a tall dialog — the options render but the lower portion is cut off/unclickable.
+   The outer .modal already scrolls the whole dialog when it doesn't fit the
+   viewport, so let modal-body size to its content instead of double-scrolling and
+   clipping the dropdown out of view. */
+.modal:has(.vh-dialog-body) .modal-body { overflow: visible; max-height: none; }
+.modal:has(.vh-dialog-body) .awesomplete ul { z-index: 1071; }
 .vh-dg-guard { display:flex; align-items:center; gap:12px; padding:12px 14px; background:var(--paper3);
   border:1px solid var(--line); border-radius:var(--r-sm); }
 .vh-dg-ava { width:38px; height:38px; border-radius:50%; flex:none; display:flex; align-items:center; justify-content:center;
