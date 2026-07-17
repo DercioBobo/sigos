@@ -26,13 +26,6 @@ const VH_ACCAO_CAMPO = {
 	"Adiantamento de Turno": "vigilante_a_adiantar",
 	"Horas Extras": "vigilante_a_horas_extras",
 };
-const VH_ACCAO_LABEL = {
-	"vigilante_substituto": __("Vigilante Substituto (em Reserva)"),
-	"vigilante_a_dobrar": __("Vigilante a Dobrar (em Reserva)"),
-	"vigilante_a_meia_dobra": __("Vigilante a Meia Dobra (em Reserva)"),
-	"vigilante_a_adiantar": __("Vigilante a Adiantar (em Reserva)"),
-	"vigilante_a_horas_extras": __("Vigilante a Horas Extras (em Reserva)"),
-};
 const VH_SEVERIDADE = { "Falta": 0, "Suspensão": 0, "Atraso": 1, "Saída Antecipada": 1, "Outro": 1, "Licença": 2, "Folga": 3, "Presente": 4 };
 const VH_PROBLEMA = new Set(["Falta", "Suspensão", "Atraso", "Saída Antecipada"]);
 
@@ -228,7 +221,6 @@ sigos.VigilantesHoje = class VigilantesHoje {
 					<div><span class="vh-pf-lbl">${__("Residência")}</span><span class="vh-pf-val">${frappe.utils.escape_html(row.residencia || "—")}</span></div>
 				</div>
 				<div class="vh-actions"></div>
-				<div class="vh-markform-slot"></div>
 			</div>
 		`).appendTo($panel);
 
@@ -237,159 +229,76 @@ sigos.VigilantesHoje = class VigilantesHoje {
 			$actions.append(`<span class="vh-folga-note">${this._icon("info")} ${__("Em folga hoje — sem escala, por isso não há ausência para marcar.")}</span>`);
 		} else {
 			const $markBtn = $(`<button class="vh-actbtn primary">${row.ja_ausencia_row ? __("Rever Marcação") : __("Marcar Ausência")}</button>`).appendTo($actions);
-			$markBtn.on("click", () => this._toggle_markform($in.find(".vh-markform-slot"), row, $markBtn));
+			$markBtn.on("click", () => this._abrir_marcar_dialog(row));
 		}
 		$actions.append(`<button class="vh-actbtn ghost" title="${__("Em breve — abre a Ocorrência já com este vigilante e posto preenchidos")}">+ ${__("Ocorrência")} <span class="soon">${__("Em breve")}</span></button>`);
 		$actions.append(`<button class="vh-actbtn ghost" title="${__("Em breve")}">${__("Ver Histórico")} <span class="soon">${__("Em breve")}</span></button>`);
 	}
 
-	_toggle_markform($slot, row, $btn) {
-		if ($slot.data("open")) {
-			$slot.empty().data("open", false);
-			$btn.removeClass("on");
-			return;
-		}
-		$slot.data("open", true);
-		$btn.addClass("on");
-		this._build_markform($slot, row);
-	}
+	// ============================================================ MARK DIALOG
+	// Same experience as the Ausencias deck's own guard editor: a focused,
+	// dedicated space to fill in — here a modal (Ausencias uses an inline
+	// "open card", same idea of "step out of the roster to fill this in").
+	_abrir_marcar_dialog(row) {
+		const isEdit = !!row.ja_ausencia_row;
+		const showSubtipo = !!this.settingsFlags.faltas_normal_vermelha_activo;
 
-	// ============================================================ MARK FORM
-	_build_markform($slot, row) {
-		const $f = $(`
-			<div class="vh-markform-in">
-				<div>
-					<span class="vh-field-lbl">${__("Tipo de Ausência")}</span>
-					<div class="vh-pillrow" data-role="tipo"></div>
-				</div>
-				<div class="vh-sub-row" data-role="subtipo-wrap">
-					<span class="vh-field-lbl">${__("Subtipo de Falta")}</span>
-					<div class="vh-pillrow" data-role="subtipo"></div>
-				</div>
-				<div class="vh-2col">
-					<div id="vh-ctrl-justif"></div>
-					<div id="vh-ctrl-nota"></div>
-				</div>
-				<div>
-					<span class="vh-field-lbl">${__("Próxima Acção")}</span>
-					<div class="vh-pillrow" data-role="accao"></div>
-				</div>
-				<div class="vh-actor-row" data-role="actor-wrap">
-					<span class="vh-field-lbl" data-role="actor-lbl"></span>
-					<div id="vh-ctrl-actor"></div>
-				</div>
-				<div class="vh-err" data-role="err"></div>
-				<div class="vh-panel-actions">
-					${row.ja_ausencia_row ? `<button class="vh-btn-ghost vh-danger" data-role="remover">${__("Remover Marcação")}</button>` : ""}
-					<span style="flex:1"></span>
-					<button class="vh-btn-ghost" data-role="cancel">${__("Cancelar")}</button>
-					<button class="vh-btn-primary" data-role="save">${__("Guardar")}</button>
-				</div>
-			</div>
-		`).appendTo($slot);
-
-		const chosen = { tipo: row.ja_tipo_de_ausencia || null, subtipo: row.ja_subtipo_falta || null, accao: row.ja_proxima_accao || "Sem Ação" };
-
-		VH_TIPOS.forEach((t) => {
-			const $b = $(`<button class="vh-optbtn" data-tipo="${t}">${__(t)}</button>`).appendTo($f.find('[data-role="tipo"]'));
-			if (t === chosen.tipo) $b.addClass("on");
-			$b.on("click", () => {
-				$f.find('[data-role="tipo"] .vh-optbtn').removeClass("on");
-				$b.addClass("on");
-				chosen.tipo = t;
-				const showSub = t === "Falta" && !!this.settingsFlags.faltas_normal_vermelha_activo;
-				$f.find('[data-role="subtipo-wrap"]').toggleClass("show", showSub);
-			});
-		});
-		if (chosen.tipo === "Falta" && this.settingsFlags.faltas_normal_vermelha_activo) {
-			$f.find('[data-role="subtipo-wrap"]').addClass("show");
-		}
-		["Normal", "Vermelha"].forEach((s) => {
-			const $b = $(`<button class="vh-optbtn sm" data-sub="${s}">${__(s)}</button>`).appendTo($f.find('[data-role="subtipo"]'));
-			if (s === chosen.subtipo) $b.addClass("on");
-			$b.on("click", () => {
-				$f.find('[data-role="subtipo"] .vh-optbtn').removeClass("on");
-				$b.addClass("on");
-				chosen.subtipo = s;
-			});
-		});
-
-		const cJustif = frappe.ui.form.make_control({
-			df: { fieldtype: "Link", fieldname: "tipo_justificacao", options: "Tipo De Justificacao", label: __("Tipo de Justificação") },
-			parent: $f.find("#vh-ctrl-justif"), render_input: true,
-		});
-		if (row.ja_tipo_justificacao) cJustif.set_value(row.ja_tipo_justificacao);
-
-		const cNota = frappe.ui.form.make_control({
-			df: { fieldtype: "Data", fieldname: "jutificativo", label: __("Justificativo (nota)") },
-			parent: $f.find("#vh-ctrl-nota"), render_input: true,
-		});
-		if (row.ja_jutificativo) cNota.set_value(row.ja_jutificativo);
-
-		let cActor = null;
-		const renderActor = (campo) => {
-			$f.find("#vh-ctrl-actor").empty();
-			cActor = null;
-			if (!campo) { $f.find('[data-role="actor-wrap"]').removeClass("show"); return; }
-			$f.find('[data-role="actor-wrap"]').addClass("show");
-			$f.find('[data-role="actor-lbl"]').text(VH_ACCAO_LABEL[campo]);
-			cActor = frappe.ui.form.make_control({
-				df: {
-					fieldtype: "Link", fieldname: campo, options: "Vigilante",
+		const d = new frappe.ui.Dialog({
+			title: isEdit
+				? __("Rever Marcação — {0}", [row.nome_completo || row.vigilante])
+				: __("Marcar Ausência — {0}", [row.nome_completo || row.vigilante]),
+			fields: [
+				{ fieldname: "tipo_de_ausencia", fieldtype: "Select", label: __("Tipo de Ausência"),
+					options: VH_TIPOS.join("\n"), reqd: 1, default: row.ja_tipo_de_ausencia || "Falta" },
+				{ fieldname: "subtipo_falta", fieldtype: "Select", label: __("Subtipo de Falta"),
+					options: "\nNormal\nVermelha", default: row.ja_subtipo_falta || "",
+					hidden: !showSubtipo, depends_on: "eval:doc.tipo_de_ausencia=='Falta'" },
+				{ fieldname: "col_vh_1", fieldtype: "Column Break" },
+				{ fieldname: "tipo_justificacao", fieldtype: "Link", options: "Tipo De Justificacao",
+					label: __("Tipo de Justificação"), default: row.ja_tipo_justificacao || "" },
+				{ fieldname: "jutificativo", fieldtype: "Data", label: __("Justificativo (nota)"),
+					default: row.ja_jutificativo || "" },
+				{ fieldname: "sec_vh_1", fieldtype: "Section Break" },
+				{ fieldname: "proxima_accao", fieldtype: "Select", label: __("Próxima Acção"),
+					options: VH_ACCOES.join("\n"), default: row.ja_proxima_accao || "Sem Ação" },
+				{ fieldname: "actor", fieldtype: "Link", options: "Vigilante",
+					label: __("Vigilante (em Reserva)"),
 					get_query: () => ({ filters: { status: "Reserva" } }),
-				},
-				parent: $f.find("#vh-ctrl-actor"), render_input: true,
+					depends_on: "eval:doc.proxima_accao && doc.proxima_accao!='Sem Ação'" },
+			],
+			primary_action_label: __("Guardar"),
+			primary_action: (vals) => this._guardar_marcacao(d, row, vals),
+		});
+
+		if (isEdit) {
+			const campo = VH_ACCAO_CAMPO[row.ja_proxima_accao];
+			if (campo && row[`ja_${campo}`]) d.set_value("actor", row[`ja_${campo}`]);
+
+			d.set_secondary_action_label(__("Remover Marcação"));
+			d.set_secondary_action(() => {
+				frappe.confirm(
+					__("Remover a marcação de {0}?", [frappe.utils.escape_html(row.nome_completo || row.vigilante)]),
+					() => {
+						frappe.call({
+							method: "sigos.api.remover_marca_ausencia",
+							args: { ausencia_doc: row.ja_ausencia_doc, ausencia_row: row.ja_ausencia_row },
+							freeze: true,
+							callback: () => {
+								d.hide();
+								frappe.show_alert({ message: __("Marcação removida."), indicator: "green" }, 4);
+								this.refresh();
+							},
+						});
+					}
+				);
 			});
-			if (row[`ja_${campo}`]) cActor.set_value(row[`ja_${campo}`]);
-		};
+		}
 
-		VH_ACCOES.forEach((a) => {
-			const $b = $(`<button class="vh-optbtn sm" data-accao="${a}">${__(a)}</button>`).appendTo($f.find('[data-role="accao"]'));
-			if (a === chosen.accao) $b.addClass("on");
-			$b.on("click", () => {
-				$f.find('[data-role="accao"] .vh-optbtn').removeClass("on");
-				$b.addClass("on");
-				chosen.accao = a;
-				renderActor(VH_ACCAO_CAMPO[a] || null);
-			});
-		});
-		renderActor(VH_ACCAO_CAMPO[chosen.accao] || null);
-
-		$f.find('[data-role="cancel"]').on("click", () => {
-			$slot.empty().data("open", false);
-		});
-
-		$f.find('[data-role="remover"]').on("click", () => {
-			frappe.confirm(
-				__("Remover a marcação de {0}?", [frappe.utils.escape_html(row.nome_completo || row.vigilante)]),
-				() => {
-					frappe.call({
-						method: "sigos.api.remover_marca_ausencia",
-						args: { ausencia_doc: row.ja_ausencia_doc, ausencia_row: row.ja_ausencia_row },
-						freeze: true,
-						callback: () => {
-							frappe.show_alert({ message: __("Marcação removida."), indicator: "green" }, 4);
-							this.refresh();
-						},
-					});
-				}
-			);
-		});
-
-		$f.find('[data-role="save"]').on("click", () => {
-			this._guardar_marcacao($f, row, chosen, cJustif, cNota, () => cActor, null);
-		});
+		d.show();
 	}
 
-	_guardar_marcacao($f, row, chosen, cJustif, cNota, getActor, motivo_atraso) {
-		const $err = $f.find('[data-role="err"]').empty();
-		if (!chosen.tipo) {
-			$err.text(__("Seleccione o Tipo de Ausência."));
-			return;
-		}
-		const cActor = getActor();
-		const campoAccao = VH_ACCAO_CAMPO[chosen.accao] || null;
-		const actorVal = cActor ? cActor.get_value() : null;
+	_guardar_marcacao(d, row, vals, motivo_atraso) {
+		const campoAccao = VH_ACCAO_CAMPO[vals.proxima_accao] || null;
 
 		const args = {
 			vigilante: row.vigilante,
@@ -399,13 +308,13 @@ sigos.VigilantesHoje = class VigilantesHoje {
 			turno: row.turno,
 			grupo_delegados: this.state.grupo_delegados || null,
 			ausencia_row: row.ja_ausencia_row || null,
-			tipo_de_ausencia: chosen.tipo,
-			subtipo_falta: chosen.subtipo || null,
-			tipo_justificacao: cJustif.get_value() || null,
-			jutificativo: cNota.get_value() || null,
-			proxima_accao: chosen.accao === "Sem Ação" ? null : chosen.accao,
+			tipo_de_ausencia: vals.tipo_de_ausencia,
+			subtipo_falta: vals.subtipo_falta || null,
+			tipo_justificacao: vals.tipo_justificacao || null,
+			jutificativo: vals.jutificativo || null,
+			proxima_accao: !vals.proxima_accao || vals.proxima_accao === "Sem Ação" ? null : vals.proxima_accao,
 		};
-		if (campoAccao) args[campoAccao] = actorVal;
+		if (campoAccao) args[campoAccao] = vals.actor || null;
 		if (motivo_atraso) args.motivo_atraso = motivo_atraso;
 
 		frappe.call({
@@ -414,6 +323,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 			freeze: true,
 			freeze_message: __("A guardar…"),
 			callback: () => {
+				d.hide();
 				frappe.show_alert({ message: __("Ausência registada."), indicator: "green" }, 4);
 				this.refresh();
 			},
@@ -426,11 +336,9 @@ sigos.VigilantesHoje = class VigilantesHoje {
 				if (msg.includes("Submissão Tardia") || msg.includes("Motivo do Atraso")) {
 					frappe.prompt(
 						{ fieldname: "motivo", fieldtype: "Small Text", label: __("Motivo do Atraso"), reqd: 1 },
-						(vals) => this._guardar_marcacao($f, row, chosen, cJustif, cNota, getActor, vals.motivo),
+						(pv) => this._guardar_marcacao(d, row, vals, pv.motivo),
 						__("Submissão Tardia")
 					);
-				} else {
-					$err.text(__("Não foi possível guardar — reveja os campos."));
 				}
 			},
 		});
@@ -694,37 +602,12 @@ sigos.VigilantesHoje = class VigilantesHoje {
   background:var(--folga-soft); border:1px solid var(--line2); border-radius:999px; padding:7px 14px 7px 12px; }
 .vh-folga-note svg { width:14px; height:14px; flex:none; }
 
-.vh-markform-in { display:flex; flex-direction:column; gap:12px; padding-top:12px; border-top:1px dashed var(--line2); margin-top:2px; }
-.vh-field-lbl { font-size:10.5px; text-transform:uppercase; letter-spacing:.07em; color:var(--ink3); font-weight:700; margin-bottom:6px; display:block; }
-.vh-pillrow { display:flex; gap:6px; flex-wrap:wrap; }
-.vh-optbtn { font-family:var(--body); font-size:12px; font-weight:600; color:var(--ink2); background:var(--paper3);
-  border:1px solid var(--line2); border-radius:999px; padding:6px 13px; cursor:pointer; transition:.13s; }
-.vh-optbtn:hover { border-color:var(--accent); color:var(--accent); }
-.vh-optbtn.on { background:var(--ink); color:var(--paper2); border-color:var(--ink); }
-.vh-optbtn[data-tipo="Falta"].on { background:var(--falta); border-color:var(--falta); }
-.vh-optbtn[data-tipo="Atraso"].on, .vh-optbtn[data-tipo="Saída Antecipada"].on { background:var(--mark); border-color:var(--mark); color:#3a2c05; }
-.vh-optbtn[data-tipo="Licença"].on { background:var(--accentInk); border-color:var(--accentInk); }
-.vh-optbtn.sm { padding:5px 11px; font-size:11.5px; }
-.vh-2col { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-.vh-sub-row, .vh-actor-row { display:none; }
-.vh-sub-row.show, .vh-actor-row.show { display:block; }
-.vh-err { color:var(--falta); font-size:12px; font-weight:600; min-height:1em; }
-.vh-panel-actions { display:flex; justify-content:flex-end; align-items:center; gap:8px; margin-top:2px; }
-.vh-btn-ghost { font-family:var(--body); font-size:12.5px; font-weight:600; color:var(--ink2); background:transparent;
-  border:1px solid var(--line2); border-radius:var(--r-sm); padding:8px 15px; cursor:pointer; }
-.vh-btn-ghost:hover { background:var(--paper3); }
-.vh-btn-ghost.vh-danger { color:var(--danger); border-color:var(--falta-soft); }
-.vh-btn-ghost.vh-danger:hover { background:var(--falta-soft); }
-.vh-btn-primary { font-family:var(--body); font-size:12.5px; font-weight:700; color:#fff; background:var(--accent);
-  border:1px solid var(--accent); border-radius:var(--r-sm); padding:8px 17px; cursor:pointer; transition:.15s; }
-.vh-btn-primary:hover { background:var(--accentInk); }
-
 .vh-empty { display:none; padding:34px 16px; text-align:center; color:var(--ink3); font-size:12.5px; background:var(--paper2);
   border:1px solid var(--line); border-radius:var(--r); }
 .vh-empty.show { display:block; }
 
 @media (max-width:640px) {
-  .vh-2col, .vh-profile { grid-template-columns:1fr; }
+  .vh-profile { grid-template-columns:1fr; }
   .vh-bar { flex-direction:column; align-items:stretch; }
   .vh-rowhead { flex-wrap:wrap; }
 }
