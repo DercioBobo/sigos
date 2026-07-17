@@ -424,7 +424,7 @@ sigos.PainelCCO = class PainelCCO {
 		const stats = [
 			["Total", g.total, "graphite"], ["Alocadas", g.alocadas, "good"],
 			["Disponíveis", g.disponiveis, "accent"], ["Manutenção", g.manutencao, "amber"],
-			["Abatidas", g.abatidas, "bad"],
+			["Em Arsenal", g.abatidas, "graphite"], ["Avariadas", g.avariadas, "bad"],
 		];
 		this.$root.find("#cco-arm-stats").html(stats.map(([l, v, t]) =>
 			`<div class="cco-pq cco-pq-${t}"><span class="cco-pq-v cco-num">${this._fmt(v || 0)}</span><span class="cco-pq-l cco-up">${l}</span></div>`).join(""));

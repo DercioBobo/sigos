@@ -182,7 +182,7 @@ def get_armas():
     por_deleg = frappe.db.sql(
         """SELECT COALESCE(NULLIF(delegacao, ''), 'Sem delegacao') AS k,
                   COUNT(*) AS n,
-                  SUM(estado = 'Operacional' AND posto IS NOT NULL AND posto <> '') AS alocadas
+                  SUM(estado = 'Boas Condições – Operacional' AND posto IS NOT NULL AND posto <> '') AS alocadas
            FROM `tabArma` GROUP BY delegacao ORDER BY n DESC""",
         as_dict=True,
     )

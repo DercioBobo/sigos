@@ -9,6 +9,7 @@
  "engine": "InnoDB",
  "field_order": [
   "numero_da_arma",
+  "marca",
   "col_break_1",
   "tipo",
   "estado",
@@ -17,7 +18,8 @@
   "posto",
   "posto_nome",
   "col_break_2",
-  "numero_de_municoes"
+  "numero_de_municoes",
+  "livrete_da_arma"
  ],
  "fields": [
   {
@@ -27,6 +29,12 @@
    "reqd": 1,
    "in_list_view": 1,
    "in_standard_filter": 1
+  },
+  {
+   "fieldname": "marca",
+   "fieldtype": "Data",
+   "label": "Marca",
+   "in_list_view": 1
   },
   {
    "fieldname": "col_break_1",
@@ -43,8 +51,8 @@
    "fieldname": "estado",
    "fieldtype": "Select",
    "label": "Estado",
-   "options": "Operacional\nEm Manutenção\nAbatida",
-   "default": "Operacional",
+   "options": "Boas Condições – Operacional\nEm Manutenção\nArsenal\nAvariado",
+   "default": "Boas Condições – Operacional",
    "in_list_view": 1
   },
   {
@@ -85,6 +93,11 @@
    "fieldtype": "Int",
    "label": "Número de Munições",
    "default": "0"
+  },
+  {
+   "fieldname": "livrete_da_arma",
+   "fieldtype": "Attach",
+   "label": "Livrete da Arma"
   }
  ],
  "links": [],

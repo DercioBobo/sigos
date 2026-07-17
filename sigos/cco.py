@@ -365,10 +365,11 @@ def _armamento(scope):
 	tot = frappe.db.sql(
 		f"""SELECT
 		      COUNT(*) AS total,
-		      SUM(estado = 'Operacional') AS operacionais,
+		      SUM(estado = 'Boas Condições – Operacional') AS operacionais,
 		      SUM(estado = 'Em Manutenção') AS manutencao,
-		      SUM(estado = 'Abatida') AS abatidas,
-		      SUM(estado = 'Operacional' AND posto IS NOT NULL AND posto <> '') AS alocadas
+		      SUM(estado = 'Arsenal') AS abatidas,
+		      SUM(estado = 'Avariado') AS avariadas,
+		      SUM(estado = 'Boas Condições – Operacional' AND posto IS NOT NULL AND posto <> '') AS alocadas
 		    FROM `tabArma`{base}""",
 		sp, as_dict=True,
 	)[0]
@@ -378,7 +379,7 @@ def _armamento(scope):
 	por_deleg = frappe.db.sql(
 		f"""SELECT COALESCE(delegacao, 'Sem delegação') AS k,
 		           COUNT(*) AS total,
-		           SUM(estado = 'Operacional' AND posto IS NOT NULL AND posto <> '') AS alocadas
+		           SUM(estado = 'Boas Condições – Operacional' AND posto IS NOT NULL AND posto <> '') AS alocadas
 		    FROM `tabArma`{base} GROUP BY delegacao ORDER BY total DESC""",
 		sp, as_dict=True,
 	)
@@ -389,7 +390,7 @@ def _armamento(scope):
 	)
 	return {
 		"total": total, "operacionais": operac, "manutencao": int(tot.get("manutencao") or 0),
-		"abatidas": int(tot.get("abatidas") or 0),
+		"abatidas": int(tot.get("abatidas") or 0), "avariadas": int(tot.get("avariadas") or 0),
 		"alocadas": alocadas, "disponiveis": operac - alocadas,
 		"por_delegacao": [dict(r, alocadas=int(r["alocadas"] or 0), total=int(r["total"])) for r in por_deleg],
 		"por_tipo": por_tipo,
