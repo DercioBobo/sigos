@@ -43,6 +43,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		this.userToggledPostos = new Map();
 		this.rows = [];
 		this.settingsFlags = {};
+		this._dialogOpen = false;
 
 		this.THEME_KEY = "sigos_vhoje_theme";
 		this.theme = localStorage.getItem(this.THEME_KEY) || "light";
@@ -58,6 +59,22 @@ sigos.VigilantesHoje = class VigilantesHoje {
 			callback: (r) => { this.settingsFlags = r.message || {}; },
 		});
 		this.refresh();
+		this._start_polling();
+	}
+
+	// A board meant to stay open all day should actually stay live. Skips a tick
+	// while a mark/details dialog is open (don't yank focus mid-edit), while the
+	// tab is backgrounded, or if the user has since navigated to a different page
+	// (the class instance is kept alive across nav per on_page_show, so the timer
+	// would otherwise keep polling forever in the background).
+	_start_polling() {
+		if (this._pollTimer) clearInterval(this._pollTimer);
+		this._pollTimer = setInterval(() => {
+			if (this._dialogOpen) return;
+			if (document.visibilityState !== "visible") return;
+			if (frappe.get_route()[0] !== "vigilantes-hoje") return;
+			this.refresh();
+		}, 75000);
 	}
 
 	// ============================================================ DATA
@@ -126,16 +143,32 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		this.$root.find(".vh-sum-faltas b").text(faltasHoje);
 
 		const $wrap = this.$root.find(".vh-roster").empty();
-		this.$root.find(".vh-empty").toggleClass("show", grupos.size === 0);
+		const $empty = this.$root.find(".vh-empty");
+		$empty.toggleClass("show", grupos.size === 0);
+		if (grupos.size === 0) {
+			$empty.text(this.rows.length === 0
+				? __("Nenhum vigilante escalado para esta data e período.")
+				: __("Nenhum vigilante ou posto corresponde à pesquisa."));
+		}
 
 		[...grupos.entries()]
 			.sort((a, b) => a[1].label.localeCompare(b[1].label))
 			.forEach(([key, g]) => {
 				const temProblema = g.rows.some((r) => VH_PROBLEMA.has(r._status));
-				const nFalta = g.rows.filter((r) => r._status === "Falta").length;
 				const aberto = this.userToggledPostos.has(key)
 					? this.userToggledPostos.get(key)
 					: temProblema;
+
+				// Coverage, not just a faltas tally: of the guards actually expected to
+				// work today (folga excluded from the denominator), how many showed up?
+				// Zero presentes with guards expected is the one signal CCO needs instantly.
+				const working = g.rows.filter((r) => r._status !== "Folga");
+				const presentes = working.filter((r) => r._status === "Presente").length;
+				let covChip = "";
+				if (working.length > 0) {
+					const covClass = presentes === 0 ? "critical" : presentes < working.length ? "partial" : "ok";
+					covChip = `<span class="vh-group-cov ${covClass}">${presentes}/${working.length} ${__("presentes")}</span>`;
+				}
 
 				const $det = $(`
 					<details class="vh-group" ${aberto ? "open" : ""}>
@@ -143,7 +176,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 							${this._icon("chev", "vh-chev")}
 							<span>${frappe.utils.escape_html(g.label)}</span>
 							<span class="vh-group-aside">
-								${nFalta ? `<span class="vh-group-falta">${nFalta} falta${nFalta > 1 ? "s" : ""}</span>` : ""}
+								${covChip}
 								<span class="vh-group-n">${g.rows.length}</span>
 							</span>
 						</summary>
@@ -168,6 +201,10 @@ sigos.VigilantesHoje = class VigilantesHoje {
 			: `<b>${frappe.utils.escape_html(row.turno || "")}</b><span class="dot">·</span>${frappe.utils.escape_html(row.regime || "")}<span class="dot">·</span>${frappe.utils.escape_html(row.delegacao || "")}`;
 		const tel = (row.contacto || "").replace(/\s/g, "");
 		const aberto = this.expandedRowKey === key;
+		const temAccao = row.ja_proxima_accao && row.ja_proxima_accao !== "Sem Ação";
+		const accaoLine = temAccao
+			? `<div class="vh-accao-chip">↳ ${frappe.utils.escape_html(row.ja_proxima_accao)}${row.ja_actor_nome ? `: <b>${frappe.utils.escape_html(row.ja_actor_nome)}</b>` : ""}</div>`
+			: "";
 
 		const $row = $(`
 			<div class="vh-row" data-status="${status}" data-saved="${row.ja_ausencia_row ? "true" : "false"}" data-open="${aberto ? "true" : "false"}">
@@ -181,6 +218,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 							${row.em_licenca ? `<span class="vh-flag">${this._icon("flag")} ${__("Licença aprovada")}</span>` : ""}
 						</div>
 						<div class="vh-meta">${metaLine}</div>
+						${accaoLine}
 					</div>
 					<div class="vh-right">
 						${tel ? `<a class="vh-call" href="tel:${tel}" title="${__("Ligar a {0}", [frappe.utils.escape_html(row.nome_completo || "")])}">${this._icon("phone")}${frappe.utils.escape_html(row.contacto)}</a>` : ""}
@@ -224,9 +262,14 @@ sigos.VigilantesHoje = class VigilantesHoje {
 			</div>
 		`).appendTo($panel);
 
+		const isSubmetida = row.ja_registado_estado === "Submetido";
 		const $actions = $in.find(".vh-actions");
 		if (isFolga) {
 			$actions.append(`<span class="vh-folga-note">${this._icon("info")} ${__("Em folga hoje — sem escala, por isso não há ausência para marcar.")}</span>`);
+		} else if (isSubmetida) {
+			$actions.append(`<span class="vh-folga-note">${this._icon("info")} ${__("Folha já submetida — só leitura. Use o formulário Ausencias para alterar.")}</span>`);
+			const $detBtn = $(`<button class="vh-actbtn primary">${__("Ver Detalhes")}</button>`).appendTo($actions);
+			$detBtn.on("click", () => this._abrir_detalhes_dialog(row));
 		} else {
 			const $markBtn = $(`<button class="vh-actbtn primary">${row.ja_ausencia_row ? __("Rever Marcação") : __("Marcar Ausência")}</button>`).appendTo($actions);
 			$markBtn.on("click", () => this._abrir_marcar_dialog(row));
@@ -253,6 +296,43 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		return `<span class="vh-dg-ava" style="background:hsl(${h},42%,38%)">${frappe.utils.escape_html(ini)}</span>`;
 	}
 
+	// ============================================================ DETAILS DIALOG (read-only)
+	// For an already-SUBMITTED sheet — no primary/secondary action, no editable
+	// controls. Same guard header + visual language as the mark dialog, values
+	// shown as plain label:value pairs instead of pill buttons/Link pickers.
+	_abrir_detalhes_dialog(row) {
+		const meta = [row.mecanografico, row.turno, row.regime, row.nome_do_posto || row.posto].filter(Boolean).join(" · ");
+		const val = (v) => (v || v === 0) ? frappe.utils.escape_html(String(v)) : "—";
+
+		const d = new frappe.ui.Dialog({
+			title: __("Detalhes da Ausência"), size: "large",
+			on_hide: () => { this._dialogOpen = false; },
+		});
+		this._dialogOpen = true;
+		const $body = $(`<div class="vh-dialog-body${this.theme === "dark" ? " theme-dark" : ""}">
+			<div class="vh-dg-guard">
+				${this._avatar_html(row.nome_completo)}
+				<div class="vh-dg-guard-txt">
+					<span class="vh-dg-name">${frappe.utils.escape_html(row.nome_completo || row.vigilante)}</span>
+					<span class="vh-dg-meta">${frappe.utils.escape_html(meta)}</span>
+				</div>
+				<span class="vh-dg-submitted-badge">${this._icon("check")} ${__("Submetida")}</span>
+			</div>
+			<div class="vh-profile vh-dg-fields">
+				<div><span class="vh-pf-lbl">${__("Tipo de Ausência")}</span><span class="vh-pf-val">${val(row.ja_tipo_de_ausencia)}</span></div>
+				<div><span class="vh-pf-lbl">${__("Subtipo")}</span><span class="vh-pf-val">${val(row.ja_subtipo_falta)}</span></div>
+				<div><span class="vh-pf-lbl">${__("Faltas Contadas")}</span><span class="vh-pf-val">${val(row.ja_n_de_faltas)}</span></div>
+				<div><span class="vh-pf-lbl">${__("Tipo de Justificação")}</span><span class="vh-pf-val">${val(row.ja_tipo_justificacao)}</span></div>
+				<div><span class="vh-pf-lbl">${__("Justificativo")}</span><span class="vh-pf-val">${val(row.ja_jutificativo)}</span></div>
+				<div><span class="vh-pf-lbl">${__("Próxima Acção")}</span><span class="vh-pf-val">${val(row.ja_proxima_accao)}</span></div>
+				${row.ja_actor_nome ? `<div><span class="vh-pf-lbl">${__("Vigilante Envolvido")}</span><span class="vh-pf-val">${val(row.ja_actor_nome)}</span></div>` : ""}
+				<div><span class="vh-pf-lbl">${__("Folha")}</span><span class="vh-pf-val mono">${val(row.ja_ausencia_doc)}</span></div>
+			</div>
+		</div>`);
+		d.$body.html($body);
+		d.show();
+	}
+
 	_abrir_marcar_dialog(row) {
 		const isEdit = !!row.ja_ausencia_row;
 		const showSubtipo = !!this.settingsFlags.faltas_normal_vermelha_activo;
@@ -264,7 +344,9 @@ sigos.VigilantesHoje = class VigilantesHoje {
 			fields: [{ fieldname: "vh_area", fieldtype: "HTML" }],
 			primary_action_label: __("Guardar"),
 			primary_action: () => this._guardar_marcacao(d, row, state, controls),
+			on_hide: () => { this._dialogOpen = false; },
 		});
+		this._dialogOpen = true;
 
 		const $body = d.fields_dict.vh_area.$wrapper;
 		$body.addClass("vh-dialog-body");
@@ -663,7 +745,11 @@ sigos.VigilantesHoje = class VigilantesHoje {
 .vh-group[open] summary svg.vh-chev { transform:rotate(90deg); }
 .vh-group-aside { margin-left:auto; display:flex; align-items:center; gap:8px; }
 .vh-group-n { font-family:var(--body); font-weight:600; font-size:11.5px; color:var(--ink3); background:var(--paper3); border-radius:999px; padding:2px 9px; }
-.vh-group-falta { font-family:var(--body); font-weight:700; font-size:11px; color:var(--falta); background:var(--falta-soft); border-radius:999px; padding:2px 9px; }
+.vh-group-cov { font-family:var(--body); font-weight:700; font-size:11px; border-radius:999px; padding:2px 9px; }
+.vh-group-cov.ok { color:var(--done); background:var(--done-soft); }
+.vh-group-cov.partial { color:var(--mark); background:var(--mark-soft); }
+.vh-group-cov.critical { color:var(--falta); background:var(--falta-soft); animation:vh-cov-pulse 1.8s ease-in-out infinite; }
+@keyframes vh-cov-pulse { 0%,100%{ opacity:1;} 50%{ opacity:.55;} }
 .vh-rows { border-top:1px solid var(--line); }
 
 .vh-row { border-bottom:1px solid var(--line); }
@@ -689,6 +775,8 @@ sigos.VigilantesHoje = class VigilantesHoje {
 .vh-folga-lbl { color:var(--folga); font-weight:700; font-style:italic; }
 .vh-flag { display:inline-flex; align-items:center; gap:4px; background:var(--mark-soft); color:var(--mark); font-size:10.5px; font-weight:700; padding:2px 8px 2px 6px; border-radius:999px; }
 .vh-flag svg { width:10px; height:10px; }
+.vh-accao-chip { font-size:11px; color:var(--ink2); margin-top:3px; }
+.vh-accao-chip b { color:var(--ink); font-weight:700; }
 
 .vh-right { display:flex; align-items:center; gap:12px; flex:none; }
 .vh-call { display:inline-flex; align-items:center; gap:6px; background:var(--paper3); border:1px solid var(--line2);
@@ -735,7 +823,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
   --ink:#0E1726; --ink2:#5B6B82; --ink3:#93A1B5;
   --line:#E6EAF2; --line2:#D5DCE8;
   --accent:#4F46E5; --accentInk:#4338CA;
-  --mark:#E8A020; --falta:#C0392B; --folga:#6B7890;
+  --mark:#E8A020; --falta:#C0392B; --folga:#6B7890; --done:#2FA56A; --done-soft:#E4F5EC;
   --r-sm:9px;
   --display:'Space Grotesk',system-ui,sans-serif; --body:'Inter',system-ui,sans-serif;
   --mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
@@ -746,7 +834,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
   --ink:#EDF1F7; --ink2:#A7B3C6; --ink3:#76839A;
   --line:#2C3444; --line2:#374155;
   --accent:#7B76F0; --accentInk:#9490F5;
-  --mark:#F0AD4E; --falta:#E0574A; --folga:#8B97AC;
+  --mark:#F0AD4E; --falta:#E0574A; --folga:#8B97AC; --done:#3FBF7F; --done-soft:#123422;
 }
 /* Link-field dropdowns (awesomplete) are position:absolute and get clipped by
    Frappe's own .modal-body { overflow-y:auto } once a field sits near the bottom
@@ -763,6 +851,9 @@ sigos.VigilantesHoje = class VigilantesHoje {
 .vh-dg-guard-txt { display:flex; flex-direction:column; gap:2px; min-width:0; }
 .vh-dg-name { font-family:var(--display); font-weight:600; font-size:15px; color:var(--ink); }
 .vh-dg-meta { font-size:11.5px; color:var(--ink2); }
+.vh-dg-submitted-badge { margin-left:auto; display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700;
+  color:var(--done); background:var(--done-soft); border-radius:999px; padding:5px 12px; flex:none; }
+.vh-dg-submitted-badge svg { width:12px; height:12px; }
 .vh-field-lbl { font-size:10.5px; text-transform:uppercase; letter-spacing:.07em; color:var(--ink3); font-weight:700; margin-bottom:6px; display:block; }
 .vh-pillrow { display:flex; gap:6px; flex-wrap:wrap; }
 .vh-optbtn { font-family:var(--body); font-size:12px; font-weight:600; color:var(--ink2); background:var(--paper3);

@@ -753,9 +753,16 @@ def _marcar_ja_registados(rows, data, periodo, excluir_doc=None):
 		       ta.name AS ja_ausencia_row, ta.tipo_de_ausencia, ta.subtipo_falta,
 		       ta.tipo_justificacao, ta.jutificativo, ta.proxima_accao,
 		       ta.vigilante_substituto, ta.vigilante_a_dobrar, ta.vigilante_a_meia_dobra,
-		       ta.vigilante_a_adiantar, ta.vigilante_a_horas_extras, ta.n_de_faltas
+		       ta.vigilante_a_adiantar, ta.vigilante_a_horas_extras, ta.n_de_faltas,
+		       COALESCE(v_sub.nome_completo, v_dob.nome_completo, v_mdb.nome_completo,
+		                v_adi.nome_completo, v_he.nome_completo) AS ja_actor_nome
 		FROM `tabTabela Ausencia` ta
 		JOIN `tabAusencias` a ON a.name = ta.parent
+		LEFT JOIN `tabVigilante` v_sub ON v_sub.name = ta.vigilante_substituto
+		LEFT JOIN `tabVigilante` v_dob ON v_dob.name = ta.vigilante_a_dobrar
+		LEFT JOIN `tabVigilante` v_mdb ON v_mdb.name = ta.vigilante_a_meia_dobra
+		LEFT JOIN `tabVigilante` v_adi ON v_adi.name = ta.vigilante_a_adiantar
+		LEFT JOIN `tabVigilante` v_he  ON v_he.name = ta.vigilante_a_horas_extras
 		WHERE a.docstatus < 2 AND a.data = %(d)s AND a.periodo = %(p)s
 		  AND ta.vigilante IN %(vigs)s {excl}
 		""",
@@ -784,6 +791,7 @@ def _marcar_ja_registados(rows, data, periodo, excluir_doc=None):
 			r["ja_vigilante_a_adiantar"] = c.vigilante_a_adiantar
 			r["ja_vigilante_a_horas_extras"] = c.vigilante_a_horas_extras
 			r["ja_n_de_faltas"] = c.n_de_faltas
+			r["ja_actor_nome"] = c.ja_actor_nome
 
 	# Guards COVERING an absence (substituto/dobra/adiantamento) in a submitted doc
 	# of the same date can't be marked absent — grey them too.
