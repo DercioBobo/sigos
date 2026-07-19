@@ -33,13 +33,12 @@ const VH_PROBLEMA = new Set(["Falta", "Suspensão", "Atraso", "Saída Antecipada
 // and to sort by that column (click header to sort, click again to reverse).
 const VH_TBL_COLS = [
 	{ key: "nome", label: "Vigilante", val: (r) => (r.nome_completo || r.vigilante || "").toLowerCase() },
-	{ key: "mecanografico", label: "Mecanográfico", val: (r) => (r.mecanografico || "").toLowerCase() },
-	{ key: "categoria", label: "Categoria", val: (r) => (r.categoria || "").toLowerCase() },
 	{ key: "posto", label: "Posto", val: (r) => (r.nome_do_posto || r.posto || "").toLowerCase() },
 	{ key: "turno", label: "Turno", val: (r) => (r.turno || "").toLowerCase() },
 	{ key: "regime", label: "Regime", val: (r) => (r.regime || "").toLowerCase() },
 	{ key: "estado", label: "Estado", val: (r) => VH_SEVERIDADE[r._status] ?? 4 },
 	{ key: "accao", label: "Acção", val: (r) => (r.ja_proxima_accao || "").toLowerCase() },
+	{ key: "contacto", label: "Contacto", val: (r) => r.contacto || "" },
 ];
 
 sigos.VigilantesHoje = class VigilantesHoje {
@@ -343,6 +342,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		const accaoLine = temAccao
 			? `↳ ${frappe.utils.escape_html(row.ja_proxima_accao)}${row.ja_actor_nome ? `: <b>${frappe.utils.escape_html(row.ja_actor_nome)}</b>` : ""}`
 			: "—";
+		const tel = (row.contacto || "").replace(/\s/g, "");
 
 		const $tr = $(`
 			<tr class="vh-tbl-row" data-status="${status}" style="--pc:${this._posto_color(postoNome)}">
@@ -350,8 +350,6 @@ sigos.VigilantesHoje = class VigilantesHoje {
 					${row.em_licenca ? `<span class="vh-tbl-lic" title="${__("Licença aprovada")}">${this._icon("flag")}</span>` : ""}
 					${frappe.utils.escape_html(row.nome_completo || row.vigilante)}
 				</td>
-				<td class="mono">${frappe.utils.escape_html(row.mecanografico || "—")}</td>
-				<td>${frappe.utils.escape_html(row.categoria || "—")}</td>
 				<td><span class="vh-tbl-posto-dot"></span>${frappe.utils.escape_html(postoNome || "—")}</td>
 				<td>${status === "Folga" ? `<span class="vh-folga-lbl">${__("Folga")}</span>` : frappe.utils.escape_html(row.turno || "—")}</td>
 				<td>${frappe.utils.escape_html(row.regime || "—")}</td>
@@ -360,6 +358,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 					<span class="vh-check">${row.ja_ausencia_row ? this._icon("check") : ""}</span>
 				</td>
 				<td class="vh-tbl-accao">${accaoLine}</td>
+				<td class="mono">${tel ? `<a class="vh-tbl-tel" href="tel:${tel}">${frappe.utils.escape_html(row.contacto)}</a>` : "—"}</td>
 				<td class="vh-tbl-menu-cell"><button type="button" class="vh-tbl-menu-btn" title="${__("Acções")}">⋯</button></td>
 			</tr>
 		`).appendTo($tbody);
@@ -368,6 +367,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 			e.stopPropagation();
 			this._abrir_row_menu(e.currentTarget, row);
 		});
+		$tr.find(".vh-tbl-tel").on("click", (e) => e.stopPropagation());
 	}
 
 	// ---- Row actions menu (custom — used by table view) --------------------
@@ -388,12 +388,8 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		this._close_menu();
 		const isFolga = row._status === "Folga";
 		const isSubmetida = row.ja_registado_estado === "Submetido";
-		const tel = (row.contacto || "").replace(/\s/g, "");
 
 		const $menu = $(`<div class="vh-menu${this.theme === "dark" ? " theme-dark" : ""}"></div>`);
-		if (tel) {
-			$menu.append(`<a class="vh-menu-item" href="tel:${tel}">${__("Ligar")} — ${frappe.utils.escape_html(row.contacto)}</a>`);
-		}
 		if (isFolga) {
 			$menu.append(`<span class="vh-menu-item disabled">${__("Em folga — sem acção disponível")}</span>`);
 		} else if (isSubmetida) {
@@ -407,11 +403,17 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		$("body").append($menu);
 		const rect = btnEl.getBoundingClientRect();
 		const largura = $menu.outerWidth();
-		$menu.css({
-			position: "fixed",
-			top: Math.min(rect.bottom + 4, window.innerHeight - $menu.outerHeight() - 8),
-			left: Math.max(8, rect.right - largura),
-		});
+		const altura = $menu.outerHeight();
+		// Clamp on BOTH edges (the earlier version only floored the left bound,
+		// so a button near the left of a scrolled-into-view table could still
+		// push the menu to hang off past the viewport) and flip above the
+		// button when there's no room below.
+		let left = rect.right - largura;
+		left = Math.max(8, Math.min(left, window.innerWidth - largura - 8));
+		let top = rect.bottom + 4;
+		if (top + altura > window.innerHeight - 8) top = rect.top - altura - 4;
+		top = Math.max(8, top);
+		$menu.css({ position: "fixed", top, left });
 		this._menuEl = $menu;
 		this._menuOutsideHandler = (e) => { if (!$menu[0].contains(e.target) && e.target !== btnEl) this._close_menu(); };
 		this._menuEscHandler = (e) => { if (e.key === "Escape") this._close_menu(); };
@@ -942,7 +944,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
   --r:14px; --r-sm:9px;
   --display:'Space Grotesk',system-ui,sans-serif; --body:'Inter',system-ui,sans-serif;
   --mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
-  max-width:1040px; margin:0 auto; padding:20px 14px 80px;
+  max-width:100%; padding:20px 20px 80px;
   color:var(--ink); font-family:var(--body); font-size:13.5px; line-height:1.45; -webkit-font-smoothing:antialiased;
 }
 .sigos-vhoje.theme-dark .vh-root {
@@ -1062,7 +1064,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
    th/td rules that otherwise out-specificity plain .vh-tbl-* class selectors
    and flatten this back to a bare default-looking table. */
 .sigos-vhoje .vh-tbl-scroll { overflow-x:auto; border-radius:var(--r); box-shadow:var(--shadow); }
-.sigos-vhoje .vh-tbl { width:100%; min-width:920px; border-collapse:separate; border-spacing:0;
+.sigos-vhoje .vh-tbl { width:100%; min-width:820px; border-collapse:separate; border-spacing:0;
   background:var(--paper2); border:1px solid var(--line); border-radius:var(--r); overflow:hidden; }
 .sigos-vhoje .vh-tbl thead th {
   position:sticky; top:0; z-index:1; text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.07em;
@@ -1085,6 +1087,8 @@ sigos.VigilantesHoje = class VigilantesHoje {
 .sigos-vhoje .vh-tbl-lic svg { width:12px; height:12px; }
 .sigos-vhoje .vh-tbl-accao { color:var(--ink2); font-size:11.5px; }
 .sigos-vhoje .vh-tbl-accao b { color:var(--ink); font-weight:700; }
+.sigos-vhoje .vh-tbl-tel { font-family:var(--mono); font-size:11.5px; color:var(--ink2); text-decoration:none; }
+.sigos-vhoje .vh-tbl-tel:hover { color:var(--accent); text-decoration:underline; }
 .sigos-vhoje .vh-tbl-row[data-status="Falta"] .vh-status-txt, .sigos-vhoje .vh-tbl-row[data-status="Suspensão"] .vh-status-txt { color:var(--falta); font-weight:700; }
 .sigos-vhoje .vh-tbl-row[data-status="Atraso"] .vh-status-txt, .sigos-vhoje .vh-tbl-row[data-status="Saída Antecipada"] .vh-status-txt, .sigos-vhoje .vh-tbl-row[data-status="Outro"] .vh-status-txt { color:var(--mark); font-weight:700; }
 .sigos-vhoje .vh-tbl-row[data-status="Licença"] .vh-status-txt { color:var(--accentInk); font-weight:700; }
