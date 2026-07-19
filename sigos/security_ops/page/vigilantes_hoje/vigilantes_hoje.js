@@ -123,6 +123,17 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		});
 	}
 
+	// Deterministic colour per posto (same hash idea as _avatar_html) — tied to
+	// the posto's identity, not its position in the table, so it stays correct
+	// even when the table is sorted by a different column and posto rows scatter.
+	_posto_color(nome) {
+		const s = (nome || "").trim();
+		if (!s) return "transparent";
+		let h = 0;
+		for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360;
+		return `hsl(${h}, 62%, 52%)`;
+	}
+
 	_status_de(row) {
 		if (row.e_folga) return "Folga";
 		if (row.ja_ausencia_row) return row.ja_tipo_de_ausencia || "Outro";
@@ -327,20 +338,21 @@ sigos.VigilantesHoje = class VigilantesHoje {
 
 	_render_table_row($tbody, row) {
 		const status = row._status;
+		const postoNome = row.nome_do_posto || row.posto || "";
 		const temAccao = row.ja_proxima_accao && row.ja_proxima_accao !== "Sem Ação";
 		const accaoLine = temAccao
 			? `↳ ${frappe.utils.escape_html(row.ja_proxima_accao)}${row.ja_actor_nome ? `: <b>${frappe.utils.escape_html(row.ja_actor_nome)}</b>` : ""}`
 			: "—";
 
 		const $tr = $(`
-			<tr class="vh-tbl-row" data-status="${status}">
-				<td class="vh-tbl-name">
+			<tr class="vh-tbl-row" data-status="${status}" style="--pc:${this._posto_color(postoNome)}">
+				<td class="vh-tbl-name vh-tbl-stripe">
 					${row.em_licenca ? `<span class="vh-tbl-lic" title="${__("Licença aprovada")}">${this._icon("flag")}</span>` : ""}
 					${frappe.utils.escape_html(row.nome_completo || row.vigilante)}
 				</td>
 				<td class="mono">${frappe.utils.escape_html(row.mecanografico || "—")}</td>
 				<td>${frappe.utils.escape_html(row.categoria || "—")}</td>
-				<td>${frappe.utils.escape_html(row.nome_do_posto || row.posto || "—")}</td>
+				<td><span class="vh-tbl-posto-dot"></span>${frappe.utils.escape_html(postoNome || "—")}</td>
 				<td>${status === "Folga" ? `<span class="vh-folga-lbl">${__("Folga")}</span>` : frappe.utils.escape_html(row.turno || "—")}</td>
 				<td>${frappe.utils.escape_html(row.regime || "—")}</td>
 				<td>
@@ -1067,6 +1079,8 @@ sigos.VigilantesHoje = class VigilantesHoje {
 .sigos-vhoje .vh-tbl-row:hover td { background:var(--accent-soft); }
 .sigos-vhoje .vh-tbl-row td.mono { font-family:var(--mono); font-size:11.5px; color:var(--ink3); }
 .sigos-vhoje .vh-tbl-name { font-weight:600; }
+.sigos-vhoje .vh-tbl-stripe { box-shadow:inset 3px 0 0 var(--pc, transparent); }
+.sigos-vhoje .vh-tbl-posto-dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--pc, var(--ink3)); margin-right:7px; vertical-align:1px; }
 .sigos-vhoje .vh-tbl-lic { display:inline-flex; vertical-align:-2px; margin-right:6px; color:var(--mark); }
 .sigos-vhoje .vh-tbl-lic svg { width:12px; height:12px; }
 .sigos-vhoje .vh-tbl-accao { color:var(--ink2); font-size:11.5px; }
