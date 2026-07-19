@@ -258,52 +258,33 @@ sigos.VigilantesHoje = class VigilantesHoje {
 	}
 
 	// ---- Table view --------------------------------------------------------
-	// Same posto grouping/severity-sort/collapse bookkeeping as cards, just one
-	// <tbody> per posto (header row + data rows together — a <tbody> can't nest
-	// a <details>, so collapse toggles a class on the <tbody> itself instead).
-	// No expand-in-place here — every action (incl. Ligar) lives in the "⋯" menu.
+	// Plain flat table — no group headers/collapsing. Rows keep the same order
+	// already computed for cards (posto A-Z, severity-sorted within), just with
+	// Posto rendered as a normal column instead of a grouping mechanism. Every
+	// action (incl. Ligar) lives in the "⋯" menu.
 	_render_table($wrap, gruposOrdenados) {
 		const $scroll = $('<div class="vh-tbl-scroll"></div>').appendTo($wrap);
 		const $table = $(`
 			<table class="vh-tbl">
 				<thead><tr>
 					<th>${__("Vigilante")}</th>
+					<th>${__("Posto")}</th>
 					<th>${__("Turno / Regime")}</th>
 					<th>${__("Estado")}</th>
 					<th>${__("Acção")}</th>
 					<th></th>
 				</tr></thead>
+				<tbody></tbody>
 			</table>
 		`).appendTo($scroll);
 
-		gruposOrdenados.forEach(([key, g]) => {
-			const aberto = this._grupo_aberto(key, g.rows);
-			const $tbody = $(`<tbody class="vh-tbl-gbody" data-key="${frappe.utils.escape_html(key)}"></tbody>`).appendTo($table);
-			$tbody.toggleClass("collapsed", !aberto);
-
-			const $ghead = $(`
-				<tr class="vh-tbl-ghead">
-					<td colspan="5">
-						${this._icon("chev", "vh-chev")}
-						<span>${frappe.utils.escape_html(g.label)}</span>
-						<span class="vh-group-aside">
-							${this._grupo_cov_chip(g.rows)}
-							<span class="vh-group-n">${g.rows.length}</span>
-						</span>
-					</td>
-				</tr>
-			`).appendTo($tbody);
-			$ghead.on("click", () => {
-				const vaiAbrir = $tbody.hasClass("collapsed");
-				$tbody.toggleClass("collapsed", !vaiAbrir);
-				this.userToggledPostos.set(key, vaiAbrir);
-			});
-
-			g.rows.forEach((row) => this._render_table_row($tbody, row));
+		const $tbody = $table.find("tbody");
+		gruposOrdenados.forEach(([, g]) => {
+			g.rows.forEach((row) => this._render_table_row($tbody, row, g.label));
 		});
 	}
 
-	_render_table_row($tbody, row) {
+	_render_table_row($tbody, row, postoLabel) {
 		const status = row._status;
 		const metaLine = status === "Folga"
 			? `<span class="vh-folga-lbl">${__("Folga hoje")}</span><span class="dot">·</span>${frappe.utils.escape_html(row.regime || "")}`
@@ -323,6 +304,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 						${row.em_licenca ? `<span class="vh-flag">${this._icon("flag")} ${__("Licença aprovada")}</span>` : ""}
 					</div>
 				</td>
+				<td class="vh-tbl-meta">${frappe.utils.escape_html(postoLabel || "")}</td>
 				<td class="vh-tbl-meta">${metaLine}</td>
 				<td>
 					<span class="vh-status-txt">${status === "Presente" ? __("Presente") : __(status)}</span>
@@ -1028,16 +1010,9 @@ sigos.VigilantesHoje = class VigilantesHoje {
 
 /* ---- Table view --------------------------------------------------------- */
 .vh-tbl-scroll { overflow-x:auto; border-radius:var(--r); box-shadow:var(--shadow); }
-.vh-tbl { width:100%; min-width:640px; border-collapse:collapse; background:var(--paper2); border:1px solid var(--line); }
+.vh-tbl { width:100%; min-width:760px; border-collapse:collapse; background:var(--paper2); border:1px solid var(--line); }
 .vh-tbl thead th { text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.06em; font-weight:700; color:var(--ink3);
   padding:10px 14px; border-bottom:1px solid var(--line); background:var(--paper3); }
-.vh-tbl-ghead { cursor:pointer; user-select:none; background:var(--paper3); }
-.vh-tbl-ghead:hover { background:var(--line); }
-.vh-tbl-ghead td { padding:10px 14px; font-family:var(--display); font-weight:600; font-size:13.5px; color:var(--ink); }
-.vh-tbl-ghead svg.vh-chev { width:14px; height:14px; color:var(--ink3); vertical-align:-2px; margin-right:6px; transition:transform .2s ease; }
-.vh-tbl-gbody.collapsed .vh-tbl-ghead svg.vh-chev { transform:rotate(0deg); }
-.vh-tbl-gbody:not(.collapsed) .vh-tbl-ghead svg.vh-chev { transform:rotate(90deg); }
-.vh-tbl-gbody.collapsed .vh-tbl-row { display:none; }
 .vh-tbl-row td { padding:9px 14px; border-top:1px solid var(--line); font-size:12.5px; vertical-align:middle; }
 .vh-tbl-row:hover td { background:var(--paper3); }
 .vh-tbl-meta { color:var(--ink2); font-size:11.5px; white-space:nowrap; }
