@@ -29,6 +29,19 @@ const VH_ACCAO_CAMPO = {
 const VH_SEVERIDADE = { "Falta": 0, "Suspensão": 0, "Atraso": 1, "Saída Antecipada": 1, "Outro": 1, "Licença": 2, "Folga": 3, "Presente": 4 };
 const VH_PROBLEMA = new Set(["Falta", "Suspensão", "Atraso", "Saída Antecipada"]);
 
+// Table view columns — label + a value-extractor used both to render the cell
+// and to sort by that column (click header to sort, click again to reverse).
+const VH_TBL_COLS = [
+	{ key: "nome", label: "Vigilante", val: (r) => (r.nome_completo || r.vigilante || "").toLowerCase() },
+	{ key: "mecanografico", label: "Mecanográfico", val: (r) => (r.mecanografico || "").toLowerCase() },
+	{ key: "categoria", label: "Categoria", val: (r) => (r.categoria || "").toLowerCase() },
+	{ key: "posto", label: "Posto", val: (r) => (r.nome_do_posto || r.posto || "").toLowerCase() },
+	{ key: "turno", label: "Turno", val: (r) => (r.turno || "").toLowerCase() },
+	{ key: "regime", label: "Regime", val: (r) => (r.regime || "").toLowerCase() },
+	{ key: "estado", label: "Estado", val: (r) => VH_SEVERIDADE[r._status] ?? 4 },
+	{ key: "accao", label: "Acção", val: (r) => (r.ja_proxima_accao || "").toLowerCase() },
+];
+
 sigos.VigilantesHoje = class VigilantesHoje {
 	constructor(page, wrapper) {
 		this.page = page;
@@ -51,6 +64,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		this.theme = localStorage.getItem(this.THEME_KEY) || "light";
 		this.VIEW_KEY = "sigos_vhoje_view";
 		this.viewMode = localStorage.getItem(this.VIEW_KEY) || "table";
+		this.tableSort = { campo: null, dir: "asc" };
 
 		this._inject_fonts();
 		this._inject_css();
@@ -258,37 +272,60 @@ sigos.VigilantesHoje = class VigilantesHoje {
 	}
 
 	// ---- Table view --------------------------------------------------------
-	// Plain flat table — no group headers/collapsing. Rows keep the same order
-	// already computed for cards (posto A-Z, severity-sorted within), just with
-	// Posto rendered as a normal column instead of a grouping mechanism. Every
-	// action (incl. Ligar) lives in the "⋯" menu.
+	// Real columns (Vigilante / Mecanográfico / Categoria / Posto / Turno / Regime
+	// / Estado / Acção), each a separate <td> — nothing stacked inside one cell.
+	// Sortable: click a header to sort by that column (asc → desc → back to the
+	// default posto/severity order); click a different header to switch column.
+	// Every row action (incl. Ligar) lives in the "⋯" menu.
 	_render_table($wrap, gruposOrdenados) {
-		const $scroll = $('<div class="vh-tbl-scroll"></div>').appendTo($wrap);
-		const $table = $(`
-			<table class="vh-tbl">
-				<thead><tr>
-					<th>${__("Vigilante")}</th>
-					<th>${__("Posto")}</th>
-					<th>${__("Turno / Regime")}</th>
-					<th>${__("Estado")}</th>
-					<th>${__("Acção")}</th>
-					<th></th>
-				</tr></thead>
-				<tbody></tbody>
-			</table>
-		`).appendTo($scroll);
+		let rows;
+		if (this.tableSort.campo) {
+			const col = VH_TBL_COLS.find((c) => c.key === this.tableSort.campo);
+			const dir = this.tableSort.dir === "desc" ? -1 : 1;
+			rows = gruposOrdenados.flatMap(([, g]) => g.rows).sort((a, b) => {
+				const va = col.val(a), vb = col.val(b);
+				if (va < vb) return -1 * dir;
+				if (va > vb) return 1 * dir;
+				return (a.nome_completo || "").localeCompare(b.nome_completo || "");
+			});
+		} else {
+			rows = gruposOrdenados.flatMap(([, g]) => g.rows);
+		}
 
-		const $tbody = $table.find("tbody");
-		gruposOrdenados.forEach(([, g]) => {
-			g.rows.forEach((row) => this._render_table_row($tbody, row, g.label));
+		const $scroll = $('<div class="vh-tbl-scroll"></div>').appendTo($wrap);
+		const $theadRow = $('<tr></tr>');
+		VH_TBL_COLS.forEach((col) => {
+			const activo = this.tableSort.campo === col.key;
+			const $th = $(`
+				<th class="vh-tbl-sortable${activo ? " active" : ""}" data-key="${col.key}">
+					<span>${__(col.label)}</span>
+					<span class="vh-tbl-sort-ico">${activo ? (this.tableSort.dir === "desc" ? "▼" : "▲") : ""}</span>
+				</th>
+			`);
+			$th.on("click", () => this._ordenar_tabela(col.key));
+			$theadRow.append($th);
 		});
+		$theadRow.append("<th></th>");
+
+		const $table = $('<table class="vh-tbl"><thead></thead><tbody></tbody></table>').appendTo($scroll);
+		$table.find("thead").append($theadRow);
+		const $tbody = $table.find("tbody");
+		rows.forEach((row) => this._render_table_row($tbody, row));
 	}
 
-	_render_table_row($tbody, row, postoLabel) {
+	_ordenar_tabela(key) {
+		if (this.tableSort.campo !== key) {
+			this.tableSort = { campo: key, dir: "asc" };
+		} else if (this.tableSort.dir === "asc") {
+			this.tableSort.dir = "desc";
+		} else {
+			this.tableSort = { campo: null, dir: "asc" };
+		}
+		this._render();
+	}
+
+	_render_table_row($tbody, row) {
 		const status = row._status;
-		const metaLine = status === "Folga"
-			? `<span class="vh-folga-lbl">${__("Folga hoje")}</span><span class="dot">·</span>${frappe.utils.escape_html(row.regime || "")}`
-			: `<b>${frappe.utils.escape_html(row.turno || "")}</b><span class="dot">·</span>${frappe.utils.escape_html(row.regime || "")}`;
 		const temAccao = row.ja_proxima_accao && row.ja_proxima_accao !== "Sem Ação";
 		const accaoLine = temAccao
 			? `↳ ${frappe.utils.escape_html(row.ja_proxima_accao)}${row.ja_actor_nome ? `: <b>${frappe.utils.escape_html(row.ja_actor_nome)}</b>` : ""}`
@@ -296,16 +333,15 @@ sigos.VigilantesHoje = class VigilantesHoje {
 
 		const $tr = $(`
 			<tr class="vh-tbl-row" data-status="${status}">
-				<td>
-					<div class="vh-idline">
-						<span class="vh-name">${frappe.utils.escape_html(row.nome_completo || row.vigilante)}</span>
-						<span class="vh-mec">${frappe.utils.escape_html(row.mecanografico || "")}</span>
-						${row.categoria ? `<span class="vh-cat">${frappe.utils.escape_html(row.categoria)}</span>` : ""}
-						${row.em_licenca ? `<span class="vh-flag">${this._icon("flag")} ${__("Licença aprovada")}</span>` : ""}
-					</div>
+				<td class="vh-tbl-name">
+					${row.em_licenca ? `<span class="vh-tbl-lic" title="${__("Licença aprovada")}">${this._icon("flag")}</span>` : ""}
+					${frappe.utils.escape_html(row.nome_completo || row.vigilante)}
 				</td>
-				<td class="vh-tbl-meta">${frappe.utils.escape_html(postoLabel || "")}</td>
-				<td class="vh-tbl-meta">${metaLine}</td>
+				<td class="mono">${frappe.utils.escape_html(row.mecanografico || "—")}</td>
+				<td>${frappe.utils.escape_html(row.categoria || "—")}</td>
+				<td>${frappe.utils.escape_html(row.nome_do_posto || row.posto || "—")}</td>
+				<td>${status === "Folga" ? `<span class="vh-folga-lbl">${__("Folga")}</span>` : frappe.utils.escape_html(row.turno || "—")}</td>
+				<td>${frappe.utils.escape_html(row.regime || "—")}</td>
 				<td>
 					<span class="vh-status-txt">${status === "Presente" ? __("Presente") : __(status)}</span>
 					<span class="vh-check">${row.ja_ausencia_row ? this._icon("check") : ""}</span>
@@ -1010,24 +1046,32 @@ sigos.VigilantesHoje = class VigilantesHoje {
 
 /* ---- Table view --------------------------------------------------------- */
 .vh-tbl-scroll { overflow-x:auto; border-radius:var(--r); box-shadow:var(--shadow); }
-.vh-tbl { width:100%; min-width:760px; border-collapse:collapse; background:var(--paper2); border:1px solid var(--line); }
-.vh-tbl thead th { text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.06em; font-weight:700; color:var(--ink3);
-  padding:10px 14px; border-bottom:1px solid var(--line); background:var(--paper3); }
-.vh-tbl-row td { padding:9px 14px; border-top:1px solid var(--line); font-size:12.5px; vertical-align:middle; }
+.vh-tbl { width:100%; min-width:920px; border-collapse:separate; border-spacing:0; background:var(--paper2); border:1px solid var(--line); border-radius:var(--r); overflow:hidden; }
+.vh-tbl thead th {
+  position:sticky; top:0; z-index:1; text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.07em;
+  font-weight:700; color:var(--ink3); padding:11px 14px; border-bottom:1px solid var(--line); background:var(--paper3);
+  white-space:nowrap;
+}
+.vh-tbl-sortable { cursor:pointer; user-select:none; transition:color .13s, background .13s; }
+.vh-tbl-sortable:hover { color:var(--accent); background:var(--line); }
+.vh-tbl-sortable.active { color:var(--accent); }
+.vh-tbl-sort-ico { display:inline-block; width:9px; font-size:9px; margin-left:3px; color:var(--accent); }
+.vh-tbl-row td { padding:10px 14px; border-top:1px solid var(--line); font-size:12.5px; color:var(--ink); vertical-align:middle; white-space:nowrap; }
 .vh-tbl-row:hover td { background:var(--paper3); }
-.vh-tbl-meta { color:var(--ink2); font-size:11.5px; white-space:nowrap; }
-.vh-tbl-meta b { color:var(--ink2); font-weight:600; }
-.vh-tbl-meta .dot { color:var(--ink3); margin:0 5px; }
+.vh-tbl-row td.mono { font-family:var(--mono); font-size:11.5px; color:var(--ink3); }
+.vh-tbl-name { font-weight:600; }
+.vh-tbl-lic { display:inline-flex; vertical-align:-2px; margin-right:6px; color:var(--mark); }
+.vh-tbl-lic svg { width:12px; height:12px; }
 .vh-tbl-accao { color:var(--ink2); font-size:11.5px; }
 .vh-tbl-accao b { color:var(--ink); font-weight:700; }
-.vh-tbl-row[data-status="Falta"] .vh-status-txt, .vh-tbl-row[data-status="Suspensão"] .vh-status-txt { color:var(--falta); }
-.vh-tbl-row[data-status="Atraso"] .vh-status-txt, .vh-tbl-row[data-status="Saída Antecipada"] .vh-status-txt, .vh-tbl-row[data-status="Outro"] .vh-status-txt { color:var(--mark); }
-.vh-tbl-row[data-status="Licença"] .vh-status-txt { color:var(--accentInk); }
-.vh-tbl-row[data-status="Folga"] .vh-status-txt { color:var(--folga); font-style:italic; }
+.vh-tbl-row[data-status="Falta"] .vh-status-txt, .vh-tbl-row[data-status="Suspensão"] .vh-status-txt { color:var(--falta); font-weight:600; }
+.vh-tbl-row[data-status="Atraso"] .vh-status-txt, .vh-tbl-row[data-status="Saída Antecipada"] .vh-status-txt, .vh-tbl-row[data-status="Outro"] .vh-status-txt { color:var(--mark); font-weight:600; }
+.vh-tbl-row[data-status="Licença"] .vh-status-txt { color:var(--accentInk); font-weight:600; }
+.vh-tbl-row[data-status="Folga"] .vh-status-txt, .vh-tbl-row[data-status="Folga"] .vh-folga-lbl { color:var(--folga); font-style:italic; }
 .vh-tbl-menu-cell { width:1%; text-align:right; }
 .vh-tbl-menu-btn { font-family:var(--body); font-size:16px; font-weight:700; line-height:1; color:var(--ink3);
   background:transparent; border:1px solid transparent; border-radius:var(--r-sm); padding:5px 10px; cursor:pointer; transition:.13s; }
-.vh-tbl-menu-btn:hover { background:var(--paper3); border-color:var(--line2); color:var(--ink); }
+.vh-tbl-menu-btn:hover { background:var(--paper2); border-color:var(--line2); color:var(--ink); }
 
 /* Custom row-actions menu — position:fixed + appended to document.body, so a
    table cell's overflow can never clip it (same reasoning as the mark dialog's
