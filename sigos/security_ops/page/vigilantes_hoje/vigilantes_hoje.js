@@ -296,10 +296,11 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		const $theadRow = $('<tr></tr>');
 		VH_TBL_COLS.forEach((col) => {
 			const activo = this.tableSort.campo === col.key;
+			const icone = activo ? (this.tableSort.dir === "desc" ? "▼" : "▲") : "⇅";
 			const $th = $(`
 				<th class="vh-tbl-sortable${activo ? " active" : ""}" data-key="${col.key}">
 					<span>${__(col.label)}</span>
-					<span class="vh-tbl-sort-ico">${activo ? (this.tableSort.dir === "desc" ? "▼" : "▲") : ""}</span>
+					<span class="vh-tbl-sort-ico">${icone}</span>
 				</th>
 			`);
 			$th.on("click", () => this._ordenar_tabela(col.key));
@@ -919,7 +920,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
   --paper:#F4F6FA; --paper2:#FFFFFF; --paper3:#EEF1F6;
   --ink:#0E1726; --ink2:#5B6B82; --ink3:#93A1B5;
   --line:#E6EAF2; --line2:#D5DCE8;
-  --accent:#4F46E5; --accentInk:#4338CA;
+  --accent:#4F46E5; --accentInk:#4338CA; --accent-soft:rgba(79,70,229,.08);
   --mark:#E8A020; --mark-soft:#FDF1DD;
   --done:#2FA56A; --done-soft:#E4F5EC;
   --falta:#C0392B; --falta-soft:#FBE7E5;
@@ -936,7 +937,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
   --paper:#151A24; --paper2:#1C2230; --paper3:#242B3B;
   --ink:#EDF1F7; --ink2:#A7B3C6; --ink3:#76839A;
   --line:#2C3444; --line2:#374155;
-  --accent:#7B76F0; --accentInk:#9490F5;
+  --accent:#7B76F0; --accentInk:#9490F5; --accent-soft:rgba(123,118,240,.14);
   --mark:#F0AD4E; --mark-soft:#3A2E14;
   --done:#3FBF7F; --done-soft:#123422;
   --falta:#E0574A; --falta-soft:#3A1917;
@@ -1044,34 +1045,43 @@ sigos.VigilantesHoje = class VigilantesHoje {
 .vh-row[data-open="true"] .vh-panel { display:block; }
 .vh-panel { display:none; }
 
-/* ---- Table view --------------------------------------------------------- */
-.vh-tbl-scroll { overflow-x:auto; border-radius:var(--r); box-shadow:var(--shadow); }
-.vh-tbl { width:100%; min-width:920px; border-collapse:separate; border-spacing:0; background:var(--paper2); border:1px solid var(--line); border-radius:var(--r); overflow:hidden; }
-.vh-tbl thead th {
-  position:sticky; top:0; z-index:1; text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.07em;
-  font-weight:700; color:var(--ink3); padding:11px 14px; border-bottom:1px solid var(--line); background:var(--paper3);
+/* ---- Table view ---------------------------------------------------------
+   Scoped under .sigos-vhoje throughout: Frappe's own desk CSS carries table/
+   th/td rules that otherwise out-specificity plain .vh-tbl-* class selectors
+   and flatten this back to a bare default-looking table. */
+.sigos-vhoje .vh-tbl-scroll { overflow-x:auto; border-radius:var(--r); box-shadow:var(--shadow); }
+.sigos-vhoje .vh-tbl { width:100%; min-width:920px; border-collapse:separate; border-spacing:0;
+  background:var(--paper2); border:1px solid var(--line); border-radius:var(--r); overflow:hidden; }
+.sigos-vhoje .vh-tbl thead th {
+  position:sticky; top:0; z-index:1; text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.07em;
+  font-weight:700; color:var(--ink2); padding:12px 14px; border-bottom:2px solid var(--line2); background:var(--paper3);
   white-space:nowrap;
 }
-.vh-tbl-sortable { cursor:pointer; user-select:none; transition:color .13s, background .13s; }
-.vh-tbl-sortable:hover { color:var(--accent); background:var(--line); }
-.vh-tbl-sortable.active { color:var(--accent); }
-.vh-tbl-sort-ico { display:inline-block; width:9px; font-size:9px; margin-left:3px; color:var(--accent); }
-.vh-tbl-row td { padding:10px 14px; border-top:1px solid var(--line); font-size:12.5px; color:var(--ink); vertical-align:middle; white-space:nowrap; }
-.vh-tbl-row:hover td { background:var(--paper3); }
-.vh-tbl-row td.mono { font-family:var(--mono); font-size:11.5px; color:var(--ink3); }
-.vh-tbl-name { font-weight:600; }
-.vh-tbl-lic { display:inline-flex; vertical-align:-2px; margin-right:6px; color:var(--mark); }
-.vh-tbl-lic svg { width:12px; height:12px; }
-.vh-tbl-accao { color:var(--ink2); font-size:11.5px; }
-.vh-tbl-accao b { color:var(--ink); font-weight:700; }
-.vh-tbl-row[data-status="Falta"] .vh-status-txt, .vh-tbl-row[data-status="Suspensão"] .vh-status-txt { color:var(--falta); font-weight:600; }
-.vh-tbl-row[data-status="Atraso"] .vh-status-txt, .vh-tbl-row[data-status="Saída Antecipada"] .vh-status-txt, .vh-tbl-row[data-status="Outro"] .vh-status-txt { color:var(--mark); font-weight:600; }
-.vh-tbl-row[data-status="Licença"] .vh-status-txt { color:var(--accentInk); font-weight:600; }
-.vh-tbl-row[data-status="Folga"] .vh-status-txt, .vh-tbl-row[data-status="Folga"] .vh-folga-lbl { color:var(--folga); font-style:italic; }
-.vh-tbl-menu-cell { width:1%; text-align:right; }
-.vh-tbl-menu-btn { font-family:var(--body); font-size:16px; font-weight:700; line-height:1; color:var(--ink3);
-  background:transparent; border:1px solid transparent; border-radius:var(--r-sm); padding:5px 10px; cursor:pointer; transition:.13s; }
-.vh-tbl-menu-btn:hover { background:var(--paper2); border-color:var(--line2); color:var(--ink); }
+.sigos-vhoje .vh-tbl-sortable { cursor:pointer; user-select:none; transition:color .13s, background .13s; }
+.sigos-vhoje .vh-tbl-sortable:hover { color:var(--accent); background:var(--line); }
+.sigos-vhoje .vh-tbl-sortable.active { color:var(--accent); background:var(--accent-soft); }
+.sigos-vhoje .vh-tbl-sort-ico { display:inline-block; width:11px; font-size:9px; margin-left:4px; color:var(--ink3); opacity:.6; }
+.sigos-vhoje .vh-tbl-sortable.active .vh-tbl-sort-ico { color:var(--accent); opacity:1; font-size:10px; }
+.sigos-vhoje .vh-tbl-row td { padding:11px 14px; border-top:1px solid var(--line); font-size:12.5px; color:var(--ink); vertical-align:middle; white-space:nowrap; }
+.sigos-vhoje .vh-tbl-row:nth-child(even) td { background:var(--paper3); }
+.sigos-vhoje .vh-tbl-row:hover td { background:var(--accent-soft); }
+.sigos-vhoje .vh-tbl-row td.mono { font-family:var(--mono); font-size:11.5px; color:var(--ink3); }
+.sigos-vhoje .vh-tbl-name { font-weight:600; }
+.sigos-vhoje .vh-tbl-lic { display:inline-flex; vertical-align:-2px; margin-right:6px; color:var(--mark); }
+.sigos-vhoje .vh-tbl-lic svg { width:12px; height:12px; }
+.sigos-vhoje .vh-tbl-accao { color:var(--ink2); font-size:11.5px; }
+.sigos-vhoje .vh-tbl-accao b { color:var(--ink); font-weight:700; }
+.sigos-vhoje .vh-tbl-row[data-status="Falta"] .vh-status-txt, .sigos-vhoje .vh-tbl-row[data-status="Suspensão"] .vh-status-txt { color:var(--falta); font-weight:700; }
+.sigos-vhoje .vh-tbl-row[data-status="Atraso"] .vh-status-txt, .sigos-vhoje .vh-tbl-row[data-status="Saída Antecipada"] .vh-status-txt, .sigos-vhoje .vh-tbl-row[data-status="Outro"] .vh-status-txt { color:var(--mark); font-weight:700; }
+.sigos-vhoje .vh-tbl-row[data-status="Licença"] .vh-status-txt { color:var(--accentInk); font-weight:700; }
+.sigos-vhoje .vh-tbl-row[data-status="Folga"] .vh-status-txt, .sigos-vhoje .vh-tbl-row[data-status="Folga"] .vh-folga-lbl { color:var(--folga); font-style:italic; }
+.sigos-vhoje .vh-tbl-menu-cell { width:1%; text-align:right; }
+.sigos-vhoje .vh-tbl-menu-btn {
+  font-family:var(--body); font-size:15px; font-weight:700; line-height:1; color:var(--ink2);
+  background:var(--paper3); border:1px solid var(--line2); border-radius:var(--r-sm); width:30px; height:26px;
+  cursor:pointer; transition:.13s;
+}
+.sigos-vhoje .vh-tbl-menu-btn:hover { background:var(--accent); border-color:var(--accent); color:#fff; }
 
 /* Custom row-actions menu — position:fixed + appended to document.body, so a
    table cell's overflow can never clip it (same reasoning as the mark dialog's
