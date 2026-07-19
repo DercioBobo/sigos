@@ -38,6 +38,8 @@ sigos.VigilantesHoje = class VigilantesHoje {
 			periodo: "Manhã",
 			grupo_delegados: null,
 			busca: "",
+			statusFiltro: null,
+			postoFiltro: null,
 		};
 		this.expandedRowKey = null;
 		this.userToggledPostos = new Map();
@@ -47,6 +49,8 @@ sigos.VigilantesHoje = class VigilantesHoje {
 
 		this.THEME_KEY = "sigos_vhoje_theme";
 		this.theme = localStorage.getItem(this.THEME_KEY) || "light";
+		this.VIEW_KEY = "sigos_vhoje_view";
+		this.viewMode = localStorage.getItem(this.VIEW_KEY) || "table";
 
 		this._inject_fonts();
 		this._inject_css();
@@ -93,6 +97,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 			callback: (r) => {
 				this._loading = false;
 				this.rows = r.message || [];
+				this._populate_posto_filter();
 				this._render();
 				const agora = new Date().toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
 				this.$root.find(".vh-stamp").text(__("Actualizado às {0}", [agora]));
@@ -112,15 +117,17 @@ sigos.VigilantesHoje = class VigilantesHoje {
 
 	// ============================================================ RENDER
 	_render() {
+		this._close_menu(); // an open row menu would otherwise float orphaned over stale DOM
 		const q = (this.state.busca || "").trim().toLowerCase();
+		this.rows.forEach((r) => { r._status = this._status_de(r); });
 		const filtradas = this.rows.filter((r) => {
+			if (this.state.statusFiltro && r._status !== this.state.statusFiltro) return false;
+			if (this.state.postoFiltro && (r.nome_do_posto || r.posto) !== this.state.postoFiltro) return false;
 			if (!q) return true;
 			return (r.nome_completo || "").toLowerCase().includes(q)
 				|| (r.mecanografico || "").toLowerCase().includes(q)
 				|| (r.nome_do_posto || r.posto || "").toLowerCase().includes(q);
 		});
-
-		filtradas.forEach((r) => { r._status = this._status_de(r); });
 
 		const grupos = new Map();
 		filtradas.forEach((r) => {
@@ -151,46 +158,49 @@ sigos.VigilantesHoje = class VigilantesHoje {
 				: __("Nenhum vigilante ou posto corresponde à pesquisa."));
 		}
 
-		[...grupos.entries()]
-			.sort((a, b) => a[1].label.localeCompare(b[1].label))
-			.forEach(([key, g]) => {
-				const temProblema = g.rows.some((r) => VH_PROBLEMA.has(r._status));
-				const aberto = this.userToggledPostos.has(key)
-					? this.userToggledPostos.get(key)
-					: temProblema;
+		const gruposOrdenados = [...grupos.entries()].sort((a, b) => a[1].label.localeCompare(b[1].label));
+		if (this.viewMode === "table") this._render_table($wrap, gruposOrdenados);
+		else this._render_cards($wrap, gruposOrdenados);
+	}
 
-				// Coverage, not just a faltas tally: of the guards actually expected to
-				// work today (folga excluded from the denominator), how many showed up?
-				// Zero presentes with guards expected is the one signal CCO needs instantly.
-				const working = g.rows.filter((r) => r._status !== "Folga");
-				const presentes = working.filter((r) => r._status === "Presente").length;
-				let covChip = "";
-				if (working.length > 0) {
-					const covClass = presentes === 0 ? "critical" : presentes < working.length ? "partial" : "ok";
-					covChip = `<span class="vh-group-cov ${covClass}">${presentes}/${working.length} ${__("presentes")}</span>`;
-				}
+	_grupo_aberto(key, rows) {
+		const temProblema = rows.some((r) => VH_PROBLEMA.has(r._status));
+		return this.userToggledPostos.has(key) ? this.userToggledPostos.get(key) : temProblema;
+	}
 
-				const $det = $(`
-					<details class="vh-group" ${aberto ? "open" : ""}>
-						<summary>
-							${this._icon("chev", "vh-chev")}
-							<span>${frappe.utils.escape_html(g.label)}</span>
-							<span class="vh-group-aside">
-								${covChip}
-								<span class="vh-group-n">${g.rows.length}</span>
-							</span>
-						</summary>
-						<div class="vh-rows"></div>
-					</details>
-				`).appendTo($wrap);
+	_grupo_cov_chip(rows) {
+		// A faltas count is a fact (someone filed it) — "X presentes" would imply
+		// confirmed attendance we don't actually have (no check-in mechanism;
+		// "not marked absent" isn't the same as "seen present").
+		const nFalta = rows.filter((r) => r._status === "Falta").length;
+		return nFalta ? `<span class="vh-group-cov critical">${nFalta} falta${nFalta > 1 ? "s" : ""}</span>` : "";
+	}
 
-				$det.on("toggle", () => {
-					this.userToggledPostos.set(key, $det.prop("open"));
-				});
+	// ---- Cards view ------------------------------------------------------
+	_render_cards($wrap, gruposOrdenados) {
+		gruposOrdenados.forEach(([key, g]) => {
+			const aberto = this._grupo_aberto(key, g.rows);
+			const $det = $(`
+				<details class="vh-group" ${aberto ? "open" : ""}>
+					<summary>
+						${this._icon("chev", "vh-chev")}
+						<span>${frappe.utils.escape_html(g.label)}</span>
+						<span class="vh-group-aside">
+							${this._grupo_cov_chip(g.rows)}
+							<span class="vh-group-n">${g.rows.length}</span>
+						</span>
+					</summary>
+					<div class="vh-rows"></div>
+				</details>
+			`).appendTo($wrap);
 
-				const $rows = $det.find(".vh-rows");
-				g.rows.forEach((row) => this._render_row($rows, row));
+			$det.on("toggle", () => {
+				this.userToggledPostos.set(key, $det.prop("open"));
 			});
+
+			const $rows = $det.find(".vh-rows");
+			g.rows.forEach((row) => this._render_row($rows, row));
+		});
 	}
 
 	_render_row($parent, row) {
@@ -245,6 +255,145 @@ sigos.VigilantesHoje = class VigilantesHoje {
 	_toggle_row(key) {
 		this.expandedRowKey = this.expandedRowKey === key ? null : key;
 		this._render();
+	}
+
+	// ---- Table view --------------------------------------------------------
+	// Same posto grouping/severity-sort/collapse bookkeeping as cards, just one
+	// <tbody> per posto (header row + data rows together — a <tbody> can't nest
+	// a <details>, so collapse toggles a class on the <tbody> itself instead).
+	// No expand-in-place here — every action (incl. Ligar) lives in the "⋯" menu.
+	_render_table($wrap, gruposOrdenados) {
+		const $scroll = $('<div class="vh-tbl-scroll"></div>').appendTo($wrap);
+		const $table = $(`
+			<table class="vh-tbl">
+				<thead><tr>
+					<th>${__("Vigilante")}</th>
+					<th>${__("Turno / Regime")}</th>
+					<th>${__("Estado")}</th>
+					<th>${__("Acção")}</th>
+					<th></th>
+				</tr></thead>
+			</table>
+		`).appendTo($scroll);
+
+		gruposOrdenados.forEach(([key, g]) => {
+			const aberto = this._grupo_aberto(key, g.rows);
+			const $tbody = $(`<tbody class="vh-tbl-gbody" data-key="${frappe.utils.escape_html(key)}"></tbody>`).appendTo($table);
+			$tbody.toggleClass("collapsed", !aberto);
+
+			const $ghead = $(`
+				<tr class="vh-tbl-ghead">
+					<td colspan="5">
+						${this._icon("chev", "vh-chev")}
+						<span>${frappe.utils.escape_html(g.label)}</span>
+						<span class="vh-group-aside">
+							${this._grupo_cov_chip(g.rows)}
+							<span class="vh-group-n">${g.rows.length}</span>
+						</span>
+					</td>
+				</tr>
+			`).appendTo($tbody);
+			$ghead.on("click", () => {
+				const vaiAbrir = $tbody.hasClass("collapsed");
+				$tbody.toggleClass("collapsed", !vaiAbrir);
+				this.userToggledPostos.set(key, vaiAbrir);
+			});
+
+			g.rows.forEach((row) => this._render_table_row($tbody, row));
+		});
+	}
+
+	_render_table_row($tbody, row) {
+		const status = row._status;
+		const metaLine = status === "Folga"
+			? `<span class="vh-folga-lbl">${__("Folga hoje")}</span><span class="dot">·</span>${frappe.utils.escape_html(row.regime || "")}`
+			: `<b>${frappe.utils.escape_html(row.turno || "")}</b><span class="dot">·</span>${frappe.utils.escape_html(row.regime || "")}`;
+		const temAccao = row.ja_proxima_accao && row.ja_proxima_accao !== "Sem Ação";
+		const accaoLine = temAccao
+			? `↳ ${frappe.utils.escape_html(row.ja_proxima_accao)}${row.ja_actor_nome ? `: <b>${frappe.utils.escape_html(row.ja_actor_nome)}</b>` : ""}`
+			: "—";
+
+		const $tr = $(`
+			<tr class="vh-tbl-row" data-status="${status}">
+				<td>
+					<div class="vh-idline">
+						<span class="vh-name">${frappe.utils.escape_html(row.nome_completo || row.vigilante)}</span>
+						<span class="vh-mec">${frappe.utils.escape_html(row.mecanografico || "")}</span>
+						${row.categoria ? `<span class="vh-cat">${frappe.utils.escape_html(row.categoria)}</span>` : ""}
+						${row.em_licenca ? `<span class="vh-flag">${this._icon("flag")} ${__("Licença aprovada")}</span>` : ""}
+					</div>
+				</td>
+				<td class="vh-tbl-meta">${metaLine}</td>
+				<td>
+					<span class="vh-status-txt">${status === "Presente" ? __("Presente") : __(status)}</span>
+					<span class="vh-check">${row.ja_ausencia_row ? this._icon("check") : ""}</span>
+				</td>
+				<td class="vh-tbl-accao">${accaoLine}</td>
+				<td class="vh-tbl-menu-cell"><button type="button" class="vh-tbl-menu-btn" title="${__("Acções")}">⋯</button></td>
+			</tr>
+		`).appendTo($tbody);
+
+		$tr.find(".vh-tbl-menu-btn").on("click", (e) => {
+			e.stopPropagation();
+			this._abrir_row_menu(e.currentTarget, row);
+		});
+	}
+
+	// ---- Row actions menu (custom — used by table view) --------------------
+	// position:fixed + appended to document.body, same reasoning as the fix
+	// already applied to the mark dialog's Link dropdown this session: a table
+	// cell is an even tighter overflow context than a modal body, so this can't
+	// risk being clipped by an ancestor's overflow.
+	_close_menu() {
+		if (this._menuEl) { this._menuEl.remove(); this._menuEl = null; }
+		if (this._menuOutsideHandler) {
+			document.removeEventListener("click", this._menuOutsideHandler, true);
+			document.removeEventListener("keydown", this._menuEscHandler, true);
+			this._menuOutsideHandler = null;
+		}
+	}
+
+	_abrir_row_menu(btnEl, row) {
+		this._close_menu();
+		const isFolga = row._status === "Folga";
+		const isSubmetida = row.ja_registado_estado === "Submetido";
+		const tel = (row.contacto || "").replace(/\s/g, "");
+
+		const $menu = $(`<div class="vh-menu${this.theme === "dark" ? " theme-dark" : ""}"></div>`);
+		if (tel) {
+			$menu.append(`<a class="vh-menu-item" href="tel:${tel}">${__("Ligar")} — ${frappe.utils.escape_html(row.contacto)}</a>`);
+		}
+		if (isFolga) {
+			$menu.append(`<span class="vh-menu-item disabled">${__("Em folga — sem acção disponível")}</span>`);
+		} else if (isSubmetida) {
+			$menu.append(this._menu_btn(__("Ver Detalhes"), () => this._abrir_detalhes_dialog(row)));
+		} else {
+			$menu.append(this._menu_btn(row.ja_ausencia_row ? __("Rever Marcação") : __("Marcar Ausência"), () => this._abrir_marcar_dialog(row)));
+		}
+		$menu.append(`<span class="vh-menu-item disabled">+ ${__("Ocorrência")} <span class="soon">${__("Em breve")}</span></span>`);
+		$menu.append(`<span class="vh-menu-item disabled">${__("Ver Histórico")} <span class="soon">${__("Em breve")}</span></span>`);
+
+		$("body").append($menu);
+		const rect = btnEl.getBoundingClientRect();
+		const largura = $menu.outerWidth();
+		$menu.css({
+			position: "fixed",
+			top: Math.min(rect.bottom + 4, window.innerHeight - $menu.outerHeight() - 8),
+			left: Math.max(8, rect.right - largura),
+		});
+		this._menuEl = $menu;
+		this._menuOutsideHandler = (e) => { if (!$menu[0].contains(e.target) && e.target !== btnEl) this._close_menu(); };
+		this._menuEscHandler = (e) => { if (e.key === "Escape") this._close_menu(); };
+		setTimeout(() => {
+			document.addEventListener("click", this._menuOutsideHandler, true);
+			document.addEventListener("keydown", this._menuEscHandler, true);
+		}, 0);
+	}
+
+	_menu_btn(label, onClick) {
+		const $b = $(`<button type="button" class="vh-menu-item">${label}</button>`);
+		$b.on("click", () => { this._close_menu(); onClick(); });
+		return $b;
 	}
 
 	// ============================================================ EXPANDED PANEL
@@ -343,7 +492,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 			size: "large",
 			fields: [{ fieldname: "vh_area", fieldtype: "HTML" }],
 			primary_action_label: __("Guardar"),
-			primary_action: () => this._guardar_marcacao(d, row, state, controls),
+			primary_action: () => this._validar_e_guardar(d, $body, row, state, controls, showSubtipo),
 			on_hide: () => { this._dialogOpen = false; },
 		});
 		this._dialogOpen = true;
@@ -379,6 +528,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 				<span class="vh-field-lbl" data-role="actor-lbl"></span>
 				<div id="vh-dg-actor"></div>
 			</div>
+			<div class="vh-dg-err" data-role="err"></div>
 		`);
 
 		const state = { tipo: row.ja_tipo_de_ausencia || "Falta", subtipo: row.ja_subtipo_falta || null, accao: row.ja_proxima_accao || "Sem Ação" };
@@ -503,6 +653,41 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		d.show();
 	}
 
+	// Pre-empt the three server rules that were only being caught AFTER a failed
+	// save (subtipo required when Falta+setting on, an actor required once an
+	// Acção is chosen, Substituto must actually be Reserva) — same rules, just
+	// surfaced inline instead of via a generic error dialog.
+	_validar_e_guardar(d, $body, row, state, controls, showSubtipo) {
+		const $err = $body.find('[data-role="err"]').text("");
+		const campoAccao = VH_ACCAO_CAMPO[state.accao] || null;
+		const actorVal = controls.actor ? controls.actor.get_value() : null;
+
+		if (state.tipo === "Falta" && showSubtipo && !state.subtipo) {
+			$err.text(__("Seleccione o Subtipo de Falta (Normal ou Vermelha)."));
+			return;
+		}
+		if (campoAccao && !actorVal) {
+			$err.text(__("Seleccione o Vigilante para a acção \"{0}\".", [state.accao]));
+			return;
+		}
+		if (campoAccao !== "vigilante_substituto" || !actorVal) {
+			this._guardar_marcacao(d, row, state, controls);
+			return;
+		}
+		// Substituto specifically must be a benched Reserva guard — the picker is
+		// already scoped to that pool via get_query, but a Link field doesn't
+		// refuse a manually-typed valid-but-out-of-pool docname, so double check.
+		frappe.db.get_value("Vigilante", actorVal, "status").then((r) => {
+			const status = r && r.message && r.message.status;
+			if (status !== "Reserva") {
+				$err.text(__("O vigilante \"{0}\" não está em Reserva (estado actual: {1}) — só vigilantes em Reserva podem ser Substituto.",
+					[actorVal, status || __("desconhecido")]));
+				return;
+			}
+			this._guardar_marcacao(d, row, state, controls);
+		});
+	}
+
 	_guardar_marcacao(d, row, state, controls, motivo_atraso) {
 		const campoAccao = VH_ACCAO_CAMPO[state.accao] || null;
 		const actorVal = controls.actor ? controls.actor.get_value() : null;
@@ -563,6 +748,10 @@ sigos.VigilantesHoje = class VigilantesHoje {
 					</div>
 					<div class="vh-head-actions">
 						<span class="vh-stamp"></span>
+						<div class="vh-seg" data-role="view">
+							<button data-v="table" class="${this.viewMode === "table" ? "on" : ""}">${__("Tabela")}</button>
+							<button data-v="cards" class="${this.viewMode === "cards" ? "on" : ""}">${__("Quadro")}</button>
+						</div>
 						<button class="vh-theme-btn" title="${__("Alternar tema")}">${this._icon("sun", "i-sun")}${this._icon("moon", "i-moon")}</button>
 						<button class="vh-refresh-btn">${__("Actualizar")}</button>
 					</div>
@@ -575,6 +764,20 @@ sigos.VigilantesHoje = class VigilantesHoje {
 						<button data-p="Noite">${__("Noite")}</button>
 					</div>
 					<div id="vh-ctrl-grupo"></div>
+					<select class="vh-select" data-role="estado-filtro">
+						<option value="">${__("Todos os Estados")}</option>
+						<option value="Falta">${__("Falta")}</option>
+						<option value="Atraso">${__("Atraso")}</option>
+						<option value="Saída Antecipada">${__("Saída Antecipada")}</option>
+						<option value="Suspensão">${__("Suspensão")}</option>
+						<option value="Licença">${__("Licença")}</option>
+						<option value="Outro">${__("Outro")}</option>
+						<option value="Folga">${__("Folga")}</option>
+						<option value="Presente">${__("Presente")}</option>
+					</select>
+					<select class="vh-select" data-role="posto-filtro">
+						<option value="">${__("Todos os Postos")}</option>
+					</select>
 					<div class="vh-search">
 						${this._icon("search")}
 						<input type="text" placeholder="${__("Procurar vigilante, mecanográfico ou posto…")}" />
@@ -620,12 +823,39 @@ sigos.VigilantesHoje = class VigilantesHoje {
 			this.state.periodo = $b.data("p");
 			this.refresh();
 		});
+		this.$root.find('.vh-seg[data-role="view"] button').on("click", (e) => {
+			const $b = $(e.currentTarget);
+			this.$root.find('.vh-seg[data-role="view"] button').removeClass("on");
+			$b.addClass("on");
+			this.viewMode = $b.data("v");
+			localStorage.setItem(this.VIEW_KEY, this.viewMode);
+			this._render();
+		});
+		this.$root.find('[data-role="estado-filtro"]').on("change", (e) => {
+			this.state.statusFiltro = e.target.value || null;
+			this._render();
+		});
+		this.$root.find('[data-role="posto-filtro"]').on("change", (e) => {
+			this.state.postoFiltro = e.target.value || null;
+			this._render();
+		});
 		this.$root.find(".vh-search input").on("input", frappe.utils.debounce((e) => {
 			this.state.busca = e.target.value;
 			this._render();
 		}, 200));
 		this.$root.find(".vh-refresh-btn").on("click", () => this.refresh());
 		this.$root.find(".vh-theme-btn").on("click", () => this._toggle_theme());
+	}
+
+	_populate_posto_filter() {
+		const $sel = this.$root.find('[data-role="posto-filtro"]');
+		if (!$sel.length) return;
+		const actual = this.state.postoFiltro;
+		const postos = [...new Set(this.rows.map((r) => r.nome_do_posto || r.posto).filter(Boolean))].sort();
+		$sel.empty().append(`<option value="">${__("Todos os Postos")}</option>`);
+		postos.forEach((p) => $sel.append(`<option value="${frappe.utils.escape_html(p)}">${frappe.utils.escape_html(p)}</option>`));
+		if (actual && postos.includes(actual)) $sel.val(actual);
+		else if (actual) { this.state.postoFiltro = null; }
 	}
 
 	_apply_theme() {
@@ -728,6 +958,9 @@ sigos.VigilantesHoje = class VigilantesHoje {
   border-radius:var(--r-sm); padding:0 12px; height:34px; flex:1; min-width:200px; }
 .vh-search svg { width:13px; height:13px; color:var(--ink3); flex:none; }
 .vh-search input { border:0; background:transparent; outline:0; font-family:var(--body); font-size:12.5px; color:var(--ink); width:100%; }
+.vh-select { font-family:var(--body); font-size:12.5px; font-weight:600; color:var(--ink2); background:var(--paper3);
+  border:1px solid var(--line2); border-radius:var(--r-sm); padding:0 10px; height:34px; cursor:pointer; }
+.vh-select:hover { border-color:var(--accent); color:var(--accent); }
 
 .vh-sum { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
 .vh-pill { display:flex; align-items:baseline; gap:7px; background:var(--paper2); border:1px solid var(--line);
@@ -746,10 +979,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 .vh-group-aside { margin-left:auto; display:flex; align-items:center; gap:8px; }
 .vh-group-n { font-family:var(--body); font-weight:600; font-size:11.5px; color:var(--ink3); background:var(--paper3); border-radius:999px; padding:2px 9px; }
 .vh-group-cov { font-family:var(--body); font-weight:700; font-size:11px; border-radius:999px; padding:2px 9px; }
-.vh-group-cov.ok { color:var(--done); background:var(--done-soft); }
-.vh-group-cov.partial { color:var(--mark); background:var(--mark-soft); }
-.vh-group-cov.critical { color:var(--falta); background:var(--falta-soft); animation:vh-cov-pulse 1.8s ease-in-out infinite; }
-@keyframes vh-cov-pulse { 0%,100%{ opacity:1;} 50%{ opacity:.55;} }
+.vh-group-cov.critical { color:var(--falta); background:var(--falta-soft); }
 .vh-rows { border-top:1px solid var(--line); }
 
 .vh-row { border-bottom:1px solid var(--line); }
@@ -795,6 +1025,55 @@ sigos.VigilantesHoje = class VigilantesHoje {
 .vh-row[data-open="true"] .vh-rowchev svg { transform:rotate(90deg); color:var(--accent); }
 .vh-row[data-open="true"] .vh-panel { display:block; }
 .vh-panel { display:none; }
+
+/* ---- Table view --------------------------------------------------------- */
+.vh-tbl-scroll { overflow-x:auto; border-radius:var(--r); box-shadow:var(--shadow); }
+.vh-tbl { width:100%; min-width:640px; border-collapse:collapse; background:var(--paper2); border:1px solid var(--line); }
+.vh-tbl thead th { text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.06em; font-weight:700; color:var(--ink3);
+  padding:10px 14px; border-bottom:1px solid var(--line); background:var(--paper3); }
+.vh-tbl-ghead { cursor:pointer; user-select:none; background:var(--paper3); }
+.vh-tbl-ghead:hover { background:var(--line); }
+.vh-tbl-ghead td { padding:10px 14px; font-family:var(--display); font-weight:600; font-size:13.5px; color:var(--ink); }
+.vh-tbl-ghead svg.vh-chev { width:14px; height:14px; color:var(--ink3); vertical-align:-2px; margin-right:6px; transition:transform .2s ease; }
+.vh-tbl-gbody.collapsed .vh-tbl-ghead svg.vh-chev { transform:rotate(0deg); }
+.vh-tbl-gbody:not(.collapsed) .vh-tbl-ghead svg.vh-chev { transform:rotate(90deg); }
+.vh-tbl-gbody.collapsed .vh-tbl-row { display:none; }
+.vh-tbl-row td { padding:9px 14px; border-top:1px solid var(--line); font-size:12.5px; vertical-align:middle; }
+.vh-tbl-row:hover td { background:var(--paper3); }
+.vh-tbl-meta { color:var(--ink2); font-size:11.5px; white-space:nowrap; }
+.vh-tbl-meta b { color:var(--ink2); font-weight:600; }
+.vh-tbl-meta .dot { color:var(--ink3); margin:0 5px; }
+.vh-tbl-accao { color:var(--ink2); font-size:11.5px; }
+.vh-tbl-accao b { color:var(--ink); font-weight:700; }
+.vh-tbl-row[data-status="Falta"] .vh-status-txt, .vh-tbl-row[data-status="Suspensão"] .vh-status-txt { color:var(--falta); }
+.vh-tbl-row[data-status="Atraso"] .vh-status-txt, .vh-tbl-row[data-status="Saída Antecipada"] .vh-status-txt, .vh-tbl-row[data-status="Outro"] .vh-status-txt { color:var(--mark); }
+.vh-tbl-row[data-status="Licença"] .vh-status-txt { color:var(--accentInk); }
+.vh-tbl-row[data-status="Folga"] .vh-status-txt { color:var(--folga); font-style:italic; }
+.vh-tbl-menu-cell { width:1%; text-align:right; }
+.vh-tbl-menu-btn { font-family:var(--body); font-size:16px; font-weight:700; line-height:1; color:var(--ink3);
+  background:transparent; border:1px solid transparent; border-radius:var(--r-sm); padding:5px 10px; cursor:pointer; transition:.13s; }
+.vh-tbl-menu-btn:hover { background:var(--paper3); border-color:var(--line2); color:var(--ink); }
+
+/* Custom row-actions menu — position:fixed + appended to document.body, so a
+   table cell's overflow can never clip it (same reasoning as the mark dialog's
+   Link dropdown fix). Own token copy since it mounts outside .vh-root. */
+.vh-menu {
+  --paper2:#FFFFFF; --paper3:#EEF1F6; --ink:#0E1726; --ink2:#5B6B82; --line:#E6EAF2; --line2:#D5DCE8;
+  --accent:#4F46E5; --falta:#C0392B; --r-sm:9px;
+  --display:'Space Grotesk',system-ui,sans-serif; --body:'Inter',system-ui,sans-serif;
+  z-index:1071; min-width:190px; background:var(--paper2); border:1px solid var(--line); border-radius:var(--r-sm);
+  box-shadow:0 8px 24px rgba(14,23,38,.18); padding:6px; display:flex; flex-direction:column; gap:1px;
+}
+.vh-menu.theme-dark {
+  --paper2:#1C2230; --paper3:#242B3B; --ink:#EDF1F7; --ink2:#A7B3C6; --line:#2C3444; --line2:#374155;
+  --accent:#7B76F0; --falta:#E0574A;
+}
+.vh-menu-item { font-family:var(--body); font-size:12.5px; font-weight:600; color:var(--ink); background:transparent;
+  border:0; border-radius:6px; padding:8px 10px; text-align:left; cursor:pointer; text-decoration:none; display:block; }
+.vh-menu-item:hover { background:var(--paper3); color:var(--accent); }
+.vh-menu-item.disabled { color:var(--ink2); cursor:default; }
+.vh-menu-item.disabled:hover { background:transparent; color:var(--ink2); }
+.vh-menu-item .soon { font-size:9px; text-transform:uppercase; letter-spacing:.05em; background:var(--paper3); border-radius:999px; padding:1px 6px; margin-left:4px; }
 
 .vh-panel-in { padding:2px 16px 18px 37px; display:flex; flex-direction:column; gap:14px; }
 .vh-profile { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; background:var(--paper3); border:1px solid var(--line); border-radius:var(--r-sm); padding:12px 14px; }
@@ -868,6 +1147,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 .vh-sub-row, .vh-actor-row { display:none; }
 .vh-sub-row.show, .vh-actor-row.show { display:block; animation:vh-dg-fade .15s ease both; }
 @keyframes vh-dg-fade { from{ opacity:0; transform:translateY(-3px);} to{ opacity:1; transform:none;} }
+.vh-dg-err { color:var(--falta); font-size:12px; font-weight:600; min-height:1em; }
 @media (max-width:600px) { .vh-2col { grid-template-columns:1fr; } }
 
 .vh-empty { display:none; padding:34px 16px; text-align:center; color:var(--ink3); font-size:12.5px; background:var(--paper2);
