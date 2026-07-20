@@ -348,7 +348,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 			<tr class="vh-tbl-row" data-status="${status}" style="--pc:${this._posto_color(postoNome)}">
 				<td class="vh-tbl-name vh-tbl-stripe">
 					${row.em_licenca ? `<span class="vh-tbl-lic" title="${__("Licença aprovada")}">${this._icon("flag")}</span>` : ""}
-					${frappe.utils.escape_html(row.nome_completo || row.vigilante)}
+					<span class="vh-tbl-name-link" title="${__("Ver perfil")}">${frappe.utils.escape_html(row.nome_completo || row.vigilante)}</span>
 				</td>
 				<td><span class="vh-tbl-posto-dot"></span>${frappe.utils.escape_html(postoNome || "—")}</td>
 				<td>${status === "Folga" ? `<span class="vh-folga-lbl">${__("Folga")}</span>` : frappe.utils.escape_html(row.turno || "—")}</td>
@@ -368,6 +368,10 @@ sigos.VigilantesHoje = class VigilantesHoje {
 			this._abrir_row_menu(e.currentTarget, row);
 		});
 		$tr.find(".vh-tbl-tel").on("click", (e) => e.stopPropagation());
+		$tr.find(".vh-tbl-name-link").on("click", (e) => {
+			e.stopPropagation();
+			this._abrir_perfil_dialog(row);
+		});
 	}
 
 	// ---- Row actions menu (custom — used by table view) --------------------
@@ -393,7 +397,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		if (isFolga) {
 			$menu.append(`<span class="vh-menu-item disabled">${__("Em folga — sem acção disponível")}</span>`);
 		} else if (isSubmetida) {
-			$menu.append(this._menu_btn(__("Ver Detalhes"), () => this._abrir_detalhes_dialog(row)));
+			$menu.append(this._menu_btn(__("Ver Perfil"), () => this._abrir_perfil_dialog(row)));
 		} else {
 			$menu.append(this._menu_btn(row.ja_ausencia_row ? __("Rever Marcação") : __("Marcar Ausência"), () => this._abrir_marcar_dialog(row)));
 		}
@@ -450,8 +454,8 @@ sigos.VigilantesHoje = class VigilantesHoje {
 			$actions.append(`<span class="vh-folga-note">${this._icon("info")} ${__("Em folga hoje — sem escala, por isso não há ausência para marcar.")}</span>`);
 		} else if (isSubmetida) {
 			$actions.append(`<span class="vh-folga-note">${this._icon("info")} ${__("Folha já submetida — só leitura. Use o formulário Ausencias para alterar.")}</span>`);
-			const $detBtn = $(`<button class="vh-actbtn primary">${__("Ver Detalhes")}</button>`).appendTo($actions);
-			$detBtn.on("click", () => this._abrir_detalhes_dialog(row));
+			const $detBtn = $(`<button class="vh-actbtn primary">${__("Ver Perfil")}</button>`).appendTo($actions);
+			$detBtn.on("click", () => this._abrir_perfil_dialog(row));
 		} else {
 			const $markBtn = $(`<button class="vh-actbtn primary">${row.ja_ausencia_row ? __("Rever Marcação") : __("Marcar Ausência")}</button>`).appendTo($actions);
 			$markBtn.on("click", () => this._abrir_marcar_dialog(row));
@@ -478,19 +482,48 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		return `<span class="vh-dg-ava" style="background:hsl(${h},42%,38%)">${frappe.utils.escape_html(ini)}</span>`;
 	}
 
-	// ============================================================ DETAILS DIALOG (read-only)
-	// For an already-SUBMITTED sheet — no primary/secondary action, no editable
-	// controls. Same guard header + visual language as the mark dialog, values
-	// shown as plain label:value pairs instead of pill buttons/Link pickers.
-	_abrir_detalhes_dialog(row) {
-		const meta = [row.mecanografico, row.turno, row.regime, row.nome_do_posto || row.posto].filter(Boolean).join(" · ");
+	// Shared by the mark dialog's "Remover Marcação" secondary action and the
+	// profile dialog's own — one confirm+call path, not two copies of it.
+	_remover_marcacao(row, onDone) {
+		frappe.confirm(
+			__("Remover a marcação de {0}?", [frappe.utils.escape_html(row.nome_completo || row.vigilante)]),
+			() => {
+				frappe.call({
+					method: "sigos.api.remover_marca_ausencia",
+					args: { ausencia_doc: row.ja_ausencia_doc, ausencia_row: row.ja_ausencia_row },
+					freeze: true,
+					callback: () => {
+						if (onDone) onDone();
+						frappe.show_alert({ message: __("Marcação removida."), indicator: "green" }, 4);
+						this.refresh();
+					},
+				});
+			}
+		);
+	}
+
+	// ============================================================ PROFILE DIALOG
+	// Click a guard's name — everything we already have on them (identity,
+	// contacts, posto/turno/regime/delegação) plus the absence record if one
+	// exists, with whichever action fits their current state. Supersedes the
+	// old standalone read-only "Ver Detalhes" dialog — that content is now the
+	// "Ausência Registada" section here, since it was always about the same
+	// guard the profile section already shows.
+	_abrir_perfil_dialog(row) {
+		const isFolga = row._status === "Folga";
+		const isMarcado = !!row.ja_ausencia_row;
+		const isSubmetida = row.ja_registado_estado === "Submetido";
+		const meta = [row.mecanografico, row.nome_do_posto || row.posto, row.turno, row.regime, row.delegacao]
+			.filter(Boolean).join(" · ");
 		const val = (v) => (v || v === 0) ? frappe.utils.escape_html(String(v)) : "—";
+		const telLink = (v) => v ? `<a href="tel:${v.replace(/\s/g, "")}">${frappe.utils.escape_html(v)}</a>` : "—";
 
 		const d = new frappe.ui.Dialog({
-			title: __("Detalhes da Ausência"), size: "large",
+			title: __("Perfil do Vigilante"), size: "large",
 			on_hide: () => { this._dialogOpen = false; },
 		});
 		this._dialogOpen = true;
+
 		const $body = $(`<div class="vh-dialog-body${this.theme === "dark" ? " theme-dark" : ""}">
 			<div class="vh-dg-guard">
 				${this._avatar_html(row.nome_completo)}
@@ -498,20 +531,47 @@ sigos.VigilantesHoje = class VigilantesHoje {
 					<span class="vh-dg-name">${frappe.utils.escape_html(row.nome_completo || row.vigilante)}</span>
 					<span class="vh-dg-meta">${frappe.utils.escape_html(meta)}</span>
 				</div>
-				<span class="vh-dg-submitted-badge">${this._icon("check")} ${__("Submetida")}</span>
+				${isSubmetida ? `<span class="vh-dg-submitted-badge">${this._icon("check")} ${__("Submetida")}</span>` : ""}
 			</div>
-			<div class="vh-profile vh-dg-fields">
-				<div><span class="vh-pf-lbl">${__("Tipo de Ausência")}</span><span class="vh-pf-val">${val(row.ja_tipo_de_ausencia)}</span></div>
-				<div><span class="vh-pf-lbl">${__("Subtipo")}</span><span class="vh-pf-val">${val(row.ja_subtipo_falta)}</span></div>
-				<div><span class="vh-pf-lbl">${__("Faltas Contadas")}</span><span class="vh-pf-val">${val(row.ja_n_de_faltas)}</span></div>
-				<div><span class="vh-pf-lbl">${__("Tipo de Justificação")}</span><span class="vh-pf-val">${val(row.ja_tipo_justificacao)}</span></div>
-				<div><span class="vh-pf-lbl">${__("Justificativo")}</span><span class="vh-pf-val">${val(row.ja_jutificativo)}</span></div>
-				<div><span class="vh-pf-lbl">${__("Próxima Acção")}</span><span class="vh-pf-val">${val(row.ja_proxima_accao)}</span></div>
-				${row.ja_actor_nome ? `<div><span class="vh-pf-lbl">${__("Vigilante Envolvido")}</span><span class="vh-pf-val">${val(row.ja_actor_nome)}</span></div>` : ""}
-				<div><span class="vh-pf-lbl">${__("Folha")}</span><span class="vh-pf-val mono">${val(row.ja_ausencia_doc)}</span></div>
+			${row.em_licenca ? `<span class="vh-flag">${this._icon("flag")} ${__("Licença aprovada hoje")} (${frappe.utils.escape_html(row.em_licenca)})</span>` : ""}
+			<div>
+				<span class="vh-field-lbl">${__("Perfil")}</span>
+				<div class="vh-profile vh-dg-fields">
+					<div><span class="vh-pf-lbl">${__("Categoria")}</span><span class="vh-pf-val">${val(row.categoria)}</span></div>
+					<div><span class="vh-pf-lbl">${__("Contacto Principal")}</span><span class="vh-pf-val mono">${telLink(row.contacto)}</span></div>
+					<div><span class="vh-pf-lbl">${__("Contacto Alternativo")}</span><span class="vh-pf-val mono">${telLink(row.contacto_alternativo)}</span></div>
+					<div><span class="vh-pf-lbl">${__("Delegação")}</span><span class="vh-pf-val">${val(row.delegacao)}</span></div>
+					<div><span class="vh-pf-lbl">${__("Residência")}</span><span class="vh-pf-val">${val(row.residencia)}</span></div>
+				</div>
 			</div>
+			${isMarcado ? `
+			<div>
+				<span class="vh-field-lbl">${__("Ausência Registada")}</span>
+				<div class="vh-profile vh-dg-fields">
+					<div><span class="vh-pf-lbl">${__("Tipo")}</span><span class="vh-pf-val">${val(row.ja_tipo_de_ausencia)}</span></div>
+					<div><span class="vh-pf-lbl">${__("Subtipo")}</span><span class="vh-pf-val">${val(row.ja_subtipo_falta)}</span></div>
+					<div><span class="vh-pf-lbl">${__("Faltas Contadas")}</span><span class="vh-pf-val">${val(row.ja_n_de_faltas)}</span></div>
+					<div><span class="vh-pf-lbl">${__("Tipo de Justificação")}</span><span class="vh-pf-val">${val(row.ja_tipo_justificacao)}</span></div>
+					<div><span class="vh-pf-lbl">${__("Justificativo")}</span><span class="vh-pf-val">${val(row.ja_jutificativo)}</span></div>
+					<div><span class="vh-pf-lbl">${__("Próxima Acção")}</span><span class="vh-pf-val">${val(row.ja_proxima_accao)}</span></div>
+					${row.ja_actor_nome ? `<div><span class="vh-pf-lbl">${__("Vigilante Envolvido")}</span><span class="vh-pf-val">${val(row.ja_actor_nome)}</span></div>` : ""}
+					<div><span class="vh-pf-lbl">${__("Folha")}</span><span class="vh-pf-val mono">${val(row.ja_ausencia_doc)}</span></div>
+				</div>
+			</div>` : ""}
+			${isFolga ? `<span class="vh-folga-note">${this._icon("info")} ${__("Em folga hoje — sem escala, por isso não há ausência para marcar.")}</span>` : ""}
 		</div>`);
 		d.$body.html($body);
+
+		if (!isFolga && !isSubmetida) {
+			if (isMarcado) {
+				d.set_primary_action(__("Rever Marcação"), () => { d.hide(); this._abrir_marcar_dialog(row); });
+				d.set_secondary_action_label(__("Remover Marcação"));
+				d.set_secondary_action(() => this._remover_marcacao(row, () => d.hide()));
+			} else {
+				d.set_primary_action(__("Marcar Ausência"), () => { d.hide(); this._abrir_marcar_dialog(row); });
+			}
+		}
+
 		d.show();
 	}
 
@@ -664,23 +724,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 
 		if (isEdit) {
 			d.set_secondary_action_label(__("Remover Marcação"));
-			d.set_secondary_action(() => {
-				frappe.confirm(
-					__("Remover a marcação de {0}?", [frappe.utils.escape_html(row.nome_completo || row.vigilante)]),
-					() => {
-						frappe.call({
-							method: "sigos.api.remover_marca_ausencia",
-							args: { ausencia_doc: row.ja_ausencia_doc, ausencia_row: row.ja_ausencia_row },
-							freeze: true,
-							callback: () => {
-								d.hide();
-								frappe.show_alert({ message: __("Marcação removida."), indicator: "green" }, 4);
-								this.refresh();
-							},
-						});
-					}
-				);
-			});
+			d.set_secondary_action(() => this._remover_marcacao(row, () => d.hide()));
 		}
 
 		d.show();
@@ -1081,6 +1125,8 @@ sigos.VigilantesHoje = class VigilantesHoje {
 .sigos-vhoje .vh-tbl-row:hover td { background:var(--accent-soft); }
 .sigos-vhoje .vh-tbl-row td.mono { font-family:var(--mono); font-size:11.5px; color:var(--ink3); }
 .sigos-vhoje .vh-tbl-name { font-weight:600; }
+.sigos-vhoje .vh-tbl-name-link { cursor:pointer; }
+.sigos-vhoje .vh-tbl-name-link:hover { color:var(--accent); text-decoration:underline; }
 .sigos-vhoje .vh-tbl-stripe { box-shadow:inset 3px 0 0 var(--pc, transparent); }
 .sigos-vhoje .vh-tbl-posto-dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--pc, var(--ink3)); margin-right:7px; vertical-align:1px; }
 .sigos-vhoje .vh-tbl-lic { display:inline-flex; vertical-align:-2px; margin-right:6px; color:var(--mark); }
@@ -1108,7 +1154,14 @@ sigos.VigilantesHoje = class VigilantesHoje {
   --paper2:#FFFFFF; --paper3:#EEF1F6; --ink:#0E1726; --ink2:#5B6B82; --line:#E6EAF2; --line2:#D5DCE8;
   --accent:#4F46E5; --falta:#C0392B; --r-sm:9px;
   --display:'Space Grotesk',system-ui,sans-serif; --body:'Inter',system-ui,sans-serif;
-  z-index:1071; min-width:190px; background:var(--paper2); border:1px solid var(--line); border-radius:var(--r-sm);
+  /* position:fixed from the start — without it the element measures as a
+     static full-width block the instant it's appended to <body>, which was
+     the actual bug: outerWidth() returned ~page-width instead of the menu's
+     real ~190px, so "right-align to button" computed a deeply negative left
+     and got clamped all the way to the screen's left edge every time. */
+  position:fixed; top:-9999px; left:-9999px;
+  z-index:1071; width:max-content; min-width:190px; max-width:260px;
+  background:var(--paper2); border:1px solid var(--line); border-radius:var(--r-sm);
   box-shadow:0 8px 24px rgba(14,23,38,.18); padding:6px; display:flex; flex-direction:column; gap:1px;
 }
 .vh-menu.theme-dark {
