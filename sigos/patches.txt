@@ -17,3 +17,4 @@ sigos.patches.backfill_processado_em_folha
 sigos.patches.rename_arma_para_numero
 sigos.patches.renomear_estados_arma
 sigos.patches.backfill_employee_projecto
+sigos.patches.fix_ssa_fetch_from
