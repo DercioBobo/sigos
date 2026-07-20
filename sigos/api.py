@@ -2120,6 +2120,67 @@ def definir_salario_base(vigilante, valor=None, usar_contrato=0, confirmar_reduc
 
 
 @frappe.whitelist()
+def definir_salario_base_bulk(vigilantes, valor, confirmar_reducao=0):
+	"""
+	Set the SAME manual base salary for a list of vigilantes at once — the
+	Ajuste de Salários page's multiselect bulk action, for an across-the-board
+	adjustment in one step instead of one row at a time via definir_salario_base.
+
+	Same pay-cut safety as the single-record path: if ANY selected guard's new
+	base is LOWER than their current resolved base, nothing is written — returns
+	{"requires_confirm": 1, "reducoes": [...]} so the caller can confirm before
+	re-calling with confirmar_reducao=1.
+	"""
+	import json as _json
+	from frappe.utils import flt
+
+	if isinstance(vigilantes, str):
+		vigilantes = _json.loads(vigilantes) if vigilantes else None
+	if not vigilantes:
+		frappe.throw(_("Seleccione pelo menos um vigilante."))
+
+	valor = flt(valor)
+	if valor <= 0:
+		frappe.throw(_("Indique um salário maior que zero."))
+
+	vigs = frappe.get_all(
+		"Vigilante", filters={"name": ["in", vigilantes]},
+		fields=["name", "funcionario", "projecto", "regime_do_vigilante", "categoria"],
+	)
+
+	sem_funcionario = [v.name for v in vigs if not v.funcionario]
+	if sem_funcionario:
+		frappe.throw(
+			_("Os seguintes vigilantes ainda não têm Funcionário associado: {0}").format(
+				", ".join(sem_funcionario)
+			),
+			title=_("Sem Funcionário"),
+		)
+
+	if not int(confirmar_reducao or 0):
+		# Pass the name (not the dict) so resolver_salario_base does its own DB
+		# lookup and picks up any EXISTING manual override — otherwise a guard
+		# already overridden above their contract base could have this bulk
+		# value silently look like a raise when it's actually a cut.
+		reducoes = [v.name for v in vigs if valor < flt(resolver_salario_base(v.name))]
+		if reducoes:
+			return {"requires_confirm": 1, "reducoes": reducoes, "novo": valor}
+
+	for v in vigs:
+		frappe.db.set_value("Vigilante", v.name, "salario_base_manual", valor)
+
+	nomes = [v.name for v in vigs]
+	resumo = aplicar_salario_base(vigilantes=nomes, silent=True)
+
+	from sigos.timeline import registar
+	valor_fmt = frappe.format_value(valor, {"fieldtype": "Currency"})
+	for nome in nomes:
+		registar(nome, _("Salário base (manual) definido para <b>{0}</b> (ajuste em massa).").format(valor_fmt))
+
+	return {"base": valor, "resumo": resumo, "n": len(nomes)}
+
+
+@frappe.whitelist()
 def get_employee_hr360(employee):
 	"""
 	Aggregator for the "Painel RH 360" on the Employee form — default-on for every

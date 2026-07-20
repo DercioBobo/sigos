@@ -188,7 +188,19 @@ def _resolve_projecto(doc):
 		)
 
 
+def _vigilante_em_reserva(doc):
+	"""True when the guard behind this slip is currently benched (Reserva) —
+	subsídios (arma/categoria/chefia/canino/projecto) don't apply to a guard
+	with no active posto/projecto, even though base salary and faltas are
+	unaffected by Reserva (see vigilante.limpar_campos_operacionais)."""
+	if not doc.custom_vigilante:
+		return False
+	return frappe.db.get_value("Vigilante", doc.custom_vigilante, "status") == "Reserva"
+
+
 def _add_project_subsidios(doc):
+	if _vigilante_em_reserva(doc):
+		return
 	_resolve_projecto(doc)
 	if not doc.custom_projecto:
 		return
@@ -212,7 +224,7 @@ def _add_project_subsidios(doc):
 
 
 def _add_subsidio_arma(doc):
-	if doc.custom_categoria != "Vigilante Armado":
+	if doc.custom_categoria != "Vigilante Armado" or _vigilante_em_reserva(doc):
 		return
 	try:
 		settings = frappe.get_single("SIGOS Settings")
@@ -250,7 +262,7 @@ def _add_subsidios_categoria_funcao(doc):
 	the same "Subsidio De Arma" component.
 	"""
 	settings = frappe.get_single("SIGOS Settings")
-	if not settings.subsidios_categoria_funcao_activo:
+	if not settings.subsidios_categoria_funcao_activo or _vigilante_em_reserva(doc):
 		return
 	try:
 		existentes = {e.salary_component for e in doc.earnings}

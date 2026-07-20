@@ -38,7 +38,6 @@
   "options": "Pre-Adimissão RH\nPre-Adimissão\nActivo\nReserva\nInactivo\nDemitido",
   "label": "Estado Operacional (SIGOS)",
   "read_only": 1,
-  "description": "Espelha o Estado do Vigilante — mais granular que o Status do Employee (que só distingue Active/Suspended/Left e não sabe distinguir Activo de Reserva, por exemplo).",
   "insert_after": "custom_vigilante"
  },
  {

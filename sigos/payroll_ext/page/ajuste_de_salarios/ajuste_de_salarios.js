@@ -79,6 +79,7 @@ sigos.AjusteDeSalarios = class AjusteDeSalarios {
 
 				<div class="as-actionbar" data-actionbar>
 					<span class="as-actionbar-txt" data-actionbar-txt></span>
+					<button type="button" class="as-btn as-btn-ghost" data-set-value>${__("Definir Valor…")}</button>
 					<button type="button" class="as-btn" data-apply>${__("Aplicar Salário Base")}</button>
 				</div>
 			</div>
@@ -125,6 +126,7 @@ sigos.AjusteDeSalarios = class AjusteDeSalarios {
 			this._load();
 		});
 		this.$body.find("[data-apply]").on("click", () => this._apply());
+		this.$body.find("[data-set-value]").on("click", () => this._set_value());
 	}
 
 	// ───────────────────────────────────────────────────────────────── data
@@ -255,6 +257,49 @@ sigos.AjusteDeSalarios = class AjusteDeSalarios {
 		}
 	}
 
+	// Bulk "Definir Valor…" — set the SAME manual base for every selected guard
+	// (e.g. an across-the-board raise), instead of each one only getting its own
+	// individually-resolved contract/regime base via "Aplicar Salário Base".
+	_set_value() {
+		const nomes = [...this.selected];
+		if (!nomes.length) return;
+
+		const d = new frappe.ui.Dialog({
+			title: __("Definir Valor para {0} Vigilante(s)", [nomes.length]),
+			fields: [
+				{ fieldtype: "HTML", options: `<p class="text-muted" style="margin-bottom:10px">${__(
+					"Define o mesmo salário base (manual) para todos os vigilantes seleccionados.")}</p>` },
+				{ fieldname: "valor", fieldtype: "Currency", label: __("Salário Base (manual)"), reqd: 1 },
+			],
+			primary_action_label: __("Aplicar"),
+			primary_action: (vals) => {
+				d.hide();
+				this._run_set_value(nomes, vals.valor, 0);
+			},
+		});
+		d.show();
+	}
+
+	_run_set_value(nomes, valor, confirmar_reducao) {
+		frappe.xcall("sigos.api.definir_salario_base_bulk", {
+			vigilantes: nomes, valor, confirmar_reducao,
+		}).then((r) => {
+			if (r && r.requires_confirm) {
+				frappe.confirm(
+					__("<b>{0}</b> dos vigilantes seleccionados vão sofrer uma <b>redução</b> de salário base para <b>{1}</b>. Confirmar mesmo assim?",
+						[r.reducoes.length, format_currency(r.novo)]),
+					() => this._run_set_value(nomes, valor, 1),
+				);
+				return;
+			}
+			frappe.show_alert({
+				message: __("Salário base definido para {0} vigilante(s): {1}", [r.n, format_currency(r.base)]),
+				indicator: "green",
+			}, 6);
+			this.refresh();
+		});
+	}
+
 	// ─────────────────────────────────────────────────────────── fonts/css
 	_inject_fonts() {
 		if (document.getElementById("as-fonts")) return;
@@ -339,6 +384,8 @@ sigos.AjusteDeSalarios = class AjusteDeSalarios {
 .as-actionbar-txt { font-size:12.5px; font-weight:600; }
 .as-btn { font-family:var(--body); font-size:12px; font-weight:600; letter-spacing:.01em; border:1px solid var(--accent); background:var(--accent); color:#fff; padding:9px 16px; border-radius:9px; cursor:pointer; }
 .as-btn:hover { background:var(--accentInk); border-color:var(--accentInk); }
+.as-btn-ghost { background:transparent; border-color:rgba(255,255,255,.35); color:#fff; }
+.as-btn-ghost:hover { background:rgba(255,255,255,.1); border-color:#fff; }
 
 @media (max-width: 960px) {
   .as-kpis { grid-template-columns:repeat(2,1fr); }
