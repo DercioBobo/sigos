@@ -53,6 +53,7 @@ _OPS_MIRROR = [
 	("projecto",            "custom_project"),
 	("tipo_de_vigilante",   "custom_tipo_de_vigilante"),
 	("idade",               "custom_idade"),
+	("status",              "custom_estado_operacional"),
 ]
 
 
