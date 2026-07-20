@@ -9,6 +9,7 @@ def after_install():
 	_fix_tab_vigilante_do_posto()
 	_set_project_naming()
 	_clean_project_fields()
+	_clean_payroll_entry_fields()
 	_seccionar_contrato()
 	_set_employee_naming()
 	_ensure_ferias_leave_type()
@@ -26,6 +27,7 @@ def after_migrate():
 	_load_custom_fields()
 	_set_project_naming()
 	_clean_project_fields()
+	_clean_payroll_entry_fields()
 	_seccionar_contrato()
 	_set_employee_naming()
 	_ensure_ferias_leave_type()
@@ -218,6 +220,34 @@ def _clean_project_fields():
 			})
 		except Exception as e:
 			frappe.log_error(f"SIGOS: hide Project.{f} failed: {e}", "SIGOS Install")
+	frappe.db.commit()
+
+
+def _clean_payroll_entry_fields():
+	"""
+	Hide stock Payroll Entry fields SIGOS doesn't use: timesheet-based slips,
+	the two tax-exemption toggles (no income-tax withholding module here),
+	Branch/Grade (SIGOS filters by Delegação/Cliente/Projecto instead — see
+	sigos.payroll_ext.payroll_entry_hooks), and attendance-based validation
+	(faltas are computed by the SIGOS engine, not HRMS attendance records).
+	Idempotent (make_property_setter upserts).
+	"""
+	ocultar = [
+		"salary_slip_based_on_timesheet",
+		"deduct_tax_for_unclaimed_employee_benefits",
+		"deduct_tax_for_unsubmitted_tax_exemption_proof",
+		"branch",
+		"grade",
+		"validate_attendance",
+	]
+	for f in ocultar:
+		try:
+			frappe.make_property_setter({
+				"doctype": "Payroll Entry", "doctype_or_field": "DocField", "fieldname": f,
+				"property": "hidden", "value": "1", "property_type": "Check",
+			})
+		except Exception as e:
+			frappe.log_error(f"SIGOS: hide Payroll Entry.{f} failed: {e}", "SIGOS Install")
 	frappe.db.commit()
 
 

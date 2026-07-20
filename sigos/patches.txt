@@ -18,3 +18,4 @@ sigos.patches.rename_arma_para_numero
 sigos.patches.renomear_estados_arma
 sigos.patches.backfill_employee_projecto
 sigos.patches.fix_ssa_fetch_from
+sigos.patches.reorder_payroll_entry_filtros
