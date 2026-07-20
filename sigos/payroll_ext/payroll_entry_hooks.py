@@ -7,10 +7,11 @@ Structure Assignments use (see sigos.api._aplicar_salario_base_vigilante). We
 only fill it when blank, so a deliberate per-run choice in the UI is never
 clobbered.
 
-(2) Narrows the "Get Employees" result by Cliente / Delegação / Situação
-(custom_customer / custom_delegacao / custom_situacao — SIGOS Setup custom
-fields). Deliberately does NOT touch HRMS's own employee-fetch query (its
-internals aren't something we want to depend on across upgrades) — instead it
+(2) Narrows the "Get Employees" result by Cliente / Delegação / Projecto /
+Situação (custom_customer / custom_delegacao / custom_project / custom_situacao
+— SIGOS Setup custom fields). Deliberately does NOT touch HRMS's own
+employee-fetch query (its internals aren't something we want to depend on
+across upgrades) — instead it
 PRUNES the `employees` child table after HRMS has already populated it, right
 before save. Re-run "Get Employee Details" after changing a filter so the table
 is refetched before pruning.
@@ -40,8 +41,9 @@ def _default_payroll_payable_account(doc):
 def _filtrar_employees_por_criterio(doc):
 	delegacao = doc.get("custom_delegacao")
 	cliente = doc.get("custom_customer")
+	projecto = doc.get("custom_project")
 	situacao = doc.get("custom_situacao") or "Activos"
-	if not (delegacao or cliente or situacao != "Todos"):
+	if not (delegacao or cliente or projecto or situacao != "Todos"):
 		return
 
 	linhas = doc.get("employees") or []
@@ -52,7 +54,7 @@ def _filtrar_employees_por_criterio(doc):
 	info_by_emp = {
 		e.name: e for e in frappe.get_all(
 			"Employee", filters={"name": ["in", nomes]},
-			fields=["name", "status", "custom_delegacao", "custom_vigilante"],
+			fields=["name", "status", "custom_delegacao", "custom_project", "custom_vigilante"],
 		)
 	}
 
@@ -71,6 +73,8 @@ def _filtrar_employees_por_criterio(doc):
 		if not info:
 			return True  # can't classify (shouldn't happen) — don't silently drop
 		if delegacao and info.custom_delegacao != delegacao:
+			return False
+		if projecto and info.custom_project != projecto:
 			return False
 		if cliente and cliente_by_vig.get(info.custom_vigilante) != cliente:
 			return False

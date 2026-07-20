@@ -454,13 +454,23 @@
   "doctype": "Custom Field",
   "dt": "Payroll Entry",
   "module": "SIGOS Setup",
+  "fieldname": "custom_project",
+  "fieldtype": "Link",
+  "options": "Project",
+  "label": "Filtrar por Projecto",
+  "insert_after": "custom_delegacao"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Payroll Entry",
+  "module": "SIGOS Setup",
   "fieldname": "custom_situacao",
   "fieldtype": "Select",
   "options": "\nActivos\nDemitidos\nTodos",
   "default": "Activos",
   "label": "Filtrar por Situação",
   "description": "Activos = apenas Employees activos; Demitidos = apenas quem saiu no período (folha final); Todos = sem filtro (comportamento nativo).",
-  "insert_after": "custom_delegacao"
+  "insert_after": "custom_project"
  },
  {
   "doctype": "Custom Field",
