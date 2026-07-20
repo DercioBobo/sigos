@@ -63,12 +63,13 @@ class Emprestimo(Document):
 			)
 
 	def _validar_limites(self):
-		"""Enforce max months and max % of salary from Settings."""
+		"""Enforce max months, max % of salário base (total) and max % of net
+		pay (monthly installment) from Settings."""
 		max_meses = (
 			frappe.db.get_single_value("SIGOS Settings", "meses_maximos_emprestimo") or 3
 		)
 		max_pct = (
-			frappe.db.get_single_value("SIGOS Settings", "percentagem_maxima_emprestimo") or 30
+			frappe.db.get_single_value("SIGOS Settings", "percentagem_maxima_emprestimo") or 100
 		)
 
 		if self.meses_a_pagar and self.meses_a_pagar > max_meses:
@@ -87,6 +88,52 @@ class Emprestimo(Document):
 					),
 					title=_("Valor Excedido"),
 				)
+
+		self._validar_prestacao_mensal()
+
+	def _referencia_salario_liquido(self):
+		"""Best available net-pay reference for the monthly-installment cap: the
+		employee's most recent submitted Salary Slip net_pay (real net). Falls
+		back to salario_base for employees with no payroll history yet (e.g.
+		brand-new hires) — flagged as an estimate since base isn't true net."""
+		net_pay = frappe.db.get_value(
+			"Salary Slip",
+			{"employee": self.funcionario, "docstatus": 1},
+			"net_pay",
+			order_by="end_date desc",
+		)
+		if net_pay:
+			return net_pay, False
+		return self.salario_base, True
+
+	def _validar_prestacao_mensal(self):
+		"""Cap the monthly installment at a % of the employee's net pay —
+		distinct from _validar_limites' total-vs-salário-base check above."""
+		if not (self.valor_a_pagar and self.meses_a_pagar and self.meses_a_pagar > 0):
+			return
+
+		max_pct_mensal = (
+			frappe.db.get_single_value("SIGOS Settings", "percentagem_maxima_prestacao_mensal") or 30
+		)
+		mensal = self.valor_a_pagar / self.meses_a_pagar
+		referencia, estimado = self._referencia_salario_liquido()
+		if not referencia:
+			return
+
+		maximo_mensal = referencia * (max_pct_mensal / 100)
+		if mensal > maximo_mensal:
+			fonte = (
+				_("salário base — estimativa, sem folha anterior")
+				if estimado else _("último salário líquido")
+			)
+			frappe.throw(
+				_("A prestação mensal (<b>{0}</b>) excede <b>{1}%</b> do {2} (<b>{3}</b>). "
+				  "Prestação máxima permitida: <b>{4}</b>. Aumente o número de meses ou "
+				  "reduza o valor do empréstimo.").format(
+					round(mensal, 2), max_pct_mensal, fonte, referencia, round(maximo_mensal, 2)
+				),
+				title=_("Prestação Mensal Excede o Limite"),
+			)
 
 	# ─── Campos calculados ───────────────────────────────────────────────────────
 

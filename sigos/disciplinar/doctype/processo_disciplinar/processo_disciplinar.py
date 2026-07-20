@@ -53,6 +53,7 @@ class ProcessoDisciplinar(Document):
 				"processo_disciplinar": self.name
 			})
 			deducao.insert(ignore_permissions=True)
+			deducao.submit()
 			frappe.msgprint(
 				_("Dedução {0} criada automaticamente.").format(deducao.name),
 				alert=True
