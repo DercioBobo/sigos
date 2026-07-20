@@ -1793,6 +1793,19 @@ def resolver_salario_base(vigilante):
 	return base
 
 
+@frappe.whitelist()
+def resolver_salario_base_por_funcionario(employee):
+	"""
+	Same resolution as resolver_salario_base, but keyed off the Employee — for the
+	Salary Structure Assignment form, which only has the Employee link (not the
+	Vigilante) to work with when suggesting a Base as soon as one is picked.
+	"""
+	vigilante = frappe.db.get_value("Employee", employee, "custom_vigilante")
+	if not vigilante:
+		return 0
+	return resolver_salario_base(vigilante)
+
+
 def _aplicar_salario_base_vigilante(v, estrutura, from_date):
 	"""
 	Write one vigilante's resolved base to a Salary Structure Assignment.

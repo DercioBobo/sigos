@@ -25,6 +25,7 @@ doctype_js = {
 	"Project": "public/js/project.js",
 	"Employee": "public/js/employee_hr360.js",
 	"Payroll Entry": "public/js/payroll_entry.js",
+	"Salary Structure Assignment": "public/js/salary_structure_assignment.js",
 }
 
 # Show all Postos of a contract under the Project's Connections tab
