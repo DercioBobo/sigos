@@ -59,11 +59,10 @@ class Rotatividade(Document):
 			vig.status = "Demitido"
 		# Enviar para Reserva: posto closed — bench the guard (employed, no posto, no escala)
 		elif op and op.enviar_reserva:
+			from sigos.security_ops.doctype.vigilante.vigilante import limpar_campos_operacionais
+
 			vig.status = "Reserva"
-			vig.posto_de_vigilancia = None
-			vig.projecto = None
-			vig.cliente = None
-			vig.nome_do_projecto = None
+			limpar_campos_operacionais(vig)
 
 		vig.save(ignore_permissions=True)
 

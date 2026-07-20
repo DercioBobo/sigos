@@ -73,6 +73,25 @@ def _copy(src, dst, src_field, dst_field):
 	return False
 
 
+def _mirror(src, dst, src_field, dst_field):
+	"""
+	Copy src_field→dst_field unconditionally — fills AND clears. Only for
+	_OPS_MIRROR: Vigilante is the sole owner of those fields (Employee's side is
+	a read-only mirror), so an empty source correctly blanks a stale Employee
+	value too — e.g. posto/regime/delegação/tipo released when the guard is
+	benched (Reserva) or suspended (Inactivo) via colocar_em_reserva/inactivar
+	or Rotatividade's "Enviar para Reserva". Never use this for _PERSONAL —
+	see _copy's warning about wiping required fields.
+	"""
+	if not hasattr(dst, dst_field):
+		return False
+	val = getattr(src, src_field, None) or None
+	if getattr(dst, dst_field, None) != val:
+		setattr(dst, dst_field, val)
+		return True
+	return False
+
+
 # ─── Vigilante → Employee ──────────────────────────────────────────────────────
 
 def vigilante_to_employee(doc, method=None):
@@ -117,9 +136,12 @@ def vigilante_to_employee(doc, method=None):
 				emp.marital_status = marital
 				changed = True
 
-		# Personal + operational direct fields
-		for vig_f, emp_f in _PERSONAL + _OPS_MIRROR:
+		# Personal (bidirectional, fill-only) + operational (forward-only, fill-and-clear)
+		for vig_f, emp_f in _PERSONAL:
 			if _copy(doc, emp, vig_f, emp_f):
+				changed = True
+		for vig_f, emp_f in _OPS_MIRROR:
+			if _mirror(doc, emp, vig_f, emp_f):
 				changed = True
 
 		# Keep relieving_date coherent with the Employee status:

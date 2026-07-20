@@ -17,6 +17,25 @@ VIGILANTE_TO_EMP_STATUS = {
 	"Demitido":         "Left",
 }
 
+# Fields released when a guard is benched/suspended (Reserva/Inactivo) — Categoria is
+# deliberately the only operational field left standing. Shared by every path that can
+# send a guard to Reserva/Inactivo (this doctype's own action buttons AND Rotatividade's
+# "Enviar para Reserva"/demissão branches) so they can never drift into clearing
+# different subsets. The Employee side follows automatically — sync.vigilante_to_employee
+# mirrors these fields fill-and-clear (see sync._mirror).
+CAMPOS_OPERACIONAIS_RESERVA = (
+	"posto_de_vigilancia", "nome_do_posto", "tipo_de_posto",
+	"regime_do_vigilante", "delegacao", "tipo_de_vigilante",
+	"projecto", "cliente", "nome_do_projecto",
+)
+
+
+def limpar_campos_operacionais(vig):
+	"""Release posto/contrato/regime/delegação/tipo on a Vigilante doc in memory
+	(caller still has to .save()). See CAMPOS_OPERACIONAIS_RESERVA."""
+	for f in CAMPOS_OPERACIONAIS_RESERVA:
+		vig.set(f, None)
+
 
 class Vigilante(Document):
 
@@ -400,13 +419,7 @@ class Vigilante(Document):
 			)
 
 		self.status = novo_estado
-		self.posto_de_vigilancia = None
-		self.nome_do_posto = None
-		self.tipo_de_posto = None
-		self.regime_do_vigilante = None
-		self.projecto = None
-		self.cliente = None
-		self.nome_do_projecto = None
+		limpar_campos_operacionais(self)
 		self.save()
 
 		from sigos.timeline import registar
