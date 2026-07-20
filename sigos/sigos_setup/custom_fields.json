@@ -13,12 +13,33 @@
   "doctype": "Custom Field",
   "dt": "Employee",
   "module": "SIGOS Setup",
+  "fieldname": "custom_sec_dados_sigos",
+  "fieldtype": "Section Break",
+  "label": "Dados SIGOS",
+  "insert_after": "employee_name"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Employee",
+  "module": "SIGOS Setup",
   "fieldname": "custom_vigilante",
   "fieldtype": "Link",
   "options": "Vigilante",
   "label": "Vigilante (SIGOS)",
   "read_only": 1,
-  "insert_after": "employee_name"
+  "insert_after": "custom_sec_dados_sigos"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Employee",
+  "module": "SIGOS Setup",
+  "fieldname": "custom_estado_operacional",
+  "fieldtype": "Select",
+  "options": "Pre-Adimissão RH\nPre-Adimissão\nActivo\nReserva\nInactivo\nDemitido",
+  "label": "Estado Operacional (SIGOS)",
+  "read_only": 1,
+  "description": "Espelha o Estado do Vigilante — mais granular que o Status do Employee (que só distingue Active/Suspended/Left e não sabe distinguir Activo de Reserva, por exemplo).",
+  "insert_after": "custom_vigilante"
  },
  {
   "doctype": "Custom Field",
@@ -27,7 +48,43 @@
   "fieldname": "custom_mecanografico",
   "fieldtype": "Data",
   "label": "Mecanográfico",
-  "insert_after": "custom_vigilante"
+  "insert_after": "custom_estado_operacional"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Employee",
+  "module": "SIGOS Setup",
+  "fieldname": "custom_tipo_documento",
+  "fieldtype": "Select",
+  "label": "Tipo de Documento",
+  "options": "\nBI\nPassaporte\nDIRE\nOutro",
+  "insert_after": "custom_mecanografico"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Employee",
+  "module": "SIGOS Setup",
+  "fieldname": "custom_numero_documento",
+  "fieldtype": "Data",
+  "label": "Nº do Documento",
+  "insert_after": "custom_tipo_documento"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Employee",
+  "module": "SIGOS Setup",
+  "fieldname": "custom_nuit",
+  "fieldtype": "Data",
+  "label": "NUIT",
+  "insert_after": "custom_numero_documento"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Employee",
+  "module": "SIGOS Setup",
+  "fieldname": "custom_col_dados_sigos",
+  "fieldtype": "Column Break",
+  "insert_after": "custom_nuit"
  },
  {
   "doctype": "Custom Field",
@@ -37,7 +94,18 @@
   "fieldtype": "Link",
   "label": "Categoria (SIGOS)",
   "options": "Categoria Vigilante",
-  "insert_after": "custom_mecanografico",
+  "insert_after": "custom_col_dados_sigos",
+  "read_only": 1
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Employee",
+  "module": "SIGOS Setup",
+  "fieldname": "custom_tipo_de_vigilante",
+  "fieldtype": "Select",
+  "label": "Tipo de Vigilante",
+  "options": "\nVigilante\nSupervisor\nChefe de Grupo\nChefe de Posto",
+  "insert_after": "custom_categoria",
   "read_only": 1
  },
  {
@@ -48,7 +116,7 @@
   "fieldtype": "Link",
   "label": "Regime (SIGOS)",
   "options": "Regime",
-  "insert_after": "custom_categoria",
+  "insert_after": "custom_tipo_de_vigilante",
   "read_only": 1
  },
  {
@@ -100,20 +168,9 @@
   "doctype": "Custom Field",
   "dt": "Employee",
   "module": "SIGOS Setup",
-  "fieldname": "custom_tipo_de_vigilante",
-  "fieldtype": "Select",
-  "label": "Tipo de Vigilante",
-  "options": "\nVigilante\nSupervisor\nChefe de Grupo\nChefe de Posto",
-  "insert_after": "custom_project",
-  "read_only": 1
- },
- {
-  "doctype": "Custom Field",
-  "dt": "Employee",
-  "module": "SIGOS Setup",
-  "fieldname": "custom_col_dados_sigos",
+  "fieldname": "custom_col_bancario",
   "fieldtype": "Column Break",
-  "insert_after": "custom_tipo_de_vigilante"
+  "insert_after": "custom_project"
  },
  {
   "doctype": "Custom Field",
@@ -122,7 +179,7 @@
   "fieldname": "custom_inss",
   "fieldtype": "Data",
   "label": "INSS",
-  "insert_after": "custom_col_dados_sigos"
+  "insert_after": "custom_col_bancario"
  },
  {
   "doctype": "Custom Field",
@@ -156,46 +213,10 @@
   "doctype": "Custom Field",
   "dt": "Employee",
   "module": "SIGOS Setup",
-  "fieldname": "custom_col_bancario",
-  "fieldtype": "Column Break",
-  "insert_after": "custom_contanib"
- },
- {
-  "doctype": "Custom Field",
-  "dt": "Employee",
-  "module": "SIGOS Setup",
-  "fieldname": "custom_tipo_documento",
-  "fieldtype": "Select",
-  "label": "Tipo de Documento",
-  "options": "\nBI\nPassaporte\nDIRE\nOutro",
-  "insert_after": "custom_col_bancario"
- },
- {
-  "doctype": "Custom Field",
-  "dt": "Employee",
-  "module": "SIGOS Setup",
-  "fieldname": "custom_numero_documento",
-  "fieldtype": "Data",
-  "label": "Nº do Documento",
-  "insert_after": "custom_tipo_documento"
- },
- {
-  "doctype": "Custom Field",
-  "dt": "Employee",
-  "module": "SIGOS Setup",
-  "fieldname": "custom_nuit",
-  "fieldtype": "Data",
-  "label": "NUIT",
-  "insert_after": "custom_numero_documento"
- },
- {
-  "doctype": "Custom Field",
-  "dt": "Employee",
-  "module": "SIGOS Setup",
   "fieldname": "custom_contacto_alternativo",
   "fieldtype": "Data",
   "label": "Contacto Alternativo",
-  "insert_after": "custom_nuit"
+  "insert_after": "custom_contanib"
  },
  {
   "doctype": "Custom Field",

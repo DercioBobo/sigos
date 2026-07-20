@@ -19,3 +19,6 @@ sigos.patches.renomear_estados_arma
 sigos.patches.backfill_employee_projecto
 sigos.patches.fix_ssa_fetch_from
 sigos.patches.reorder_payroll_entry_filtros
+sigos.patches.limpar_campos_reserva_existentes
+sigos.patches.backfill_employee_estado_operacional
+sigos.patches.reorganizar_employee_dados_sigos
