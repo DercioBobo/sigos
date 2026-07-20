@@ -22,7 +22,7 @@ sigos.AjusteDeSalarios = class AjusteDeSalarios {
 		this.wrapper = wrapper;
 		this.state = {
 			search: "", status: "Activo", delegacao: null, categoria: null,
-			regime_do_vigilante: null, posto_de_vigilancia: null,
+			cliente: null, posto_de_vigilancia: null,
 			so_sem_ssa: 0, so_com_override: 0, so_divergentes: 0,
 		};
 		this.rows = [];
@@ -71,7 +71,7 @@ sigos.AjusteDeSalarios = class AjusteDeSalarios {
 					</select>
 					<div data-ctrl="delegacao"></div>
 					<div data-ctrl="categoria"></div>
-					<div data-ctrl="regime_do_vigilante"></div>
+					<div data-ctrl="cliente"></div>
 					<div data-ctrl="posto_de_vigilancia"></div>
 				</div>
 
@@ -94,11 +94,11 @@ sigos.AjusteDeSalarios = class AjusteDeSalarios {
 
 	_mount_filter_controls() {
 		this._ctrls = {};
-		["delegacao", "categoria", "regime_do_vigilante", "posto_de_vigilancia"].forEach((key) => {
+		["delegacao", "categoria", "cliente", "posto_de_vigilancia"].forEach((key) => {
 			const opts = { delegacao: "Delegacao", categoria: "Categoria Vigilante",
-				regime_do_vigilante: "Regime", posto_de_vigilancia: "Posto De Vigilancia" }[key];
+				cliente: "Customer", posto_de_vigilancia: "Posto De Vigilancia" }[key];
 			const placeholder = { delegacao: __("Delegação…"), categoria: __("Categoria…"),
-				regime_do_vigilante: __("Regime…"), posto_de_vigilancia: __("Posto…") }[key];
+				cliente: __("Cliente…"), posto_de_vigilancia: __("Posto…") }[key];
 			this._ctrls[key] = frappe.ui.form.make_control({
 				df: {
 					fieldtype: "Link", fieldname: key, options: opts, placeholder,

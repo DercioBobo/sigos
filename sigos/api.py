@@ -1952,7 +1952,7 @@ def get_ajuste_salarios(filters=None):
 
 	status = filters.get("status") or "Activo"
 	conds = {} if status == "Todos" else {"status": status}
-	for campo in ("delegacao", "categoria", "regime_do_vigilante", "posto_de_vigilancia", "projecto"):
+	for campo in ("delegacao", "categoria", "cliente", "posto_de_vigilancia", "projecto"):
 		valor = filters.get(campo)
 		if valor:
 			conds[campo] = valor

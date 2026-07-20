@@ -88,11 +88,23 @@
   "doctype": "Custom Field",
   "dt": "Employee",
   "module": "SIGOS Setup",
+  "fieldname": "custom_project",
+  "fieldtype": "Link",
+  "options": "Project",
+  "label": "Projecto (SIGOS)",
+  "fetch_from": "custom_vigilante.projecto",
+  "insert_after": "custom_cliente",
+  "read_only": 1
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Employee",
+  "module": "SIGOS Setup",
   "fieldname": "custom_tipo_de_vigilante",
   "fieldtype": "Select",
   "label": "Tipo de Vigilante",
   "options": "\nVigilante\nSupervisor\nChefe de Grupo\nChefe de Posto",
-  "insert_after": "custom_cliente",
+  "insert_after": "custom_project",
   "read_only": 1
  },
  {
@@ -394,6 +406,7 @@
   "fieldtype": "Link",
   "options": "Customer",
   "label": "Cliente",
+  "fetch_from": "employee.custom_cliente",
   "insert_after": "employee"
  },
  {
@@ -404,6 +417,7 @@
   "fieldtype": "Link",
   "options": "Project",
   "label": "Projecto",
+  "fetch_from": "employee.custom_project",
   "insert_after": "custom_cliente"
  },
  {

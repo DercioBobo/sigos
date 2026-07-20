@@ -50,6 +50,7 @@ _OPS_MIRROR = [
 	("posto_de_vigilancia", "custom_posto"),
 	("delegacao",           "custom_delegacao"),
 	("cliente",             "custom_cliente"),
+	("projecto",            "custom_project"),
 	("tipo_de_vigilante",   "custom_tipo_de_vigilante"),
 	("idade",               "custom_idade"),
 ]
