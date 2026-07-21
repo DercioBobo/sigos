@@ -116,7 +116,10 @@
   {
    "fieldname": "data_de_inicio",
    "fieldtype": "Date",
-   "label": "Data de Início"
+   "label": "Data de Início",
+   "reqd": 1,
+   "default": "Today",
+   "description": "Início do desconto na folha. A folha só aplica a prestação mensal em períodos entre esta data e a Data de Fim — sem esta data, o empréstimo nunca seria descontado."
   },
   {
    "fieldname": "data_de_fim",
