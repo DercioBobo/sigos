@@ -109,7 +109,10 @@
    "fieldname": "data_de_inicio",
    "fieldtype": "Date",
    "label": "Data de Início",
-   "read_only": 1
+   "read_only": 1,
+   "reqd": 1,
+   "default": "Today",
+   "description": "Início do pagamento na folha. A folha só aplica esta remuneração em períodos entre esta data e a Data de Fim — sem esta data, a remuneração nunca seria paga."
   },
   {
    "fieldname": "data_de_fim",
