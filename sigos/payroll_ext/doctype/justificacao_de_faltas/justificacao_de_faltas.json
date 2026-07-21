@@ -118,8 +118,7 @@
   {
    "fieldname": "justificativo",
    "fieldtype": "Attach",
-   "label": "Justificativo",
-   "reqd": 1
+   "label": "Justificativo"
   },
   {
    "fieldname": "observacoes",

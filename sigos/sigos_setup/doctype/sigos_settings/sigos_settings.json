@@ -13,6 +13,7 @@
   "manter_meses_passados",
   "hora_limite_manha",
   "hora_limite_noite",
+  "justificativo_faltas_obrigatorio",
   "tab_ss_rh",
   "percentagem_maxima_emprestimo",
   "meses_maximos_emprestimo",
@@ -148,6 +149,13 @@
    "label": "Hora Limite Submissão Noite",
    "default": "18:30:00",
    "description": "Hora limite para submissão de ausências do período da noite"
+  },
+  {
+   "fieldname": "justificativo_faltas_obrigatorio",
+   "fieldtype": "Check",
+   "label": "Justificativo de Faltas Obrigatório",
+   "default": "1",
+   "description": "Quando activo, é obrigatório anexar o documento justificativo em cada Justificação de Faltas. Desactive para permitir submeter sem anexo (ex.: justificativo entregue em papel)."
   },
   {
    "fieldname": "tab_ss_rh",

@@ -4,6 +4,10 @@ frappe.ui.form.on("Justificacao De Faltas", {
 		frm.set_query("vigilante", () => ({
 			filters: { status: "Activo" }
 		}));
+
+		frappe.db.get_single_value("SIGOS Settings", "justificativo_faltas_obrigatorio").then(val => {
+			frm.toggle_reqd("justificativo", val === undefined || val === null ? true : !!val);
+		});
 	},
 
 	validate(frm) {

@@ -11,6 +11,7 @@ class JustificacaoDeFaltas(Document):
 	def validate(self):
 		self._recompute_numero()
 		self._validar_prazo()
+		self._validar_justificativo()
 
 	def _recompute_numero(self):
 		"""
@@ -55,6 +56,14 @@ class JustificacaoDeFaltas(Document):
 					self.dia_de_fim
 				)
 			)
+
+	def _validar_justificativo(self):
+		obrigatorio = frappe.db.get_single_value("SIGOS Settings", "justificativo_faltas_obrigatorio")
+		if obrigatorio is None:
+			obrigatorio = 1
+
+		if obrigatorio and not self.justificativo:
+			frappe.throw(_("É obrigatório anexar o Justificativo."))
 
 
 @frappe.whitelist()
