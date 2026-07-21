@@ -23,6 +23,9 @@
   "col_e2",
   "data_de_inicio",
   "data_de_fim",
+  "sec_excepcao",
+  "excepcao_limite",
+  "motivo_excepcao",
   "sec_info",
   "descricao",
   "col_e3",
@@ -120,6 +123,27 @@
    "fieldtype": "Date",
    "label": "Data de Fim",
    "read_only": 1
+  },
+  {
+   "fieldname": "sec_excepcao",
+   "fieldtype": "Section Break",
+   "label": "Excepção ao Limite",
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:doc.excepcao_limite"
+  },
+  {
+   "fieldname": "excepcao_limite",
+   "fieldtype": "Check",
+   "label": "Excepção ao Limite Autorizada",
+   "default": "0",
+   "description": "Marcado automaticamente quando o utilizador confirma, no diálogo apresentado ao exceder o limite do VALOR TOTAL do empréstimo (% do salário base), que pretende avançar mesmo assim (ex.: emprestar acima do salário em casos especiais). Não se aplica aos limites de meses ou de prestação mensal — esses são sempre bloqueantes. Exige motivo."
+  },
+  {
+   "fieldname": "motivo_excepcao",
+   "fieldtype": "Small Text",
+   "label": "Motivo da Excepção",
+   "depends_on": "eval:doc.excepcao_limite",
+   "mandatory_depends_on": "eval:doc.excepcao_limite"
   },
   {
    "fieldname": "sec_info",
