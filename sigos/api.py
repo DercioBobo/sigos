@@ -1952,9 +1952,17 @@ def get_ajuste_salarios(filters=None):
 	side with the RESOLVED base (contract/regime + override + floor), so HR can
 	see the picture before bulk-applying via `aplicar_salario_base(vigilantes=...)`.
 
+	tem_override vs tem_retido_rotatividade: both read from the same
+	salario_base_manual field, but mean very different things to HR. tem_override
+	is a deliberate RH exception (set via "Definir Salário") — worth reviewing.
+	tem_retido_rotatividade is a value Vigilante._reter_salario_mais_alto froze
+	automatically after a Rotatividade/Reserva move — routine, not an exception.
+	Kept in separate stats/filters so the automatic ones don't bury the real
+	overrides HR actually needs to look at.
+
 	`stats` are computed over the full status/delegação/regime/etc.-filtered scope
-	BEFORE the three so_* view toggles narrow `rows` — so a stat tile's count
-	doesn't move when the user clicks it to filter the table by that same tile.
+	BEFORE the so_* view toggles narrow `rows` — so a stat tile's count doesn't
+	move when the user clicks it to filter the table by that same tile.
 	"""
 	import json as _json
 	from frappe.utils import flt
@@ -1984,7 +1992,7 @@ def get_ajuste_salarios(filters=None):
 		or_filters=or_filters,
 		fields=["name", "nome_completo", "status", "delegacao", "categoria",
 				"regime_do_vigilante", "posto_de_vigilancia", "projecto", "cliente",
-				"funcionario", "salario_base_manual"],
+				"funcionario", "salario_base_manual", "salario_retido_automaticamente"],
 		order_by="nome_completo asc",
 		limit_page_length=2000,
 	)
@@ -2010,13 +2018,19 @@ def get_ajuste_salarios(filters=None):
 		atual_by_emp = {r.employee: flt(r.base) for r in ssa_rows}
 
 	rows = []
-	stats = {"total": 0, "sem_salario": 0, "sem_ssa": 0, "com_override": 0, "divergentes": 0}
+	stats = {"total": 0, "sem_salario": 0, "sem_ssa": 0, "com_override": 0,
+			 "retido_rotatividade": 0, "divergentes": 0}
 	for v in vigs:
 		atual = atual_by_emp.get(v.funcionario, 0) if v.funcionario else 0
 		resolvido = flt(resolver_salario_base(v))
 		diferenca = resolvido - atual
 		tem_ssa = bool(v.funcionario) and v.funcionario in atual_by_emp
-		tem_override = flt(v.salario_base_manual) > 0
+		tem_manual = flt(v.salario_base_manual) > 0
+		# "Override" = an RH-set exception, worth reviewing. A value the automatic
+		# Rotatividade/Reserva freeze set (salario_retido_automaticamente) is routine,
+		# not an exception — kept in its own bucket so it doesn't bury real overrides.
+		tem_retido_rotatividade = tem_manual and bool(v.salario_retido_automaticamente)
+		tem_override = tem_manual and not tem_retido_rotatividade
 
 		stats["total"] += 1
 		if resolvido <= 0:
@@ -2025,6 +2039,8 @@ def get_ajuste_salarios(filters=None):
 			stats["sem_ssa"] += 1
 		if tem_override:
 			stats["com_override"] += 1
+		if tem_retido_rotatividade:
+			stats["retido_rotatividade"] += 1
 		if diferenca:
 			stats["divergentes"] += 1
 
@@ -2035,6 +2051,7 @@ def get_ajuste_salarios(filters=None):
 			"diferenca": diferenca,
 			"tem_ssa": tem_ssa,
 			"tem_override": tem_override,
+			"tem_retido_rotatividade": tem_retido_rotatividade,
 		})
 		rows.append(row)
 
@@ -2042,6 +2059,8 @@ def get_ajuste_salarios(filters=None):
 		rows = [r for r in rows if not r["tem_ssa"]]
 	if filters.get("so_com_override"):
 		rows = [r for r in rows if r["tem_override"]]
+	if filters.get("so_retido_rotatividade"):
+		rows = [r for r in rows if r["tem_retido_rotatividade"]]
 	if filters.get("so_divergentes"):
 		rows = [r for r in rows if r["diferenca"]]
 

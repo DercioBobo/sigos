@@ -23,7 +23,7 @@ sigos.AjusteDeSalarios = class AjusteDeSalarios {
 		this.state = {
 			search: "", status: "Activo", delegacao: null, categoria: null,
 			cliente: null, posto_de_vigilancia: null,
-			so_sem_ssa: 0, so_com_override: 0, so_divergentes: 0,
+			so_sem_ssa: 0, so_com_override: 0, so_retido_rotatividade: 0, so_divergentes: 0,
 		};
 		this.rows = [];
 		this.stats = {};
@@ -154,7 +154,8 @@ sigos.AjusteDeSalarios = class AjusteDeSalarios {
 			tile("total", __("Total"), s.total ?? 0, "neu", false),
 			tile("sem_salario", __("Sem Salário Definido"), s.sem_salario ?? 0, "bad", false),
 			tile("sem_ssa", __("Sem SSA"), s.sem_ssa ?? 0, "amber", true),
-			tile("com_override", __("Com Override"), s.com_override ?? 0, "info", true),
+			tile("com_override", __("Com Override (RH)"), s.com_override ?? 0, "info", true),
+			tile("retido_rotatividade", __("Retido (Rotatividade)"), s.retido_rotatividade ?? 0, "neu", true),
 			tile("divergentes", __("Divergentes"), s.divergentes ?? 0, "sal", true),
 		].join(""));
 		this.$count.text(__("{0} vigilante(s)", [s.total ?? 0]));
@@ -205,7 +206,7 @@ sigos.AjusteDeSalarios = class AjusteDeSalarios {
 		return `
 			<tr>
 				<td class="as-chk"><input type="checkbox" data-row-chk="${frappe.utils.escape_html(r.name)}" ${this.selected.has(r.name) ? "checked" : ""} /></td>
-				<td><a href="javascript:void(0)" data-open="${frappe.utils.escape_html(r.name)}">${frappe.utils.escape_html(r.nome_completo || r.name)}</a>${r.tem_override ? ` <span class="as-badge">${__("override")}</span>` : ""}</td>
+				<td><a href="javascript:void(0)" data-open="${frappe.utils.escape_html(r.name)}">${frappe.utils.escape_html(r.nome_completo || r.name)}</a>${r.tem_override ? ` <span class="as-badge">${__("override")}</span>` : ""}${r.tem_retido_rotatividade ? ` <span class="as-badge as-badge-muted">${__("retido")}</span>` : ""}</td>
 				<td>${frappe.utils.escape_html(r.delegacao || "—")}</td>
 				<td>${frappe.utils.escape_html(r.categoria || "—")}</td>
 				<td>${frappe.utils.escape_html(r.regime_do_vigilante || "—")}</td>
@@ -340,7 +341,7 @@ sigos.AjusteDeSalarios = class AjusteDeSalarios {
 .as-h1 { font-family:var(--display); font-weight:600; font-size:24px; line-height:1.1; letter-spacing:-.02em; margin:0; color:var(--ink); }
 .as-count { font-size:12px; color:var(--ink3); font-weight:600; }
 
-.as-kpis { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:16px; }
+.as-kpis { display:grid; grid-template-columns:repeat(6,1fr); gap:12px; margin-bottom:16px; }
 .as-kpi { background:var(--paper2); border:1px solid var(--line); border-radius:12px; padding:12px 14px; display:flex; flex-direction:column; gap:4px; min-width:0; box-shadow:var(--shadow); }
 .as-kpi[data-toggle] { cursor:pointer; }
 .as-kpi[data-toggle]:hover { border-color:var(--accent); }
@@ -377,6 +378,7 @@ sigos.AjusteDeSalarios = class AjusteDeSalarios {
 .as-tone-bad { color:var(--bad); }
 .as-tone-muted { color:var(--ink3); }
 .as-badge { font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--accentInk); background:var(--wash); border-radius:6px; padding:2px 6px; margin-left:4px; }
+.as-badge-muted { color:var(--graphite); background:var(--paper3); }
 
 .as-actionbar { position:sticky; bottom:12px; margin-top:16px; display:none; align-items:center; justify-content:space-between; gap:16px;
   background:var(--ink); color:#fff; border-radius:12px; padding:12px 18px; box-shadow:0 14px 34px -12px rgba(16,23,38,.5); }
@@ -387,6 +389,9 @@ sigos.AjusteDeSalarios = class AjusteDeSalarios {
 .as-btn-ghost { background:transparent; border-color:rgba(255,255,255,.35); color:#fff; }
 .as-btn-ghost:hover { background:rgba(255,255,255,.1); border-color:#fff; }
 
+@media (max-width: 1180px) {
+  .as-kpis { grid-template-columns:repeat(3,1fr); }
+}
 @media (max-width: 960px) {
   .as-kpis { grid-template-columns:repeat(2,1fr); }
 }
