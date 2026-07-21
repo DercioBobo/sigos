@@ -2104,7 +2104,13 @@ def definir_salario_base(vigilante, valor=None, usar_contrato=0, confirmar_reduc
 		return {"requires_confirm": 1, "atual": atual, "novo": novo}
 
 	# permlevel-2 field — set server-side (whitelisted method already trusts the role gate)
-	frappe.db.set_value("Vigilante", vigilante, "salario_base_manual", novo_manual)
+	# This is an explicit RH decision, so it always clears the auto-retention marker
+	# (see Vigilante._reter_salario_mais_alto) — a future rotation is then free to
+	# retain/release around THIS value like any other manually-set override.
+	frappe.db.set_value("Vigilante", vigilante, {
+		"salario_base_manual": novo_manual,
+		"salario_retido_automaticamente": 0,
+	})
 
 	resumo = aplicar_salario_base(vigilante=vigilante, silent=True)
 	base = resolver_salario_base(vigilante)
@@ -2167,7 +2173,10 @@ def definir_salario_base_bulk(vigilantes, valor, confirmar_reducao=0):
 			return {"requires_confirm": 1, "reducoes": reducoes, "novo": valor}
 
 	for v in vigs:
-		frappe.db.set_value("Vigilante", v.name, "salario_base_manual", valor)
+		frappe.db.set_value("Vigilante", v.name, {
+			"salario_base_manual": valor,
+			"salario_retido_automaticamente": 0,
+		})
 
 	nomes = [v.name for v in vigs]
 	resumo = aplicar_salario_base(vigilantes=nomes, silent=True)

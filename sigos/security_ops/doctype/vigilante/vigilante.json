@@ -75,7 +75,8 @@
   "sec_rh",
   "funcionario",
   "col_break_rh",
-  "salario_base_manual"
+  "salario_base_manual",
+  "salario_retido_automaticamente"
  ],
  "fields": [
   {
@@ -497,6 +498,15 @@
    "label": "Salário Base (manual)",
    "description": "Deixe vazio para herdar o salário base do contrato (por regime). Preencha apenas para excepções a este vigilante.",
    "permlevel": 2
+  },
+  {
+   "fieldname": "salario_retido_automaticamente",
+   "fieldtype": "Check",
+   "label": "Salário Base Retido Automaticamente",
+   "default": "0",
+   "hidden": 1,
+   "read_only": 1,
+   "description": "Interno: marca que o valor acima em Salário Base (manual) foi congelado pela lógica automática de Rotatividade/Reserva (SIGOS Settings.reter_salario_base_em_rotatividade), não definido por RH via \"Definir Salário\". Permite que, ao sair da Reserva para uma nova colocação num posto real, este valor seja libertado sozinho (recomeço no valor do novo posto/regime) sem tocar numa excepção definida manualmente por RH."
   },
   {
    "fieldname": "tab_geral",
