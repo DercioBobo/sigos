@@ -2145,6 +2145,59 @@ def definir_salario_base(vigilante, valor=None, usar_contrato=0, confirmar_reduc
 
 
 @frappe.whitelist()
+def repor_salario_padrao_reserva(vigilante):
+	"""
+	Manually reset a Reserva-held vigilante's base salary to SIGOS Settings.
+	salario_base_padrao_reserva — an HR escape hatch to force-align a benched
+	guard's pay to the standard Reserva rate at any time, not just first-timers
+	(the automatic seed in Vigilante._aplicar_salario_padrao_reserva only fires
+	for a guard with no prior salary history at all). No pay-cut confirmation
+	here — this is an explicit, named action, not a side effect.
+
+	Same as the automatic seed, the applied value is tagged
+	salario_retido_automaticamente=1, so a later real posto assignment still
+	releases it on its own and resolves from that posto/regime instead.
+	"""
+	from frappe.utils import flt
+
+	vig = frappe.db.get_value("Vigilante", vigilante, ["status", "funcionario"], as_dict=True)
+	if not vig:
+		frappe.throw(_("Vigilante {0} não encontrado.").format(vigilante))
+	if vig.status != "Reserva":
+		frappe.throw(
+			_("Só é possível repor o salário padrão de Reserva para um vigilante em Reserva."),
+			title=_("Vigilante Não Está em Reserva"),
+		)
+	if not vig.funcionario:
+		frappe.throw(
+			_("O vigilante <b>{0}</b> ainda não tem Funcionário associado.").format(vigilante),
+			title=_("Sem Funcionário"),
+		)
+
+	padrao = flt(frappe.db.get_single_value("SIGOS Settings", "salario_base_padrao_reserva"))
+	if padrao <= 0:
+		frappe.throw(
+			_("Defina primeiro o <b>Salário Base Padrão para Reserva</b> em SIGOS Settings."),
+			title=_("Salário Padrão em Falta"),
+		)
+
+	frappe.db.set_value("Vigilante", vigilante, {
+		"salario_base_manual": padrao,
+		"salario_retido_automaticamente": 1,
+	})
+
+	resumo = aplicar_salario_base(vigilante=vigilante, silent=True)
+	base = resolver_salario_base(vigilante)
+
+	from sigos.timeline import registar
+	registar(vigilante, _("Salário base reposto para o padrão de Reserva: <b>{0}</b>.").format(
+		frappe.format_value(base, {"fieldtype": "Currency"})
+	))
+
+	return {"base": base, "resumo": resumo}
+
+
+@frappe.whitelist()
 def definir_salario_base_bulk(vigilantes, valor, confirmar_reducao=0):
 	"""
 	Set the SAME manual base salary for a list of vigilantes at once — the

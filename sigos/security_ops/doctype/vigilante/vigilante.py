@@ -53,12 +53,46 @@ class Vigilante(Document):
 		self._validar_capacidade_posto()
 		self._validar_link_employee()
 		self._guardar_mudanca_regime()
+		self._aplicar_salario_padrao_reserva()
 		self._reter_salario_mais_alto()
 
 	def on_update(self):
 		self._atualizar_ocupacao_postos()
 		self._migrar_escala_se_mudou()
 		self._seed_salario_base()
+
+	def _aplicar_salario_padrao_reserva(self):
+		"""
+		A vigilante created (or first activated) directly into Reserva — never
+		having held a real posto — has no contract/regime to resolve a base
+		from, so would otherwise fall through to Categoria/Salário Mínimo.
+		SIGOS Settings.salario_base_padrao_reserva gives HR a dedicated default
+		for exactly this case. Only fires when there is NO prior submitted SSA
+		at all (a genuinely first-ever salary) and no value already set
+		(manual override or an earlier freeze) — an existing salary is never
+		overwritten. Marked salario_retido_automaticamente so a later real
+		posto assignment releases it automatically, same as any other
+		Reserva-held value (see _reter_salario_mais_alto). The same default is
+		also available on demand via the "Repor Salário Padrão de Reserva"
+		button (sigos.api.repor_salario_padrao_reserva), for any vigilante
+		currently in Reserva, not just first-timers.
+		"""
+		if self.status != "Reserva" or not self.funcionario:
+			return
+
+		from frappe.utils import flt
+		if flt(self.salario_base_manual) > 0:
+			return  # already has a value — don't overwrite
+
+		padrao = flt(frappe.db.get_single_value("SIGOS Settings", "salario_base_padrao_reserva"))
+		if padrao <= 0:
+			return
+
+		if frappe.db.exists("Salary Structure Assignment", {"employee": self.funcionario, "docstatus": 1}):
+			return  # already has real salary history — not a first-timer
+
+		self.salario_base_manual = padrao
+		self.salario_retido_automaticamente = 1
 
 	def _reter_salario_mais_alto(self):
 		"""
@@ -144,12 +178,16 @@ class Vigilante(Document):
 	def _seed_salario_base(self):
 		"""
 		Auto-assign the contract/regime base salary to a newly-onboarded or
-		re-deployed guard's Salary Structure Assignment. Fires only when the guard
-		is Activo with a Funcionário and the relevant fields actually changed; it's
-		idempotent (no-op if the SSA already matches) and silent so a missing default
-		structure or any error never blocks the guard's save.
+		re-deployed guard's Salary Structure Assignment. Fires for Activo or
+		Reserva guards with a Funcionário when the relevant fields actually
+		changed — Reserva is included so a first-timer's
+		salario_base_padrao_reserva (or a retained value from
+		_reter_salario_mais_alto) actually lands on a Salary Structure
+		Assignment, not just the Vigilante field; it's idempotent (no-op if the
+		SSA already matches) and silent so a missing default structure or any
+		error never blocks the guard's save.
 		"""
-		if self.status != "Activo" or not self.funcionario:
+		if self.status not in ("Activo", "Reserva") or not self.funcionario:
 			return
 
 		before = self.get_doc_before_save()

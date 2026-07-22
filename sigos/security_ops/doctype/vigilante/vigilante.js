@@ -127,6 +127,12 @@ frappe.ui.form.on("Vigilante", {
 			frm.add_custom_button(__("Definir Salário"), () => _definir_salario(frm), __("Acções"));
 		}
 
+		// Repor Salário Padrão de Reserva — force-align a benched guard's base to
+		// SIGOS Settings.salario_base_padrao_reserva, regardless of what they had before.
+		if (pode_rh && frm.doc.funcionario && frm.doc.status === "Reserva") {
+			frm.add_custom_button(__("Repor Salário Padrão de Reserva"), () => _repor_salario_padrao_reserva(frm), __("Acções"));
+		}
+
 		// Operational benching — release posto + escala, keep the guard employed.
 		const pode_ops = frappe.user.has_role("Aprovador Operações")
 			|| frappe.user.has_role("SIGOS Manager")
@@ -208,6 +214,22 @@ function _mudar_estado_op(frm, metodo, titulo, aviso) {
 // used by the Employee "Painel RH 360" deck and the Diretório de Colaboradores page.
 function _definir_salario(frm) {
 	sigos.quick_docs.definir_salario(frm.doc.name, () => frm.reload_doc(), frm.doc.salario_base_manual);
+}
+
+// ─── Repor Salário Padrão de Reserva ───────────────────────────────────────────
+function _repor_salario_padrao_reserva(frm) {
+	frappe.confirm(
+		__("Repor o salário base deste vigilante para o <b>Salário Base Padrão para Reserva</b> configurado em SIGOS Settings? Isto substitui o valor actual."),
+		() => {
+			frappe.xcall("sigos.api.repor_salario_padrao_reserva", { vigilante: frm.doc.name }).then((r) => {
+				frappe.show_alert({
+					message: __("Salário base reposto: {0}", [format_currency((r && r.base) || 0)]),
+					indicator: "green",
+				}, 6);
+				frm.reload_doc();
+			});
+		}
+	);
 }
 
 // ─── Mini-dash: operational readiness at a glance, above the tabs ──────────────
