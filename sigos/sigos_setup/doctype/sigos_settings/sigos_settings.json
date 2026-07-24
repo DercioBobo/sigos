@@ -47,6 +47,10 @@
   "base_dias_de_trabalho",
   "n_faltas_abandono_posto",
   "n_faltas_reserva",
+  "metodo_faltas_reserva",
+  "col_ss_pay2",
+  "regime_reserva",
+  "data_inicio_rotacao_reserva",
   "sec_ss_arma",
   "componente_subsidio_arma",
   "col_ss_arma",
@@ -358,7 +362,34 @@
    "fieldtype": "Int",
    "label": "Nº de Faltas por Falta de Reserva",
    "default": "1",
-   "description": "Número de faltas debitado automaticamente quando um vigilante em Reserva falta — valor fixo, não passa pelo cálculo de peso de regime/turno (não há turno atribuído para um vigilante em Reserva)."
+   "description": "Usado quando o Método de Faltas em Reserva abaixo é \"Valor Fixo\" — número de faltas debitado automaticamente quando um vigilante em Reserva falta, independentemente do dia."
+  },
+  {
+   "fieldname": "metodo_faltas_reserva",
+   "fieldtype": "Select",
+   "label": "Método de Faltas em Reserva",
+   "options": "Valor Fixo\nPeso do Turno",
+   "default": "Valor Fixo",
+   "description": "Valor Fixo: usa sempre o Nº de Faltas acima. Peso do Turno: calcula pelo turno teórico do dia segundo o Regime de Reserva partilhado (ao lado) — mesma lógica de peso das faltas normais (Regime Turno Item), aplicada a todo o grupo em Reserva de uma vez (não há escala/turno individual por vigilante em Reserva)."
+  },
+  {
+   "fieldname": "col_ss_pay2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "regime_reserva",
+   "fieldtype": "Link",
+   "options": "Regime",
+   "label": "Regime de Reserva (Partilhado)",
+   "depends_on": "eval:doc.metodo_faltas_reserva==\"Peso do Turno\"",
+   "description": "Regime ÚNICO aplicado a TODOS os vigilantes em Reserva para efeitos de peso de faltas — não o regime individual que cada um tinha antes de ser colocado em Reserva."
+  },
+  {
+   "fieldname": "data_inicio_rotacao_reserva",
+   "fieldtype": "Date",
+   "label": "Início da Rotação de Reserva",
+   "depends_on": "eval:doc.metodo_faltas_reserva==\"Peso do Turno\"",
+   "description": "Data-âncora do ciclo partilhado — o índice 0 da sequência de turnos do Regime de Reserva cai nesta data; a partir daí, o mesmo turno teórico aplica-se a TODOS os vigilantes em Reserva no mesmo dia."
   },
   {
    "fieldname": "sec_ss_arma",

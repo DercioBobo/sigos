@@ -3,7 +3,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.model.naming import make_autoname
 from frappe.utils import now_datetime
-from sigos.utils import calcular_n_faltas_efetivo
+from sigos.utils import calcular_n_faltas_efetivo, calcular_n_faltas_reserva
 
 TIPOS_DE_REGISTO_ESPECIAIS = ("Abandono de Posto", "Falta de Reserva")
 
@@ -477,11 +477,12 @@ class Ausencias(Document):
 					"SIGOS Settings", "n_faltas_abandono_posto"
 				) or 1
 			elif row.tipo_de_ausencia == "Falta de Reserva":
-				# Same flat-count rationale — a Reserva guard has no turno for that day,
-				# so the regime/turno weight lookup below doesn't apply.
-				row.n_de_faltas = frappe.db.get_single_value(
-					"SIGOS Settings", "n_faltas_reserva"
-				) or 1
+				# Flat by default (n_faltas_reserva) — or, when SIGOS Settings.
+				# metodo_faltas_reserva == "Peso do Turno", the weighted count from
+				# the shared Regime de Reserva rotation (same Regime Turno Item
+				# weight normal escala guards get, just against one theoretical
+				# cycle for the whole bench pool instead of an individual escala).
+				row.n_de_faltas = calcular_n_faltas_reserva(self.data)
 			else:
 				row.n_de_faltas = calcular_n_faltas_efetivo(
 					row.vigilante, row.regime, row.turno, self.data

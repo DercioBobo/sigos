@@ -163,14 +163,25 @@ def calcular_faltas_detalhado(vigilante: str, start_date, end_date) -> list:
 	cumul = 0
 	for a in absences:
 		d = getdate(a.data)
-		# Always derive the BASE from the regime — never from the stored n_de_faltas,
-		# which is itself the de-dup'd value (else we'd de-dup twice).
-		base = calcular_n_faltas(a.regime, a.turno)
-		dedup = False
-		if _regime_deduz_consecutivas(a.regime):
-			anterior = _turno_anterior_de_trabalho(vigilante, a.regime, d)
-			dedup = anterior is not None and anterior in absence_dates
-		efetivo = 1 if dedup else int(base or 1)
+		if a.tipo_de_ausencia in ("Abandono de Posto", "Falta de Reserva"):
+			# Flat-count row types — the weight was already fully resolved and
+			# stamped at Ausencias-save time (a Settings constant, or — for Falta
+			# de Reserva with metodo_faltas_reserva == "Peso do Turno" — the shared
+			# Regime de Reserva rotation's weight). These never go through the
+			# consecutive de-dup below (there's no individual escala to de-dup
+			# against), so the stored value IS the effective one — re-deriving
+			# from regime/turno here would silently ignore it (both are blank for
+			# these types unless explicitly stamped) and always collapse to 1.
+			efetivo = int(a.n_de_faltas or 1)
+		else:
+			# Always derive the BASE from the regime — never from the stored n_de_faltas,
+			# which is itself the de-dup'd value (else we'd de-dup twice).
+			base = calcular_n_faltas(a.regime, a.turno)
+			dedup = False
+			if _regime_deduz_consecutivas(a.regime):
+				anterior = _turno_anterior_de_trabalho(vigilante, a.regime, d)
+				dedup = anterior is not None and anterior in absence_dates
+			efetivo = 1 if dedup else int(base or 1)
 		if start <= d <= end:
 			cumul += efetivo
 			rows.append({
@@ -369,6 +380,60 @@ def calcular_n_faltas_efetivo(vigilante: str, regime_nome: str, turno: str, data
 	if anterior and _existe_falta(vigilante, anterior):
 		return 1
 	return base
+
+
+# ─── Faltas de Reserva (turno-weighted, opt-in) ────────────────────────────────
+
+def calcular_turno_teorico_reserva(data) -> str:
+	"""
+	The turno every Reserva guard is theoretically on for `data`, per the SINGLE
+	shared rotation SIGOS Settings.regime_reserva defines for the whole bench
+	pool — anchored at SIGOS Settings.data_inicio_rotacao_reserva, sequence
+	index 0. There's no per-guard escala for Reserva (no posto to hang one off
+	of), so this reuses the exact same pure rotation math Escala Do Vigilante
+	generates real schedules with (_turno_para_data) without materializing a
+	per-guard schedule — one theoretical cycle, shared by every Reserva guard.
+	Returns None when the setting isn't fully configured, or on an off day
+	(weekend, for a "Dias Úteis"-style regime).
+	"""
+	regime_nome = frappe.db.get_single_value("SIGOS Settings", "regime_reserva")
+	anchor = frappe.db.get_single_value("SIGOS Settings", "data_inicio_rotacao_reserva")
+	if not regime_nome or not anchor:
+		return None
+
+	regime = _get_regime(regime_nome)
+	if not regime:
+		return None
+	sequence = regime.get_turno_sequence()
+	if not sequence:
+		return None
+	working = [s for s in sequence if not s["e_folga"]]
+
+	from sigos.security_ops.doctype.escala_do_vigilante.escala_do_vigilante import _turno_para_data
+	item = _turno_para_data(regime, sequence, working, getdate(anchor), sequence[0]["turno"], getdate(data))
+	return item["turno"] if item else None
+
+
+def calcular_n_faltas_reserva(data) -> int:
+	"""
+	The effective n_de_faltas for a Falta de Reserva row. Default (SIGOS
+	Settings.metodo_faltas_reserva == "Valor Fixo", unchanged behaviour):
+	n_faltas_reserva flat constant. Opt-in ("Peso do Turno"): the shared Regime
+	de Reserva rotation's weight for the day's theoretical turno — same
+	Regime Turno Item lookup normal escala guards get, just against the one
+	shared bench-pool cycle instead of an individual escala. Falls back to the
+	flat constant whenever the turno-weighted setup isn't fully configured
+	(missing Settings) or the theoretical day has no turno to weigh.
+	"""
+	flat = frappe.db.get_single_value("SIGOS Settings", "n_faltas_reserva") or 1
+	if frappe.db.get_single_value("SIGOS Settings", "metodo_faltas_reserva") != "Peso do Turno":
+		return flat
+
+	regime_nome = frappe.db.get_single_value("SIGOS Settings", "regime_reserva")
+	turno = calcular_turno_teorico_reserva(data)
+	if not turno:
+		return flat
+	return calcular_n_faltas(regime_nome, turno)
 
 
 def atualizar_ocupacao_posto(posto_name: str):
