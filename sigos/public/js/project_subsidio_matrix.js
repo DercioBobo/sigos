@@ -49,7 +49,7 @@ function _psm_mostrar(frm, dados) {
 			<div class="psm-col-inner">
 				<span class="psm-col-nome">${frappe.utils.escape_html(c.salary_component)}</span>
 				<span class="psm-col-valor">${fmt(c.amount)}</span>
-				<span class="psm-col-toggle" title="${__("Alternar toda a coluna")}">⇅</span>
+				<span class="psm-col-toggle" title="${__("Marcar/desmarcar toda a coluna")}">✓</span>
 			</div>
 		</th>`).join("");
 
@@ -66,7 +66,7 @@ function _psm_mostrar(frm, dados) {
 		return `
 			<tr class="psm-row" data-vig="${frappe.utils.escape_html(v.name)}">
 				<th class="psm-row-head">
-					<span class="psm-row-toggle" title="${__("Alternar toda a linha")}">⇅</span>
+					<span class="psm-row-toggle" title="${__("Marcar/desmarcar toda a linha")}">✓</span>
 					<div class="psm-row-info">
 						<span class="psm-row-nome">${frappe.utils.escape_html(v.nome_completo || v.name)}</span>
 						<span class="psm-row-meta">${frappe.utils.escape_html(
@@ -93,7 +93,7 @@ function _psm_mostrar(frm, dados) {
 					max-height: 60vh; overflow: auto; border: 1px solid var(--border-color, #d1d8dd);
 					border-radius: 8px;
 				}
-				.psm-table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 12.5px; }
+				.psm-table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 11.5px; }
 				.psm-table thead th {
 					position: sticky; top: 0; z-index: 2; background: var(--fg-color, #fff);
 					border-bottom: 1px solid var(--border-color, #d1d8dd); padding: 8px 10px; text-align: center;
@@ -104,7 +104,7 @@ function _psm_mostrar(frm, dados) {
 				.psm-col-nome { font-weight: 600; white-space: nowrap; }
 				.psm-col-valor { color: var(--text-muted, #8d99a6); font-size: 11px; }
 				.psm-col-toggle, .psm-row-toggle {
-					color: var(--text-muted, #8d99a6); font-size: 12px; cursor: pointer; opacity: .55;
+					color: var(--text-muted, #8d99a6); font-size: 18px; line-height: 1; cursor: pointer; opacity: .55;
 				}
 				.psm-col-toggle:hover, .psm-row-toggle:hover { opacity: 1; color: var(--primary, #5e64ff); }
 				.psm-row-head {
