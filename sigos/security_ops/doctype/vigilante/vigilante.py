@@ -17,22 +17,27 @@ VIGILANTE_TO_EMP_STATUS = {
 	"Demitido":         "Left",
 }
 
-# Fields released when a guard is benched/suspended (Reserva/Inactivo) — Categoria is
-# deliberately the only operational field left standing. Shared by every path that can
-# send a guard to Reserva/Inactivo (this doctype's own action buttons AND Rotatividade's
-# "Enviar para Reserva"/demissão branches) so they can never drift into clearing
-# different subsets. The Employee side follows automatically — sync.vigilante_to_employee
-# mirrors these fields fill-and-clear (see sync._mirror).
+# Fields released when a guard is benched/suspended (Reserva/Inactivo) — Categoria AND
+# Delegação are deliberately left standing. Delegação in particular survives a bench:
+# it's the guard's "home" delegation, not tied to the posto/contract they're leaving,
+# so a Reserva/Inactivo move (temporary, still employed) must never blank it out — only
+# an actual Demissão does (handled separately, in demissao.py's own on_submit) or a
+# Rotatividade that deliberately transfers the guard to a different delegação (which
+# assigns the NEW value directly, it never routes through this clear-all). Shared by
+# every path that can send a guard to Reserva/Inactivo (this doctype's own action
+# buttons AND Rotatividade's "Enviar para Reserva" branch) so they can never drift into
+# clearing different subsets. The Employee side follows automatically —
+# sync.vigilante_to_employee mirrors these fields fill-and-clear (see sync._mirror).
 CAMPOS_OPERACIONAIS_RESERVA = (
 	"posto_de_vigilancia", "nome_do_posto", "tipo_de_posto",
-	"regime_do_vigilante", "delegacao", "tipo_de_vigilante",
+	"regime_do_vigilante", "tipo_de_vigilante",
 	"projecto", "cliente", "nome_do_projecto",
 )
 
 
 def limpar_campos_operacionais(vig):
-	"""Release posto/contrato/regime/delegação/tipo on a Vigilante doc in memory
-	(caller still has to .save()). See CAMPOS_OPERACIONAIS_RESERVA."""
+	"""Release posto/contrato/regime/tipo (NOT delegação — see CAMPOS_OPERACIONAIS_RESERVA)
+	on a Vigilante doc in memory (caller still has to .save())."""
 	for f in CAMPOS_OPERACIONAIS_RESERVA:
 		vig.set(f, None)
 

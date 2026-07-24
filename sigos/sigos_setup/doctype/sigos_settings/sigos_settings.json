@@ -18,6 +18,7 @@
   "percentagem_maxima_emprestimo",
   "meses_maximos_emprestimo",
   "percentagem_maxima_prestacao_mensal",
+  "percentagem_maxima_deducao_mensal",
   "col_ss_rh1",
   "valor_padrao_uniforme",
   "meses_padrao_uniforme",
@@ -183,6 +184,13 @@
    "label": "Percentagem Máxima da Prestação Mensal",
    "default": "30",
    "description": "Percentagem máxima do salário líquido que a prestação mensal do empréstimo pode consumir. Usa o net_pay da última Salary Slip submetida; sem histórico de folha, usa o salário base como estimativa."
+  },
+  {
+   "fieldname": "percentagem_maxima_deducao_mensal",
+   "fieldtype": "Percent",
+   "label": "Percentagem Máxima da Dedução Mensal",
+   "default": "30",
+   "description": "Percentagem máxima do salário líquido que o valor mensal de uma Outras Deduções pode consumir. Mesmo princípio da prestação mensal do empréstimo, mas com o seu próprio limite — sempre bloqueante, sem excepção."
   },
   {
    "fieldname": "col_ss_rh1",

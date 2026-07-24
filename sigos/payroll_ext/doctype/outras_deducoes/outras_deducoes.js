@@ -34,6 +34,39 @@ function _ded_aplicar_tipo_pagamento(frm) {
 }
 
 // =========================
+// Salário base — buscado assim que o funcionário é escolhido, para que o
+// aviso de limite mensal (percentagem_maxima_deducao_mensal) tenha uma
+// referência desde já, e não só depois de gravar.
+// =========================
+async function _ded_buscar_salario_base(frm) {
+	if (!frm.doc.funcionario) return;
+	const r = await frappe.call({
+		method: "sigos.payroll_ext.doctype.emprestimo.emprestimo.buscar_salario_base",
+		args: { funcionario: frm.doc.funcionario },
+	});
+	frm.set_value("salario_base", r.message || 0);
+}
+
+// =========================
+// Verificar limite mensal (UX — o servidor é a autoridade e bloqueia sempre;
+// não há excepção para este tecto).
+// =========================
+async function _ded_checar_limite_mensal(frm) {
+	if (!frm.doc.funcionario || !frm.doc.valor_mensal) return;
+	const r = await frappe.call({
+		method: "sigos.payroll_ext.doctype.outras_deducoes.outras_deducoes.verificar_limite_mensal",
+		args: {
+			funcionario: frm.doc.funcionario,
+			salario_base: frm.doc.salario_base,
+			valor_mensal: frm.doc.valor_mensal,
+		},
+	});
+	if (r.message) {
+		frappe.show_alert({ message: r.message, indicator: "red" }, 7);
+	}
+}
+
+// =========================
 // Cálculo valor mensal
 // =========================
 function _ded_calcular_valor_mensal(frm) {
@@ -133,6 +166,9 @@ frappe.ui.form.on("Outras Deducoes", {
 		if (!frm.doc.data_de_inicio && frm.doc.mes_referencia) {
 			_ded_calcular_data_inicio_por_mes(frm);
 		}
+		if (frm.doc.funcionario && !frm.doc.salario_base) {
+			_ded_buscar_salario_base(frm);
+		}
 	},
 
 	refresh(frm) {
@@ -141,6 +177,11 @@ frappe.ui.form.on("Outras Deducoes", {
 		if (!frm.doc.data_de_inicio && frm.doc.mes_referencia) {
 			_ded_calcular_data_inicio_por_mes(frm);
 		}
+	},
+
+	async funcionario(frm) {
+		await _ded_buscar_salario_base(frm);
+		_ded_checar_limite_mensal(frm);
 	},
 
 	tipo(frm) {
@@ -155,6 +196,7 @@ frappe.ui.form.on("Outras Deducoes", {
 		_ded_aplicar_tipo_pagamento(frm);
 		_ded_calcular_valor_mensal(frm);
 		_ded_calcular_data_fim(frm);
+		_ded_checar_limite_mensal(frm);
 	},
 
 	mes_referencia(frm) {
@@ -168,11 +210,13 @@ frappe.ui.form.on("Outras Deducoes", {
 
 	valor_a_pagar(frm) {
 		_ded_calcular_valor_mensal(frm);
+		_ded_checar_limite_mensal(frm);
 	},
 
 	meses_a_pagar(frm) {
 		_ded_calcular_valor_mensal(frm);
 		_ded_calcular_data_fim(frm);
+		_ded_checar_limite_mensal(frm);
 	},
 
 	data_de_inicio(frm) {
