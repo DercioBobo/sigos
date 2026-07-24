@@ -1315,10 +1315,10 @@ def get_vigilantes_sem_posto(delegacao=None):
 def get_vigilantes_do_projecto(project):
 	"""
 	Every Activo vigilante currently posted on this project (any posto whose
-	Project matches) — the eligible pool for a Project Subsídio's per-guard
-	beneficiary picker (Project Subsidio Item.aplicar_a == "Vigilantes
-	Específicos"). Reserva/Inactivo/Demitido guards have no posto on the project
-	any more, so they're naturally excluded — nothing to prune separately.
+	Project matches) — the eligible pool for the Project's "Gerir Subsídios"
+	matrix (who can be granted which subsídio). Reserva/Inactivo/Demitido guards
+	have no posto on the project any more, so they're naturally excluded —
+	nothing to prune separately.
 	"""
 	if not project:
 		return []
@@ -1334,6 +1334,92 @@ def get_vigilantes_do_projecto(project):
 		order_by="nome_completo asc",
 		limit_page_length=0,
 	)
+
+
+@frappe.whitelist()
+def get_project_subsidio_matrix(project):
+	"""
+	Everything the "Gerir Subsídios" matrix modal needs in one call: the
+	project's subsídio components (component + amount, as configured in
+	Project.custom_subsidios), every Activo vigilante on the project, and the
+	current applicability matrix (as "vigilante::salary_component" keys) so the
+	modal can pre-check the right cells.
+	"""
+	if not project:
+		frappe.throw(_("Projecto obrigatório."))
+	if not frappe.has_permission("Project", "read", project):
+		frappe.throw(_("Sem permissão para consultar este Projecto."), frappe.PermissionError)
+
+	componentes = frappe.get_all(
+		"Project Subsidio Item",
+		filters={"parent": project, "parenttype": "Project", "parentfield": "custom_subsidios"},
+		fields=["salary_component", "amount"],
+		order_by="idx asc",
+	)
+	vigilantes = get_vigilantes_do_projecto(project)
+	aplicacoes = frappe.get_all(
+		"Project Subsidio Aplicacao",
+		filters={"project": project},
+		fields=["vigilante", "salary_component"],
+	)
+
+	return {
+		"componentes": componentes,
+		"vigilantes": vigilantes,
+		"aplicacoes": [f"{a.vigilante}::{a.salary_component}" for a in aplicacoes],
+	}
+
+
+@frappe.whitelist()
+def salvar_project_subsidio_matrix(project, pares):
+	"""
+	Full-replace save for the "Gerir Subsídios" matrix: `pares` is the
+	JSON-encoded list of "vigilante::salary_component" keys that should be ON —
+	everything else for this project is OFF. One atomic delete + bulk-insert per
+	save, so there's never a diffing step to get wrong; the matrix simply always
+	matches whatever was checked in the modal.
+	"""
+	import json as _json
+
+	if not project:
+		frappe.throw(_("Projecto obrigatório."))
+	if not frappe.has_permission("Project", "write", project):
+		frappe.throw(_("Sem permissão para gerir os subsídios deste Projecto."), frappe.PermissionError)
+
+	if isinstance(pares, str):
+		pares = _json.loads(pares) if pares else []
+
+	vistos = set()
+	rows = []
+	agora = frappe.utils.now()
+	for par in pares or []:
+		if "::" not in par:
+			continue
+		vigilante, salary_component = par.split("::", 1)
+		if not vigilante or not salary_component:
+			continue
+		chave = (vigilante, salary_component)
+		if chave in vistos:
+			continue
+		vistos.add(chave)
+		rows.append([
+			frappe.generate_hash(length=10), project, salary_component, vigilante,
+			frappe.session.user, frappe.session.user, agora, agora,
+		])
+
+	frappe.db.delete("Project Subsidio Aplicacao", {"project": project})
+	if rows:
+		frappe.db.bulk_insert(
+			"Project Subsidio Aplicacao",
+			fields=["name", "project", "salary_component", "vigilante", "owner", "modified_by", "creation", "modified"],
+			values=rows,
+		)
+
+	frappe.msgprint(
+		_("Matriz de subsídios actualizada — {0} atribuição(ões).").format(len(rows)),
+		alert=True, indicator="green",
+	)
+	return len(rows)
 
 
 @frappe.whitelist()

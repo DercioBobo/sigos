@@ -7,6 +7,19 @@ frappe.ui.form.on("Project", {
 	refresh(frm) {
 		if (frm.is_new()) return;
 
+		// Grid-level button, always visible above the Subsídios table (not tucked
+		// into the form's own button bar) — the subsídios table only defines the
+		// component + valor now; WHO on the project actually receives each one is
+		// managed here, in the matrix modal (sigos.project_subsidios). Grid.
+		// add_custom_button is itself idempotent (re-shows the same button by
+		// label instead of duplicating it), so this is safe to call on every refresh.
+		const grid = frm.fields_dict.custom_subsidios && frm.fields_dict.custom_subsidios.grid;
+		if (grid) {
+			grid.add_custom_button(__("Gerir Subsídios..."), () => {
+				sigos.project_subsidios.abrir_matriz(frm);
+			}, "top");
+		}
+
 		frm.add_custom_button(__("Aplicar Salário Base"), () => {
 			frappe.warn(
 				__("Aplicar Salário Base"),

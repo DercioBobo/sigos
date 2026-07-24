@@ -23,8 +23,6 @@ Wire-up (hooks.py):
     }
 """
 
-import json
-
 import frappe
 from frappe.utils import getdate, add_days, date_diff, flt, formatdate
 from sigos.utils import (
@@ -200,21 +198,19 @@ def _vigilante_em_reserva(doc):
 	return frappe.db.get_value("Vigilante", doc.custom_vigilante, "status") == "Reserva"
 
 
-def _subsidio_aplica_ao_vigilante(row, vigilante):
-	"""A Project Subsídio line only applies to every guard on the project when
-	aplicar_a == "Todos do Projecto" (also the fallback for rows saved before this
-	field existed — see _sincronizar_resumo_beneficiarios's own backward-compat
-	read). Otherwise it's opt-in per guard, picked via the "Gerir Beneficiários"
-	dialog and stored as a JSON array of Vigilante names in vigilantes_json."""
-	if (row.aplicar_a or "Todos do Projecto") == "Todos do Projecto":
-		return True
+def _componentes_aplicaveis(project, vigilante):
+	"""Which of the project's subsídio components this specific guard is opted
+	into, per the HR-managed matrix (Project Subsidio Aplicacao — see the "Gerir
+	Subsídios" button on the Project form). No row for a given (project,
+	vigilante, component) means that guard simply doesn't receive it — the
+	matrix has full control, there's no implicit "everyone gets it" default."""
 	if not vigilante:
-		return False
-	try:
-		selecionados = json.loads(row.vigilantes_json or "[]")
-	except (TypeError, ValueError):
-		return False
-	return vigilante in selecionados
+		return set()
+	return set(frappe.get_all(
+		"Project Subsidio Aplicacao",
+		filters={"project": project, "vigilante": vigilante},
+		pluck="salary_component",
+	))
 
 
 def _add_project_subsidios(doc):
@@ -227,11 +223,12 @@ def _add_project_subsidios(doc):
 		project = frappe.get_doc("Project", doc.custom_projecto)
 		if not project.custom_subsidios:
 			return
+		aplicaveis = _componentes_aplicaveis(doc.custom_projecto, doc.custom_vigilante)
 		existentes = {e.salary_component for e in doc.earnings}
 		for row in project.custom_subsidios:
 			if row.salary_component in existentes:
 				continue
-			if not _subsidio_aplica_ao_vigilante(row, doc.custom_vigilante):
+			if row.salary_component not in aplicaveis:
 				continue
 			doc.append("earnings", {
 				"salary_component": row.salary_component,
