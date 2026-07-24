@@ -23,6 +23,8 @@ Wire-up (hooks.py):
     }
 """
 
+import json
+
 import frappe
 from frappe.utils import getdate, add_days, date_diff, flt, formatdate
 from sigos.utils import (
@@ -198,6 +200,23 @@ def _vigilante_em_reserva(doc):
 	return frappe.db.get_value("Vigilante", doc.custom_vigilante, "status") == "Reserva"
 
 
+def _subsidio_aplica_ao_vigilante(row, vigilante):
+	"""A Project Subsídio line only applies to every guard on the project when
+	aplicar_a == "Todos do Projecto" (also the fallback for rows saved before this
+	field existed — see _sincronizar_resumo_beneficiarios's own backward-compat
+	read). Otherwise it's opt-in per guard, picked via the "Gerir Beneficiários"
+	dialog and stored as a JSON array of Vigilante names in vigilantes_json."""
+	if (row.aplicar_a or "Todos do Projecto") == "Todos do Projecto":
+		return True
+	if not vigilante:
+		return False
+	try:
+		selecionados = json.loads(row.vigilantes_json or "[]")
+	except (TypeError, ValueError):
+		return False
+	return vigilante in selecionados
+
+
 def _add_project_subsidios(doc):
 	if _vigilante_em_reserva(doc):
 		return
@@ -210,12 +229,15 @@ def _add_project_subsidios(doc):
 			return
 		existentes = {e.salary_component for e in doc.earnings}
 		for row in project.custom_subsidios:
-			if row.salary_component not in existentes:
-				doc.append("earnings", {
-					"salary_component": row.salary_component,
-					"amount": row.amount,
-				})
-				existentes.add(row.salary_component)
+			if row.salary_component in existentes:
+				continue
+			if not _subsidio_aplica_ao_vigilante(row, doc.custom_vigilante):
+				continue
+			doc.append("earnings", {
+				"salary_component": row.salary_component,
+				"amount": row.amount,
+			})
+			existentes.add(row.salary_component)
 	except Exception as e:
 		frappe.log_error(
 			f"SalarySlip {doc.name}: erro ao adicionar subsídios do projecto: {e}",

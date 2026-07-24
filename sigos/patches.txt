@@ -23,3 +23,4 @@ sigos.patches.limpar_campos_reserva_existentes
 sigos.patches.backfill_employee_estado_operacional
 sigos.patches.reorganizar_employee_dados_sigos
 sigos.patches.backfill_processo_disciplinar_delegacao
+sigos.patches.backfill_project_subsidio_aplicar_a

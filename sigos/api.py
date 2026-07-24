@@ -1312,6 +1312,31 @@ def get_vigilantes_sem_posto(delegacao=None):
 
 
 @frappe.whitelist()
+def get_vigilantes_do_projecto(project):
+	"""
+	Every Activo vigilante currently posted on this project (any posto whose
+	Project matches) — the eligible pool for a Project Subsídio's per-guard
+	beneficiary picker (Project Subsidio Item.aplicar_a == "Vigilantes
+	Específicos"). Reserva/Inactivo/Demitido guards have no posto on the project
+	any more, so they're naturally excluded — nothing to prune separately.
+	"""
+	if not project:
+		return []
+
+	postos = frappe.get_all("Posto De Vigilancia", filters={"project": project}, pluck="name")
+	if not postos:
+		return []
+
+	return frappe.get_all(
+		"Vigilante",
+		filters={"posto_de_vigilancia": ["in", postos], "status": "Activo"},
+		fields=["name", "nome_completo", "posto_de_vigilancia", "categoria", "regime_do_vigilante"],
+		order_by="nome_completo asc",
+		limit_page_length=0,
+	)
+
+
+@frappe.whitelist()
 def atribuir_vigilantes_ao_posto(posto, vigilantes, regime=None):
 	"""
 	Assign unassigned admitted vigilantes to a posto.
