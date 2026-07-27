@@ -2032,8 +2032,30 @@ def _aplicar_salario_base_vigilante(v, estrutura, from_date):
 	if not funcionario:
 		return ("ignorado", _("{0}: sem Funcionário").format(v.get("name")))
 
-	base = resolver_salario_base(v)
-	if flt(base) <= 0:
+	base = flt(resolver_salario_base(v))
+	if base <= 0 and v.get("status") == "Reserva":
+		# First-ever salary for a guard who never held a real posto (no manual
+		# override, no contract/regime, no Categoria default): fall back to the
+		# Reserva default — the same rule Vigilante._aplicar_salario_padrao_reserva
+		# already applies, but that hook only fires from a save on the Vigilante
+		# FORM. This bulk/API path (Ajuste de Salários, the Project button, silent
+		# onboarding) calls straight into the resolver and never goes through it,
+		# so a configured salario_base_padrao_reserva was silently ignored here.
+		# Written back onto the Vigilante (like the form hook does) so the result
+		# is idempotent on a later call, not just for this one SSA write.
+		sem_historico = not frappe.db.exists(
+			"Salary Structure Assignment", {"employee": funcionario, "docstatus": 1}
+		)
+		if sem_historico:
+			padrao = flt(frappe.db.get_single_value("SIGOS Settings", "salario_base_padrao_reserva"))
+			if padrao > 0:
+				frappe.db.set_value("Vigilante", v.get("name"), {
+					"salario_base_manual": padrao,
+					"salario_retido_automaticamente": 1,
+				})
+				base = padrao
+
+	if base <= 0:
 		return ("ignorado", _("{0}: sem salário base (regime do contrato sem valor)").format(v.get("name")))
 
 	existing = frappe.get_all(
@@ -2129,7 +2151,7 @@ def aplicar_salario_base(project=None, vigilante=None, vigilantes=None, silent=F
 	vigs = frappe.get_all(
 		"Vigilante",
 		filters=filters,
-		fields=["name", "funcionario", "projecto", "cliente", "regime_do_vigilante", "salario_base_manual", "categoria"],
+		fields=["name", "funcionario", "projecto", "cliente", "regime_do_vigilante", "salario_base_manual", "categoria", "status"],
 	)
 
 	resumo = {"atribuido": 0, "actualizado": 0, "inalterado": 0, "ignorado": 0}
