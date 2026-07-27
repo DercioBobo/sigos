@@ -1956,23 +1956,26 @@ def get_regime_salary(project, regime):
 	) or 0
 
 
-def _resolver_salario_contrato(v):
+def _resolver_salario_contrato(v, usar_categoria=True):
 	"""
 	Base salary from the contract/regime alone (no manual override): the
-	contract's per-regime salary, else the guard's Categoria's own global
-	default (Categoria Vigilante.salario_base — contract-independent, for
-	customers who don't price salary per Project) — then floored at the
-	Salário Mínimo Padrão (SIGOS Settings). Shared by resolver_salario_base
-	(which adds manual-override precedence on top) and
+	contract's per-regime salary, else — when `usar_categoria` — the guard's
+	Categoria's own global default (Categoria Vigilante.salario_base —
+	contract-independent, for customers who don't price salary per Project) —
+	then floored at the Salário Mínimo Padrão (SIGOS Settings). Shared by
+	resolver_salario_base (which adds manual-override precedence on top,
+	`usar_categoria` always True there — a guard actually working a posto) and
 	Vigilante._reter_salario_mais_alto (which needs the contract-only rate to
-	compare against the guard's retained top salary, without the current
-	manual value — itself possibly a previous freeze — feeding back into it).
-	No permission check: internal helper, called from a document hook that may
-	run under any user.
+	compare against the guard's retained top salary; passes `usar_categoria`
+	False for a Reserva move — there's no real posto to price by categoria
+	there, so only the Salário Mínimo Padrão floor should be able to raise pay,
+	not a categoria default the guard isn't actually earning). No permission
+	check: internal helper, called from a document hook that may run under any
+	user.
 	"""
 	from frappe.utils import flt
 	base = flt(get_regime_salary(v.get("projecto"), v.get("regime_do_vigilante")))
-	if base <= 0 and v.get("categoria"):
+	if base <= 0 and usar_categoria and v.get("categoria"):
 		base = flt(frappe.db.get_value("Categoria Vigilante", v.get("categoria"), "salario_base")) or 0
 
 	minimo = flt(frappe.db.get_single_value("SIGOS Settings", "salario_minimo_padrao"))

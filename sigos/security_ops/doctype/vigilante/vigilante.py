@@ -116,6 +116,14 @@ class Vigilante(Document):
 		them less. Only the guard's own top salary and the new posto/regime's
 		rate are compared; the higher one wins.
 
+		Entering/staying in Reserva itself can only ever FLOOR, never raise via
+		a categoria default: there's no real posto there, so the Categoria's
+		global rate (meant to price an actual assignment for customers who bill
+		by categoria, not by project) must not read as "the new posto's own
+		rate" and bump pay up. Only Salário Mínimo Padrão (a real wage floor
+		that applies to anyone employed) can still raise pay on a Reserva move —
+		see the `usar_categoria` flag on _resolver_salario_contrato.
+
 		salario_retido_automaticamente distinguishes a value THIS method wrote
 		from one RH deliberately set via "Definir Salário": only our own value
 		is ever touched here — an RH override is never overwritten, in either
@@ -166,7 +174,7 @@ class Vigilante(Document):
 			"projecto": self.projecto,
 			"regime_do_vigilante": self.regime_do_vigilante,
 			"categoria": self.categoria,
-		}))
+		}, usar_categoria=(self.status == "Activo")))
 		alvo = max(topo_anterior, novo_resolvido)
 
 		if flt(self.salario_base_manual) == alvo and self.salario_retido_automaticamente:
