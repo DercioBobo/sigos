@@ -16,6 +16,8 @@ def _next_contract_name(customer):
 
 @frappe.whitelist()
 def next_contract_name(customer):
+	from sigos.api import PAPEIS_INTERNOS
+	frappe.only_for(PAPEIS_INTERNOS)
 	return _next_contract_name(customer)
 
 

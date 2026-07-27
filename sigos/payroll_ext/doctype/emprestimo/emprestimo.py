@@ -154,6 +154,8 @@ def buscar_salario_base(funcionario):
 	"""Lets the form show salário base — and therefore the limit previews and
 	defaults that depend on it — as soon as the funcionário is picked, instead
 	of only after the first save."""
+	from sigos.api import PAPEIS_SALARIO
+	frappe.only_for(PAPEIS_SALARIO)
 	return _buscar_salario_base(funcionario)
 
 
@@ -237,4 +239,6 @@ def _calcular_excedencias(funcionario, salario_base, valor_a_pagar, meses_a_paga
 def verificar_limites(funcionario=None, salario_base=0, valor_a_pagar=0, meses_a_pagar=0):
 	"""Form preview of the same limit checks _validar_limites enforces on save —
 	lets the client prompt for an authorized exception before the user hits Save."""
+	from sigos.api import PAPEIS_SALARIO
+	frappe.only_for(PAPEIS_SALARIO)
 	return _calcular_excedencias(funcionario, salario_base, valor_a_pagar, meses_a_pagar)

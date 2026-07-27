@@ -142,4 +142,6 @@ def verificar_limite_mensal(funcionario=None, salario_base=0, valor_mensal=0):
 	"""Form preview of the same check _validar_limite_mensal enforces on save — lets
 	the client warn before the user hits Save (no exception flow: this cap is
 	always a hard block)."""
+	from sigos.api import PAPEIS_SALARIO
+	frappe.only_for(PAPEIS_SALARIO)
 	return _calcular_excedencia_mensal(funcionario, salario_base, valor_mensal)

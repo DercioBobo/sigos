@@ -21,6 +21,8 @@ _AUSENCIA_PARCIAL = ("Atraso", "Saída Antecipada")
 @frappe.whitelist()
 def painel_operacional(data=None, delegacao=None, cliente=None, posto=None, busca=None):
 	"""Snapshot of the operation for `data` (default today), optionally scoped."""
+	from sigos.api import PAPEIS_INTERNOS
+	frappe.only_for(PAPEIS_INTERNOS)
 	d = getdate(data or nowdate())
 
 	postos = _postos_activos(delegacao, cliente, posto)
@@ -378,6 +380,8 @@ def _agrupar_dias(d0, rows):
 @frappe.whitelist()
 def escala_semana_posto(posto, data=None):
 	"""7-day escala for one posto (from `data`), grouped per day — for the board modal."""
+	from sigos.api import PAPEIS_INTERNOS
+	frappe.only_for(PAPEIS_INTERNOS)
 	d0 = getdate(data or nowdate())
 	d1 = getdate(frappe.utils.add_days(d0, 6))
 	info = frappe.db.get_value(
@@ -407,6 +411,8 @@ def escala_semana_posto(posto, data=None):
 @frappe.whitelist()
 def escala_semana_vigilante(vigilante, data=None):
 	"""7-day escala for one vigilante (from `data`) plus key profile fields — board modal."""
+	from sigos.api import PAPEIS_INTERNOS
+	frappe.only_for(PAPEIS_INTERNOS)
 	d0 = getdate(data or nowdate())
 	d1 = getdate(frappe.utils.add_days(d0, 6))
 	v = frappe.db.get_value(

@@ -12,7 +12,9 @@
   "deck_escala",
   "sec_cabecalho",
   "naming_series",
+  "tipo_de_escala",
   "posto_de_vigilancia",
+  "delegacao",
   "nome_do_posto",
   "col_break_1",
   "cliente",
@@ -56,20 +58,45 @@
    "set_only_once": 1
   },
   {
+   "fieldname": "tipo_de_escala",
+   "fieldtype": "Select",
+   "label": "Tipo de Escala",
+   "options": "Posto\nReserva",
+   "default": "Posto",
+   "reqd": 1,
+   "set_only_once": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "description": "Posto: escala normal de um posto real. Reserva: escala especial para o grupo de vigilantes em Reserva de uma delegação — sem posto associado, invisível aos painéis de cobertura (que só contam postos reais)."
+  },
+  {
    "fieldname": "posto_de_vigilancia",
    "fieldtype": "Link",
    "label": "Posto de Vigilância",
    "options": "Posto De Vigilancia",
-   "reqd": 1,
+   "mandatory_depends_on": "eval:doc.tipo_de_escala==\"Posto\"",
+   "depends_on": "eval:doc.tipo_de_escala==\"Posto\"",
    "in_list_view": 1,
    "in_standard_filter": 1
+  },
+  {
+   "fieldname": "delegacao",
+   "fieldtype": "Link",
+   "label": "Delegação",
+   "options": "Delegacao",
+   "mandatory_depends_on": "eval:doc.tipo_de_escala==\"Reserva\"",
+   "depends_on": "eval:doc.tipo_de_escala==\"Reserva\"",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "description": "Todos os vigilantes em Reserva desta delegação partilham esta escala (mesmo Regime, turno_inicial individual por vigilante)."
   },
   {
    "fieldname": "nome_do_posto",
    "fieldtype": "Data",
    "label": "Nome do Posto",
    "fetch_from": "posto_de_vigilancia.nome_do_posto",
-   "read_only": 1
+   "read_only": 1,
+   "depends_on": "eval:doc.tipo_de_escala==\"Posto\""
   },
   {
    "fieldname": "col_break_1",
@@ -82,7 +109,8 @@
    "options": "Customer",
    "fetch_from": "posto_de_vigilancia.cliente",
    "read_only": 1,
-   "in_list_view": 1
+   "in_list_view": 1,
+   "depends_on": "eval:doc.tipo_de_escala==\"Posto\""
   },
   {
    "fieldname": "estado",

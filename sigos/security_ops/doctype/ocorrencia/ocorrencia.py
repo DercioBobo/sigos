@@ -103,6 +103,7 @@ class Ocorrencia(Document):
 		that's undecided. Kept working (picks the first guard) rather than broken,
 		so it's a small step to re-enable once that's settled.
 		"""
+		frappe.has_permission("Participacao", "create", throw=True)
 		primeiro = self.vigilantes_envolvidos[0].vigilante if self.vigilantes_envolvidos else None
 		if not primeiro:
 			frappe.throw(_("Defina o Vigilante envolvido antes de abrir uma Participação."))

@@ -1,6 +1,23 @@
 import frappe
 from frappe import _
 
+# ─── Role gates for whitelisted endpoints ──────────────────────────────────────
+# Every @frappe.whitelist() function here used to be callable by ANY authenticated
+# Desk user regardless of role — several write via ignore_permissions=True or raw
+# frappe.db.set_value/sql, which bypass the doctype's own permission grid entirely.
+# These three tuples mirror what the underlying doctypes already declare, so the
+# API stops being a side-channel around permissions the doctype JSON already
+# enforces in the UI. See sigos/security_ops/doctype/vigilante/vigilante.json,
+# escala_do_vigilante.json, posto_de_vigilancia.json for the source of truth.
+PAPEIS_INTERNOS = (
+	"System Manager", "SIGOS Manager", "Aprovador RH",
+	"Aprovador Operações", "Operações SIGOS", "Supervisor SIGOS",
+)  # baseline — every real SIGOS user holds at least one of these; no portal/guest access exists.
+PAPEIS_OPERACOES = ("System Manager", "SIGOS Manager", "Aprovador Operações")
+# ^ matches Vigilante/Escala Do Vigilante/Posto De Vigilancia's own write roster.
+PAPEIS_SALARIO = ("System Manager", "SIGOS Manager", "Aprovador RH")
+# ^ matches Vigilante's permlevel-2 (salário/dados bancários) write roster.
+
 
 def _vigilantes_com_escala_futura(excluir_escala=None):
 	"""
@@ -30,6 +47,7 @@ def get_reservas_disponiveis(delegacao=None, excluir_escala=None):
 	active escala. Used by the Escala 'Alocar Reservas' dialog. Reserva is an ESTADO — a
 	benched, available guard; categoria is irrelevant to the pool.
 	"""
+	frappe.only_for(PAPEIS_INTERNOS)
 	ocupados = set(_vigilantes_com_escala_futura(excluir_escala=excluir_escala))
 
 	filters = {"status": "Reserva"}
@@ -54,6 +72,7 @@ def alocar_reservas(posto, vigilantes, regime=None):
 	Categoria is kept, so they return to the pool when the post closes.
 	The post's Escala (built separately) then picks them up via Sincronizar.
 	"""
+	frappe.only_for(PAPEIS_OPERACOES)
 	import json
 	if isinstance(vigilantes, str):
 		vigilantes = json.loads(vigilantes)
@@ -98,6 +117,7 @@ def get_substitutos_disponiveis(doctype, txt, searchfield, start, page_len, filt
 	that day already marks them absent, or already books them as substituto for the
 	same periodo — no double-booking a reserve across documents.
 	"""
+	frappe.only_for(PAPEIS_INTERNOS)
 	import json
 	if isinstance(filters, str):
 		filters = json.loads(filters)
@@ -171,6 +191,7 @@ def get_escalados_no_posto_dia(doctype, txt, searchfield, start, page_len, filte
 	Excludes guards with a SUBMITTED absence on that day, plus everyone in
 	excluir_lista (the current doc's absentees and already-chosen replacements).
 	"""
+	frappe.only_for(PAPEIS_INTERNOS)
 	import json
 	if isinstance(filters, str):
 		filters = json.loads(filters)
@@ -231,6 +252,7 @@ def get_vigilantes_de_folga_na_delegacao_dia(doctype, txt, searchfield, start, p
 	since folga rows are more likely to be stale future rows an archived Escala
 	never pruned.
 	"""
+	frappe.only_for(PAPEIS_INTERNOS)
 	import json
 	if isinstance(filters, str):
 		filters = json.loads(filters)
@@ -288,6 +310,7 @@ def get_substitutos_para_wizard(doctype, txt, searchfield, start, page_len, filt
 	Wizard substituto search: benched reserve guards (status = Reserva) AND not in another
 	active Escala overlapping the given escala's period. Reserva is an ESTADO, not a categoria.
 	"""
+	frappe.only_for(PAPEIS_INTERNOS)
 	import json
 	if isinstance(filters, str):
 		filters = json.loads(filters)
@@ -323,6 +346,7 @@ def get_substitutos_para_wizard(doctype, txt, searchfield, start, page_len, filt
 @frappe.whitelist()
 def get_vigilante_data(vigilante, data):
 	"""Return schedule data (posto, regime, turno, periodo) for a vigilante on a given date."""
+	frappe.only_for(PAPEIS_INTERNOS)
 	return frappe.db.sql(
 		"""
 		SELECT
@@ -345,6 +369,7 @@ def get_vigilante_data(vigilante, data):
 @frappe.whitelist()
 def get_filtered_vigilantes(periodo, data):
 	"""Return distinct vigilantes active in the schedule for a given periodo and date."""
+	frappe.only_for(PAPEIS_INTERNOS)
 	results = frappe.db.sql(
 		"""
 		SELECT DISTINCT te.vigilante
@@ -364,6 +389,7 @@ def get_filtered_vigilantes(periodo, data):
 @frappe.whitelist()
 def get_vigilantes_on_folga(data):
 	"""Return vigilantes whose turno is a folga turn on the given date (from active Escalas)."""
+	frappe.only_for(PAPEIS_INTERNOS)
 	if not data:
 		frappe.throw(_("Data é obrigatória"))
 
@@ -388,6 +414,7 @@ def get_vigilantes_sem_escala_activa_query(doctype, txt, searchfield, start, pag
 	Frappe link search query — returns Vigilantes not in any active Escala
 	overlapping the given escala's period. Used by the wizard substituto picker.
 	"""
+	frappe.only_for(PAPEIS_INTERNOS)
 	escala_name = filters.get("escala_name") or ""
 	excluir     = filters.get("excluir") or ""
 
@@ -426,6 +453,7 @@ def get_vigilantes_sem_escala_activa(escala_name, delegacao=None):
 	with a period overlapping the given escala's period.
 	Used to filter the substituto picker in the wizard.
 	"""
+	frappe.only_for(PAPEIS_INTERNOS)
 	ocupados = _vigilantes_com_escala_futura(excluir_escala=escala_name)
 
 	filters = [
@@ -445,6 +473,7 @@ def get_vigilantes_em_outra_escala(escala_name, vigilantes):
 	Given a list of vigilante names, return those that already have FUTURE rows
 	in another active Escala.
 	"""
+	frappe.only_for(PAPEIS_INTERNOS)
 	import json
 	from frappe.utils import nowdate
 	if isinstance(vigilantes, str):
@@ -474,6 +503,7 @@ def get_vigilantes_em_outra_escala(escala_name, vigilantes):
 @frappe.whitelist()
 def get_escalas_activas_para_vigilante(vigilante):
 	"""Return active Escalas containing this vigilante, with row counts."""
+	frappe.only_for(PAPEIS_INTERNOS)
 	from sigos.utils import get_escalas_activas_com_vigilante
 	escalas = get_escalas_activas_com_vigilante(vigilante)
 
@@ -505,6 +535,7 @@ def actualizar_escala_apos_mudanca(
 	  "substituir" — remove vigilante, add novo_vigilante to the guard list
 	  "manter" / "pular" — nothing
 	"""
+	frappe.only_for(PAPEIS_OPERACOES)
 	if accao in ("manter", "pular"):
 		return {"removido": 0, "adicionado": 0}
 
@@ -561,6 +592,7 @@ def actualizar_escala_apos_mudanca(
 @frappe.whitelist()
 def gerar_escala_posto(escala_name):
 	"""Manually generate/extend the escala (button). Reconcile runs in validate on save."""
+	frappe.only_for(PAPEIS_OPERACOES)
 	escala = frappe.get_doc("Escala Do Vigilante", escala_name)
 	escala.reconciliar_escala()
 	escala.save(ignore_permissions=True)
@@ -570,6 +602,7 @@ def gerar_escala_posto(escala_name):
 @frappe.whitelist()
 def limpar_futuro_escala(escala_name):
 	"""Remove all future, non-override rows."""
+	frappe.only_for(PAPEIS_OPERACOES)
 	escala = frappe.get_doc("Escala Do Vigilante", escala_name)
 	escala.limpar_futuro()
 	escala.save(ignore_permissions=True)
@@ -582,6 +615,7 @@ def get_regime_turnos(regime):
 	Return the ordered turno sequence for a regime.
 	Used by Escala Do Vigilante JS to generate the schedule dynamically.
 	"""
+	frappe.only_for(PAPEIS_INTERNOS)
 	from sigos.utils import get_regime_turno_sequence
 	return get_regime_turno_sequence(regime)
 
@@ -589,6 +623,7 @@ def get_regime_turnos(regime):
 @frappe.whitelist()
 def get_turnos_do_regime_query(doctype, txt, searchfield, start, page_len, filters):
 	"""Link search: working (non-folga) turnos that belong to a regime."""
+	frappe.only_for(PAPEIS_INTERNOS)
 	import json
 	if isinstance(filters, str):
 		filters = json.loads(filters)
@@ -630,6 +665,7 @@ def get_vigilantes_da_escala(data, periodo, grupo_delegados=None, excluir_doc=No
 	previous query (folga rows never match a real periodo, so they're excluded
 	exactly as before) — existing callers (Ausencias quick-add) are unaffected.
 	"""
+	frappe.only_for(PAPEIS_INTERNOS)
 	folga_clause = "OR t.e_folga = 1" if int(incluir_folga or 0) else ""
 	base_sql = """
 		SELECT
@@ -687,28 +723,43 @@ def get_vigilantes_da_escala(data, periodo, grupo_delegados=None, excluir_doc=No
 def get_vigilantes_reserva(grupo_delegados=None, excluir_doc=None, data=None, periodo=None):
 	"""
 	Return every vigilante in Reserva (bench, not assigned to any posto) — the
-	roster source for 'Falta de Reserva'. Unlike get_vigilantes_da_escala, these
-	guards have no escala row for any day, so there's no posto/turno to report and
-	no Regime Turno Item weight to look up (n_de_faltas for this tipo comes from
-	SIGOS Settings at validate time instead, not from this search).
+	roster source for 'Falta de Reserva'. When the guard's delegação has a
+	Reserva-tipo Escala Do Vigilante (tipo_de_escala == "Reserva" — a special
+	escala with no posto, scoped by delegação instead, see
+	escala_do_vigilante.py) with a real row for data+periodo, this returns their
+	actual theoretical turno/regime, the same way get_vigilantes_da_escala does
+	for real postos — Ausencias._calcular_n_faltas_todas_linhas then weighs a
+	Falta de Reserva exactly like a Normal absence (SIGOS Settings.
+	metodo_faltas_reserva == "Peso do Turno"). Guards with no matching escala row
+	(no Reserva escala for their delegação, or a periodo mismatch) simply come
+	back with turno/regime = NULL, same as before this feature existed —
+	Ausencias falls back to the flat n_faltas_reserva constant for those.
 	Optionally scoped to the delegacoes in grupo_delegados; annotated the same way
 	as the escala roster so already-registered guards grey out at add-time.
 	"""
-	base_sql = """
-		SELECT
-			v.name AS vigilante,
-			v.nome_completo,
-			v.mecanografico,
-			v.delegacao,
-			v.regime_do_vigilante AS regime,
-			NULL AS posto,
-			NULL AS turno
-		FROM `tabVigilante` v
-		WHERE v.status = 'Reserva'
-		{extra}
-		ORDER BY v.delegacao, v.nome_completo
-	"""
-	params = {}
+	frappe.only_for(PAPEIS_INTERNOS)
+	if data and periodo:
+		join_escala = """
+			LEFT JOIN `tabEscala Do Vigilante` e
+				ON e.tipo_de_escala = 'Reserva' AND e.delegacao = v.delegacao AND e.estado = 'Activo'
+			LEFT JOIN `tabTabela De Escala De Vigilante` te
+				ON te.parent = e.name AND te.vigilante = v.name AND te.data = %(data)s
+			LEFT JOIN `tabTurno` t ON t.name = te.turno AND t.periodo = %(periodo)s
+		"""
+		# Only trust te.* when `t` actually matched the requested periodo — a
+		# guard whose escala row that day is the WRONG periodo (e.g. their
+		# theoretical turno is Noite but this sheet is registering Manhã) must
+		# come back with no context, not a mismatched one.
+		regime_col, posto_col, turno_col = (
+			"CASE WHEN t.name IS NOT NULL THEN te.regime END",
+			"CASE WHEN t.name IS NOT NULL THEN te.posto END",
+			"CASE WHEN t.name IS NOT NULL THEN te.turno END",
+		)
+	else:
+		join_escala = ""
+		regime_col = posto_col = turno_col = "NULL"
+
+	params = {"data": data, "periodo": periodo}
 
 	extra = ""
 	if grupo_delegados:
@@ -722,7 +773,25 @@ def get_vigilantes_reserva(grupo_delegados=None, excluir_doc=None, data=None, pe
 			params["delegacoes"] = tuple(delegacoes)
 			extra = "AND v.delegacao IN %(delegacoes)s"
 
-	rows = frappe.db.sql(base_sql.format(extra=extra), params, as_dict=True)
+	rows = frappe.db.sql(
+		f"""
+		SELECT
+			v.name AS vigilante,
+			v.nome_completo,
+			v.mecanografico,
+			v.delegacao,
+			{regime_col} AS regime,
+			{posto_col} AS posto,
+			{turno_col} AS turno
+		FROM `tabVigilante` v
+		{join_escala}
+		WHERE v.status = 'Reserva'
+		{extra}
+		ORDER BY v.delegacao, v.nome_completo
+		""",
+		params,
+		as_dict=True,
+	)
 	if data and periodo:
 		_marcar_ja_registados(rows, data, periodo, excluir_doc)
 		_marcar_licencas(rows, data)
@@ -864,6 +933,7 @@ def get_sigos_settings_flags():
 	enforcement always stays server-side in the doctype's own validate(). Started
 	for Vigilantes de Hoje's mark form (Subtipo de Falta visibility).
 	"""
+	frappe.only_for(PAPEIS_INTERNOS)
 	return {
 		"faltas_normal_vermelha_activo": frappe.db.get_single_value(
 			"SIGOS Settings", "faltas_normal_vermelha_activo"
@@ -1032,6 +1102,7 @@ def get_vigilante_dash(vigilante):
 	Mini-dash for the Vigilante form: faltas accumulated this month (same single
 	source as payroll/report) + today's escala shift. Both indexed and cheap.
 	"""
+	frappe.only_for(PAPEIS_INTERNOS)
 	from frappe.utils import getdate, nowdate
 	from sigos.utils import calcular_faltas_vigilante
 
@@ -1067,6 +1138,7 @@ def get_contexto_faltas(data, linhas):
 	- faltas_mes = SUBMITTED faltas accumulated this month up to `data`
 	  (same source as the Cumulativo de Faltas report and payroll).
 	"""
+	frappe.only_for(PAPEIS_INTERNOS)
 	import json
 	from frappe.utils import getdate
 	from sigos.utils import calcular_n_faltas, calcular_n_faltas_efetivo, calcular_faltas_vigilante
@@ -1101,6 +1173,7 @@ def get_vigilantes(from_date=None, to_date=None, status=None, delegacao=None, pr
 	- delegacao: exact match
 	- projecto: exact match
 	"""
+	frappe.only_for(PAPEIS_INTERNOS)
 	filters = {}
 
 	if from_date and to_date:
@@ -1162,6 +1235,7 @@ def get_ausencias(from_date=None, to_date=None, delegacao=None, periodo=None, li
 	rows: limited by the `limit` parameter.
 	summaries: computed over the full unfiltered dataset.
 	"""
+	frappe.only_for(PAPEIS_INTERNOS)
 	conditions = ["a.docstatus < 2"]
 	params = {"limit": int(limit)}
 
@@ -1294,6 +1368,7 @@ def get_vigilantes_sem_posto(delegacao=None):
 	Reserva guards are the prime candidates here — the reserve pool is what you deploy.
 	Used by the Atribuir Vigilantes dialog on Posto De Vigilancia.
 	"""
+	frappe.only_for(PAPEIS_INTERNOS)
 	filters = {
 		"status":              ["in", ["Pre-Adimissão", "Activo", "Reserva"]],
 		"posto_de_vigilancia": ["is", "not set"],
@@ -1320,6 +1395,7 @@ def get_vigilantes_do_projecto(project):
 	have no posto on the project any more, so they're naturally excluded —
 	nothing to prune separately.
 	"""
+	frappe.only_for(PAPEIS_INTERNOS)
 	if not project:
 		return []
 
@@ -1429,6 +1505,7 @@ def atribuir_vigilantes_ao_posto(posto, vigilantes, regime=None):
 	Validates posto state, capacity, and employee link.
 	Saves via vig.save() so all Vigilante validations fire.
 	"""
+	frappe.only_for(PAPEIS_OPERACOES)
 	import json
 	if isinstance(vigilantes, str):
 		vigilantes = json.loads(vigilantes)
@@ -1508,6 +1585,7 @@ def get_escala_preview_posto(posto, dias=7):
 	Return a 7-day schedule preview for every Escala at a posto.
 	Used by the Ver Escala dialog on Posto De Vigilancia.
 	"""
+	frappe.only_for(PAPEIS_INTERNOS)
 	from frappe.utils import today, add_days, getdate
 
 	hoje = getdate(today())
@@ -1587,6 +1665,7 @@ def has_active_workflow(doctype):
 	"""Whether an ACTIVE Workflow currently governs doctype — unlike checking for
 	the workflow_state field client-side, this doesn't false-positive once a
 	Workflow has been disabled (Frappe never removes the field just for that)."""
+	frappe.only_for(PAPEIS_INTERNOS)
 	from frappe.model.workflow import get_workflow_name
 	return bool(get_workflow_name(doctype))
 
@@ -1596,6 +1675,7 @@ def sugerir_periodo_folha(ano, mes):
 	"""Thin wrapper over sigos.utils.resolver_periodo_folha for the Payroll Entry
 	client-side date suggestion (see public/js/payroll_entry.js) — a proposal
 	the user can still freely edit, never a forced server-side rewrite."""
+	frappe.only_for(PAPEIS_INTERNOS)
 	from frappe.utils import cint
 	from sigos.utils import resolver_periodo_folha
 	inicio, fim = resolver_periodo_folha(cint(mes), cint(ano))
@@ -1616,6 +1696,7 @@ def resumo_aplicado_rotatividade(name):
 	CURRENT state, which may have moved on since via later rotations, so replaying
 	them here would risk showing something that never actually happened.
 	"""
+	frappe.only_for(PAPEIS_INTERNOS)
 	out = {
 		"vigilante": None, "nome": None, "operacao": None,
 		"mudancas": [], "escala": None, "ocupacao": [], "substituto": None,
@@ -1684,6 +1765,7 @@ def preview_rotatividade(vigilante, abreviatura_op=None, novo_posto=None, novo_r
 	wizard can show what will happen before commit. Shares the operation-flag and
 	escala-pair logic with the on_submit executor, so preview and execution agree.
 	"""
+	frappe.only_for(PAPEIS_INTERNOS)
 	from sigos.security_ops.doctype.escala_do_vigilante.escala_do_vigilante import _escala_do_par
 
 	out = {
@@ -1811,6 +1893,7 @@ def preview_rotatividade(vigilante, abreviatura_op=None, novo_posto=None, novo_r
 @frappe.whitelist()
 def search_vigilantes_rich(txt="", status="Activo", delegacao=None, excluir=None, so_substitutos=0):
 	"""Rich vigilante search for the Rotatividade wizard pickers — returns name + current posto/regime/categoria."""
+	frappe.only_for(PAPEIS_INTERNOS)
 	cond = []
 	params = {"txt": "%" + (txt or "") + "%"}
 	substituto = int(so_substitutos or 0)
@@ -1846,6 +1929,7 @@ def get_regime_rate(project, regime):
 	Reads the project's per-regime tariff table; falls back to the project's
 	default valor (custom_valor_do_contrato) when the regime has no specific rate.
 	"""
+	frappe.only_for(PAPEIS_INTERNOS)
 	if not project:
 		return 0
 	rate = frappe.db.get_value("Project Regime Rate", {"parent": project, "regime": regime}, "valor")
@@ -1864,6 +1948,7 @@ def get_regime_salary(project, regime):
 	rate there is no project-level fallback — a regime with no base returns 0, which
 	the apply action surfaces as 'ignorado'.
 	"""
+	frappe.only_for(PAPEIS_INTERNOS)
 	if not project or not regime:
 		return 0
 	return frappe.db.get_value(
@@ -1883,6 +1968,7 @@ def resolver_salario_base(vigilante):
 	one is set). `vigilante` may be a name (str) or a dict carrying the needed
 	fields.
 	"""
+	frappe.only_for(PAPEIS_SALARIO)
 	from frappe.utils import flt
 	if isinstance(vigilante, str):
 		v = frappe.db.get_value(
@@ -1911,6 +1997,7 @@ def resolver_salario_base_por_funcionario(employee):
 	Salary Structure Assignment form, which only has the Employee link (not the
 	Vigilante) to work with when suggesting a Base as soon as one is picked.
 	"""
+	frappe.only_for(PAPEIS_SALARIO)
 	vigilante = frappe.db.get_value("Employee", employee, "custom_vigilante")
 	if not vigilante:
 		return 0
@@ -1999,6 +2086,7 @@ def aplicar_salario_base(project=None, vigilante=None, vigilantes=None, silent=F
 	list of vigilantes. Used by the Project button (bulk), onboarding (single,
 	silent), and the Ajuste de Salários page (filtered bulk). Idempotent.
 	"""
+	frappe.only_for(PAPEIS_SALARIO)
 	from frappe.utils import today
 	import json as _json
 
@@ -2075,6 +2163,7 @@ def get_ajuste_salarios(filters=None):
 	BEFORE the so_* view toggles narrow `rows` — so a stat tile's count doesn't
 	move when the user clicks it to filter the table by that same tile.
 	"""
+	frappe.only_for(PAPEIS_SALARIO)
 	import json as _json
 	from frappe.utils import flt
 
@@ -2192,6 +2281,7 @@ def definir_salario_base(vigilante, valor=None, usar_contrato=0, confirmar_reduc
 	caller can confirm a pay cut with HR before re-calling with confirmar_reducao=1.
 	Otherwise returns {"base", "resumo"}.
 	"""
+	frappe.only_for(PAPEIS_SALARIO)
 	from frappe.utils import flt
 
 	if not frappe.db.exists("Vigilante", vigilante):
@@ -2269,6 +2359,7 @@ def repor_salario_padrao_reserva(vigilante):
 	salario_retido_automaticamente=1, so a later real posto assignment still
 	releases it on its own and resolves from that posto/regime instead.
 	"""
+	frappe.only_for(PAPEIS_SALARIO)
 	from frappe.utils import flt
 
 	vig = frappe.db.get_value("Vigilante", vigilante, ["status", "funcionario"], as_dict=True)
@@ -2320,6 +2411,7 @@ def definir_salario_base_bulk(vigilantes, valor, confirmar_reducao=0):
 	{"requires_confirm": 1, "reducoes": [...]} so the caller can confirm before
 	re-calling with confirmar_reducao=1.
 	"""
+	frappe.only_for(PAPEIS_SALARIO)
 	import json as _json
 	from frappe.utils import flt
 
@@ -2388,6 +2480,7 @@ def get_employee_hr360(employee):
 	    Reclamacao De Salario — already keyed on Employee via `funcionario`, no
 	    vigilante resolution needed for these.
 	"""
+	frappe.only_for(PAPEIS_SALARIO)
 	from frappe.utils import add_months, flt, get_first_day, get_last_day, getdate, nowdate
 	from sigos.ferias import _saldo
 	from sigos.utils import calcular_faltas_detalhado, calcular_faltas_vigilante
@@ -2497,6 +2590,7 @@ def get_employee_disciplinar(employee):
 	a separate call so get_employee_hr360's contract (already used by the
 	shipped Employee "Painel RH 360" panel) doesn't change.
 	"""
+	frappe.only_for(PAPEIS_INTERNOS)
 	vigilante = frappe.db.get_value("Employee", employee, "custom_vigilante")
 	if not vigilante:
 		return {"vigilante": None, "processos": [], "participacoes": []}
@@ -2527,6 +2621,7 @@ def get_employee_directory(filters=None):
 	get_employee_hr360 / get_employee_disciplinar), so this stays fast at any
 	headcount instead of running N queries for N employees.
 	"""
+	frappe.only_for(PAPEIS_INTERNOS)
 	import json as _json
 
 	if isinstance(filters, str):
@@ -2564,6 +2659,7 @@ def enviar_posto_para_reserva(posto, motivo):
 	Bench every Activo guard at a (closing) posto: creates + submits a RES rotatividade
 	per guard (status -> Reserva, posto cleared, escala removed), with a shared reason.
 	"""
+	frappe.only_for(PAPEIS_OPERACOES)
 	from frappe.utils import today
 	if not (motivo or "").strip():
 		frappe.throw(_("Indique o motivo para enviar os vigilantes para reserva."))
@@ -2596,6 +2692,7 @@ def encerrar_posto(posto, motivo):
 	(RES rotatividade per guard) AND inactivate the posto (which archives its escalas).
 	Avoids the limbo of an Inactivo posto still holding Activo guards with no schedule.
 	"""
+	frappe.only_for(PAPEIS_OPERACOES)
 	if not (motivo or "").strip():
 		frappe.throw(_("Indique o motivo do encerramento do posto."))
 	if not frappe.db.exists("Posto De Vigilancia", posto):
@@ -2630,6 +2727,7 @@ def licencas_na_escala(escala_name):
 	NOT pull the guard off the escala — it only flags the cells. Maps guards ->
 	Employees and reads their approved Leave Applications within the escala window.
 	"""
+	frappe.only_for(PAPEIS_INTERNOS)
 	from frappe.utils import getdate, add_days
 
 	datas = frappe.db.sql(

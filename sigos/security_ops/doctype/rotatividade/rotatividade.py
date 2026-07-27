@@ -57,11 +57,16 @@ class Rotatividade(Document):
 		demite = bool(op and op.demite) or self.motivo == "Demissão"
 		if demite:
 			vig.status = "Demitido"
-		# Enviar para Reserva: posto closed — bench the guard (employed, no posto, no escala)
+		# Enviar para Reserva: posto closed — bench the guard (employed, no posto, no
+		# real escala). If their delegação has a Reserva-tipo escala set up, they're
+		# added to it (Vigilante._migrar_escala_reserva_se_mudou), carrying over this
+		# same turno_vago slot when compatible — same continuity a substituto gets.
 		elif op and op.enviar_reserva:
 			from sigos.security_ops.doctype.vigilante.vigilante import limpar_campos_operacionais
 
 			vig.status = "Reserva"
+			if turno_vago:
+				vig.flags.turno_inicial_preferido = turno_vago
 			limpar_campos_operacionais(vig)
 
 		vig.save(ignore_permissions=True)
@@ -158,6 +163,19 @@ class Rotatividade(Document):
 			frappe.log_error(
 				f"Rotatividade {self.name}: erro ao criar Demissao para {self.vigilante}: {e}",
 				"SIGOS Rotatividade",
+			)
+			# Best-effort by design (the Vigilante's status change already committed
+			# above, in step 1 — there's nothing to roll back to at this point), but
+			# a failure here means NO Demissao record exists and the Employee's
+			# relieving_date is likely unset. A log entry alone is easy to miss —
+			# this must be a loud, hard-to-dismiss warning, not a quiet alert.
+			frappe.msgprint(
+				_("<b>Atenção:</b> não foi possível criar a Demissão automaticamente para "
+				  "<b>{0}</b> ({1}). O vigilante já está marcado como Demitido, mas falta "
+				  "criar manualmente o registo de Demissão (e confirmar a data de saída do "
+				  "Funcionário).").format(self.vigilante, e),
+				title=_("Demissão Automática Falhou"),
+				indicator="red",
 			)
 
 	# ─── Validation helpers ────────────────────────────────────────────────────

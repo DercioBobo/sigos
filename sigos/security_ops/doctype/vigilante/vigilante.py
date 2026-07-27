@@ -221,10 +221,16 @@ class Vigilante(Document):
 		Universal — fires for Rotatividade, Troca De Regime, Atribuir, manual edits.
 		A guard is only ADDED to the new escala when Activo with a posto+regime;
 		otherwise (demitido / inactivo / no posto) they are just removed from the old.
+		Also runs the Reserva-escala counterpart (delegação-scoped, no posto) —
+		see _migrar_escala_reserva_se_mudou, called unconditionally below since its
+		own trigger condition (entering/leaving Reserva) is independent of the
+		posto/regime-change gate this real-escala migration short-circuits on.
 		"""
 		before = self.get_doc_before_save()
 		if not before:
 			return
+
+		self._migrar_escala_reserva_se_mudou(before)
 
 		old_posto, old_regime = before.posto_de_vigilancia, before.regime_do_vigilante
 		new_posto, new_regime = self.posto_de_vigilancia, self.regime_do_vigilante
@@ -256,6 +262,43 @@ class Vigilante(Document):
 		migrar_escala_vigilante(
 			self.name, old_posto, old_regime, destino[0], destino[1], turno_inicial=turno_inicial
 		)
+
+	def _migrar_escala_reserva_se_mudou(self, before):
+		"""
+		Reserva-escala (delegação-scoped, no posto — Escala Do Vigilante
+		tipo_de_escala == "Reserva") membership follows Reserva status the same
+		way a real escala follows posto/regime. Entering Reserva adds the guard
+		to their delegação's Reserva escala (if exactly one exists — never
+		auto-created); leaving Reserva, or changing delegação while STILL in
+		Reserva, removes them from the old one. Silent no-op whenever there's no
+		Reserva escala for a delegação (most won't have one); warns when there's
+		more than one (ambiguous — needs a manual pick).
+		"""
+		entrou_reserva = before.status != "Reserva" and self.status == "Reserva"
+		saiu_reserva = before.status == "Reserva" and self.status != "Reserva"
+		delegacao_mudou_em_reserva = (
+			before.status == "Reserva" and self.status == "Reserva"
+			and before.delegacao != self.delegacao
+		)
+		if not (entrou_reserva or saiu_reserva or delegacao_mudou_em_reserva):
+			return
+
+		from sigos.security_ops.doctype.escala_do_vigilante.escala_do_vigilante import (
+			adicionar_vigilante_a_escala_reserva, remover_vigilante_da_escala_reserva,
+		)
+
+		if (saiu_reserva or delegacao_mudou_em_reserva) and before.delegacao:
+			remover_vigilante_da_escala_reserva(self.name, before.delegacao)
+
+		if (entrou_reserva or delegacao_mudou_em_reserva) and self.delegacao:
+			# Carry over the guard's just-vacated real turno when possible — set by
+			# whoever put them in Reserva (Rotatividade, or Vigilante's own
+			# _mudar_estado_operacional) via the same turno_inicial_preferido flag
+			# the real-escala migration above reuses for substitutes.
+			turno_vago = self.flags.get("turno_inicial_preferido")
+			_, aviso = adicionar_vigilante_a_escala_reserva(self.name, self.delegacao, turno_inicial=turno_vago)
+			if aviso:
+				frappe.msgprint(aviso, indicator="orange", alert=True)
 
 	# ─── Auto-activation ─────────────────────────────────────────────────────────
 
@@ -542,6 +585,20 @@ class Vigilante(Document):
 				_("O vigilante já está em <b>{0}</b>.").format(novo_estado),
 				title=_("Sem alteração"),
 			)
+
+		if novo_estado == "Reserva" and self.posto_de_vigilancia and self.regime_do_vigilante:
+			# Capture the vacated rotation slot BEFORE limpar_campos_operacionais
+			# wipes posto/regime — carried into the Reserva escala (if one exists
+			# for this guard's delegação) via _migrar_escala_reserva_se_mudou, same
+			# turno_inicial_preferido flag Rotatividade uses for a substitute.
+			from sigos.security_ops.doctype.escala_do_vigilante.escala_do_vigilante import (
+				obter_turno_inicial_actual,
+			)
+			turno_vago = obter_turno_inicial_actual(
+				self.name, self.posto_de_vigilancia, self.regime_do_vigilante
+			)
+			if turno_vago:
+				self.flags.turno_inicial_preferido = turno_vago
 
 		self.status = novo_estado
 		limpar_campos_operacionais(self)

@@ -17,6 +17,7 @@ class FaturacaoMensal(Document):
 		with the contract's per-regime tariff. Cliente is derived from the Project so it
 		is always authoritative. posto_interno / project-less guards are not billable.
 		"""
+		frappe.only_for(("System Manager", "SIGOS Manager", "Accounts Manager"))
 		self.set("linhas", [])
 
 		cond = ""
@@ -82,6 +83,10 @@ class FaturacaoMensal(Document):
 
 	@frappe.whitelist()
 	def gerar_faturas(self):
+		# Money-generating action (real draft Sales Invoices via ignore_permissions=True
+		# below) — gate on role explicitly rather than relying on whatever incidental
+		# read/write access this doctype happens to grant.
+		frappe.only_for(("System Manager", "SIGOS Manager", "Accounts Manager"))
 		if self.faturas_geradas:
 			frappe.throw(
 				_("Esta execução já gerou facturas (<b>{0}</b>). Crie uma nova execução "

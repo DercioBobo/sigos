@@ -10,6 +10,8 @@ def consultar_saldo(vigilante, tipo_de_licenca, ate=None):
 	Leave Type as of the requested start date, computed via the same ledger-sum
 	source ferias.py uses (SUM of Leave Ledger Entries, not new_leaves_allocated).
 	Called before the doc is even saved, purely to help the approver decide."""
+	from sigos.api import PAPEIS_INTERNOS
+	frappe.only_for(PAPEIS_INTERNOS)
 	if not (vigilante and tipo_de_licenca):
 		return None
 	funcionario = frappe.db.get_value("Vigilante", vigilante, "funcionario")

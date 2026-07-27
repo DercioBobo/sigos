@@ -22,7 +22,14 @@ class Participacao(Document):
 	@frappe.whitelist()
 	def criar_processo_disciplinar(self):
 		"""Open a draft Processo Disciplinar pre-filled from this participação.
-		Returns the (existing or new) process name so the UI can route to it."""
+		Returns the (existing or new) process name so the UI can route to it.
+
+		Only this manual entry point is gated — _abrir_processo (the shared insert
+		helper) is also called by the automatic 3-strikes accumulation from
+		on_submit, which must keep working regardless of the submitting user's own
+		Processo Disciplinar permissions (it's a system-driven consequence of
+		submitting a Participação, not a user action on the PD itself)."""
+		frappe.has_permission("Processo Disciplinar", "create", throw=True)
 		if self.docstatus != 1:
 			frappe.throw(_("Submeta a participação antes de abrir um Processo Disciplinar."))
 
@@ -122,9 +129,23 @@ class Participacao(Document):
 				indicator="orange", alert=True,
 			)
 		except Exception as e:
+			# Deliberately NOT re-raised: the Participação being submitted right now
+			# is the actual misconduct report and must go through regardless of
+			# whether the accumulation trigger succeeds — failing the whole
+			# submission over a secondary auto-open would lose the primary record
+			# too. But this is the real accountability mechanism (a guard's 3rd
+			# strike), so a log entry alone is not enough — it must be a loud,
+			# hard-to-dismiss warning, not a quiet alert.
 			frappe.log_error(
 				f"Participacao {self.name}: erro ao criar Processo Disciplinar automático: {e}",
 				"SIGOS Participacao",
+			)
+			frappe.msgprint(
+				_("<b>Atenção:</b> esta participação atingiu o limite de acumulação ({0}), mas o "
+				  "Processo Disciplinar automático <b>falhou</b> ao ser criado. Abra-o manualmente "
+				  "com o botão \"Abrir Processo Disciplinar\".").format(razao),
+				title=_("Processo Disciplinar Automático Falhou"),
+				indicator="red",
 			)
 
 	def _registar_timeline(self, accao):

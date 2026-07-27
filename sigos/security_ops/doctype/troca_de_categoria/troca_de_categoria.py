@@ -34,3 +34,4 @@ class TrocaDeCategoria(Document):
 				f"TrocaDeCategoria {self.name}: erro ao atualizar categoria do vigilante {self.vigilante}: {e}",
 				"SIGOS Troca De Categoria"
 			)
+			raise

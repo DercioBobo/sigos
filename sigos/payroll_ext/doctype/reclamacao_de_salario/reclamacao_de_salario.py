@@ -112,6 +112,8 @@ def resolver_folha_reclamacao(funcionario, mes=None, ano=None):
 	slip exists. Picks the most recent slip if more than one overlaps the month."""
 	from frappe.utils import cint
 	from sigos.utils import resolver_periodo_folha
+	from sigos.api import PAPEIS_SALARIO
+	frappe.only_for(PAPEIS_SALARIO)
 
 	mes_num = MESES.get(mes)
 	ano = cint(ano)

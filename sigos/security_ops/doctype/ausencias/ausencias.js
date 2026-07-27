@@ -648,7 +648,7 @@ function _render_badges(frm, $card, row, ctx) {
 	const titulo = dedup
 		? __("Turno consecutivo — as folgas já foram contadas na falta anterior")
 		: row.tipo_de_ausencia === "Falta de Reserva"
-			? __("Nº de faltas configurado em SIGOS Settings para Falta de Reserva")
+			? __("Nº de faltas para Falta de Reserva — valor fixo ou peso da escala de Reserva da delegação, definido ao gravar")
 			: __("Peso desta falta no regime");
 	let html = `<span class="ausb-bdg ${dedup ? "bdg-dedup" : "bdg-peso"}" title="${titulo}">
 		${__("conta")} <b>${n}</b> ${n === 1 ? __("falta") : __("faltas")}${dedup ? " · " + __("consecutiva") : ""}</span>`;

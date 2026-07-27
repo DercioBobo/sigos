@@ -45,6 +45,8 @@ def _series(rows, keys, k="ym", v="n"):
 @frappe.whitelist()
 def get_cards():
     """Headline KPIs + the secondary ledger strip."""
+    from sigos.api import PAPEIS_INTERNOS
+    frappe.only_for(PAPEIS_INTERNOS)
     v = frappe.db.sql(
         """
         SELECT
@@ -101,6 +103,8 @@ def get_cards():
 @frappe.whitelist()
 def get_composicao(status="Activo"):
     """Distribution of the active workforce by categoria, regime, sexo, delegacao."""
+    from sigos.api import PAPEIS_INTERNOS
+    frappe.only_for(PAPEIS_INTERNOS)
     base = "status = %(st)s" if status and status != "Todos" else "1 = 1"
     p = {"st": status}
 
@@ -131,6 +135,8 @@ def get_composicao(status="Activo"):
 @frappe.whitelist()
 def get_movimento(months=12):
     """12-month (default) movement: admissoes vs demissoes, rotatividades, ausencias."""
+    from sigos.api import PAPEIS_INTERNOS
+    frappe.only_for(PAPEIS_INTERNOS)
     start, keys, labels = _month_buckets(months)
     p = {"start": start}
 
@@ -179,6 +185,8 @@ def get_movimento(months=12):
 @frappe.whitelist()
 def get_armas():
     """Weapons by delegacao (total + deployed)."""
+    from sigos.api import PAPEIS_INTERNOS
+    frappe.only_for(PAPEIS_INTERNOS)
     por_deleg = frappe.db.sql(
         """SELECT COALESCE(NULLIF(delegacao, ''), 'Sem delegacao') AS k,
                   COUNT(*) AS n,
@@ -199,6 +207,8 @@ def get_faltas(min_faltas=8, months=6):
     Guards over `min_faltas` absences in the window. Reuses the Cumulativo de Faltas
     approach: only compute for guards who actually have a submitted absence in-window.
     """
+    from sigos.api import PAPEIS_INTERNOS
+    frappe.only_for(PAPEIS_INTERNOS)
     min_faltas = int(min_faltas or 8)
     start, _keys, _labels = _month_buckets(months)
     ate = getdate(nowdate())

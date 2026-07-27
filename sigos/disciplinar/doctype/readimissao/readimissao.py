@@ -18,6 +18,8 @@ def ultima_demissao(vigilante):
 	"""Vigilante's most recent submitted Demissao (motivo/data/observacoes) — lets
 	RH see why they left last time before deciding on the readmission. Called from
 	the form as soon as the vigilante is picked, before the doc is even saved."""
+	from sigos.api import PAPEIS_INTERNOS
+	frappe.only_for(PAPEIS_INTERNOS)
 	return _buscar_ultima_demissao(vigilante) or {}
 
 

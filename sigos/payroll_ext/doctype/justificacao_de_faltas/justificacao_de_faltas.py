@@ -72,6 +72,8 @@ def preview_numero(vigilante, dia_de_inicio, dia_de_fim):
 	Form preview of `numero` — returns the SAME escala-aware count that
 	_recompute_numero stamps on save, so what the user sees matches what is stored.
 	"""
+	from sigos.api import PAPEIS_SALARIO
+	frappe.only_for(PAPEIS_SALARIO)
 	if not (vigilante and dia_de_inicio and dia_de_fim):
 		return 0
 	return calcular_faltas_vigilante(vigilante, dia_de_inicio, dia_de_fim)

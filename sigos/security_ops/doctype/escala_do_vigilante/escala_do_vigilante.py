@@ -8,6 +8,7 @@ class EscalaDoVigilante(Document):
 
 	def validate(self):
 		self._validar_um_por_posto()
+		self._validar_um_por_delegacao()
 		self._validar_turnos()
 		self._validar_capacidade_posto()
 		self._auto_arquivar_se_vazia()   # before reconcile — skips generation when empty
@@ -58,6 +59,32 @@ class EscalaDoVigilante(Document):
 					self.posto_de_vigilancia, self.regime_do_vigilante, existing
 				),
 				title=_("Escala Duplicada"),
+			)
+
+	def _validar_um_por_delegacao(self):
+		"""Only one Escala de Reserva per (delegação, regime) — the tipo_de_escala
+		== "Reserva" counterpart of _validar_um_por_posto, keyed by delegação
+		instead of posto since this escala has no posto at all."""
+		if self.tipo_de_escala != "Reserva" or not (self.delegacao and self.regime_do_vigilante):
+			return
+		existing = frappe.db.get_value(
+			"Escala Do Vigilante",
+			{
+				"tipo_de_escala": "Reserva",
+				"delegacao": self.delegacao,
+				"regime_do_vigilante": self.regime_do_vigilante,
+				"name": ["!=", self.name or ""],
+			},
+			"name",
+		)
+		if existing:
+			frappe.throw(
+				_("Já existe uma escala de Reserva para a delegação <b>{0}</b> no regime <b>{1}</b>: "
+				  "<a href='/app/escala-do-vigilante/{2}'>{2}</a>. "
+				  "Cada combinação delegação + regime tem uma única escala de Reserva.").format(
+					self.delegacao, self.regime_do_vigilante, existing
+				),
+				title=_("Escala de Reserva Duplicada"),
 			)
 
 	def _validar_turnos(self):
@@ -385,3 +412,88 @@ def migrar_escala_vigilante(vigilante, old_posto, old_regime, new_posto, new_reg
 	if not (removido or adicionado):
 		return None
 	return {"removido_de": removido, "adicionado_a": adicionado, "criada": criada}
+
+
+# ─── Escala de Reserva (delegação-scoped, no posto) ────────────────────────────
+# The Reserva counterpart of the keystone above — same "escala follows the
+# guard" idea, but keyed by delegação instead of (posto, regime), and never
+# auto-created: unlike a real posto (where posto+regime fully determine the
+# escala), there's no safe default posto-less escala to conjure up, so this is
+# opt-in infrastructure HR sets up deliberately (Escala Do Vigilante,
+# tipo_de_escala == "Reserva"). Triggered from Vigilante._migrar_escala_reserva_se_mudou.
+
+def _escalas_reserva_da_delegacao(delegacao):
+	"""Every non-arquivada Reserva-tipo escala for a delegação."""
+	if not delegacao:
+		return []
+	return frappe.get_all(
+		"Escala Do Vigilante",
+		filters={"tipo_de_escala": "Reserva", "delegacao": delegacao, "estado": ["!=", "Arquivado"]},
+		pluck="name",
+	)
+
+
+def remover_vigilante_da_escala_reserva(vigilante, delegacao):
+	"""Remove a guard from whatever Reserva escala(s) they're on for `delegacao`
+	— used when a guard leaves Reserva, or moves to a different delegação while
+	still in Reserva. Silent no-op if none found or they weren't in it."""
+	removido = None
+	for nome in _escalas_reserva_da_delegacao(delegacao):
+		esc = frappe.get_doc("Escala Do Vigilante", nome)
+		antes = len(esc.tab_vigilante_do_posto)
+		esc.set("tab_vigilante_do_posto", [
+			g for g in esc.tab_vigilante_do_posto if g.vigilante != vigilante
+		])
+		if len(esc.tab_vigilante_do_posto) != antes:
+			esc.save(ignore_permissions=True)
+			removido = nome
+	return removido
+
+
+def adicionar_vigilante_a_escala_reserva(vigilante, delegacao, turno_inicial=None):
+	"""
+	Add a guard to their delegação's Reserva-tipo escala, if EXACTLY one exists.
+	Never auto-creates one (see module note above). turno_inicial (optional): the
+	guard's just-vacated real turno (obter_turno_inicial_actual) — reused as-is
+	ONLY if that exact Turno also exists in the Reserva escala's own Regime
+	sequence (continuity); otherwise falls back to the generic "first free
+	working turno" pick, same collision-avoidance as the real-posto engine.
+
+	Returns (nome_da_escala_ou_None, aviso_ou_None) — `aviso` is a user-facing
+	message for the ambiguous case (more than one Reserva escala for this
+	delegação); the caller (Vigilante) surfaces it via msgprint. No escala at
+	all is NOT a warning — most delegações won't have one set up, and that's
+	fine, the guard just enters Reserva without turno-weighted faltas tracking.
+	"""
+	nomes = _escalas_reserva_da_delegacao(delegacao)
+	if len(nomes) > 1:
+		return None, _(
+			"Existem <b>{0}</b> Escalas de Reserva para a delegação <b>{1}</b> — "
+			"não é possível escolher automaticamente. Adicione o vigilante "
+			"manualmente à escala correcta."
+		).format(len(nomes), delegacao)
+	if not nomes:
+		return None, None
+
+	esc = frappe.get_doc("Escala Do Vigilante", nomes[0])
+	if any(g.vigilante == vigilante for g in esc.tab_vigilante_do_posto):
+		return esc.name, None  # already on it
+
+	turno = None
+	if turno_inicial:
+		validos = {r.turno for r in frappe.get_cached_doc("Regime", esc.regime_do_vigilante).turnos}
+		if turno_inicial in validos:
+			turno = turno_inicial
+
+	if not turno:
+		turno = _turno_inicial_livre(esc, esc.regime_do_vigilante)
+	elif any(g.turno_inicial == turno for g in esc.tab_vigilante_do_posto):
+		# Carried-over slot collides with someone already on it — bump THEM to a
+		# free slot instead of silently overlapping two guards on the same turno,
+		# same rule _adicionar_vigilante_a_escala applies for real postos.
+		colidente = next(g for g in esc.tab_vigilante_do_posto if g.turno_inicial == turno)
+		colidente.turno_inicial = _turno_inicial_livre(esc, esc.regime_do_vigilante)
+
+	esc.append("tab_vigilante_do_posto", {"vigilante": vigilante, "turno_inicial": turno})
+	esc.save(ignore_permissions=True)
+	return esc.name, None

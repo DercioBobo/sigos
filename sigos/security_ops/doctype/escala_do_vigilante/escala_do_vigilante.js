@@ -6,7 +6,8 @@ frappe.ui.form.on("Escala Do Vigilante", {
 		// Only hide the natives once the deck field actually exists on this site
 		// (it arrives via migrate) — otherwise keep the classic form fully usable.
 		if (frm.fields_dict.deck_escala) {
-			["sec_cabecalho", "naming_series", "posto_de_vigilancia", "col_break_1", "cliente", "estado",
+			["sec_cabecalho", "naming_series", "tipo_de_escala", "posto_de_vigilancia", "delegacao",
+			 "col_break_1", "cliente", "estado",
 			 "sec_config", "regime_do_vigilante", "data_de_inicio", "col_break_per", "gerado_ate",
 			 "sincronizar_vigilantes", "distribuir_turnos", "btn_gerar", "btn_limpar_futuro"]
 				.forEach(f => frm.set_df_property(f, "hidden", 1));
@@ -147,28 +148,50 @@ function _set_estado(frm, novo) {
 	});
 }
 
-// ─── Sync guards from posto, with STAGGERED turnos for coverage ───────────────
+// ─── Sync guards from posto (or, for tipo_de_escala == "Reserva", from
+// delegação + status Reserva), with STAGGERED turnos for coverage ─────────────
 function _sincronizar_vigilantes(frm) {
-	if (!frm.doc.posto_de_vigilancia || !frm.doc.regime_do_vigilante) {
+	const reserva = frm.doc.tipo_de_escala === "Reserva";
+
+	if (reserva) {
+		if (!frm.doc.delegacao || !frm.doc.regime_do_vigilante) {
+			frappe.msgprint(__("Defina a Delegação e o Regime primeiro."));
+			return;
+		}
+	} else if (!frm.doc.posto_de_vigilancia || !frm.doc.regime_do_vigilante) {
 		frappe.msgprint(__("Defina o Posto e o Regime primeiro."));
 		return;
 	}
+
+	// Reserva guards have NO regime_do_vigilante of their own while benched
+	// (cleared same as posto — see vigilante.py CAMPOS_OPERACIONAIS_RESERVA), so
+	// the shared Regime here is a property of THIS escala, not of each guard —
+	// filtering by delegação + status is the complete match, unlike the Posto
+	// branch which also matches the guard's own regime.
+	const filters = reserva
+		? [["delegacao", "=", frm.doc.delegacao], ["status", "=", "Reserva"]]
+		: [
+			["posto_de_vigilancia", "=", frm.doc.posto_de_vigilancia],
+			["regime_do_vigilante", "=", frm.doc.regime_do_vigilante],
+			["status", "=", "Activo"],
+		];
 
 	frappe.call({
 		method: "frappe.client.get_list",
 		args: {
 			doctype: "Vigilante",
-			filters: [
-				["posto_de_vigilancia", "=", frm.doc.posto_de_vigilancia],
-				["regime_do_vigilante", "=", frm.doc.regime_do_vigilante],
-				["status", "=", "Activo"],
-			],
+			filters,
 			fields: ["name", "nome_completo"],
 			limit_page_length: 0,
 		},
 		callback(r) {
 			const guards = r.message || [];
-			if (!guards.length) { frappe.msgprint(__("Nenhum vigilante activo neste posto e regime.")); return; }
+			if (!guards.length) {
+				frappe.msgprint(reserva
+					? __("Nenhum vigilante em Reserva nesta delegação.")
+					: __("Nenhum vigilante activo neste posto e regime."));
+				return;
+			}
 
 			// Drop rows that no longer belong to this posto/regime (e.g. posto was
 			// changed on the doc) — otherwise sync only ever appends, leaving stale
@@ -731,7 +754,7 @@ function _build_deck_shell(frm, w, editable, key) {
 		<div id="sigos-esc-deck" data-key="${key}" class="${editable ? "" : "is-arquivada"}">
 			<div class="escd-top">
 				<div class="escd-id">
-					<div class="escd-kicker">${__("Escala do Posto")}</div>
+					<div class="escd-kicker" data-escd-kicker></div>
 					<div class="escd-title" data-escd-title></div>
 					<div class="escd-sub" data-escd-sub></div>
 				</div>
@@ -741,7 +764,9 @@ function _build_deck_shell(frm, w, editable, key) {
 				</div>
 			</div>
 			<div class="escd-controls">
-				<div class="escd-field"><label>${__("Posto")}</label><div id="escd-c-posto"></div></div>
+				<div class="escd-field"><label>${__("Tipo")}</label><div id="escd-c-tipo"></div></div>
+				<div class="escd-field" id="escd-wrap-posto"><label>${__("Posto")}</label><div id="escd-c-posto"></div></div>
+				<div class="escd-field" id="escd-wrap-delegacao"><label>${__("Delegação")}</label><div id="escd-c-delegacao"></div></div>
 				<div class="escd-field"><label>${__("Regime")}</label><div id="escd-c-regime"></div></div>
 				<div class="escd-field"><label>${__("Início do Ciclo")}</label><div id="escd-c-inicio"></div></div>
 			</div>
@@ -756,6 +781,31 @@ function _build_deck_shell(frm, w, editable, key) {
 		</div>`);
 
 	const ro = editable ? 0 : 1;
+
+	// Tipo de Escala: Posto (normal) vs Reserva (delegação-scoped, no posto at
+	// all — see escala_do_vigilante.py._validar_um_por_delegacao). Locked after
+	// the first save, same as naming_series — switching tipo on an escala that
+	// may already have generated rows tied to a real posto would be confusing
+	// at best, so it's a one-time choice made when the escala is created.
+	const _toggle_tipo_wrap = () => {
+		const reserva = frm.doc.tipo_de_escala === "Reserva";
+		w.find("#escd-wrap-posto").toggle(!reserva);
+		w.find("#escd-wrap-delegacao").toggle(reserva);
+	};
+	const c_tipo = frappe.ui.form.make_control({
+		df: { fieldtype: "Select", fieldname: "tipo_de_escala", options: "Posto\nReserva",
+			read_only: ro || !frm.is_new() ? 1 : 0,
+			onchange: () => {
+				const v = c_tipo.get_value();
+				if ((v || "Posto") !== (frm.doc.tipo_de_escala || "Posto")) {
+					frm.set_value("tipo_de_escala", v || "Posto").then(() => { _toggle_tipo_wrap(); _deck_identity(frm); });
+				}
+			} },
+		parent: w.find("#escd-c-tipo"), render_input: true,
+	});
+	c_tipo.set_value(frm.doc.tipo_de_escala || "Posto");
+	_toggle_tipo_wrap();
+
 	const c_posto = frappe.ui.form.make_control({
 		df: { fieldtype: "Link", fieldname: "posto_de_vigilancia", options: "Posto De Vigilancia", read_only: ro,
 			get_query: () => ({ filters: { estado: "Activo" } }),
@@ -766,6 +816,16 @@ function _build_deck_shell(frm, w, editable, key) {
 		parent: w.find("#escd-c-posto"), render_input: true,
 	});
 	if (frm.doc.posto_de_vigilancia) c_posto.set_value(frm.doc.posto_de_vigilancia);
+
+	const c_delegacao = frappe.ui.form.make_control({
+		df: { fieldtype: "Link", fieldname: "delegacao", options: "Delegacao", read_only: ro,
+			onchange: () => {
+				const v = c_delegacao.get_value();
+				if ((v || "") !== (frm.doc.delegacao || "")) frm.set_value("delegacao", v || null).then(() => _deck_identity(frm));
+			} },
+		parent: w.find("#escd-c-delegacao"), render_input: true,
+	});
+	if (frm.doc.delegacao) c_delegacao.set_value(frm.doc.delegacao);
 
 	const c_regime = frappe.ui.form.make_control({
 		df: { fieldtype: "Link", fieldname: "regime_do_vigilante", options: "Regime", read_only: ro,
@@ -797,8 +857,14 @@ function _deck_identity(frm) {
 	const w = frm.fields_dict.deck_escala?.$wrapper;
 	if (!w || !w.find("#sigos-esc-deck").length) return;
 
-	w.find("[data-escd-title]").text(frm.doc.posto_de_vigilancia || __("Nova Escala"));
-	const sub = [frm.doc.cliente, frm.doc.regime_do_vigilante].filter(Boolean).join("  ·  ");
+	const reserva = frm.doc.tipo_de_escala === "Reserva";
+	w.find("[data-escd-kicker]").text(reserva ? __("Escala de Reserva") : __("Escala do Posto"));
+	w.find("[data-escd-title]").text(
+		reserva ? (frm.doc.delegacao || __("Nova Escala de Reserva")) : (frm.doc.posto_de_vigilancia || __("Nova Escala"))
+	);
+	const sub = reserva
+		? [frm.doc.regime_do_vigilante].filter(Boolean).join("  ·  ")
+		: [frm.doc.cliente, frm.doc.regime_do_vigilante].filter(Boolean).join("  ·  ");
 	w.find("[data-escd-sub]").text(sub);
 
 	const chips = {

@@ -6,6 +6,12 @@ from frappe.model.document import Document
 class ProcessoDisciplinar(Document):
 
 	def on_update(self):
+		# docstatus == 1 (not just workflow_state) is the real gate: on_update fires
+		# on EVERY save, including drafts. Without this, a site where the Workflow
+		# isn't provisioned yet (workflow_state missing → falls back to "Aprovado")
+		# would create and submit a real payroll deduction from a mere draft save.
+		if self.docstatus != 1:
+			return
 		if (self.get("workflow_state") or "Aprovado") != "Aprovado":
 			return
 
@@ -63,6 +69,7 @@ class ProcessoDisciplinar(Document):
 				f"ProcessoDisciplinar {self.name}: erro ao criar Outras Deducoes: {e}",
 				"SIGOS Processo Disciplinar"
 			)
+			raise
 
 	def _aplicar_retencao_salario(self):
 		"""Suspend Employee and deactivate Vigilante."""
@@ -82,6 +89,7 @@ class ProcessoDisciplinar(Document):
 				f"ProcessoDisciplinar {self.name}: erro ao aplicar Retenção de Salário: {e}",
 				"SIGOS Processo Disciplinar"
 			)
+			raise
 
 	def _criar_demissao(self):
 		"""Create and submit a Demissao document."""
@@ -119,3 +127,4 @@ class ProcessoDisciplinar(Document):
 				f"ProcessoDisciplinar {self.name}: erro ao criar Demissao: {e}",
 				"SIGOS Processo Disciplinar"
 			)
+			raise

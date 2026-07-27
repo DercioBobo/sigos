@@ -21,7 +21,11 @@ class Demissao(Document):
 				_("Já existe uma Demissão submetida para o vigilante {0}.").format(self.vigilante)
 			)
 
-		# Update Vigilante
+		# Update Vigilante — never let this fail silently: a Demissão that ends up
+		# "Submitted" while the guard is still Activo is a real operational risk
+		# (still on the posto/escala, could still be paid). Log for the audit
+		# trail, then re-raise so the submit itself fails/rolls back instead of
+		# looking successful.
 		try:
 			vigilante_doc = frappe.get_doc("Vigilante", self.vigilante)
 			vigilante_doc.delegacao = None
@@ -39,6 +43,7 @@ class Demissao(Document):
 				f"Demissao {self.name}: erro ao atualizar Vigilante {self.vigilante}: {e}",
 				"SIGOS Demissao"
 			)
+			raise
 
 		from sigos.timeline import registar
 		texto = _("Demissão registada — data <b>{0}</b>").format(
@@ -47,7 +52,10 @@ class Demissao(Document):
 			texto += _(" · motivo: {0}").format(self.motivo)
 		registar(self.vigilante, texto, self)
 
-		# Update linked Employee
+		# Update linked Employee — relieving_date is ONLY ever set here (the
+		# Vigilante-side auto-correct above only mirrors status), so a silent
+		# failure would leave the Employee "Left" with no relieving date. Same
+		# reasoning as above: log, then re-raise.
 		try:
 			funcionario = frappe.db.get_value("Vigilante", self.vigilante, "funcionario")
 			if funcionario:
@@ -60,3 +68,4 @@ class Demissao(Document):
 				f"Demissao {self.name}: erro ao atualizar Employee para vigilante {self.vigilante}: {e}",
 				"SIGOS Demissao"
 			)
+			raise

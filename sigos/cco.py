@@ -25,6 +25,8 @@ _META_COBERTURA = 95.0
 @frappe.whitelist()
 def cco_dashboard(de=None, ate=None, delegacao=None, cliente=None, posto=None):
 	"""Full CCO statistical snapshot for a period, optionally scoped."""
+	from sigos.api import PAPEIS_INTERNOS
+	frappe.only_for(PAPEIS_INTERNOS)
 	ate_d = getdate(ate or nowdate())
 	de_d = getdate(de) if de else getdate(add_days(ate_d, -29))
 	if de_d > ate_d:
