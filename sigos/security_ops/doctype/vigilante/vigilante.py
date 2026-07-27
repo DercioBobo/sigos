@@ -101,30 +101,34 @@ class Vigilante(Document):
 
 	def _reter_salario_mais_alto(self):
 		"""
-		A move between two real assignments (posto change, regime change, or into
-		Reserva) must never silently CHANGE base pay by itself — in EITHER
-		direction. The guard simply keeps earning whatever they already earn;
-		the new posto/regime's own contract rate is ignored. Base pay only ever
-		changes through a deliberate action ("Definir Salário", Ajuste de
-		Salários, or a contract-driven bulk apply) — never as a side effect of a
-		rotation.
+		A move between two real assignments (posto change, regime change, or
+		into/out of Reserva) never LOWERS base pay by itself — the guard keeps
+		earning at least whatever they already earn. It CAN go UP: if the new
+		posto/regime's own contract rate beats the guard's current top salary,
+		that higher rate applies — a move to a better-paying posto is a real
+		raise, not something to suppress. Base pay only ever DROPS through a
+		deliberate action ("Definir Salário", Ajuste de Salários, or a
+		contract-driven bulk apply) — never as a side effect of a rotation.
 
-		The one exception: leaving Reserva for a NEW real posto assignment is a
-		fresh start — the new posto/regime's own resolved rate applies directly,
-		and any freeze carried through Reserva is released.
+		Applies uniformly across a Reserva stint too: a guard benched after
+		posto A and later placed on posto B keeps posto A's rate as a floor —
+		posto B's own (possibly lower) rate is not a "fresh start" that can pay
+		them less. Only the guard's own top salary and the new posto/regime's
+		rate are compared; the higher one wins.
 
-		salario_retido_automaticamente distinguishes a value THIS method froze
+		salario_retido_automaticamente distinguishes a value THIS method wrote
 		from one RH deliberately set via "Definir Salário": only our own value
-		is ever frozen/released here — an RH override is never touched, in
-		either direction. Only the base salary is affected — subsídios are
-		unrelated. Opt-out: SIGOS Settings.reter_salario_base_em_rotatividade.
+		is ever touched here — an RH override is never overwritten, in either
+		direction. Only the base salary is affected — subsídios are unrelated.
+		Opt-out: SIGOS Settings.reter_salario_base_em_rotatividade (when off,
+		base always resolves fresh from the new posto/regime, up or down).
 		"""
 		if self.status not in ("Activo", "Reserva") or not self.funcionario:
 			return
 
 		before = self.get_doc_before_save()
 		if not before or before.status not in ("Activo", "Reserva"):
-			return  # new doc, or first-ever assignment — nothing to freeze from
+			return  # new doc, or first-ever assignment — nothing to floor from
 
 		mudou = (
 			before.projecto != self.projecto
@@ -138,23 +142,11 @@ class Vigilante(Document):
 			return
 
 		from frappe.utils import flt
+		from sigos.api import _resolver_salario_contrato
 		from sigos.timeline import registar
 
-		# Exiting Reserva into a real posto: fresh start for the contract-driven
-		# base — release our own freeze so the new posto/regime resolves normally.
-		if before.status == "Reserva" and self.status == "Activo":
-			if self.salario_retido_automaticamente:
-				self.salario_base_manual = None
-				self.salario_retido_automaticamente = 0
-				registar(self.name, _(
-					"Retenção automática de salário base libertada — nova colocação em posto, "
-					"o salário passa a resolver pelo novo posto/regime."
-				))
-			return
-
-		# Any other real move never changes base pay by itself — freeze at
-		# whatever the guard already earns. An RH-set override already persists
-		# through any project/regime change on its own — leave it untouched.
+		# An RH-set override already persists through any project/regime change
+		# on its own — leave it untouched, in either direction.
 		tem_override_rh = flt(self.salario_base_manual) > 0 and not self.salario_retido_automaticamente
 		if tem_override_rh:
 			return
@@ -166,19 +158,31 @@ class Vigilante(Document):
 			order_by="from_date desc",
 			limit=1,
 		)
-		base_anterior = flt(ultima_ssa[0].base) if ultima_ssa else 0
-		if base_anterior <= 0:
+		topo_anterior = flt(ultima_ssa[0].base) if ultima_ssa else 0
+		if topo_anterior <= 0:
 			return
 
-		if flt(self.salario_base_manual) == base_anterior and self.salario_retido_automaticamente:
-			return  # already frozen at this value
+		novo_resolvido = flt(_resolver_salario_contrato({
+			"projecto": self.projecto,
+			"regime_do_vigilante": self.regime_do_vigilante,
+			"categoria": self.categoria,
+		}))
+		alvo = max(topo_anterior, novo_resolvido)
 
-		self.salario_base_manual = base_anterior
+		if flt(self.salario_base_manual) == alvo and self.salario_retido_automaticamente:
+			return  # already at the right value
+
+		self.salario_base_manual = alvo
 		self.salario_retido_automaticamente = 1
-		registar(self.name, _(
-			"Salário base mantido em <b>{0}</b> — mudança de posto/regime/Reserva não altera "
-			"automaticamente o salário base."
-		).format(frappe.format_value(base_anterior, {"fieldtype": "Currency"})))
+		if alvo > topo_anterior:
+			registar(self.name, _(
+				"Salário base actualizado para <b>{0}</b> — o novo posto/regime paga mais."
+			).format(frappe.format_value(alvo, {"fieldtype": "Currency"})))
+		else:
+			registar(self.name, _(
+				"Salário base mantido em <b>{0}</b> — mudança de posto/regime/Reserva não reduz "
+				"automaticamente o salário base."
+			).format(frappe.format_value(alvo, {"fieldtype": "Currency"})))
 
 	def _seed_salario_base(self):
 		"""

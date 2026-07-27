@@ -1956,17 +1956,37 @@ def get_regime_salary(project, regime):
 	) or 0
 
 
+def _resolver_salario_contrato(v):
+	"""
+	Base salary from the contract/regime alone (no manual override): the
+	contract's per-regime salary, else the guard's Categoria's own global
+	default (Categoria Vigilante.salario_base — contract-independent, for
+	customers who don't price salary per Project) — then floored at the
+	Salário Mínimo Padrão (SIGOS Settings). Shared by resolver_salario_base
+	(which adds manual-override precedence on top) and
+	Vigilante._reter_salario_mais_alto (which needs the contract-only rate to
+	compare against the guard's retained top salary, without the current
+	manual value — itself possibly a previous freeze — feeding back into it).
+	No permission check: internal helper, called from a document hook that may
+	run under any user.
+	"""
+	from frappe.utils import flt
+	base = flt(get_regime_salary(v.get("projecto"), v.get("regime_do_vigilante")))
+	if base <= 0 and v.get("categoria"):
+		base = flt(frappe.db.get_value("Categoria Vigilante", v.get("categoria"), "salario_base")) or 0
+
+	minimo = flt(frappe.db.get_single_value("SIGOS Settings", "salario_minimo_padrao"))
+	if minimo > 0:
+		base = max(base, minimo)
+	return base
+
+
 @frappe.whitelist()
 def resolver_salario_base(vigilante):
 	"""
-	A vigilante's base = manual override if set, else the contract's per-regime
-	salary, else the guard's Categoria's own global default (Categoria
-	Vigilante.salario_base — contract-independent, for customers who don't price
-	salary per Project) — then floored at the Salário Mínimo Padrão (SIGOS
-	Settings). The floor doubles as the final fallback: a vigilante with no
-	override and no contract/categoria base still resolves to the minimum (when
-	one is set). `vigilante` may be a name (str) or a dict carrying the needed
-	fields.
+	A vigilante's base = manual override if set, else the contract-only rate
+	(see _resolver_salario_contrato). `vigilante` may be a name (str) or a dict
+	carrying the needed fields.
 	"""
 	frappe.only_for(PAPEIS_SALARIO)
 	from frappe.utils import flt
@@ -1980,14 +2000,9 @@ def resolver_salario_base(vigilante):
 		v = vigilante or {}
 
 	manual = flt(v.get("salario_base_manual"))
-	base = manual if manual > 0 else flt(get_regime_salary(v.get("projecto"), v.get("regime_do_vigilante")))
-	if base <= 0 and v.get("categoria"):
-		base = flt(frappe.db.get_value("Categoria Vigilante", v.get("categoria"), "salario_base")) or 0
-
-	minimo = flt(frappe.db.get_single_value("SIGOS Settings", "salario_minimo_padrao"))
-	if minimo > 0:
-		base = max(base, minimo)
-	return base
+	if manual > 0:
+		return manual
+	return _resolver_salario_contrato(v)
 
 
 @frappe.whitelist()

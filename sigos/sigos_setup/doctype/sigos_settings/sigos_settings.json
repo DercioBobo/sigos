@@ -567,7 +567,7 @@
    "fieldtype": "Check",
    "label": "Manter Salário Base em Rotatividade/Reserva",
    "default": "1",
-   "description": "Quando activo, uma mudança entre dois vínculos reais (posto, regime, ou envio para Reserva) nunca altera automaticamente o salário BASE de um vigilante — nem para cima, nem para baixo: mantém-se sempre o que já recebe, ignorando o valor do novo posto/regime. O salário só muda por acção deliberada (\"Definir Salário\", Ajuste de Salários, ou aplicação em massa por contrato). Excepção: sair da Reserva para uma NOVA colocação num posto real é um recomeço — aplica-se directamente o valor do novo posto/regime. Aplica-se apenas ao salário base; subsídios não são afectados. Nunca sobrepõe um valor manual definido por RH em \"Definir Salário\"."
+   "description": "Quando activo, uma mudança entre dois vínculos reais (posto, regime, ou entrada/saída de Reserva) nunca REDUZ automaticamente o salário BASE de um vigilante: mantém-se sempre, no mínimo, o que já recebe. Pode SUBIR — se o novo posto/regime paga mais do que o vigilante já recebe, aplica-se o valor mais alto. Isto vale mesmo através de uma passagem por Reserva (o topo anterior ao entrar em Reserva continua a ser o piso ao sair, mesmo para um posto novo). O salário só desce por acção deliberada (\"Definir Salário\", Ajuste de Salários, ou aplicação em massa por contrato). Aplica-se apenas ao salário base; subsídios não são afectados. Nunca sobrepõe um valor manual definido por RH em \"Definir Salário\"."
   },
   {
    "fieldname": "payroll_payable_account",
