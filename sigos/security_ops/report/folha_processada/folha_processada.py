@@ -4,6 +4,10 @@ same employee resolution, same columns, but reading actual submitted Salary
 Slips instead of simulating one. No simulation, no rollback — this is a plain
 read of what payroll already processed for the period.
 
+Only employees with an actual submitted slip for the period are listed — this
+is a read of what was processed, not a roster of who's missing (that's what
+Previsão de Folha's "sem Estrutura Salarial" style warnings are for).
+
 Component columns (earn_*/ded_*) are only shown when at least one row actually
 carries a non-zero value for them — an all-zero component (e.g. a Salary
 Component every employee has on the structure but nobody triggered this month)
@@ -26,27 +30,17 @@ def execute(filters=None):
 
 	data = []
 	for emp in funcionarios:
-		base_row = {
+		slip = slips.get(emp.name)
+		if not slip:
+			continue
+
+		data.append({
 			"employee": emp.name,
 			"employee_name": emp.employee_name,
 			"vigilante": emp.custom_vigilante,
 			"delegacao": emp.custom_delegacao,
 			"posto": emp.custom_posto,
 			"cliente": emp.custom_cliente,
-		}
-		slip = slips.get(emp.name)
-		if not slip:
-			data.append({
-				**base_row,
-				"base": 0, "faltas": 0, "faltas_nao_justificadas": 0, "dias_trabalhados": 0,
-				"total_rendimentos": 0, "total_deducoes": 0, "valor_liquido": 0,
-				"salary_slip": None, "estado": _("Não Processada"),
-				"_earnings": {}, "_deductions": {},
-			})
-			continue
-
-		data.append({
-			**base_row,
 			"base": slip.base or 0,
 			"faltas": slip.custom_faltas_no_mes or 0,
 			"faltas_nao_justificadas": slip.custom_faltas_nao_justificadas or 0,
@@ -55,7 +49,6 @@ def execute(filters=None):
 			"total_deducoes": slip.total_deduction or 0,
 			"valor_liquido": slip.net_pay or 0,
 			"salary_slip": slip.name,
-			"estado": _("Processada"),
 			"_earnings": slip._earnings,
 			"_deductions": slip._deductions,
 		})
@@ -178,5 +171,4 @@ def _columns(earning_cols, deduction_cols):
 		{"label": _("Total Deduções"), "fieldname": "total_deducoes", "fieldtype": "Currency", "width": 130},
 		{"label": _("Valor Líquido a Receber"), "fieldname": "valor_liquido", "fieldtype": "Currency", "width": 150},
 		{"label": _("Salary Slip"), "fieldname": "salary_slip", "fieldtype": "Link", "options": "Salary Slip", "width": 130},
-		{"label": _("Estado"), "fieldname": "estado", "fieldtype": "Data", "width": 110},
 	]
