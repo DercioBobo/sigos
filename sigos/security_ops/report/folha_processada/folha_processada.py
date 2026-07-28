@@ -83,7 +83,7 @@ def _buscar_slips(funcionarios, start_date, end_date):
 			"end_date": [">=", start_date],
 		},
 		fields=[
-			"name", "employee", "base", "gross_pay", "total_deduction", "net_pay",
+			"name", "employee", "salary_structure", "gross_pay", "total_deduction", "net_pay",
 			"custom_faltas_no_mes", "custom_faltas_nao_justificadas", "custom_dias_trabalhados",
 		],
 		order_by="end_date desc",
@@ -94,6 +94,16 @@ def _buscar_slips(funcionarios, start_date, end_date):
 	by_employee = {}
 	for s in slips:
 		by_employee.setdefault(s.employee, s)  # first hit wins — order_by end_date desc
+
+	# Salary Slip has no "base" column (only base_hour_rate/base_gross_pay/…
+	# company-currency mirrors) — the real base salary lives on the Salary
+	# Structure Assignment, same fallback salary_slip_hooks._get_salario_base uses.
+	for slip in by_employee.values():
+		slip["base"] = frappe.db.get_value(
+			"Salary Structure Assignment",
+			{"employee": slip.employee, "salary_structure": slip.salary_structure, "docstatus": 1},
+			"base",
+		) or 0
 
 	slip_names = [s.name for s in by_employee.values()]
 	details = frappe.get_all(
