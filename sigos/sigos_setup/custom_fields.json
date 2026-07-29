@@ -494,10 +494,10 @@
   "module": "SIGOS Setup",
   "fieldname": "custom_situacao",
   "fieldtype": "Select",
-  "options": "\nActivos\nDemitidos\nTodos",
+  "options": "\nActivos\nDemitidos\nReserva\nAdministrativos\nTodos",
   "default": "Activos",
   "label": "Filtrar por Situação",
-  "description": "Activos = apenas Employees activos; Demitidos = apenas quem saiu no período (folha final); Todos = sem filtro (comportamento nativo).",
+  "description": "Todos = sem filtro (comportamento nativo).",
   "insert_after": "custom_project"
  },
  {

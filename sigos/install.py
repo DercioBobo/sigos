@@ -10,6 +10,7 @@ def after_install():
 	_set_project_naming()
 	_clean_project_fields()
 	_clean_payroll_entry_fields()
+	_add_situacao_options()
 	_seccionar_contrato()
 	_set_employee_naming()
 	_ensure_ferias_leave_type()
@@ -28,6 +29,7 @@ def after_migrate():
 	_set_project_naming()
 	_clean_project_fields()
 	_clean_payroll_entry_fields()
+	_add_situacao_options()
 	_seccionar_contrato()
 	_set_employee_naming()
 	_ensure_ferias_leave_type()
@@ -249,6 +251,30 @@ def _clean_payroll_entry_fields():
 		except Exception as e:
 			frappe.log_error(f"SIGOS: hide Payroll Entry.{f} failed: {e}", "SIGOS Install")
 	frappe.db.commit()
+
+
+def _add_situacao_options():
+	"""
+	Add the "Reserva"/"Administrativos" options to Payroll Entry.custom_situacao on
+	sites that already had this Custom Field before they were added —
+	_load_custom_fields skips fields that already exist, so a new option string in
+	custom_fields.json never reaches an existing site on its own. Idempotent
+	(no-op once both options are present).
+	"""
+	try:
+		fieldname = {"dt": "Payroll Entry", "fieldname": "custom_situacao"}
+		if not frappe.db.exists("Custom Field", fieldname):
+			return
+		options = (frappe.db.get_value("Custom Field", fieldname, "options") or "").split("\n")
+		if "Reserva" in options and "Administrativos" in options:
+			return
+		frappe.db.set_value(
+			"Custom Field", fieldname, "options",
+			"\nActivos\nDemitidos\nReserva\nAdministrativos\nTodos",
+		)
+		frappe.clear_cache(doctype="Payroll Entry")
+	except Exception as e:
+		frappe.log_error(f"SIGOS: add situacao options failed: {e}", "SIGOS Install")
 
 
 def _load_custom_fields():

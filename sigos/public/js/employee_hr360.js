@@ -64,7 +64,7 @@ function _rh360_build(frm, w, data) {
 		<div id="sigos-emp360" data-doc="${frm.doc.name}">
 			<div class="emp360-head">
 				<div class="emp360-title">${__("Painel RH 360")}</div>
-				${!data.vigilante ? `<span class="emp360-note">${__("Sem Vigilante (SIGOS) associado — faltas e Definir Salário indisponíveis.")}</span>` : ""}
+				${!data.vigilante ? `<span class="emp360-note">${__("Sem Vigilante (SIGOS) associado — faltas indisponíveis.")}</span>` : ""}
 			</div>
 			<div class="emp360-tiles">
 				${_rh360_tile("t-aus", data.vigilante ? data.faltas.mes_atual : "—", __("Faltas Este Mês"))}
@@ -249,15 +249,17 @@ function _rh360_novo_reclamacao(frm) {
 	sigos.quick_docs.nova_reclamacao(frm.doc.name, frm.doc.employee_name, () => _rh360_render(frm));
 }
 
-// ─── Definir Salário — same server calls/flow as Vigilante's button, resolved
-// through the Employee's linked Vigilante (custom_vigilante). ─────────────────
+// ─── Definir Salário — Vigilante-linked Employees go through the Vigilante's
+// contract/regime resolver (custom_vigilante); an administrativo (no Vigilante)
+// gets the simpler straight-value dialog instead. ─────────────────────────────
 function _rh360_definir_salario(frm) {
 	const vigilante = frm.doc.custom_vigilante;
-	if (!vigilante) {
-		frappe.msgprint(__("Este Employee não tem um Vigilante (SIGOS) associado — não é possível definir o salário por aqui."));
+	if (vigilante) {
+		sigos.quick_docs.definir_salario(vigilante, () => _rh360_render(frm));
 		return;
 	}
-	sigos.quick_docs.definir_salario(vigilante, () => _rh360_render(frm));
+	const atual = (_rh360_data[frm.doc.name] && _rh360_data[frm.doc.name].salario.base_resolvida) || 0;
+	sigos.quick_docs.definir_salario_administrativo(frm.doc.name, atual, () => _rh360_render(frm));
 }
 
 // ─── Self-injected CSS (ASCII only) — same dark-deck language as the Ausências

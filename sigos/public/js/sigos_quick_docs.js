@@ -94,6 +94,45 @@ function _qd_aplicar_salario(vigilante, vals, confirmar_reducao, on_done) {
 	});
 }
 
+// ─── Definir Salário (Administrativo) ──────────────────────────────────────
+// Admin-side equivalent for an Employee with NO Vigilante — no contract/regime
+// to resolve or revert to, so it's just a straight Currency value against the
+// current Salary Structure Assignment base. Same pay-cut confirm loop as the
+// Vigilante dialog.
+sigos.quick_docs.definir_salario_administrativo = function (employee, atual, on_done) {
+	const d = new frappe.ui.Dialog({
+		title: __("Definir Salário Base"),
+		fields: [
+			{ fieldtype: "HTML", options: `<p class="text-muted" style="margin-bottom:10px">${__(
+				"Salário base actual: <b>{0}</b>.", [format_currency(atual || 0)])}</p>` },
+			{ fieldname: "valor", fieldtype: "Currency", label: __("Salário Base"), default: atual, reqd: 1 },
+		],
+		primary_action_label: __("Aplicar"),
+		primary_action(vals) {
+			d.hide();
+			_qd_aplicar_salario_administrativo(employee, vals.valor, 0, on_done);
+		},
+	});
+	d.show();
+};
+
+function _qd_aplicar_salario_administrativo(employee, valor, confirmar_reducao, on_done) {
+	frappe.xcall("sigos.api.definir_salario_administrativo", {
+		employee, valor, confirmar_reducao,
+	}).then((r) => {
+		if (r && r.requires_confirm) {
+			frappe.confirm(
+				__("Está a <b>reduzir</b> o salário base de <b>{0}</b> para <b>{1}</b>. Confirmar a redução?",
+					[format_currency(r.atual), format_currency(r.novo)]),
+				() => _qd_aplicar_salario_administrativo(employee, valor, 1, on_done),
+			);
+			return;
+		}
+		frappe.show_alert({ message: __("Salário base aplicado: {0}", [format_currency((r && r.base) || 0)]), indicator: "green" }, 6);
+		if (on_done) on_done(r);
+	});
+}
+
 // ─── Money docs (Outras Deducoes / Emprestimo / Outras Remuneracoes / Reclamacao) ──
 sigos.quick_docs.novo_deducao = function (funcionario, funcionario_nome, on_done) {
 	const d = new frappe.ui.Dialog({

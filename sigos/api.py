@@ -2505,6 +2505,94 @@ def definir_salario_base_bulk(vigilantes, valor, confirmar_reducao=0):
 
 
 @frappe.whitelist()
+def definir_salario_administrativo(employee, valor, confirmar_reducao=0):
+	"""
+	Admin-side equivalent of definir_salario_base for an Employee with NO Vigilante
+	(administrativo) — there's no contract/regime to resolve, so this just writes
+	the given value straight to a Salary Structure Assignment. A Vigilante-linked
+	Employee must use definir_salario_base instead (via the Vigilante), so the
+	one-way pay floor (Vigilante._reter_salario_mais_alto) keeps governing them.
+
+	Same pay-cut safety: if the new base is LOWER than the current SSA base,
+	nothing is written — returns {"requires_confirm": 1, "atual", "novo"} so the
+	caller can confirm before re-calling with confirmar_reducao=1.
+	"""
+	frappe.only_for(PAPEIS_SALARIO)
+	from frappe.utils import flt, getdate, today
+
+	emp = frappe.db.get_value("Employee", employee, ["custom_vigilante", "date_of_joining", "company"], as_dict=True)
+	if not emp:
+		frappe.throw(_("Funcionário {0} não encontrado.").format(employee))
+	if emp.custom_vigilante:
+		frappe.throw(
+			_("Este Funcionário está ligado ao Vigilante <b>{0}</b> — defina o salário "
+			  "por lá para manter o piso de salário aplicado nas movimentações.").format(emp.custom_vigilante),
+			title=_("Tem Vigilante Associado"),
+		)
+
+	valor = flt(valor)
+	if valor <= 0:
+		frappe.throw(_("Indique um salário maior que zero."), title=_("Valor Inválido"))
+
+	existing = frappe.get_all(
+		"Salary Structure Assignment",
+		filters={"employee": employee, "docstatus": ["<", 2]},
+		fields=["name", "base", "docstatus", "from_date"],
+		order_by="from_date desc",
+		limit=1,
+	)
+	atual = flt(existing[0].base) if existing else 0
+	if existing and valor == atual:
+		return {"base": valor}
+	if existing and valor < atual and not int(confirmar_reducao or 0):
+		return {"requires_confirm": 1, "atual": atual, "novo": valor}
+
+	estrutura = frappe.db.get_single_value("SIGOS Settings", "estrutura_salarial_padrao")
+	if not estrutura:
+		frappe.throw(_(
+			"Defina a <b>Estrutura Salarial Padrão</b> em SIGOS Settings antes de "
+			"atribuir o salário base."
+		), title=_("Estrutura Salarial em Falta"))
+
+	efetiva = today() if existing else (emp.date_of_joining or today())
+	if emp.date_of_joining and getdate(efetiva) < getdate(emp.date_of_joining):
+		efetiva = emp.date_of_joining
+
+	conta_pagar = frappe.db.get_single_value("SIGOS Settings", "payroll_payable_account")
+	dup = frappe.db.exists("Salary Structure Assignment", {
+		"employee": employee, "salary_structure": estrutura, "from_date": efetiva, "docstatus": ["<", 2],
+	})
+	if dup:
+		ssa = frappe.get_doc("Salary Structure Assignment", dup)
+		if ssa.docstatus != 0:
+			frappe.throw(_("Já existe uma Estrutura Salarial submetida em {0}.").format(efetiva))
+		ssa.base = valor
+		if conta_pagar:
+			ssa.payroll_payable_account = conta_pagar
+		ssa.save(ignore_permissions=True)
+		ssa.submit()
+	else:
+		ssa = frappe.get_doc({
+			"doctype": "Salary Structure Assignment",
+			"employee": employee,
+			"salary_structure": estrutura,
+			"from_date": efetiva,
+			"base": valor,
+			"company": emp.company,
+		})
+		if conta_pagar:
+			ssa.payroll_payable_account = conta_pagar
+		ssa.insert(ignore_permissions=True)
+		ssa.submit()
+
+	frappe.get_doc("Employee", employee).add_comment(
+		"Info", _("Salário base definido para <b>{0}</b>.").format(frappe.format_value(valor, {"fieldtype": "Currency"}))
+	)
+
+	return {"base": valor}
+
+
+@frappe.whitelist()
 def get_employee_hr360(employee):
 	"""
 	Aggregator for the "Painel RH 360" on the Employee form — default-on for every
@@ -2563,7 +2651,7 @@ def get_employee_hr360(employee):
 		limit=1,
 	)
 	salario = {
-		"base_resolvida": flt(resolver_salario_base(vigilante)) if vigilante else 0,
+		"base_resolvida": flt(resolver_salario_base(vigilante)) if vigilante else flt((ssa_atual[0].base) if ssa_atual else 0),
 		"ssa_atual": ssa_atual[0] if ssa_atual else None,
 		"slips_recentes": frappe.get_all(
 			"Salary Slip",

@@ -59,14 +59,14 @@ def _filtrar_employees_por_criterio(doc):
 	}
 
 	cliente_by_vig = {}
-	if cliente:
-		vig_names = [e.custom_vigilante for e in info_by_emp.values() if e.custom_vigilante]
-		if vig_names:
-			cliente_by_vig = {
-				v.name: v.cliente for v in frappe.get_all(
-					"Vigilante", filters={"name": ["in", vig_names]}, fields=["name", "cliente"],
-				)
-			}
+	status_vig_by_vig = {}
+	vig_names = [e.custom_vigilante for e in info_by_emp.values() if e.custom_vigilante]
+	if vig_names and (cliente or situacao == "Reserva"):
+		for v in frappe.get_all(
+			"Vigilante", filters={"name": ["in", vig_names]}, fields=["name", "cliente", "status"],
+		):
+			cliente_by_vig[v.name] = v.cliente
+			status_vig_by_vig[v.name] = v.status
 
 	def mantem(employee):
 		info = info_by_emp.get(employee)
@@ -81,6 +81,16 @@ def _filtrar_employees_por_criterio(doc):
 		if situacao == "Activos" and info.status != "Active":
 			return False
 		if situacao == "Demitidos" and info.status != "Left":
+			return False
+		# Reserva guards have no Cliente/Projecto (cleared on benching), so they're
+		# invisible to those filters by construction — this option finds them by
+		# Vigilante.status instead, bypassing that gap.
+		if situacao == "Reserva" and status_vig_by_vig.get(info.custom_vigilante) != "Reserva":
+			return False
+		# Administrativos have no Vigilante at all, so custom_delegacao/custom_project
+		# (Vigilante-sourced mirrors) are always blank for them too — same invisibility
+		# to Cliente/Projecto/Delegação filters, for a different reason.
+		if situacao == "Administrativos" and (info.custom_vigilante or info.status != "Active"):
 			return False
 		return True
 
