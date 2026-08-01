@@ -1,0 +1,128 @@
+{
+  "info": {
+    "name": "SIGOS - SMV Integration",
+    "description": "Server-to-server API SMV's backend uses to fetch posto rosters and mark ausências. One shared credential for all postos — `posto` is passed explicitly on every call. See docs/mobile-api-spec.md for the full contract.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "apikey",
+    "apikey": [
+      { "key": "key", "value": "Authorization", "type": "string" },
+      { "key": "value", "value": "token {{api_key}}:{{api_secret}}", "type": "string" },
+      { "key": "in", "value": "header", "type": "string" }
+    ]
+  },
+  "variable": [
+    { "key": "base_url", "value": "https://<seu-site>.sigos.local", "type": "string" },
+    { "key": "api_key", "value": "COLE_AQUI_O_API_KEY", "type": "string" },
+    { "key": "api_secret", "value": "COLE_AQUI_O_API_SECRET", "type": "string" },
+    { "key": "posto", "value": "PT-MPT-01", "type": "string", "description": "Substituir por um posto real — obtido via get_postos" },
+    { "key": "vigilante", "value": "VIG-00123", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "1. get_postos (sync list)",
+      "request": {
+        "method": "GET",
+        "auth": { "type": "inherit" },
+        "url": {
+          "raw": "{{base_url}}/api/method/sigos.mobile_api.get_postos",
+          "host": ["{{base_url}}"],
+          "path": ["api", "method", "sigos.mobile_api.get_postos"]
+        }
+      }
+    },
+    {
+      "name": "2. get_posto_info",
+      "request": {
+        "method": "GET",
+        "auth": { "type": "inherit" },
+        "url": {
+          "raw": "{{base_url}}/api/method/sigos.mobile_api.get_posto_info?posto={{posto}}",
+          "host": ["{{base_url}}"],
+          "path": ["api", "method", "sigos.mobile_api.get_posto_info"],
+          "query": [{ "key": "posto", "value": "{{posto}}" }]
+        }
+      }
+    },
+    {
+      "name": "3. get_opcoes",
+      "request": {
+        "method": "GET",
+        "auth": { "type": "inherit" },
+        "url": {
+          "raw": "{{base_url}}/api/method/sigos.mobile_api.get_opcoes",
+          "host": ["{{base_url}}"],
+          "path": ["api", "method", "sigos.mobile_api.get_opcoes"]
+        }
+      }
+    },
+    {
+      "name": "4. get_escalados_hoje",
+      "request": {
+        "method": "GET",
+        "auth": { "type": "inherit" },
+        "url": {
+          "raw": "{{base_url}}/api/method/sigos.mobile_api.get_escalados_hoje?posto={{posto}}",
+          "host": ["{{base_url}}"],
+          "path": ["api", "method", "sigos.mobile_api.get_escalados_hoje"],
+          "query": [
+            { "key": "posto", "value": "{{posto}}" },
+            { "key": "data", "value": "", "disabled": true, "description": "YYYY-MM-DD, opcional — omitir usa hoje" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "5. marcar_ausencia (Falta simples)",
+      "request": {
+        "method": "POST",
+        "auth": { "type": "inherit" },
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"posto\": \"{{posto}}\",\n  \"vigilante\": \"{{vigilante}}\",\n  \"tipo_de_ausencia\": \"Falta\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/method/sigos.mobile_api.marcar_ausencia",
+          "host": ["{{base_url}}"],
+          "path": ["api", "method", "sigos.mobile_api.marcar_ausencia"]
+        }
+      }
+    },
+    {
+      "name": "6. marcar_ausencia (Falta com Substituto)",
+      "request": {
+        "method": "POST",
+        "auth": { "type": "inherit" },
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"posto\": \"{{posto}}\",\n  \"vigilante\": \"{{vigilante}}\",\n  \"tipo_de_ausencia\": \"Falta\",\n  \"proxima_accao\": \"Substituto\",\n  \"vigilante_substituto\": \"VIG-00456\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/method/sigos.mobile_api.marcar_ausencia",
+          "host": ["{{base_url}}"],
+          "path": ["api", "method", "sigos.mobile_api.marcar_ausencia"]
+        }
+      }
+    },
+    {
+      "name": "7. remover_marca",
+      "request": {
+        "method": "POST",
+        "auth": { "type": "inherit" },
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"posto\": \"{{posto}}\",\n  \"ausencia_doc\": \"AUS-2026-000042\",\n  \"ausencia_row\": \"row-id-abc\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/method/sigos.mobile_api.remover_marca",
+          "host": ["{{base_url}}"],
+          "path": ["api", "method", "sigos.mobile_api.remover_marca"]
+        }
+      }
+    }
+  ]
+}
