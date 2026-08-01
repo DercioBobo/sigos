@@ -44,6 +44,7 @@ fixtures = [
 			"Operações SIGOS",
 			"Supervisor SIGOS",
 			"SIGOS Manager",
+			"SMV Integration",
 		]]],
 	},
 	{

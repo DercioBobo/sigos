@@ -194,6 +194,20 @@
    "share": 0,
    "submit": 0,
    "write": 1
+  },
+  {
+   "cancel": 0,
+   "create": 1,
+   "delete": 0,
+   "email": 0,
+   "export": 0,
+   "print": 0,
+   "read": 1,
+   "report": 0,
+   "role": "SMV Integration",
+   "share": 0,
+   "submit": 0,
+   "write": 1
   }
  ],
  "sort_field": "data",
