@@ -5,6 +5,27 @@ from frappe.model.document import Document
 
 class PostoDeVigilancia(Document):
 
+	def autoname(self):
+		# format:PT-{indicativo}-{##} looked like a per-indicativo counter but isn't:
+		# Frappe resolves each {..} group in isolation, so {##} was one counter shared
+		# by every indicativo. This gives each indicativo its own independent sequence
+		# (PT-BH-01, PT-BH-02, ... / PT-BZ-01, PT-BZ-02, ...).
+		if not self.indicativo:
+			frappe.throw(_("Defina o <b>Indicativo</b> antes de gravar."))
+
+		prefix = f"PT-{self.indicativo}-"
+		existing = frappe.get_all(
+			"Posto De Vigilancia",
+			filters={"name": ["like", f"{prefix}%"]},
+			pluck="name",
+		)
+		max_n = 0
+		for name in existing:
+			suffix = name[len(prefix):]
+			if suffix.isdigit():
+				max_n = max(max_n, int(suffix))
+		self.name = f"{prefix}{max_n + 1:02d}"
+
 	def validate(self):
 		self._preencher_nome_financeiro()
 		self._validar_temporario()
