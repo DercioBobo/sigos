@@ -114,7 +114,19 @@ class EscalaDoVigilante(Document):
 		) or 0
 		if not max_vagas:
 			return
-		n = len({r.vigilante for r in self.tab_vigilante_do_posto if r.vigilante})
+		nomes = {r.vigilante for r in self.tab_vigilante_do_posto if r.vigilante}
+		if not nomes:
+			return
+		# Active Cobridor shadows co-locate with the colleague they're covering —
+		# not a real second headcount (see escala_do_vigilante.deployar_cobridor).
+		# Query-based (not a one-time flag) so it stays correct on every future
+		# save of this escala, not just the deployment moment.
+		sombras = set(frappe.get_all(
+			"Vigilante",
+			filters={"name": ["in", list(nomes)], "cobertura_de_posto_activa": ["is", "set"]},
+			pluck="name",
+		))
+		n = len(nomes - sombras)
 		if n > max_vagas:
 			frappe.throw(
 				_("A escala inclui <b>{0}</b> vigilante(s), mas o posto <b>{1}</b> tem "
@@ -353,7 +365,7 @@ def obter_turno_inicial_actual(vigilante, posto, regime):
 	)
 
 
-def _adicionar_vigilante_a_escala(vigilante, posto, regime, turno_inicial=None):
+def _adicionar_vigilante_a_escala(vigilante, posto, regime, turno_inicial=None, evitar_colisao=True):
 	nome = _escala_do_par(posto, regime)
 	criada = False
 	if nome:
@@ -369,34 +381,53 @@ def _adicionar_vigilante_a_escala(vigilante, posto, regime, turno_inicial=None):
 			esc.cliente = cliente
 		criada = True
 
+	turno_ocupado = None
 	if not any(g.vigilante == vigilante for g in esc.tab_vigilante_do_posto):
 		if turno_inicial:
 			# Explicit slot (typically a vacated one carried forward from whoever this
 			# guard is replacing) — trusted as-is, NOT restricted to non-folga turnos
 			# like _turno_inicial_livre: a guard can legitimately inherit a folga slot.
 			turno = turno_inicial
-			colidente = next(
-				(g for g in esc.tab_vigilante_do_posto if g.turno_inicial == turno), None
-			)
-			if colidente:
-				colidente.turno_inicial = _turno_inicial_livre(esc, regime)
+			# evitar_colisao=False (Cobridor): the guard already holding this turno_inicial
+			# is NOT displaced — they're still nominally on the roster (just away/absent),
+			# and the whole point is the Cobridor SHARING their exact slot, not bumping them.
+			if evitar_colisao:
+				colidente = next(
+					(g for g in esc.tab_vigilante_do_posto if g.turno_inicial == turno), None
+				)
+				if colidente:
+					colidente.turno_inicial = _turno_inicial_livre(esc, regime)
 		else:
 			turno = _turno_inicial_livre(esc, regime)
 		esc.append("tab_vigilante_do_posto", {
 			"vigilante": vigilante,
 			"turno_inicial": turno,
 		})
+		turno_ocupado = turno
 	esc.save(ignore_permissions=True)  # reconcile generates their rows
+
+	if turno_ocupado and evitar_colisao:
+		# Whoever lands on a posto+regime+turno slot auto-closes any open Vaga De
+		# Posto for it — universal hook (Rotatividade substituto, Atribuir, manual
+		# edits all funnel through here via the keystone). Skipped for a Cobridor
+		# co-locating with a still-present guard: nothing was ever vacated, so
+		# there's no Vaga to close.
+		from sigos.security_ops.doctype.vaga_de_posto.vaga_de_posto import fechar_vaga
+		fechar_vaga(posto, regime, turno_ocupado, vigilante)
+
 	return esc.name, criada
 
 
-def migrar_escala_vigilante(vigilante, old_posto, old_regime, new_posto, new_regime, turno_inicial=None):
+def migrar_escala_vigilante(vigilante, old_posto, old_regime, new_posto, new_regime, turno_inicial=None,
+                             evitar_colisao=True):
 	"""
 	Move a guard from the (old_posto, old_regime) escala to the (new_posto, new_regime)
 	escala. Pass new_posto/new_regime as None to only remove (e.g. demissão / inactive).
 	turno_inicial (optional): a specific rotation slot to give them on arrival — e.g. the
 	slot vacated by whoever they're replacing (see obter_turno_inicial_actual) — instead
 	of the generic "first free working turno" pick.
+	evitar_colisao=False only for a Cobridor deployment (see deployar_cobridor) — they
+	intentionally co-locate with a still-present guard instead of displacing them.
 	Returns {removido_de, adicionado_a, criada} or None when nothing changed.
 	"""
 	if (old_posto, old_regime) == (new_posto, new_regime):
@@ -406,7 +437,7 @@ def migrar_escala_vigilante(vigilante, old_posto, old_regime, new_posto, new_reg
 	adicionado, criada = (None, False)
 	if new_posto and new_regime:
 		adicionado, criada = _adicionar_vigilante_a_escala(
-			vigilante, new_posto, new_regime, turno_inicial=turno_inicial
+			vigilante, new_posto, new_regime, turno_inicial=turno_inicial, evitar_colisao=evitar_colisao,
 		)
 
 	if not (removido or adicionado):
@@ -497,3 +528,62 @@ def adicionar_vigilante_a_escala_reserva(vigilante, delegacao, turno_inicial=Non
 	esc.append("tab_vigilante_do_posto", {"vigilante": vigilante, "turno_inicial": turno})
 	esc.save(ignore_permissions=True)
 	return esc.name, None
+
+
+# ─── Cobridor (temporary named-cover deployment) ───────────────────────────────
+# A Cobridor is a Reserva guard deployed onto ONE specific colleague's exact
+# posto+regime+turno for the duration of the colleague's absence — Licença,
+# Suspensão/Investigação, or any other reason (Cobertura De Posto.tipo_cobertura)
+# — the covered guard's own row is never touched by the trigger flow (Pedido De
+# Licença/Processo Disciplinar never save the Vigilante doc), so both rows
+# coexist sharing one turno_inicial. See Cobertura De Posto for the record that
+# drives this, including the "Efectivar" outcome where the Cobridor becomes the
+# permanent holder instead of reverting.
+
+def deployar_cobridor(vigilante_cobridor, cobertura, posto, regime, turno_inicial):
+	"""
+	Deploy a Reserva guard as a Cobridor onto (posto, regime, turno_inicial) —
+	the exact slot of the colleague they're covering — WITHOUT displacing them.
+	Mirrors Rotatividade's substituto deployment, plus the two markers that make
+	the "Activo but shadow" distinction survive across requests: status flips to
+	Activo (so pool-exclusion queries filtering status='Reserva' exclude them for
+	free), and cobertura_de_posto_activa records why (read by
+	EscalaDoVigilante._validar_capacidade_posto, Vigilante._validar_capacidade_posto,
+	atualizar_ocupacao_posto and Faturacao Mensal's billing query, so none of them
+	double-count this guard against the real posto headcount — until Cobertura De
+	Posto.efectivar() clears it, at which point they become a real headcount).
+	"""
+	sub = frappe.get_doc("Vigilante", vigilante_cobridor)
+	sub.posto_de_vigilancia = posto
+	if sub.regime_do_vigilante != regime:
+		sub.regime_do_vigilante = regime
+		sub.flags.via_troca_regime = True  # deployment, not an arbitrary regime change
+	sub.status = "Activo"
+	sub.cobertura_de_posto_activa = cobertura
+	sub.flags.turno_inicial_preferido = turno_inicial
+	sub.flags.via_cobridor = True  # read by Vigilante._migrar_escala_se_mudou / _validar_capacidade_posto
+	sub.save(ignore_permissions=True)
+
+
+def reverter_cobridor(vigilante_cobridor):
+	"""Send a deployed Cobridor back to Reserva, carrying their vacated turno
+	into the delegação's Reserva escala when one exists — same continuity
+	Vigilante._mudar_estado_operacional gives a guard sent to Reserva normally.
+	The covered guard's own row/future rows are untouched (removal below is
+	keyed by vigilante name, not turno_inicial). NOT called when a Cobertura is
+	Efectivada instead of Concluída/Cancelada — the Cobridor stays deployed."""
+	sub = frappe.get_doc("Vigilante", vigilante_cobridor)
+	if sub.status != "Activo" or not (sub.posto_de_vigilancia and sub.regime_do_vigilante):
+		return
+
+	turno_vago = obter_turno_inicial_actual(
+		vigilante_cobridor, sub.posto_de_vigilancia, sub.regime_do_vigilante
+	)
+	if turno_vago:
+		sub.flags.turno_inicial_preferido = turno_vago
+
+	from sigos.security_ops.doctype.vigilante.vigilante import limpar_campos_operacionais
+	sub.status = "Reserva"
+	limpar_campos_operacionais(sub)
+	sub.cobertura_de_posto_activa = None
+	sub.save(ignore_permissions=True)

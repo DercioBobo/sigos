@@ -14,6 +14,7 @@
   "col_break_header",
   "nome_completo",
   "status",
+  "cobertura_de_posto_activa",
   "sec_pessoais",
   "data_de_nascimento",
   "idade",
@@ -225,6 +226,16 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "description": "Definido pelo sistema — use os botões (Admitir RH, Ativar) e as operações (Rotatividade, Demissão) para mudar o estado. Mantém o Funcionário e a escala consistentes."
+  },
+  {
+   "fieldname": "cobertura_de_posto_activa",
+   "fieldtype": "Link",
+   "label": "Cobertura De Posto Activa",
+   "options": "Cobertura De Posto",
+   "read_only": 1,
+   "no_copy": 1,
+   "depends_on": "eval:doc.cobertura_de_posto_activa",
+   "description": "Este vigilante está Activo como Cobridor temporário — a cobrir outro colega ausente — em vez de ocupar um posto próprio. Definido/limpo automaticamente pela Cobertura De Posto."
   },
   {
    "fieldname": "data_admissao",

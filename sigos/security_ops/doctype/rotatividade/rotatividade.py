@@ -87,6 +87,21 @@ class Rotatividade(Document):
 				sub.flags.turno_inicial_preferido = turno_vago
 			sub.save(ignore_permissions=True)
 
+		# 2.5. Vaga aberta: guard left a posto+regime+turno slot and nobody took it
+		#      over right away - flag it so Vigilantes de Hoje can show "Desfalcado".
+		#      Auto-closes later, whenever anyone lands on that exact slot (see
+		#      escala_do_vigilante._adicionar_vigilante_a_escala).
+		slot_preenchido = bool(op and op.requer_substituto and self.novo_vigilante and posto_vago)
+		if posto_vago and turno_vago and self.regime and (demite or (op and op.enviar_reserva)) and not slot_preenchido:
+			from sigos.security_ops.doctype.vaga_de_posto.vaga_de_posto import abrir_vaga
+			abrir_vaga(
+				posto=posto_vago,
+				regime=self.regime,
+				turno=turno_vago,
+				vigilante_anterior=self.vigilante,
+				origem_rotatividade=self.name,
+			)
+
 		# 3. Create the Demissão record
 		if demite:
 			self._criar_demissao()

@@ -26,8 +26,8 @@ const VH_ACCAO_CAMPO = {
 	"Adiantamento de Turno": "vigilante_a_adiantar",
 	"Horas Extras": "vigilante_a_horas_extras",
 };
-const VH_SEVERIDADE = { "Falta": 0, "Suspensão": 0, "Atraso": 1, "Saída Antecipada": 1, "Outro": 1, "Licença": 2, "Folga": 3, "Presente": 4 };
-const VH_PROBLEMA = new Set(["Falta", "Suspensão", "Atraso", "Saída Antecipada"]);
+const VH_SEVERIDADE = { "Desfalcado": -1, "Falta": 0, "Suspensão": 0, "Atraso": 1, "Saída Antecipada": 1, "Outro": 1, "Licença": 2, "Folga": 3, "Presente": 4 };
+const VH_PROBLEMA = new Set(["Desfalcado", "Falta", "Suspensão", "Atraso", "Saída Antecipada"]);
 
 // Table view columns — label + a value-extractor used both to render the cell
 // and to sort by that column (click header to sort, click again to reverse).
@@ -99,26 +99,50 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		if (this._loading) return;
 		this._loading = true;
 		this.$root.find(".vh-stamp").text(__("A actualizar…"));
-		frappe.call({
-			method: "sigos.api.get_vigilantes_da_escala",
-			args: {
-				data: this.state.data,
-				periodo: this.state.periodo,
-				grupo_delegados: this.state.grupo_delegados,
-				incluir_folga: 1,
-			},
-			callback: (r) => {
-				this._loading = false;
-				this.rows = r.message || [];
-				this._populate_posto_filter();
-				this._render();
-				const agora = new Date().toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
-				this.$root.find(".vh-stamp").text(__("Actualizado às {0}", [agora]));
-			},
-			error: () => {
-				this._loading = false;
+
+		const escalaCall = new Promise((resolve) => {
+			frappe.call({
+				method: "sigos.api.get_vigilantes_da_escala",
+				args: {
+					data: this.state.data,
+					periodo: this.state.periodo,
+					grupo_delegados: this.state.grupo_delegados,
+					incluir_folga: 1,
+				},
+				callback: (r) => resolve(r.message || []),
+				error: () => resolve(null),
+			});
+		});
+		// Best-effort: a failure here shouldn't take down the rest of the board.
+		const vagasCall = new Promise((resolve) => {
+			frappe.call({
+				method: "sigos.api.get_vagas_desfalcadas",
+				args: { periodo: this.state.periodo, grupo_delegados: this.state.grupo_delegados },
+				callback: (r) => resolve(r.message || []),
+				error: () => resolve([]),
+			});
+		});
+
+		Promise.all([escalaCall, vagasCall]).then(([escala, vagas]) => {
+			this._loading = false;
+			if (escala === null) {
 				this.$root.find(".vh-stamp").text(__("Erro ao actualizar"));
-			},
+				return;
+			}
+			const vagaRows = (vagas || []).map((v) => ({
+				escala_row: `vaga:${v.name}`,
+				posto: v.posto,
+				nome_do_posto: v.nome_do_posto,
+				turno: v.turno,
+				regime: v.regime,
+				delegacao: v.delegacao,
+				_isVaga: true,
+			}));
+			this.rows = [...escala, ...vagaRows];
+			this._populate_posto_filter();
+			this._render();
+			const agora = new Date().toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
+			this.$root.find(".vh-stamp").text(__("Actualizado às {0}", [agora]));
 		});
 	}
 
@@ -134,6 +158,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 	}
 
 	_status_de(row) {
+		if (row._isVaga) return "Desfalcado";
 		if (row.e_folga) return "Folga";
 		if (row.ja_ausencia_row) return row.ja_tipo_de_ausencia || "Outro";
 		return "Presente";
@@ -166,12 +191,14 @@ sigos.VigilantesHoje = class VigilantesHoje {
 			});
 		});
 
-		const total = filtradas.length;
+		const total = filtradas.filter((r) => !r._isVaga).length;
 		const registados = filtradas.filter((r) => !!r.ja_ausencia_row).length;
 		const faltasHoje = filtradas.filter((r) => r._status === "Falta").length;
+		const vagasAbertas = filtradas.filter((r) => r._isVaga).length;
 		this.$root.find(".vh-sum-total b").text(total);
 		this.$root.find(".vh-sum-done b").text(registados);
 		this.$root.find(".vh-sum-faltas b").text(faltasHoje);
+		this.$root.find(".vh-sum-vagas b").text(vagasAbertas);
 
 		const $wrap = this.$root.find(".vh-roster").empty();
 		const $empty = this.$root.find(".vh-empty");
@@ -197,7 +224,11 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		// confirmed attendance we don't actually have (no check-in mechanism;
 		// "not marked absent" isn't the same as "seen present").
 		const nFalta = rows.filter((r) => r._status === "Falta").length;
-		return nFalta ? `<span class="vh-group-cov critical">${nFalta} falta${nFalta > 1 ? "s" : ""}</span>` : "";
+		const nVaga = rows.filter((r) => r._isVaga).length;
+		const partes = [];
+		if (nVaga) partes.push(`${nVaga} ${__("desfalcado")}${nVaga > 1 ? "s" : ""}`);
+		if (nFalta) partes.push(`${nFalta} falta${nFalta > 1 ? "s" : ""}`);
+		return partes.length ? `<span class="vh-group-cov critical">${partes.join(", ")}</span>` : "";
 	}
 
 	// ---- Cards view ------------------------------------------------------
@@ -228,6 +259,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 	}
 
 	_render_row($parent, row) {
+		if (row._isVaga) return this._render_vaga_row($parent, row);
 		const key = row.escala_row;
 		const status = row._status;
 		const metaLine = status === "Folga"
@@ -250,6 +282,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 							<span class="vh-mec">${frappe.utils.escape_html(row.mecanografico || "")}</span>
 							${row.categoria ? `<span class="vh-cat">${frappe.utils.escape_html(row.categoria)}</span>` : ""}
 							${row.em_licenca ? `<span class="vh-flag">${this._icon("flag")} ${__("Licença aprovada")}</span>` : ""}
+							${this._cobertura_badge_html(row)}
 						</div>
 						<div class="vh-meta">${metaLine}</div>
 						${accaoLine}
@@ -274,6 +307,31 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		$row.find(".vh-call").on("click", (e) => e.stopPropagation());
 
 		if (aberto) this._render_panel($row.find(".vh-panel"), row);
+	}
+
+	// A vacated posto+regime+turno slot nobody has filled yet — no vigilante, so
+	// no click-to-expand, no call button, no menu: there's nothing to act on here
+	// except go find someone to cover it.
+	_render_vaga_row($parent, row) {
+		const metaLine = `<b>${frappe.utils.escape_html(row.turno || "")}</b><span class="dot">·</span>${frappe.utils.escape_html(row.regime || "")}<span class="dot">·</span>${frappe.utils.escape_html(row.delegacao || "")}`;
+		$(`
+			<div class="vh-row vh-row-vaga" data-status="Desfalcado">
+				<div class="vh-rowhead vh-rowhead-vaga">
+					<span class="vh-ring"></span>
+					<div class="vh-info">
+						<div class="vh-idline">
+							<span class="vh-name vh-vaga-lbl">${__("Desfalcado")}</span>
+						</div>
+						<div class="vh-meta">${metaLine}</div>
+					</div>
+					<div class="vh-right">
+						<div class="vh-status">
+							<span class="vh-status-txt">${__("Desfalcado")}</span>
+						</div>
+					</div>
+				</div>
+			</div>
+		`).appendTo($parent);
 	}
 
 	_toggle_row(key) {
@@ -336,6 +394,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 	}
 
 	_render_table_row($tbody, row) {
+		if (row._isVaga) return this._render_vaga_table_row($tbody, row);
 		const status = row._status;
 		const postoNome = row.nome_do_posto || row.posto || "";
 		const temAccao = row.ja_proxima_accao && row.ja_proxima_accao !== "Sem Ação";
@@ -348,7 +407,10 @@ sigos.VigilantesHoje = class VigilantesHoje {
 			<tr class="vh-tbl-row" data-status="${status}" style="--pc:${this._posto_color(postoNome)}">
 				<td class="vh-tbl-name vh-tbl-stripe">
 					${row.em_licenca ? `<span class="vh-tbl-lic" title="${__("Licença aprovada")}">${this._icon("flag")}</span>` : ""}
+					${row.cobertura_papel ? `<span class="vh-tbl-lic" title="${frappe.utils.escape_html(row.cobertura_par || "")}">${this._icon("flag")}</span>` : ""}
 					<span class="vh-tbl-name-link" title="${__("Ver perfil")}">${frappe.utils.escape_html(row.nome_completo || row.vigilante)}</span>
+					${row.cobertura_papel === "titular_coberto" ? `<span class="vh-tbl-cobertura-tag">${__("Coberto")}</span>` : ""}
+					${row.cobertura_papel === "cobridor_provisorio" ? `<span class="vh-tbl-cobertura-tag">${__("A Cobrir")}</span>` : ""}
 				</td>
 				<td><span class="vh-tbl-posto-dot"></span>${frappe.utils.escape_html(postoNome || "—")}</td>
 				<td>${status === "Folga" ? `<span class="vh-folga-lbl">${__("Folga")}</span>` : frappe.utils.escape_html(row.turno || "—")}</td>
@@ -372,6 +434,24 @@ sigos.VigilantesHoje = class VigilantesHoje {
 			e.stopPropagation();
 			this._abrir_perfil_dialog(row);
 		});
+	}
+
+	// Table-view counterpart of _render_vaga_row — no vigilante, so no name link,
+	// no menu, no phone: nothing here is actionable, it's just a "go fill this" flag.
+	_render_vaga_table_row($tbody, row) {
+		const postoNome = row.nome_do_posto || row.posto || "";
+		$(`
+			<tr class="vh-tbl-row vh-tbl-row-vaga" data-status="Desfalcado" style="--pc:${this._posto_color(postoNome)}">
+				<td class="vh-tbl-name vh-tbl-stripe"><span class="vh-vaga-lbl">${__("Desfalcado")}</span></td>
+				<td><span class="vh-tbl-posto-dot"></span>${frappe.utils.escape_html(postoNome || "—")}</td>
+				<td>${frappe.utils.escape_html(row.turno || "—")}</td>
+				<td>${frappe.utils.escape_html(row.regime || "—")}</td>
+				<td><span class="vh-status-txt">${__("Desfalcado")}</span></td>
+				<td class="vh-tbl-accao">—</td>
+				<td class="mono">—</td>
+				<td class="vh-tbl-menu-cell"></td>
+			</tr>
+		`).appendTo($tbody);
 	}
 
 	// ---- Row actions menu (custom — used by table view) --------------------
@@ -482,6 +562,20 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		return `<span class="vh-dg-ava" style="background:hsl(${h},42%,38%)">${frappe.utils.escape_html(ini)}</span>`;
 	}
 
+	// Cobertura De Posto badge — flags either side of an active provisional
+	// coverage (Licença, Suspensão/Investigação, etc.): the titular still shown
+	// as scheduled (their own escala row is untouched while covered) gets
+	// "Coberto Provisoriamente"; the guard actually standing in gets "A Cobrir".
+	_cobertura_badge_html(row) {
+		if (row.cobertura_papel === "titular_coberto") {
+			return `<span class="vh-flag vh-flag-cobertura" title="${__("A cobrir: {0}", [frappe.utils.escape_html(row.cobertura_par || "")])}">${this._icon("flag")} ${__("Coberto Provisoriamente")}</span>`;
+		}
+		if (row.cobertura_papel === "cobridor_provisorio") {
+			return `<span class="vh-flag vh-flag-cobertura" title="${__("A cobrir: {0}", [frappe.utils.escape_html(row.cobertura_par || "")])}">${this._icon("flag")} ${__("A Cobrir")}</span>`;
+		}
+		return "";
+	}
+
 	// Shared by the mark dialog's "Remover Marcação" secondary action and the
 	// profile dialog's own — one confirm+call path, not two copies of it.
 	_remover_marcacao(row, onDone) {
@@ -534,6 +628,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 				${isSubmetida ? `<span class="vh-dg-submitted-badge">${this._icon("check")} ${__("Submetida")}</span>` : ""}
 			</div>
 			${row.em_licenca ? `<span class="vh-flag">${this._icon("flag")} ${__("Licença aprovada hoje")} (${frappe.utils.escape_html(row.em_licenca)})</span>` : ""}
+			${this._cobertura_badge_html(row)}
 			<div>
 				<span class="vh-field-lbl">${__("Perfil")}</span>
 				<div class="vh-profile vh-dg-fields">
@@ -844,6 +939,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 					<div id="vh-ctrl-grupo"></div>
 					<select class="vh-select" data-role="estado-filtro">
 						<option value="">${__("Todos os Estados")}</option>
+						<option value="Desfalcado">${__("Desfalcado")}</option>
 						<option value="Falta">${__("Falta")}</option>
 						<option value="Atraso">${__("Atraso")}</option>
 						<option value="Saída Antecipada">${__("Saída Antecipada")}</option>
@@ -866,6 +962,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 					<div class="vh-pill tot vh-sum-total"><b class="num">0</b><span>${__("Escalados")}</span></div>
 					<div class="vh-pill done vh-sum-done"><b class="num">0</b><span>${__("Já Registados")}</span></div>
 					<div class="vh-pill bad vh-sum-faltas"><b class="num">0</b><span>${__("Faltas Hoje")}</span></div>
+					<div class="vh-pill bad vh-sum-vagas"><b class="num">0</b><span>${__("Desfalcado")}</span></div>
 				</div>
 
 				<div class="vh-roster"></div>
@@ -1066,6 +1163,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 .vh-rowhead:hover { background:var(--paper3); }
 .vh-rowhead:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
 .vh-ring { width:9px; height:9px; border-radius:50%; flex:none; margin-top:6px; background:var(--paper3); border:2px solid var(--line2); box-shadow:0 0 0 3px var(--paper2); }
+.vh-row[data-status="Desfalcado"] .vh-ring { background:var(--falta); border-color:var(--falta); }
 .vh-row[data-status="Falta"] .vh-ring, .vh-row[data-status="Suspensão"] .vh-ring { background:var(--falta); border-color:var(--falta); }
 .vh-row[data-status="Atraso"] .vh-ring, .vh-row[data-status="Saída Antecipada"] .vh-ring, .vh-row[data-status="Outro"] .vh-ring { background:var(--mark); border-color:var(--mark); }
 .vh-row[data-status="Licença"] .vh-ring { background:var(--accentInk); border-color:var(--accentInk); }
@@ -1083,6 +1181,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 .vh-folga-lbl { color:var(--folga); font-weight:700; font-style:italic; }
 .vh-flag { display:inline-flex; align-items:center; gap:4px; background:var(--mark-soft); color:var(--mark); font-size:10.5px; font-weight:700; padding:2px 8px 2px 6px; border-radius:999px; }
 .vh-flag svg { width:10px; height:10px; }
+.vh-flag-cobertura { background:var(--accent-soft); color:var(--accentInk); }
 .vh-accao-chip { font-size:11px; color:var(--ink2); margin-top:3px; }
 .vh-accao-chip b { color:var(--ink); font-weight:700; }
 
@@ -1094,6 +1193,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 .vh-call svg { width:12px; height:12px; flex:none; }
 .vh-status { display:flex; align-items:center; gap:8px; }
 .vh-status-txt { font-size:12px; font-weight:600; color:var(--ink3); }
+.vh-row[data-status="Desfalcado"] .vh-status-txt { color:var(--falta); font-weight:700; }
 .vh-row[data-status="Falta"] .vh-status-txt, .vh-row[data-status="Suspensão"] .vh-status-txt { color:var(--falta); }
 .vh-row[data-status="Atraso"] .vh-status-txt, .vh-row[data-status="Saída Antecipada"] .vh-status-txt, .vh-row[data-status="Outro"] .vh-status-txt { color:var(--mark); }
 .vh-row[data-status="Licença"] .vh-status-txt { color:var(--accentInk); }
@@ -1103,6 +1203,14 @@ sigos.VigilantesHoje = class VigilantesHoje {
 .vh-row[data-open="true"] .vh-rowchev svg { transform:rotate(90deg); color:var(--accent); }
 .vh-row[data-open="true"] .vh-panel { display:block; }
 .vh-panel { display:none; }
+
+/* Desfalcado — vacated posto/turno/regime slot, no vigilante attached. Not
+   interactive (no click, no chevron, no call button), so it gets its own
+   non-hover header and a dashed left edge instead of the usual solid ring. */
+.vh-row-vaga { background:var(--falta-soft); }
+.vh-rowhead-vaga { cursor:default; }
+.vh-rowhead-vaga:hover { background:transparent; }
+.vh-vaga-lbl { color:var(--falta); font-weight:700; text-transform:uppercase; font-size:11.5px; letter-spacing:.04em; }
 
 /* ---- Table view ---------------------------------------------------------
    Scoped under .sigos-vhoje throughout: Frappe's own desk CSS carries table/
@@ -1132,10 +1240,14 @@ sigos.VigilantesHoje = class VigilantesHoje {
 .sigos-vhoje .vh-tbl-posto-dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--pc, var(--ink3)); margin-right:7px; vertical-align:1px; }
 .sigos-vhoje .vh-tbl-lic { display:inline-flex; vertical-align:-2px; margin-right:6px; color:var(--mark); }
 .sigos-vhoje .vh-tbl-lic svg { width:12px; height:12px; }
+.sigos-vhoje .vh-tbl-cobertura-tag { display:inline-block; margin-left:6px; padding:1px 7px; border-radius:999px;
+  font-size:10px; font-weight:700; background:var(--accent-soft); color:var(--accentInk); vertical-align:1px; }
 .sigos-vhoje .vh-tbl-accao { color:var(--ink2); font-size:11.5px; }
 .sigos-vhoje .vh-tbl-accao b { color:var(--ink); font-weight:700; }
 .sigos-vhoje .vh-tbl-tel { font-family:var(--mono); font-size:11.5px; color:var(--ink2); text-decoration:none; }
 .sigos-vhoje .vh-tbl-tel:hover { color:var(--accent); text-decoration:underline; }
+.sigos-vhoje .vh-tbl-row-vaga td, .sigos-vhoje .vh-tbl-row-vaga:nth-child(even) td { background:var(--falta-soft); }
+.sigos-vhoje .vh-tbl-row[data-status="Desfalcado"] .vh-status-txt { color:var(--falta); font-weight:700; }
 .sigos-vhoje .vh-tbl-row[data-status="Falta"] .vh-status-txt, .sigos-vhoje .vh-tbl-row[data-status="Suspensão"] .vh-status-txt { color:var(--falta); font-weight:700; }
 .sigos-vhoje .vh-tbl-row[data-status="Atraso"] .vh-status-txt, .sigos-vhoje .vh-tbl-row[data-status="Saída Antecipada"] .vh-status-txt, .sigos-vhoje .vh-tbl-row[data-status="Outro"] .vh-status-txt { color:var(--mark); font-weight:700; }
 .sigos-vhoje .vh-tbl-row[data-status="Licença"] .vh-status-txt { color:var(--accentInk); font-weight:700; }

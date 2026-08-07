@@ -1,0 +1,208 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "naming_series:",
+ "creation": "2026-08-07 00:00:00.000000",
+ "doctype": "DocType",
+ "document_type": "Document",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "posto_de_vigilancia",
+  "regime",
+  "turno",
+  "col_break_1",
+  "delegacao",
+  "estado",
+  "sec_origem",
+  "vigilante_anterior",
+  "origem_rotatividade",
+  "data_abertura",
+  "col_origem",
+  "vigilante_preenchido",
+  "data_preenchimento"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Série",
+   "options": "VP-.YY.-.####",
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "posto_de_vigilancia",
+   "fieldtype": "Link",
+   "label": "Posto",
+   "options": "Posto De Vigilancia",
+   "reqd": 1,
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "regime",
+   "fieldtype": "Link",
+   "label": "Regime",
+   "options": "Regime",
+   "reqd": 1,
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "turno",
+   "fieldtype": "Link",
+   "label": "Turno",
+   "options": "Turno",
+   "reqd": 1,
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "col_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "delegacao",
+   "fieldtype": "Link",
+   "label": "Delegação",
+   "options": "Delegacao",
+   "read_only": 1,
+   "fetch_from": "posto_de_vigilancia.delegacao",
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "estado",
+   "fieldtype": "Select",
+   "label": "Estado",
+   "options": "Aberta\nPreenchida\nCancelada",
+   "default": "Aberta",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "description": "Fechada automaticamente quando alguém é colocado neste posto/regime/turno. Pode ser alterada manualmente (ex.: Cancelada, se o posto for encerrado antes de ser preenchida)."
+  },
+  {
+   "fieldname": "sec_origem",
+   "fieldtype": "Section Break",
+   "label": "Origem"
+  },
+  {
+   "fieldname": "vigilante_anterior",
+   "fieldtype": "Link",
+   "label": "Vigilante Anterior",
+   "options": "Vigilante",
+   "read_only": 1,
+   "description": "Quem ocupava este posto/turno antes de sair."
+  },
+  {
+   "fieldname": "origem_rotatividade",
+   "fieldtype": "Link",
+   "label": "Rotatividade de Origem",
+   "options": "Rotatividade",
+   "read_only": 1
+  },
+  {
+   "fieldname": "data_abertura",
+   "fieldtype": "Datetime",
+   "label": "Aberta Em",
+   "read_only": 1
+  },
+  {
+   "fieldname": "col_origem",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "vigilante_preenchido",
+   "fieldtype": "Link",
+   "label": "Preenchida Por",
+   "options": "Vigilante",
+   "read_only": 1
+  },
+  {
+   "fieldname": "data_preenchimento",
+   "fieldtype": "Datetime",
+   "label": "Preenchida Em",
+   "read_only": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-08-07 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Security Ops",
+ "name": "Vaga De Posto",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "SIGOS Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Aprovador Operações",
+   "share": 0,
+   "write": 1
+  },
+  {
+   "create": 0,
+   "delete": 0,
+   "email": 0,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Operações SIGOS",
+   "share": 0,
+   "write": 0
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [
+  {
+   "color": "Red",
+   "title": "Aberta"
+  },
+  {
+   "color": "Green",
+   "title": "Preenchida"
+  },
+  {
+   "color": "Gray",
+   "title": "Cancelada"
+  }
+ ],
+ "title_field": "posto_de_vigilancia",
+ "track_changes": 1,
+ "app": "sigos"
+}

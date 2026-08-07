@@ -8,6 +8,34 @@ def daily():
 	_rolar_escalas()
 	_verificar_postos_temporarios()
 	_acumular_ferias()
+	_fechar_coberturas_expiradas()
+
+
+def _fechar_coberturas_expiradas():
+	"""Auto-close Cobertura De Posto records set to end by date (modo_termino ==
+	'Automático pela Data') once their Fim Previsto has passed — reverts the
+	Cobridor to Reserva the same way the manual 'Concluir' button does."""
+	from frappe.utils import today
+
+	nomes = frappe.get_all(
+		"Cobertura De Posto",
+		filters={
+			"estado": "Activa",
+			"modo_termino": "Automático pela Data",
+			"data_fim_prevista": ["<=", today()],
+		},
+		pluck="name",
+	)
+	for nome in nomes:
+		try:
+			doc = frappe.get_doc("Cobertura De Posto", nome)
+			doc.concluir()
+			frappe.db.commit()
+		except Exception as ex:
+			frappe.db.rollback()
+			frappe.log_error(
+				f"Erro ao concluir cobertura {nome}: {ex}", "SIGOS Cobertura De Posto Daily"
+			)
 
 
 def _acumular_ferias():

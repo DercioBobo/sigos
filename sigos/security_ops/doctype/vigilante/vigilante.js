@@ -289,9 +289,13 @@ function _render_mini_dash(frm) {
 		postoOpts = { html: `<span class="vigd-dim">${__("Reserva — sem posto")}</span>` };
 	}
 
+	const cobridorBadge = frm.doc.cobertura_de_posto_activa
+		? ` <span class="vigd-cobertura-badge" title="${esc(__("A cobrir outro colega — ver {0}", [frm.doc.cobertura_de_posto_activa]))}">${esc(__("Cobridor"))}</span>`
+		: "";
+
 	const $dash = $(`
 		<div class="sigos-vig-dash">
-			${cell(__("Estado"), null, { html: `<span class="vigd-st ${stCls}">${esc(frm.doc.status || "-")}</span>` })}
+			${cell(__("Estado"), null, { html: `<span class="vigd-st ${stCls}">${esc(frm.doc.status || "-")}</span>${cobridorBadge}<span data-vigd="coberto"></span>` })}
 			${cell(__("Posto"), frm.doc.posto_de_vigilancia, postoOpts)}
 			${cell(__("Regime"), frm.doc.regime_do_vigilante, { req: req.has("regime_do_vigilante") })}
 			${cell(__("Categoria"), frm.doc.categoria, { req: req.has("categoria") })}
@@ -324,6 +328,13 @@ function _render_mini_dash(frm) {
 
 		const n = d.faltas_mes || 0;
 		$faltas.html(`<span class="vigd-n ${n ? "vigd-n-warn" : ""}">${n}</span>`);
+
+		if (d.cobertura_coberto) {
+			$dash.find('[data-vigd="coberto"]').html(
+				` <span class="vigd-cobertura-badge" title="${esc(__("Ver {0}", [d.cobertura_coberto.name]))}">`
+				+ `${esc(__("Posto coberto por {0}", [d.cobertura_coberto.vigilante_cobridor]))}</span>`
+			);
+		}
 	});
 }
 
@@ -350,6 +361,8 @@ function _inject_dash_css() {
 .vigd-st-pre { background: #fff3cd; color: #856404; }
 .vigd-st-off { background: #e2e3e5; color: #41464b; }
 .vigd-st-dem { background: #f8d7da; color: #842029; }
+.vigd-cobertura-badge { display: inline-block; margin-left: 6px; padding: 2px 10px; border-radius: 999px;
+  font-size: .82em; font-weight: 600; background: #fff3cd; color: #856404; }
 .vigd-chip { display: inline-block; padding: 2px 10px; border-radius: 999px; color: #fff; font-size: .82em; font-weight: 700; }
 .vigd-n { font-size: 1.25em; }
 .vigd-n-warn { color: #b8860b; }

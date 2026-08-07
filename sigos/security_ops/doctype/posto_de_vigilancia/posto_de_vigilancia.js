@@ -9,6 +9,7 @@ frappe.ui.form.on("Posto De Vigilancia", {
 	refresh(frm) {
 		_mostrar_indicador(frm);
 		_mostrar_aviso_temporario(frm);
+		_mostrar_aviso_cobertura(frm);
 
 		if (!frm.is_new()) {
 			// Schedule preview — available for any saved posto (Activo, Inactivo, or Arquivado)
@@ -426,4 +427,28 @@ function _mostrar_indicador(frm) {
 				? `<span class="badge-faltam">Faltam ${max - atual}</span>`
 				: ""}
 		</div>`);
+}
+
+// ─── Provisional coverage notice (Cobertura De Posto) ─────────────────────────
+function _mostrar_aviso_cobertura(frm) {
+	const w = frm.fields_dict.aviso_cobertura?.$wrapper;
+	if (!w) return;
+	w.html("");
+	if (frm.is_new()) return;
+
+	frappe.db.get_value(
+		"Cobertura De Posto",
+		{ posto_de_vigilancia: frm.doc.name, estado: "Activa" },
+		["name", "vigilante_coberto", "vigilante_cobridor", "tipo_cobertura"]
+	).then(({ message }) => {
+		if (!message || !message.name) return;
+		w.html(`
+			<div class="sigos-posto-badge badge-desfalcado">
+				<span class="badge-icon">🟠</span>
+				${__("Cobertura provisória")} (${frappe.utils.escape_html(message.tipo_cobertura || "")}) —
+				<strong>${frappe.utils.escape_html(message.vigilante_cobridor || "")}</strong>
+				${__("a cobrir")}
+				<strong>${frappe.utils.escape_html(message.vigilante_coberto || "")}</strong>
+			</div>`);
+	});
 }

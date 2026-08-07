@@ -163,6 +163,7 @@ def get_substitutos_disponiveis(doctype, txt, searchfield, start, page_len, filt
 		SELECT v.name, v.nome_completo, v.categoria, v.status
 		FROM `tabVigilante` v
 		WHERE v.status = 'Reserva'
+		  AND (v.cobertura_de_posto_activa IS NULL OR v.cobertura_de_posto_activa = '')
 		  AND (v.name LIKE %(txt)s OR v.nome_completo LIKE %(txt)s)
 		  {excluir_sql}
 		  {grupo_sql}
@@ -717,7 +718,52 @@ def get_vigilantes_da_escala(data, periodo, grupo_delegados=None, excluir_doc=No
 	rows = frappe.db.sql(base_sql.format(extra=extra, folga_clause=folga_clause), params, as_dict=True)
 	_marcar_ja_registados(rows, data, periodo, excluir_doc)
 	_marcar_licencas(rows, data)
+	_marcar_coberturas(rows)
 	return rows
+
+
+@frappe.whitelist()
+def get_vagas_desfalcadas(periodo, grupo_delegados=None):
+	"""
+	Open Vaga De Posto slots (posto+regime+turno a Rotatividade vacated with no
+	substituto) whose turno matches this periodo. Vigilantes de Hoje shows these
+	as a nameless "Desfalcado" line so ops knows the spot still needs filling.
+	A vaga has no date of its own — it stays open across every day/periodo view
+	until someone actually lands on that exact slot (auto-closed by
+	escala_do_vigilante._adicionar_vigilante_a_escala).
+	"""
+	frappe.only_for(PAPEIS_INTERNOS)
+	base_sql = """
+		SELECT
+			vp.name,
+			vp.posto_de_vigilancia AS posto,
+			p.nome_do_posto,
+			vp.turno,
+			vp.regime,
+			vp.delegacao
+		FROM `tabVaga De Posto` vp
+		JOIN `tabTurno` t ON t.name = vp.turno
+		LEFT JOIN `tabPosto De Vigilancia` p ON p.name = vp.posto_de_vigilancia
+		WHERE vp.estado = 'Aberta'
+		  AND t.periodo = %(periodo)s
+		{extra}
+		ORDER BY p.nome_do_posto
+	"""
+	params = {"periodo": periodo}
+
+	extra = ""
+	if grupo_delegados:
+		delegacoes = frappe.get_all(
+			"Grupo Delegados Item",
+			filters={"parent": grupo_delegados},
+			fields=["delegacao"],
+			pluck="delegacao",
+		)
+		if delegacoes:
+			params["delegacoes"] = tuple(delegacoes)
+			extra = "AND vp.delegacao IN %(delegacoes)s"
+
+	return frappe.db.sql(base_sql.format(extra=extra), params, as_dict=True)
 
 
 @frappe.whitelist()
@@ -787,6 +833,7 @@ def get_vigilantes_reserva(grupo_delegados=None, excluir_doc=None, data=None, pe
 		FROM `tabVigilante` v
 		{join_escala}
 		WHERE v.status = 'Reserva'
+		  AND (v.cobertura_de_posto_activa IS NULL OR v.cobertura_de_posto_activa = '')
 		{extra}
 		ORDER BY v.delegacao, v.nome_completo
 		""",
@@ -924,6 +971,45 @@ def _marcar_licencas(rows, data):
 	for r in rows:
 		if r.vigilante in licenca_de_vig:
 			r["em_licenca"] = licenca_de_vig[r.vigilante]
+
+
+def _marcar_coberturas(rows):
+	"""
+	Annotate roster rows that belong to either side of an Activa Cobertura De
+	Posto: the original guard (cobertura_papel='titular_coberto') and the
+	guard covering them (cobertura_papel='cobridor_provisorio') — Vigilantes de
+	Hoje shows both with a small badge so the board makes clear who's the real
+	titular vs. who's provisionally standing in.
+	"""
+	vigs = [r.vigilante for r in rows if r.get("vigilante")]
+	if not vigs:
+		return
+
+	coberturas = frappe.get_all(
+		"Cobertura De Posto",
+		filters={
+			"estado": "Activa",
+			"vigilante_coberto": ["in", vigs],
+		},
+		fields=["name", "vigilante_coberto", "vigilante_cobridor"],
+	)
+	# A cobridor could theoretically be covering someone outside today's roster
+	# filters (different grupo_delegados) — but they're always deployed onto the
+	# SAME posto/turno as the titular, so if the titular is in `rows`, the
+	# cobridor's own row (same posto/turno) will be too. No second query needed.
+	papel_de_vig = {}
+	par_de_vig = {}
+	for c in coberturas:
+		papel_de_vig[c.vigilante_coberto] = "titular_coberto"
+		par_de_vig[c.vigilante_coberto] = c.vigilante_cobridor
+		if c.vigilante_cobridor:
+			papel_de_vig[c.vigilante_cobridor] = "cobridor_provisorio"
+			par_de_vig[c.vigilante_cobridor] = c.vigilante_coberto
+
+	for r in rows:
+		if r.vigilante in papel_de_vig:
+			r["cobertura_papel"] = papel_de_vig[r.vigilante]
+			r["cobertura_par"] = par_de_vig[r.vigilante]
 
 
 @frappe.whitelist()
@@ -1128,6 +1214,13 @@ def get_vigilante_dash(vigilante):
 		as_dict=True,
 	)
 	out["hoje"] = turno[0] if turno else None
+
+	out["cobertura_coberto"] = frappe.db.get_value(
+		"Cobertura De Posto",
+		{"vigilante_coberto": vigilante, "estado": "Activa"},
+		["name", "vigilante_cobridor"],
+		as_dict=True,
+	)
 	return out
 
 

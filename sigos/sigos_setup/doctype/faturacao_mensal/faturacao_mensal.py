@@ -29,6 +29,9 @@ class FaturacaoMensal(Document):
 		# Snapshot ALL active guards with a contract+regime — permanent AND temporary
 		# postos alike (no posto-type filter). We also group on posto type so temporary
 		# deployments show as their own, clearly-labelled, auditable lines.
+		# Active Cobridor shadows are excluded: they co-locate with the colleague
+		# they're covering (both Activo, same posto/regime) — billing only the
+		# covered guard's own row avoids double-charging the customer for one slot.
 		rows = frappe.db.sql(f"""
 			SELECT v.projecto AS project, p.customer AS cliente,
 			       v.regime_do_vigilante AS regime,
@@ -39,6 +42,7 @@ class FaturacaoMensal(Document):
 			LEFT JOIN `tabPosto De Vigilancia` pv ON pv.name = v.posto_de_vigilancia
 			WHERE v.status = 'Activo'
 			  AND v.regime_do_vigilante IS NOT NULL AND v.regime_do_vigilante != ''
+			  AND (v.cobertura_de_posto_activa IS NULL OR v.cobertura_de_posto_activa = '')
 			  {cond}
 			GROUP BY v.projecto, p.customer, v.regime_do_vigilante, COALESCE(pv.tipo_de_posto, 'Permanente')
 			ORDER BY p.customer, v.projecto, v.regime_do_vigilante, tipo_posto

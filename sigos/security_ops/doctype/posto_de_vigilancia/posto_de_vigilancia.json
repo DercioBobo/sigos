@@ -22,6 +22,7 @@
   "aviso_expiracao_enviado",
   "sec_ocup",
   "indicador_ocupacao",
+  "aviso_cobertura",
   "numero_de_vagas",
   "ocupacao_atual",
   "col_pv_2",
@@ -134,6 +135,11 @@
    "fieldtype": "HTML",
    "label": "Indicador de Ocupação",
    "options": ""
+  },
+  {
+   "fieldname": "aviso_cobertura",
+   "fieldtype": "HTML",
+   "label": "Aviso de Cobertura Provisória"
   },
   {
    "fieldname": "numero_de_vagas",

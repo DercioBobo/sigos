@@ -5,6 +5,15 @@ from frappe.model.document import Document
 
 class ProcessoDisciplinar(Document):
 
+	def after_insert(self):
+		# Fires the moment an investigation opens (draft, before any decisão is
+		# known) — the posto needs covering immediately, not only once the
+		# process is eventually submitted/approved.
+		self._criar_cobertura_se_necessario()
+
+	def on_cancel(self):
+		self._cancelar_cobertura_se_existir()
+
 	def on_update(self):
 		# docstatus == 1 (not just workflow_state) is the real gate: on_update fires
 		# on EVERY save, including drafts. Without this, a site where the Workflow
@@ -28,6 +37,47 @@ class ProcessoDisciplinar(Document):
 			self._criar_demissao()
 
 	# ─── Private helpers ──────────────────────────────────────────────────────
+
+	def _criar_cobertura_se_necessario(self):
+		"""Auto-create a Cobertura De Posto in 'Por Atribuir' so ops just has to
+		pick a Cobridor — skipped when the guard has no real posto/regime to
+		cover, or a Cobertura already exists for this process (idempotent)."""
+		if frappe.db.exists("Cobertura De Posto", {"processo_disciplinar": self.name}):
+			return
+
+		posto, regime = frappe.db.get_value(
+			"Vigilante", self.vigilante, ["posto_de_vigilancia", "regime_do_vigilante"]
+		) or (None, None)
+		if not (posto and regime):
+			return
+
+		cob = frappe.get_doc({
+			"doctype": "Cobertura De Posto",
+			"vigilante_coberto": self.vigilante,
+			"tipo_cobertura": "Suspensão/Investigação",
+			"processo_disciplinar": self.name,
+			"data_inicio_prevista": self.data,
+			"estado": "Por Atribuir",
+		})
+		cob.insert(ignore_permissions=True)
+		frappe.msgprint(
+			_("Cobertura de Posto <b>{0}</b> criada — atribua um Cobridor quando tiver um "
+			  "disponível.").format(cob.name),
+			indicator="blue", alert=True,
+		)
+
+	def _cancelar_cobertura_se_existir(self):
+		"""If cancelling this Processo Disciplinar after a Cobertura (possibly
+		already Activa, with a Cobridor deployed) was created for it, cancel/
+		revert it too — otherwise a cancelled process leaves a Cobridor
+		permanently mis-deployed with no linked case."""
+		nome = frappe.db.exists("Cobertura De Posto", {"processo_disciplinar": self.name})
+		if not nome:
+			return
+		cob = frappe.get_doc("Cobertura De Posto", nome)
+		if cob.estado in ("Concluída", "Cancelada", "Efectivada"):
+			return
+		cob.cancelar(motivo=_("Processo Disciplinar de origem foi cancelado."))
 
 	def _criar_deducao(self):
 		"""Create an Outras Deducoes record linked to this Processo Disciplinar."""

@@ -34,8 +34,11 @@ class PedidoDeLicenca(Document):
 		if (self.get("workflow_state") or "Aprovado") != "Aprovado":
 			return
 		self._criar_leave_application()
+		self._criar_cobertura_se_necessario()
 
 	def on_cancel(self):
+		self._cancelar_cobertura_se_existir()
+
 		if not self.leave_application_ref:
 			return
 		if not frappe.db.exists("Leave Application", self.leave_application_ref):
@@ -47,6 +50,49 @@ class PedidoDeLicenca(Document):
 		self._registar_timeline(
 			_("Pedido de Licença cancelado — Licença {0} revertida.").format(la.name)
 		)
+
+	def _criar_cobertura_se_necessario(self):
+		"""Auto-create a Cobertura De Posto in 'Por Atribuir' so ops just has to
+		pick a Cobridor — skipped when the covered guard has no real posto/regime
+		to cover (e.g. already in Reserva) or a Cobertura already exists for this
+		Pedido (idempotent — on_submit can run more than once via workflow states)."""
+		if frappe.db.exists("Cobertura De Posto", {"pedido_de_licenca": self.name}):
+			return
+
+		posto, regime = frappe.db.get_value(
+			"Vigilante", self.vigilante, ["posto_de_vigilancia", "regime_do_vigilante"]
+		) or (None, None)
+		if not (posto and regime):
+			return
+
+		cob = frappe.get_doc({
+			"doctype": "Cobertura De Posto",
+			"vigilante_coberto": self.vigilante,
+			"tipo_cobertura": "Licença",
+			"pedido_de_licenca": self.name,
+			"data_inicio_prevista": self.data_inicio,
+			"data_fim_prevista": self.data_fim,
+			"estado": "Por Atribuir",
+		})
+		cob.insert(ignore_permissions=True)
+		frappe.msgprint(
+			_("Cobertura de Posto <b>{0}</b> criada — atribua um Cobridor quando tiver um "
+			  "disponível.").format(cob.name),
+			indicator="blue", alert=True,
+		)
+
+	def _cancelar_cobertura_se_existir(self):
+		"""If cancelling this Pedido after a Cobertura (possibly already Activa,
+		with a Cobridor deployed) was created for it, cancel/revert it too —
+		otherwise a cancelled leave request leaves a Cobridor permanently
+		mis-deployed with no linked leave."""
+		nome = frappe.db.exists("Cobertura De Posto", {"pedido_de_licenca": self.name})
+		if not nome:
+			return
+		cob = frappe.get_doc("Cobertura De Posto", nome)
+		if cob.estado in ("Concluída", "Cancelada", "Efectivada"):
+			return
+		cob.cancelar(motivo=_("Pedido De Licença de origem foi cancelado."))
 
 	def _criar_leave_application(self):
 		"""Create + submit the real HRMS Leave Application that actually moves the

@@ -271,8 +271,13 @@ class Vigilante(Document):
 		# rotation position vacated by the guard they're replacing) — see
 		# escala_do_vigilante.obter_turno_inicial_actual.
 		turno_inicial = self.flags.get("turno_inicial_preferido")
+		# via_cobridor (set by escala_do_vigilante.deployar_cobridor): this guard is
+		# intentionally co-locating with the colleague they're covering, not
+		# displacing them — skip the normal collision-avoidance.
+		via_cobridor = bool(self.flags.get("via_cobridor"))
 		migrar_escala_vigilante(
-			self.name, old_posto, old_regime, destino[0], destino[1], turno_inicial=turno_inicial
+			self.name, old_posto, old_regime, destino[0], destino[1], turno_inicial=turno_inicial,
+			evitar_colisao=not via_cobridor,
 		)
 
 	def _migrar_escala_reserva_se_mudou(self, before):
@@ -432,6 +437,10 @@ class Vigilante(Document):
 
 	def _validar_capacidade_posto(self):
 		"""Prevent assigning more vigilantes than the posto's maximum."""
+		if self.flags.get("via_cobridor"):
+			# Deliberately co-located with the guard being covered — not a real
+			# second headcount. See escala_do_vigilante.deployar_cobridor.
+			return
 		if not self.posto_de_vigilancia or self.status != "Activo":
 			return
 
@@ -442,13 +451,16 @@ class Vigilante(Document):
 		if not max_vagas:
 			return  # No limit defined
 
-		# Count other active vigilantes at this posto (exclude self)
+		# Count other active vigilantes at this posto (exclude self AND any active
+		# Cobridor shadows — they intentionally co-locate with who they cover,
+		# not a real second headcount; see escala_do_vigilante.deployar_cobridor).
 		ocupados = frappe.db.count(
 			"Vigilante",
 			{
 				"posto_de_vigilancia": self.posto_de_vigilancia,
 				"status": "Activo",
 				"name": ["!=", self.name or "__new__"],
+				"cobertura_de_posto_activa": ["is", "not set"],
 			},
 		)
 

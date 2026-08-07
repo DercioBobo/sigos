@@ -1,0 +1,297 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "naming_series:",
+ "creation": "2026-08-07 00:00:00.000000",
+ "doctype": "DocType",
+ "document_type": "Document",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "vigilante_coberto",
+  "tipo_cobertura",
+  "col_break_1",
+  "pedido_de_licenca",
+  "processo_disciplinar",
+  "sec_local",
+  "delegacao",
+  "posto_de_vigilancia",
+  "regime",
+  "turno_inicial_coberto",
+  "sec_periodo",
+  "data_inicio_prevista",
+  "data_fim_prevista",
+  "col_break_2",
+  "modo_termino",
+  "data_fim_real",
+  "sec_cobridor",
+  "vigilante_cobridor",
+  "data_atribuicao",
+  "sec_estado",
+  "estado",
+  "motivo_cancelamento"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Série",
+   "options": "CP-.YY.-.####",
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "vigilante_coberto",
+   "fieldtype": "Link",
+   "label": "Vigilante Coberto",
+   "options": "Vigilante",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "description": "Quem está ausente (licença/férias, suspensão/investigação, ou outro motivo) e precisa que o posto seja coberto."
+  },
+  {
+   "fieldname": "tipo_cobertura",
+   "fieldtype": "Select",
+   "label": "Tipo de Cobertura",
+   "options": "Licença\nSuspensão/Investigação\nOutro",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "col_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "pedido_de_licenca",
+   "fieldtype": "Link",
+   "label": "Pedido De Licença de Origem",
+   "options": "Pedido De Licenca",
+   "read_only": 1,
+   "description": "Preenchido automaticamente quando esta cobertura foi criada a partir da aprovação de um Pedido De Licença."
+  },
+  {
+   "fieldname": "processo_disciplinar",
+   "fieldtype": "Link",
+   "label": "Processo Disciplinar de Origem",
+   "options": "Processo Disciplinar",
+   "read_only": 1,
+   "description": "Preenchido automaticamente quando esta cobertura foi criada a partir da abertura de um Processo Disciplinar."
+  },
+  {
+   "fieldname": "sec_local",
+   "fieldtype": "Section Break",
+   "label": "Local"
+  },
+  {
+   "fieldname": "delegacao",
+   "fieldtype": "Link",
+   "label": "Delegação",
+   "options": "Delegacao",
+   "read_only": 1,
+   "fetch_from": "vigilante_coberto.delegacao",
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "posto_de_vigilancia",
+   "fieldtype": "Link",
+   "label": "Posto",
+   "options": "Posto De Vigilancia",
+   "read_only": 1,
+   "fetch_from": "vigilante_coberto.posto_de_vigilancia",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "regime",
+   "fieldtype": "Link",
+   "label": "Regime",
+   "options": "Regime",
+   "read_only": 1,
+   "fetch_from": "vigilante_coberto.regime_do_vigilante"
+  },
+  {
+   "fieldname": "turno_inicial_coberto",
+   "fieldtype": "Link",
+   "label": "Turno (posição de rotação)",
+   "options": "Turno",
+   "read_only": 1,
+   "description": "A posição de rotação exacta do vigilante coberto neste posto/regime, capturada quando o Cobridor é atribuído — é essa posição que o Cobridor passa a seguir."
+  },
+  {
+   "fieldname": "sec_periodo",
+   "fieldtype": "Section Break",
+   "label": "Período"
+  },
+  {
+   "fieldname": "data_inicio_prevista",
+   "fieldtype": "Date",
+   "label": "Início Previsto",
+   "reqd": 1,
+   "default": "Today"
+  },
+  {
+   "fieldname": "data_fim_prevista",
+   "fieldtype": "Date",
+   "label": "Fim Previsto",
+   "description": "Data prevista de regresso do vigilante coberto, se conhecida (ex.: fim de licença). Deixe em branco quando não há data prevista (ex.: investigação em curso)."
+  },
+  {
+   "fieldname": "col_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "modo_termino",
+   "fieldtype": "Select",
+   "label": "Encerramento",
+   "options": "Manual\nAutomático pela Data",
+   "default": "Manual",
+   "reqd": 1,
+   "description": "Manual: alguém tem de clicar em Concluir/Efectivar quando a situação se resolver (datas de regresso mudam com frequência, e casos disciplinares raramente têm data certa). Automático: encerra sozinho (regresso do titular) no Fim Previsto."
+  },
+  {
+   "fieldname": "data_fim_real",
+   "fieldtype": "Date",
+   "label": "Fim Real",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_cobridor",
+   "fieldtype": "Section Break",
+   "label": "Cobridor"
+  },
+  {
+   "fieldname": "vigilante_cobridor",
+   "fieldtype": "Link",
+   "label": "Vigilante Cobridor",
+   "options": "Vigilante",
+   "read_only": 1,
+   "description": "Definido pelo botão Atribuir Cobridor — passa a seguir a escala exacta do vigilante coberto até a cobertura ser concluída ou efectivada."
+  },
+  {
+   "fieldname": "data_atribuicao",
+   "fieldtype": "Datetime",
+   "label": "Atribuído Em",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_estado",
+   "fieldtype": "Section Break",
+   "label": "Estado"
+  },
+  {
+   "fieldname": "estado",
+   "fieldtype": "Select",
+   "label": "Estado",
+   "options": "Por Atribuir\nActiva\nConcluída\nCancelada\nEfectivada",
+   "default": "Por Atribuir",
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "description": "Definido pelo sistema — use os botões (Atribuir Cobridor, Concluir, Efectivar, Cancelar)."
+  },
+  {
+   "fieldname": "motivo_cancelamento",
+   "fieldtype": "Small Text",
+   "label": "Motivo do Cancelamento",
+   "depends_on": "eval:doc.estado==\"Cancelada\""
+  }
+ ],
+ "links": [],
+ "modified": "2026-08-07 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Security Ops",
+ "name": "Cobertura De Posto",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "SIGOS Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Aprovador Operações",
+   "share": 0,
+   "write": 1
+  },
+  {
+   "create": 0,
+   "delete": 0,
+   "email": 0,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Operações SIGOS",
+   "share": 0,
+   "write": 0
+  },
+  {
+   "create": 0,
+   "delete": 0,
+   "email": 0,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Aprovador RH",
+   "share": 0,
+   "write": 0
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [
+  {
+   "color": "Orange",
+   "title": "Por Atribuir"
+  },
+  {
+   "color": "Blue",
+   "title": "Activa"
+  },
+  {
+   "color": "Green",
+   "title": "Concluída"
+  },
+  {
+   "color": "Gray",
+   "title": "Cancelada"
+  },
+  {
+   "color": "Purple",
+   "title": "Efectivada"
+  }
+ ],
+ "title_field": "vigilante_coberto",
+ "track_changes": 1,
+ "app": "sigos"
+}

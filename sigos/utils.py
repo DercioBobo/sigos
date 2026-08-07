@@ -397,7 +397,13 @@ def atualizar_ocupacao_posto(posto_name: str):
 
 		atual = frappe.db.count(
 			"Vigilante",
-			{"posto_de_vigilancia": posto_name, "status": "Activo"},
+			{
+				"posto_de_vigilancia": posto_name,
+				"status": "Activo",
+				# Active Cobridor shadows co-locate with who they cover — not a real
+				# second headcount (see escala_do_vigilante.deployar_cobridor).
+				"cobertura_de_posto_activa": ["is", "not set"],
+			},
 		)
 
 		if max_vagas == 0:
