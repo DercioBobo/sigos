@@ -678,6 +678,7 @@ def get_vigilantes_da_escala(data, periodo, grupo_delegados=None, excluir_doc=No
 			v.contacto,
 			v.contacto_alternativo,
 			v.residencia,
+			v.supervisor,
 			te.posto,
 			p.nome_do_posto,
 			te.turno,
@@ -937,6 +938,9 @@ def get_sigos_settings_flags():
 	return {
 		"faltas_normal_vermelha_activo": frappe.db.get_single_value(
 			"SIGOS Settings", "faltas_normal_vermelha_activo"
+		),
+		"supervisor_activo": frappe.db.get_single_value(
+			"SIGOS Settings", "supervisor_activo"
 		),
 	}
 

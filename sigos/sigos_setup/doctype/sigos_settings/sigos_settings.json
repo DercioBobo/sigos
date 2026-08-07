@@ -638,6 +638,13 @@
    "description": "Quando activo, mostra o campo Posição (texto livre) no Vigilante, na secção Alocação — a função/posição do vigilante dentro do posto (ex: Chefe de Equipa, Motorista). Campo opcional, sem lista fixa de valores."
   },
   {
+   "fieldname": "supervisor_activo",
+   "fieldtype": "Check",
+   "label": "Vigilante: Campo Supervisor",
+   "default": "0",
+   "description": "Quando activo, mostra o campo Supervisor (texto livre) no Vigilante, na secção Alocação — o nome do supervisor responsável por este vigilante. Campo opcional, sem lista fixa de valores. Também aparece no perfil do vigilante em Vigilantes de Hoje."
+  },
+  {
    "fieldname": "subsidios_categoria_funcao_activo",
    "fieldtype": "Check",
    "label": "Subsídios por Categoria e Função (Combináveis)",

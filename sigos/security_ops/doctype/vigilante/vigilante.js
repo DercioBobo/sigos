@@ -22,6 +22,7 @@ frappe.ui.form.on("Vigilante", {
 		_setup_proximo_btn(frm);
 		_render_mini_dash(frm);
 		_toggle_posicao(frm);
+		_toggle_supervisor(frm);
 		_toggle_subsidios_comb(frm);
 
 		// Ver Escala — only for active guards already assigned to a posto
@@ -168,6 +169,20 @@ function _toggle_posicao(frm) {
 		});
 	} else {
 		frm.set_df_property("posicao", "hidden", _posicao_activo ? 0 : 1);
+	}
+}
+
+// ─── Supervisor (customer-specific, SIGOS Settings.supervisor_activo) ─────────
+// Hidden by default — free text, no fixed list (customers use their own naming).
+let _supervisor_activo = null;
+function _toggle_supervisor(frm) {
+	if (_supervisor_activo === null) {
+		frappe.db.get_single_value("SIGOS Settings", "supervisor_activo").then((v) => {
+			_supervisor_activo = !!v;
+			frm.set_df_property("supervisor", "hidden", _supervisor_activo ? 0 : 1);
+		});
+	} else {
+		frm.set_df_property("supervisor", "hidden", _supervisor_activo ? 0 : 1);
 	}
 }
 

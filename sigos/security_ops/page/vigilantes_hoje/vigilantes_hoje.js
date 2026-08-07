@@ -542,6 +542,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 					<div><span class="vh-pf-lbl">${__("Contacto Alternativo")}</span><span class="vh-pf-val mono">${telLink(row.contacto_alternativo)}</span></div>
 					<div><span class="vh-pf-lbl">${__("Delegação")}</span><span class="vh-pf-val">${val(row.delegacao)}</span></div>
 					<div><span class="vh-pf-lbl">${__("Residência")}</span><span class="vh-pf-val">${val(row.residencia)}</span></div>
+					${this.settingsFlags.supervisor_activo ? `<div><span class="vh-pf-lbl">${__("Supervisor")}</span><span class="vh-pf-val">${val(row.supervisor)}</span></div>` : ""}
 				</div>
 			</div>
 			${isMarcado ? `

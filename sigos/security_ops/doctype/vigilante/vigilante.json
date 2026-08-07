@@ -44,6 +44,7 @@
   "nome_do_posto",
   "tipo_de_posto",
   "posicao",
+  "supervisor",
   "col_break_aloc",
   "cliente",
   "projecto",
@@ -333,6 +334,14 @@
    "hidden": 1,
    "permlevel": 1,
    "description": "Função/posição do vigilante dentro do posto (ex: Chefe de Equipa, Motorista)."
+  },
+  {
+   "fieldname": "supervisor",
+   "fieldtype": "Data",
+   "label": "Supervisor",
+   "hidden": 1,
+   "permlevel": 1,
+   "description": "Nome do supervisor responsável por este vigilante. Texto livre, sem lista fixa de valores."
   },
   {
    "fieldname": "col_break_aloc",
