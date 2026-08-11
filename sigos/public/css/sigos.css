@@ -874,7 +874,7 @@ thead .esc-name-col { z-index: 3; }
 .cell-folga { background: linear-gradient(180deg, #bcc3ca 0%, #adb5bd 52%, #9aa2aa 100%); color: #fff; }
 /* Único (team-rostered regimes) and any other working período without its own
    colour yet — never falls back to the grey Folga look, since it's a work day. */
-.cell-outro { background: linear-gradient(180deg, #9270ea 0%, #7a5ee0 52%, #5a3fc0 100%); }
+.cell-outro { background: linear-gradient(180deg, #9270ea 0%, #7a5ee0 52%, #5a3fc0 100%); color: #fff; }
 
 .esc-override { box-shadow: inset 0 0 0 2px #e05c5c; }
 
