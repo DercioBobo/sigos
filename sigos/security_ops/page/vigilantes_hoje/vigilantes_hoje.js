@@ -57,6 +57,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		this.userToggledPostos = new Map();
 		this.rows = [];
 		this.settingsFlags = {};
+		this.equipaLabel = {};   // Turno Da Equipa name -> short display label (codigo or derived)
 		this._dialogOpen = false;
 
 		this.THEME_KEY = "sigos_vhoje_theme";
@@ -73,7 +74,25 @@ sigos.VigilantesHoje = class VigilantesHoje {
 
 		frappe.call({
 			method: "sigos.api.get_sigos_settings_flags",
-			callback: (r) => { this.settingsFlags = r.message || {}; },
+			callback: (r) => {
+				this.settingsFlags = r.message || {};
+				// Turno da Equipa (customer-specific): "Único" período only makes
+				// sense for team-rostered regimes — hidden otherwise, same gate as
+				// the Escala Do Vigilante columns/buttons.
+				this.$root.find('.vh-seg[data-role="periodo"] button[data-p="Único"]')
+					.toggle(!!this.settingsFlags.turno_equipa_activo);
+			},
+		});
+		frappe.call({
+			method: "frappe.client.get_list",
+			args: { doctype: "Turno Da Equipa", fields: ["name", "codigo"], limit_page_length: 0 },
+			callback: (r) => {
+				this.equipaLabel = {};
+				(r.message || []).forEach((e) => {
+					this.equipaLabel[e.name] = e.codigo || (e.name.match(/\S+$/) || [e.name])[0];
+				});
+				this._render();   // refresh already-rendered rows with the resolved labels
+			},
 		});
 		this.refresh();
 		this._start_polling();
@@ -258,13 +277,21 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		});
 	}
 
+	// "24" + Turno da Equipa "Equipa A" -> "24 - A"; no equipa -> just the turno.
+	// Team membership is right there on the roster line — no equipa is a no-op.
+	_turno_label(row) {
+		if (!row.turno_equipa) return row.turno || "";
+		const lbl = this.equipaLabel[row.turno_equipa] || row.turno_equipa;
+		return `${row.turno || ""} - ${lbl}`;
+	}
+
 	_render_row($parent, row) {
 		if (row._isVaga) return this._render_vaga_row($parent, row);
 		const key = row.escala_row;
 		const status = row._status;
 		const metaLine = status === "Folga"
-			? `<span class="vh-folga-lbl">${__("Folga hoje")}</span><span class="dot">·</span>${frappe.utils.escape_html(row.regime || "")}<span class="dot">·</span>${frappe.utils.escape_html(row.delegacao || "")}`
-			: `<b>${frappe.utils.escape_html(row.turno || "")}</b><span class="dot">·</span>${frappe.utils.escape_html(row.regime || "")}<span class="dot">·</span>${frappe.utils.escape_html(row.delegacao || "")}`;
+			? `<span class="vh-folga-lbl">${frappe.utils.escape_html(this._turno_label({ turno: __("Folga hoje"), turno_equipa: row.turno_equipa }))}</span><span class="dot">·</span>${frappe.utils.escape_html(row.regime || "")}<span class="dot">·</span>${frappe.utils.escape_html(row.delegacao || "")}`
+			: `<b>${frappe.utils.escape_html(this._turno_label(row))}</b><span class="dot">·</span>${frappe.utils.escape_html(row.regime || "")}<span class="dot">·</span>${frappe.utils.escape_html(row.delegacao || "")}`;
 		const tel = (row.contacto || "").replace(/\s/g, "");
 		const aberto = this.expandedRowKey === key;
 		const temAccao = row.ja_proxima_accao && row.ja_proxima_accao !== "Sem Ação";
@@ -413,7 +440,9 @@ sigos.VigilantesHoje = class VigilantesHoje {
 					${row.cobertura_papel === "cobridor_provisorio" ? `<span class="vh-tbl-cobertura-tag">${__("A Cobrir")}</span>` : ""}
 				</td>
 				<td><span class="vh-tbl-posto-dot"></span>${frappe.utils.escape_html(postoNome || "—")}</td>
-				<td>${status === "Folga" ? `<span class="vh-folga-lbl">${__("Folga")}</span>` : frappe.utils.escape_html(row.turno || "—")}</td>
+				<td>${status === "Folga"
+					? `<span class="vh-folga-lbl">${frappe.utils.escape_html(this._turno_label({ turno: __("Folga"), turno_equipa: row.turno_equipa }))}</span>`
+					: frappe.utils.escape_html(this._turno_label(row) || "—")}</td>
 				<td>${frappe.utils.escape_html(row.regime || "—")}</td>
 				<td>
 					<span class="vh-status-txt">${status === "Presente" ? __("Presente") : __(status)}</span>
@@ -607,7 +636,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		const isFolga = row._status === "Folga";
 		const isMarcado = !!row.ja_ausencia_row;
 		const isSubmetida = row.ja_registado_estado === "Submetido";
-		const meta = [row.mecanografico, row.nome_do_posto || row.posto, row.turno, row.regime, row.delegacao]
+		const meta = [row.mecanografico, row.nome_do_posto || row.posto, this._turno_label(row), row.regime, row.delegacao]
 			.filter(Boolean).join(" · ");
 		const val = (v) => (v || v === 0) ? frappe.utils.escape_html(String(v)) : "—";
 		const telLink = (v) => v ? `<a href="tel:${v.replace(/\s/g, "")}">${frappe.utils.escape_html(v)}</a>` : "—";
@@ -674,7 +703,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 	_abrir_marcar_dialog(row) {
 		const isEdit = !!row.ja_ausencia_row;
 		const showSubtipo = !!this.settingsFlags.faltas_normal_vermelha_activo;
-		const meta = [row.mecanografico, row.turno, row.regime, row.nome_do_posto || row.posto].filter(Boolean).join(" · ");
+		const meta = [row.mecanografico, this._turno_label(row), row.regime, row.nome_do_posto || row.posto].filter(Boolean).join(" · ");
 
 		const d = new frappe.ui.Dialog({
 			title: isEdit ? __("Rever Marcação") : __("Marcar Ausência"),
@@ -935,6 +964,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 					<div class="vh-seg" data-role="periodo">
 						<button data-p="Manhã" class="on">${__("Manhã")}</button>
 						<button data-p="Noite">${__("Noite")}</button>
+						<button data-p="Único" style="display:none">${__("Único")}</button>
 					</div>
 					<div id="vh-ctrl-grupo"></div>
 					<select class="vh-select" data-role="estado-filtro">

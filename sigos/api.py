@@ -683,6 +683,7 @@ def get_vigilantes_da_escala(data, periodo, grupo_delegados=None, excluir_doc=No
 			te.posto,
 			p.nome_do_posto,
 			te.turno,
+			te.turno_equipa,
 			te.regime,
 			COALESCE(NULLIF(te.periodo, ''), t.periodo) AS periodo,
 			t.e_folga,
@@ -1027,6 +1028,9 @@ def get_sigos_settings_flags():
 		),
 		"supervisor_activo": frappe.db.get_single_value(
 			"SIGOS Settings", "supervisor_activo"
+		),
+		"turno_equipa_activo": frappe.db.get_single_value(
+			"SIGOS Settings", "turno_equipa_activo"
 		),
 	}
 

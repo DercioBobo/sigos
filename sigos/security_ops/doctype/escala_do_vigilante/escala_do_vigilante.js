@@ -590,14 +590,37 @@ function _load_and_render(frm) {
 	const licencas = (frm.doc.name && !frm.is_new())
 		? frappe.xcall("sigos.api.licencas_na_escala", { escala_name: frm.doc.name }).catch(() => ({}))
 		: Promise.resolve({});
+	// Fetched unconditionally (cheap, small table) rather than gated on
+	// turno_equipa_activo — on non-team escalas every row's turno_equipa is
+	// simply empty, so the label suffix is a no-op either way.
+	const equipas = frappe.db.get_list("Turno Da Equipa", { fields: ["name", "codigo"], limit_page_length: 0 })
+		.catch(() => []);
 	Promise.all([
 		frappe.db.get_value("Regime", frm.doc.regime_do_vigilante, "tipo_ciclo"),
 		frappe.xcall("sigos.api.get_regime_turnos", { regime: frm.doc.regime_do_vigilante }),
 		licencas,
-	]).then(([tc, seq, lic]) => {
+		equipas,
+	]).then(([tc, seq, lic, eqs]) => {
 		frm._esc_licencas = lic || {};
-		_render_grid(frm, tc?.message?.tipo_ciclo || null, seq || []);
+		const equipaLabel = {};
+		(eqs || []).forEach(e => { equipaLabel[e.name] = _short_equipa(e.name, e.codigo); });
+		_render_grid(frm, tc?.message?.tipo_ciclo || null, seq || [], equipaLabel);
 	});
+}
+
+// Short display label for a Turno Da Equipa: its own codigo if set, otherwise
+// the name with a leading "Equipa " (or similar) stripped — "Equipa A" -> "A".
+function _short_equipa(nome, codigo) {
+	if (codigo) return codigo;
+	const m = (nome || "").match(/\S+$/);
+	return m ? m[0] : (nome || "");
+}
+
+// "24" + "Equipa A" -> "24 - A"; no equipa -> just the turno, unchanged.
+function _turno_com_equipa(turno, turnoEquipa, equipaLabel) {
+	if (!turnoEquipa) return turno;
+	const lbl = (equipaLabel && equipaLabel[turnoEquipa]) || turnoEquipa;
+	return `${turno} - ${lbl}`;
 }
 
 // Read-only "on approved leave" flag for a guard/day — returns the Leave Type
@@ -626,15 +649,16 @@ function _badge_licenca(tipo) {
 	return `<span class="esc-fer-badge" title="${esc} (aprovada)">${_abrev_licenca(tipo)}</span>`;
 }
 
-const _PERIODO_CLS = { "Manhã": "cell-manha", "Noite": "cell-noite", "Tarde": "cell-tarde" };
+const _PERIODO_CLS = { "Manhã": "cell-manha", "Noite": "cell-noite", "Tarde": "cell-tarde", "Único": "cell-outro" };
 const _DOW = ["D", "S", "T", "Q", "Q", "S", "S"];
 const _MES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
-function _render_grid(frm, tipo_ciclo, seq) {
+function _render_grid(frm, tipo_ciclo, seq, equipaLabel) {
 	_inject_ferias_css();
 	// Cache for instant re-render when the range/week changes
 	frm._esc_tc = tipo_ciclo;
 	frm._esc_seq = seq;
+	frm._esc_equipaLabel = equipaLabel || frm._esc_equipaLabel || {};
 	if (frm._esc_range === undefined) frm._esc_range = "7";
 
 	const wrapper = frm.fields_dict.grid_escala?.$wrapper;
@@ -665,7 +689,12 @@ function _render_grid(frm, tipo_ciclo, seq) {
 	const cellMap = {};
 	rows.forEach(r => { cellMap[`${r.vigilante}|${r.data}`] = r; });
 
-	const ctx = { frm, tipo_ciclo, seq, todasDatas, guards, nameMap, cellMap, hoje };
+	// Turnos flagged e_folga in the regime — used to tell a real rest day apart
+	// from a working turno whose período has no dedicated colour yet (e.g. a
+	// team-rostered "24"/Único turno) so the latter never gets styled grey.
+	const folgaTurnos = new Set((seq || []).filter(s => s.e_folga).map(s => s.turno));
+
+	const ctx = { frm, tipo_ciclo, seq, todasDatas, guards, nameMap, cellMap, hoje, folgaTurnos, equipaLabel: frm._esc_equipaLabel };
 
 	_update_deck_stats(frm, ctx, tipo_ciclo);
 
@@ -680,7 +709,7 @@ function _render_grid(frm, tipo_ciclo, seq) {
 	wrapper.find(".esc-range-btn").on("click", function () {
 		frm._esc_range = $(this).attr("data-range");
 		frm._esc_week_start = undefined;   // reset week nav on mode change
-		_render_grid(frm, frm._esc_tc, frm._esc_seq);
+		_render_grid(frm, frm._esc_tc, frm._esc_seq, frm._esc_equipaLabel);
 	});
 
 	_bind_cell_clicks(frm, wrapper, hoje);
@@ -691,8 +720,10 @@ function _render_grid(frm, tipo_ciclo, seq) {
 // the guard's position in the rotation — the posto needs at least ONE guard on
 // Manhã and ONE on Noite (and Tarde, if the regime has it) each day.
 function _coverage_for_day(d, ctx) {
-	const periodoDe = {};   // working turno -> its período
-	(ctx.seq || []).forEach(s => { if (!s.e_folga && s.periodo) periodoDe[s.turno] = s.periodo; });
+	const periodoDe = {};   // working turno -> its período (falls back to its own
+	// name when the Turno has no categorical período set — e.g. a team-rostered
+	// "24" turno — so coverage still works without requiring that field filled in)
+	(ctx.seq || []).forEach(s => { if (!s.e_folga) periodoDe[s.turno] = s.periodo || s.turno; });
 	const periodos = [...new Set(Object.values(periodoDe))];
 	if (!periodos.length) return null;
 
@@ -715,7 +746,7 @@ function _coverage_legend(tipo_ciclo) {
 	return `
 		<div class="esc-cobertura-help">
 			<span class="esc-ch-title">${__("Cobertura")}</span>
-			<span class="esc-ch-desc">${__("cada período do dia (Manhã/Noite) tem vigilante?")}</span>
+			<span class="esc-ch-desc">${__("cada período do dia tem vigilante?")}</span>
 			<span class="esc-ch-item"><span class="esc-ch-dot cov-ok">✓</span> ${__("completo")}</span>
 			<span class="esc-ch-item"><span class="esc-ch-dot cov-gap">▲</span> ${__("falta alguém")}</span>
 			<span class="esc-ch-item"><span class="esc-ch-dot cov-double">●</span> ${__("a mais")}</span>
@@ -728,6 +759,7 @@ function _legend(tipo_ciclo) {
 			<span class="esc-lg cell-manha">Manhã</span>
 			<span class="esc-lg cell-noite">Noite</span>
 			<span class="esc-lg cell-tarde">Tarde</span>
+			<span class="esc-lg cell-outro">${__("Único / Outro")}</span>
 			<span class="esc-lg cell-folga">Folga</span>
 			<span class="esc-lg esc-override-lg">Manual</span>
 			<span class="esc-lg esc-ferias-lg">Licença</span>
@@ -814,13 +846,13 @@ function _render_week(wrapper, toolbar, ctx) {
 			if (!r) {
 				body += `<td class="esc-wk-cell esc-wk-blank ${ferCls} ${weCls(di)} ${isPast ? "esc-wk-past" : ""}">${ferBadge}</td>`;
 			} else {
-				const cls = _PERIODO_CLS[r.periodo] || "cell-folga";
+				const cls = _PERIODO_CLS[r.periodo] || (ctx.folgaTurnos.has(r.turno) ? "cell-folga" : "cell-outro");
 				const ovr = r.override ? "esc-wk-override" : "";
 				body += `<td class="esc-wk-cell ${ferCls} ${weCls(di)} ${isPast ? "esc-wk-past" : ""}"
 					${isPast ? "" : `data-vig="${vig}" data-data="${d}"`}>
 					${ferBadge}
-					<div class="esc-wk-chip ${cls} ${ovr}" title="${r.turno}${r.override ? " (manual)" : ""}">
-						${frappe.utils.escape_html(r.turno)}${r.override ? ' <span class="esc-wk-star">✎</span>' : ""}
+					<div class="esc-wk-chip ${cls} ${ovr}" title="${_turno_com_equipa(r.turno, r.turno_equipa, ctx.equipaLabel)}${r.override ? " (manual)" : ""}">
+						${frappe.utils.escape_html(_turno_com_equipa(r.turno, r.turno_equipa, ctx.equipaLabel))}${r.override ? ' <span class="esc-wk-star">✎</span>' : ""}
 					</div>
 				</td>`;
 			}
@@ -841,11 +873,11 @@ function _render_week(wrapper, toolbar, ctx) {
 
 	wrapper.find('.esc-wk-btn[data-wk="prev"]').on("click", () => {
 		frm._esc_week_start = todasDatas[Math.max(0, start - 7)];
-		_render_grid(frm, frm._esc_tc, frm._esc_seq);
+		_render_grid(frm, frm._esc_tc, frm._esc_seq, frm._esc_equipaLabel);
 	});
 	wrapper.find('.esc-wk-btn[data-wk="next"]').on("click", () => {
 		frm._esc_week_start = todasDatas[Math.min(todasDatas.length - 1, start + 7)];
-		_render_grid(frm, frm._esc_tc, frm._esc_seq);
+		_render_grid(frm, frm._esc_tc, frm._esc_seq, frm._esc_equipaLabel);
 	});
 }
 
@@ -900,11 +932,13 @@ function _render_compact(wrapper, toolbar, ctx) {
 			if (!r) {
 				body += `<td class="esc-cell esc-empty ${ferCls} ${isPast ? "esc-pastcell" : ""}"></td>`;
 			} else {
-				const cls = _PERIODO_CLS[r.periodo] || "cell-folga";
+				const cls = _PERIODO_CLS[r.periodo] || (ctx.folgaTurnos.has(r.turno) ? "cell-folga" : "cell-outro");
 				const ovr = r.override ? "esc-override" : "";
 				const fTitle = lic ? ` · ${frappe.utils.escape_html(lic)}` : "";
+				const eqShort = r.turno_equipa ? (ctx.equipaLabel?.[r.turno_equipa] || r.turno_equipa) : "";
+				const abbr = _abbr(r.turno) + (eqShort ? `·${eqShort}` : "");
 				body += `<td class="esc-cell ${cls} ${ovr} ${ferCls} ${isPast ? "esc-pastcell" : ""}"
-					data-vig="${vig}" data-data="${d}" title="${r.turno}${r.override ? " (manual)" : ""}${fTitle}">${_abbr(r.turno)}</td>`;
+					data-vig="${vig}" data-data="${d}" title="${_turno_com_equipa(r.turno, r.turno_equipa, ctx.equipaLabel)}${r.override ? " (manual)" : ""}${fTitle}">${frappe.utils.escape_html(abbr)}</td>`;
 			}
 		});
 		body += `</tr>`;
@@ -954,6 +988,7 @@ function _abbr(turno) {
 	const m = turno.match(/^(\d)a?\s*(Manhã|Noite|Tarde|Folga)/i);
 	if (m) return m[1] + m[2][0].toUpperCase();
 	if (/folga/i.test(turno)) return "F";
+	if (/único/i.test(turno)) return "U";
 	return turno.length <= 4 ? turno : turno.slice(0, 4);
 }
 
