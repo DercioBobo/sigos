@@ -50,7 +50,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		this.wrapper = wrapper;
 		this.state = {
 			data: frappe.datetime.get_today(),
-			periodo: "Manhã",
+			periodo: "",   // "Todos" — every período at once, the default view
 			grupo_delegados: null,
 			busca: "",
 			statusFiltro: null,
@@ -82,27 +82,11 @@ sigos.VigilantesHoje = class VigilantesHoje {
 				this.settingsFlags = r.message || {};
 				// Turno da Equipa (customer-specific): "Único" período only makes
 				// sense for team-rostered regimes — hidden otherwise, same gate as
-				// the Escala Do Vigilante columns/buttons.
-				const equipaActiva = !!this.settingsFlags.turno_equipa_activo;
-				this.$root.find('.vh-seg[data-role="periodo"] button[data-p="Único"]').toggle(equipaActiva);
-
-				// Team-rostered customers live on "Único" — default to it instead of
-				// Manhã, but only as the INITIAL default (guarded on the untouched
-				// starting state) so it never overrides a period the user already
-				// picked in the brief window before this flag resolved.
-				if (equipaActiva && this.state.periodo === "Manhã") {
-					this.state.periodo = "Único";
-					this.$root.find('.vh-seg[data-role="periodo"] button').removeClass("on");
-					this.$root.find('.vh-seg[data-role="periodo"] button[data-p="Único"]').addClass("on");
-					// The page's own initial refresh() (fired for "Manhã") may still be
-					// in flight — calling refresh() again right now would silently no-op
-					// against its _loading guard, so wait for it to clear first.
-					const aguardarERefrescar = () => {
-						if (this._loading) { setTimeout(aguardarERefrescar, 150); return; }
-						this.refresh();
-					};
-					aguardarERefrescar();
-				}
+				// the Escala Do Vigilante columns/buttons. No default-période override
+				// needed here anymore — "Todos" (the page default) already includes
+				// Único guards, so there's nothing team-specific left to switch to.
+				this.$root.find('.vh-seg[data-role="periodo"] button[data-p="Único"]')
+					.toggle(!!this.settingsFlags.turno_equipa_activo);
 			},
 		});
 		frappe.call({
@@ -1017,10 +1001,10 @@ sigos.VigilantesHoje = class VigilantesHoje {
 				<div class="vh-bar">
 					<div id="vh-ctrl-data"></div>
 					<div class="vh-seg" data-role="periodo">
-						<button data-p="Manhã" class="on">${__("Manhã")}</button>
+						<button data-p="Manhã">${__("Manhã")}</button>
 						<button data-p="Noite">${__("Noite")}</button>
 						<button data-p="Único" style="display:none">${__("Único")}</button>
-						<button data-p="">${__("Todos")}</button>
+						<button data-p="" class="on">${__("Todos")}</button>
 					</div>
 					<div id="vh-ctrl-grupo"></div>
 					<select class="vh-select" data-role="estado-filtro">
