@@ -37,21 +37,18 @@ def resolver_periodo_folha(mes_num: int, ano: int) -> tuple:
 	return inicio, fim
 
 
-# ─── Regime cache (per request) ───────────────────────────────────────────────
-
-_regime_cache: dict = {}
-
+# ─── Regime cache ──────────────────────────────────────────────────────────────
 
 def _get_regime(regime_nome: str):
-	"""Return the Regime document, cached within the current request."""
+	"""Return the Regime document, via Frappe's own document cache — auto-invalidated
+	whenever the Regime is saved, unlike a hand-rolled process-level dict (which would
+	keep serving a stale Turnos sequence for the life of the worker after an edit)."""
 	if not regime_nome:
 		return None
-	if regime_nome not in _regime_cache:
-		try:
-			_regime_cache[regime_nome] = frappe.get_doc("Regime", regime_nome)
-		except frappe.DoesNotExistError:
-			_regime_cache[regime_nome] = None
-	return _regime_cache[regime_nome]
+	try:
+		return frappe.get_cached_doc("Regime", regime_nome)
+	except frappe.DoesNotExistError:
+		return None
 
 
 def calcular_n_faltas(regime_nome: str, turno: str) -> int:
