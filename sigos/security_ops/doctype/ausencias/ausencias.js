@@ -16,7 +16,7 @@ let _atraso_restam = null;        // minutes until the cutoff (null when n/a or 
 let _limites_cache = {};          // SIGOS Settings hora_limite_* (fetched once per session)
 
 const ACCOES = ["Sem Ação", "Substituto", "Dobra de Turno", "Meia Dobra", "Adiantamento de Turno", "Horas Extras"];
-const PERIODO_CLASSE = { "Manhã": "per-manha", "Noite": "per-noite", "Tarde": "per-tarde" };
+const PERIODO_CLASSE = { "Manhã": "per-manha", "Noite": "per-noite", "Tarde": "per-tarde", "Único": "per-unico" };
 const ACCAO_FIELD = {
 	"Substituto":             "vigilante_substituto",
 	"Dobra de Turno":         "vigilante_a_dobrar",
@@ -189,7 +189,7 @@ function _mount_header_controls(frm, w, formEditable) {
 	c_data.set_value(frm.doc.data || frappe.datetime.get_today());
 
 	const c_periodo = frappe.ui.form.make_control({
-		df: { fieldtype: "Select", fieldname: "periodo", options: "\nManhã\nNoite", read_only: ro,
+		df: { fieldtype: "Select", fieldname: "periodo", options: "\nManhã\nNoite\nÚnico", read_only: ro,
 			onchange: () => { const v = c_periodo.get_value(); if (v !== frm.doc.periodo) frm.set_value("periodo", v); } },
 		parent: w.find("#ausd-ctrl-periodo"), render_input: true,
 	});
@@ -1100,6 +1100,7 @@ function _inject_css() {
 .per-manha { background: linear-gradient(180deg, #62a2e2 0%, #3a7ec5 100%); }
 .per-noite { background: linear-gradient(180deg, #3b5074 0%, #212f44 100%); border: 1px solid rgba(255,255,255,.22); }
 .per-tarde { background: linear-gradient(180deg, #e8a020 0%, #c9821a 100%); }
+.per-unico { background: linear-gradient(180deg, #7a5ee0 0%, #5a3fc0 100%); }
 .per-outro { background: rgba(255,255,255,.16); }
 .ausb-justif { min-width: 150px; }
 .ausb-remove { background: rgba(255,255,255,.1); border: none; color: #ffb4b4; width: 24px; height: 24px; border-radius: 6px; font-size: 1.1em; line-height: 1; cursor: pointer; flex: none; }

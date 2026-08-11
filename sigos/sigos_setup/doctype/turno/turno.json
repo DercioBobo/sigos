@@ -28,7 +28,7 @@
    "fieldname": "periodo",
    "fieldtype": "Select",
    "label": "Período",
-   "options": "\nManhã\nNoite\nTarde",
+   "options": "\nManhã\nNoite\nTarde\nÚnico",
    "in_list_view": 1
   },
   {

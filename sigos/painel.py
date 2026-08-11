@@ -187,7 +187,7 @@ _AGG_KEY = {
 	"substituido": "substituidos",
 	"atraso": "atrasos",
 }
-_ORD_PERIODO = {"Manhã": 0, "Tarde": 1, "Noite": 2}
+_ORD_PERIODO = {"Manhã": 0, "Tarde": 1, "Noite": 2, "Único": 3}
 _ORD_COBERTURA = {"descoberto": 0, "sem_escala": 1, "lacuna": 2, "coberto": 3}
 
 

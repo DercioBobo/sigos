@@ -102,6 +102,12 @@ frappe.ui.form.on("Tab Vigilante Do Posto", {
 		const antigo = frm._slot_snap?.[cdn];
 		if (!novo) { _snapshot_slots(frm); return; }
 
+		// Turno da Equipa (customer-specific): team rows are synced server-side on
+		// save (_sincronizar_turno_por_equipa) — skip the single-guard swap here so
+		// editing one teammate doesn't visibly bump a stranger before the server
+		// corrects it back to the whole team's shared value.
+		if (row.turno_equipa) { _snapshot_slots(frm); return; }
+
 		// Another guard already on this slot?
 		const outro = (frm.doc.tab_vigilante_do_posto || [])
 			.find(g => g.name !== cdn && g.turno_inicial === novo);
@@ -210,44 +216,70 @@ function _sincronizar_vigilantes(frm) {
 				callback(res) {
 					const seq = res.message || [];
 					if (!seq.length) { frappe.msgprint(__("Regime sem turnos.")); return; }
-
-					// Evenly space guards across the FULL cycle, not just the next slots
-					// in sequence order — e.g. 3 guards on a 6-slot H24 cycle (1a/2a Manhã,
-					// 1a/2a Noite, 1a/2a Folga) land on 1a Manhã / 1a Noite / 1a Folga
-					// (one of each type) instead of piling into the first 3 slots.
 					const L = seq.length;
-					const N = guards.length;
-					const alvo = Array.from({ length: N }, (_, i) => seq[Math.round(i * L / N) % L].turno);
 
-					// Keep already-placed guards in their current relative order (by where
-					// their existing slot sits in the cycle) so an unchanged roster is a
-					// no-op; newcomers are appended after, in server return order.
 					const rowsPorNome = new Map(
 						(frm.doc.tab_vigilante_do_posto || []).map(row => [row.vigilante, row])
 					);
-					const colocados = guards.map(g => g.name).filter(n => rowsPorNome.has(n));
-					colocados.sort((a, b) =>
-						seq.findIndex(t => t.turno === rowsPorNome.get(a).turno_inicial) -
-						seq.findIndex(t => t.turno === rowsPorNome.get(b).turno_inicial));
-					const ordem = colocados.concat(guards.map(g => g.name).filter(n => !rowsPorNome.has(n)));
+
+					// Evenly space UNITS across the FULL cycle, not just the next slots in
+					// sequence order — e.g. 3 units on a 6-slot H24 cycle (1a/2a Manhã, 1a/2a
+					// Noite, 1a/2a Folga) land on 1a Manhã / 1a Noite / 1a Folga (one of each
+					// type) instead of piling into the first 3 slots.
+					//
+					// Turno da Equipa (customer-specific): a UNIT is a whole equipa, not a
+					// single guard, so every member of the same team always lands on the same
+					// slot (server-side _sincronizar_turno_por_equipa is the ultimate
+					// authority — this just avoids the sync button visibly scrambling teammates
+					// apart first). Guards without an equipa tag are their own unit, same as
+					// before — lets HR bulk-add first, tag teams after.
+					const equipaAtiva = !!_turno_equipa_activo;
+					const jaColocados = guards.map(g => g.name).filter(n => rowsPorNome.has(n));
+					const novos = guards.map(g => g.name).filter(n => !rowsPorNome.has(n));
+
+					const unidades = [];
+					const unidadePorEquipa = new Map();
+					jaColocados.forEach(nome => {
+						const equipa = equipaAtiva ? rowsPorNome.get(nome).turno_equipa : null;
+						if (equipa) {
+							let u = unidadePorEquipa.get(equipa);
+							if (!u) { u = { membros: [] }; unidadePorEquipa.set(equipa, u); unidades.push(u); }
+							u.membros.push(nome);
+						} else {
+							unidades.push({ membros: [nome] });
+						}
+					});
+					// Keep already-placed units in their current relative order (by where
+					// their existing slot sits in the cycle) so an unchanged roster is a
+					// no-op; new guards (never yet tagged with an equipa) are appended after,
+					// each their own unit, in server return order.
+					unidades.sort((a, b) =>
+						seq.findIndex(t => t.turno === rowsPorNome.get(a.membros[0]).turno_inicial) -
+						seq.findIndex(t => t.turno === rowsPorNome.get(b.membros[0]).turno_inicial));
+					novos.forEach(nome => unidades.push({ membros: [nome], nova: true }));
+
+					const Nu = unidades.length;
+					const alvo = Array.from({ length: Nu }, (_, i) => seq[Math.round(i * L / Nu) % L].turno);
 
 					const porNome = new Map(guards.map(g => [g.name, g]));
 					let adicionados = 0, reequilibrados = 0;
-					ordem.forEach((nome, i) => {
+					unidades.forEach((u, i) => {
 						const slot = alvo[i];
-						let row = rowsPorNome.get(nome);
-						if (!row) {
-							row = frm.add_child("tab_vigilante_do_posto");
-							row.vigilante     = nome;
-							row.nome_completo = porNome.get(nome).nome_completo;
-							row.turno_inicial = slot;
-							adicionados++;
-							return;
-						}
-						if (row.turno_inicial !== slot) {
-							row.turno_inicial = slot;
-							reequilibrados++;
-						}
+						u.membros.forEach(nome => {
+							let row = rowsPorNome.get(nome);
+							if (!row) {
+								row = frm.add_child("tab_vigilante_do_posto");
+								row.vigilante     = nome;
+								row.nome_completo = porNome.get(nome).nome_completo;
+								row.turno_inicial = slot;
+								adicionados++;
+								return;
+							}
+							if (row.turno_inicial !== slot) {
+								row.turno_inicial = slot;
+								reequilibrados++;
+							}
+						});
 					});
 
 					frm.refresh_field("tab_vigilante_do_posto");
@@ -283,22 +315,43 @@ function _distribuir_turnos(frm) {
 
 		const opts = "\n" + seq.map(t => t.turno).join("\n");
 
-		// One Select per guard, pre-filled with current turno_inicial
+		// Turno da Equipa (customer-specific): group guards into UNITS so a whole team
+		// is edited — and staggered — as one, every member always getting the same
+		// turno_inicial. Guards without an equipa tag are their own unit, same as before.
+		const equipaAtiva = !!_turno_equipa_activo;
+		const unidades = [];
+		const porEquipa = new Map();
+		guards.forEach(g => {
+			const equipa = equipaAtiva ? g.turno_equipa : null;
+			if (equipa) {
+				let u = porEquipa.get(equipa);
+				if (!u) {
+					u = { rotulo: equipa, membros: [], turno_inicial: g.turno_inicial };
+					porEquipa.set(equipa, u);
+					unidades.push(u);
+				}
+				u.membros.push(g);
+			} else {
+				unidades.push({ rotulo: g.nome_completo || g.vigilante, membros: [g], turno_inicial: g.turno_inicial });
+			}
+		});
+
+		// One Select per unit, pre-filled with its current turno_inicial
 		const fields = [
 			{
 				fieldname: "info", fieldtype: "HTML",
 				options: `<div style="margin-bottom:6px;color:#555;">
-					${__("Atribua o turno inicial de cada vigilante. Use <b>Escalonar Automaticamente</b> para distribuir em sequência (cobertura ideal).")}
+					${__("Atribua o turno inicial de cada " + (equipaAtiva ? "equipa/vigilante" : "vigilante") + ". Use <b>Escalonar Automaticamente</b> para distribuir em sequência (cobertura ideal).")}
 				</div>`,
 			},
 		];
-		guards.forEach((g, i) => {
+		unidades.forEach((u, i) => {
 			fields.push({
 				fieldname: `t_${i}`,
 				fieldtype: "Select",
-				label: g.nome_completo || g.vigilante,
+				label: u.membros.length > 1 ? `${u.rotulo} (${u.membros.length})` : u.rotulo,
 				options: opts,
-				default: g.turno_inicial || "",
+				default: u.turno_inicial || "",
 			});
 		});
 
@@ -307,10 +360,13 @@ function _distribuir_turnos(frm) {
 			fields,
 			primary_action_label: __("Aplicar"),
 			primary_action(v) {
-				// Warn on duplicates (not blocking — overstaffed postos may repeat)
-				const vals = guards.map((g, i) => v[`t_${i}`]);
-				guards.forEach((g, i) => {
-					frappe.model.set_value(g.doctype, g.name, "turno_inicial", v[`t_${i}`] || null);
+				// Warn on duplicates across units (not blocking — overstaffed postos may
+				// repeat); teammates sharing a value is expected, not a duplicate here.
+				const vals = unidades.map((u, i) => v[`t_${i}`]);
+				unidades.forEach((u, i) => {
+					u.membros.forEach(g => {
+						frappe.model.set_value(g.doctype, g.name, "turno_inicial", v[`t_${i}`] || null);
+					});
 				});
 				frm.refresh_field("tab_vigilante_do_posto");
 				_snapshot_slots(frm);
@@ -328,8 +384,8 @@ function _distribuir_turnos(frm) {
 			},
 			secondary_action_label: __("Escalonar Automaticamente"),
 			secondary_action() {
-				// Stagger by row order: guard i → sequence[i % L]
-				guards.forEach((g, i) => {
+				// Stagger by unit order: unit i → sequence[i % L]
+				unidades.forEach((u, i) => {
 					d.set_value(`t_${i}`, seq[i % seq.length].turno);
 				});
 			},

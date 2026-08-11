@@ -9,6 +9,7 @@ class EscalaDoVigilante(Document):
 	def validate(self):
 		self._validar_um_por_posto()
 		self._validar_um_por_delegacao()
+		self._sincronizar_turno_por_equipa()
 		self._validar_turnos()
 		self._validar_capacidade_posto()
 		self._auto_arquivar_se_vazia()   # before reconcile — skips generation when empty
@@ -86,6 +87,44 @@ class EscalaDoVigilante(Document):
 				),
 				title=_("Escala de Reserva Duplicada"),
 			)
+
+	def _sincronizar_turno_por_equipa(self):
+		"""
+		Customer-specific team rostering (SIGOS Settings.turno_equipa_activo): guards
+		sharing a turno_equipa (Equipa A/B/C...) must always share the same turno_inicial
+		— editing one member's anchor via the native grid, the bulk dialog, the sync
+		button, or the API all funnel through here, so it can't be bypassed. Rows without
+		turno_equipa are untouched — non-team customers see no behaviour change.
+		"""
+		if not self.tab_vigilante_do_posto:
+			return
+
+		before = self.get_doc_before_save()
+		antes_por_nome = {g.name: g.turno_inicial for g in before.tab_vigilante_do_posto} if before else {}
+
+		grupos = {}
+		for row in self.tab_vigilante_do_posto:
+			if not row.turno_equipa:
+				continue
+			grupos.setdefault(row.turno_equipa, []).append(row)
+
+		for rows in grupos.values():
+			valores = {r.turno_inicial for r in rows if r.turno_inicial}
+			if len(valores) <= 1:
+				continue  # already consistent (or all empty)
+
+			# Whichever row's turno_inicial actually changed this save is the guard the
+			# user just edited — their choice wins for the whole team.
+			canonico = next(
+				(r.turno_inicial for r in rows
+				 if r.turno_inicial and antes_por_nome.get(r.name) != r.turno_inicial),
+				None,
+			)
+			if not canonico:
+				canonico = next(r.turno_inicial for r in rows if r.turno_inicial)
+
+			for r in rows:
+				r.turno_inicial = canonico
 
 	def _validar_turnos(self):
 		if not self.regime_do_vigilante:

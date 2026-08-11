@@ -95,7 +95,7 @@
    "fieldname": "periodo",
    "fieldtype": "Select",
    "label": "Período",
-   "options": "\nManhã\nNoite\nTarde",
+   "options": "\nManhã\nNoite\nTarde\nÚnico",
    "read_only": 1
   },
   {

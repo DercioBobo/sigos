@@ -21,6 +21,8 @@ def _abbr(turno):
 		return m.group(1) + m.group(2)[0].upper()
 	if re.search("folga", turno, re.I):
 		return "F"
+	if re.search("único", turno, re.I):
+		return "U"
 	return turno if len(turno) <= 4 else turno[:4]
 
 
@@ -139,7 +141,7 @@ def render_escala_print(doc, mes=None):
 					b.append("<td></td>")
 				else:
 					per = (r.periodo or "").lower()
-					pcls = {"manhã": "pm", "noite": "pn", "tarde": "pt"}.get(per, "pf")
+					pcls = {"manhã": "pm", "noite": "pn", "tarde": "pt", "único": "pu"}.get(per, "pf")
 					ovr = "ovr" if r.override else ""
 					b.append(f'<td class="cell {pcls} {ovr}">{_abbr(r.turno)}</td>')
 			b.append("</tr>")
@@ -147,7 +149,7 @@ def render_escala_print(doc, mes=None):
 		b.append("</tbody></table>")
 		b.append(
 			'<div class="esc-print-legend">'
-			'M=Manhã · N=Noite · T=Tarde · F=Folga · (1/2 = 1ª/2ª) &nbsp;|&nbsp; '
+			'M=Manhã · N=Noite · T=Tarde · U=Único · F=Folga · (1/2 = 1ª/2ª) &nbsp;|&nbsp; '
 			'Cobertura: ✓ coberto · ▲ falta · ● duplo &nbsp;|&nbsp; '
 			'célula a vermelho = alteração manual'
 			'</div>'
