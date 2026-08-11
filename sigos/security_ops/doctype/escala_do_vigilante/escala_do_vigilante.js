@@ -159,9 +159,16 @@ function _estado_buttons(frm) {
 }
 
 function _set_estado(frm, novo) {
+	// freeze: true blocks the whole page (native buttons AND the deck's own) for the
+	// round trip — without it, the button's label flips as soon as reload_doc() lands
+	// (Activar -> Arquivar in the same spot), so an impatient double-click can land on
+	// the NEW action instead of a repeat of the one just clicked (e.g. activating then
+	// immediately archiving, with no visible feedback in between to explain why).
 	frappe.call({
 		method: "frappe.client.set_value",
 		args: { doctype: "Escala Do Vigilante", name: frm.doc.name, fieldname: "estado", value: novo },
+		freeze: true,
+		freeze_message: __("A actualizar estado..."),
 		callback: () => frm.reload_doc(),
 	});
 }
