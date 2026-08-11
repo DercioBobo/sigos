@@ -27,6 +27,9 @@ const VH_ACCAO_CAMPO = {
 	"Horas Extras": "vigilante_a_horas_extras",
 };
 const VH_SEVERIDADE = { "Desfalcado": -1, "Falta": 0, "Suspensão": 0, "Atraso": 1, "Saída Antecipada": 1, "Outro": 1, "Licença": 2, "Folga": 3, "Presente": 4 };
+// Same palette + assignment order as Escala Do Vigilante's Equipas & Turnos modal —
+// Equipa A/B/C.. always gets the same colour on both boards, and across every posto.
+const VH_EQUIPA_CORES = ["#7a5ee0", "#1f9d7c", "#d6336c", "#c9821a", "#3a7ec5", "#5a3fc0"];
 const VH_PROBLEMA = new Set(["Desfalcado", "Falta", "Suspensão", "Atraso", "Saída Antecipada"]);
 
 // Table view columns — label + a value-extractor used both to render the cell
@@ -58,6 +61,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		this.rows = [];
 		this.settingsFlags = {};
 		this.equipaLabel = {};   // Turno Da Equipa name -> short display label (codigo or derived)
+		this.equipaColor = {};  // Turno Da Equipa name -> dot colour, shared across every posto (A is always the same colour everywhere)
 		this._dialogOpen = false;
 
 		this.THEME_KEY = "sigos_vhoje_theme";
@@ -79,17 +83,33 @@ sigos.VigilantesHoje = class VigilantesHoje {
 				// Turno da Equipa (customer-specific): "Único" período only makes
 				// sense for team-rostered regimes — hidden otherwise, same gate as
 				// the Escala Do Vigilante columns/buttons.
-				this.$root.find('.vh-seg[data-role="periodo"] button[data-p="Único"]')
-					.toggle(!!this.settingsFlags.turno_equipa_activo);
+				const equipaActiva = !!this.settingsFlags.turno_equipa_activo;
+				this.$root.find('.vh-seg[data-role="periodo"] button[data-p="Único"]').toggle(equipaActiva);
+
+				// Team-rostered customers live on "Único" — default to it instead of
+				// Manhã, but only as the INITIAL default (guarded on the untouched
+				// starting state) so it never overrides a period the user already
+				// picked in the brief window before this flag resolved.
+				if (equipaActiva && this.state.periodo === "Manhã") {
+					this.state.periodo = "Único";
+					this.$root.find('.vh-seg[data-role="periodo"] button').removeClass("on");
+					this.$root.find('.vh-seg[data-role="periodo"] button[data-p="Único"]').addClass("on");
+					this.refresh();
+				}
 			},
 		});
 		frappe.call({
 			method: "frappe.client.get_list",
-			args: { doctype: "Turno Da Equipa", fields: ["name", "codigo"], limit_page_length: 0 },
+			args: { doctype: "Turno Da Equipa", fields: ["name", "codigo"], order_by: "name asc", limit_page_length: 0 },
 			callback: (r) => {
 				this.equipaLabel = {};
-				(r.message || []).forEach((e) => {
+				this.equipaColor = {};
+				(r.message || []).forEach((e, i) => {
 					this.equipaLabel[e.name] = e.codigo || (e.name.match(/\S+$/) || [e.name])[0];
+					// Same palette + same "name asc" order as Escala Do Vigilante's
+					// Equipas & Turnos modal, so A/B/C.. share one colour everywhere —
+					// same team looks the same whether you're on this board or that one.
+					this.equipaColor[e.name] = VH_EQUIPA_CORES[i % VH_EQUIPA_CORES.length];
 				});
 				this._render();   // refresh already-rendered rows with the resolved labels
 			},
@@ -285,13 +305,23 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		return `${row.turno || ""} - ${lbl}`;
 	}
 
+	// Small colour dot for a guard's Turno da Equipa — "" when there's no equipa
+	// (nothing to show, no wasted space). Colour comes from equipaColor, shared
+	// across postos so the same team is always the same colour on this board.
+	_equipa_dot(turnoEquipa) {
+		if (!turnoEquipa) return "";
+		const cor = this.equipaColor[turnoEquipa];
+		if (!cor) return "";
+		return `<span class="vh-eq-dot" style="--ec:${cor}" title="${frappe.utils.escape_html(this.equipaLabel[turnoEquipa] || turnoEquipa)}"></span>`;
+	}
+
 	_render_row($parent, row) {
 		if (row._isVaga) return this._render_vaga_row($parent, row);
 		const key = row.escala_row;
 		const status = row._status;
 		const metaLine = status === "Folga"
-			? `<span class="vh-folga-lbl">${frappe.utils.escape_html(this._turno_label({ turno: __("Folga hoje"), turno_equipa: row.turno_equipa }))}</span><span class="dot">·</span>${frappe.utils.escape_html(row.regime || "")}<span class="dot">·</span>${frappe.utils.escape_html(row.delegacao || "")}`
-			: `<b>${frappe.utils.escape_html(this._turno_label(row))}</b><span class="dot">·</span>${frappe.utils.escape_html(row.regime || "")}<span class="dot">·</span>${frappe.utils.escape_html(row.delegacao || "")}`;
+			? `${this._equipa_dot(row.turno_equipa)}<span class="vh-folga-lbl">${frappe.utils.escape_html(this._turno_label({ turno: __("Folga hoje"), turno_equipa: row.turno_equipa }))}</span><span class="dot">·</span>${frappe.utils.escape_html(row.regime || "")}<span class="dot">·</span>${frappe.utils.escape_html(row.delegacao || "")}`
+			: `${this._equipa_dot(row.turno_equipa)}<b>${frappe.utils.escape_html(this._turno_label(row))}</b><span class="dot">·</span>${frappe.utils.escape_html(row.regime || "")}<span class="dot">·</span>${frappe.utils.escape_html(row.delegacao || "")}`;
 		const tel = (row.contacto || "").replace(/\s/g, "");
 		const aberto = this.expandedRowKey === key;
 		const temAccao = row.ja_proxima_accao && row.ja_proxima_accao !== "Sem Ação";
@@ -449,7 +479,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 					${row.cobertura_papel === "cobridor_provisorio" ? `<span class="vh-tbl-cobertura-tag">${__("A Cobrir")}</span>` : ""}
 				</td>
 				<td><span class="vh-tbl-posto-dot"></span>${frappe.utils.escape_html(postoNome || "—")}</td>
-				<td>${status === "Folga"
+				<td>${this._equipa_dot(row.turno_equipa)}${status === "Folga"
 					? `<span class="vh-folga-lbl">${frappe.utils.escape_html(this._turno_label({ turno: __("Folga"), turno_equipa: row.turno_equipa }))}</span>`
 					: frappe.utils.escape_html(this._turno_label(row) || "—")}</td>
 				<td>${frappe.utils.escape_html(row.regime || "—")}</td>
@@ -1280,6 +1310,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 .sigos-vhoje .vh-tbl-name-link:hover { color:var(--accent); text-decoration:underline; }
 .sigos-vhoje .vh-tbl-stripe { box-shadow:inset 3px 0 0 var(--pc, transparent); }
 .sigos-vhoje .vh-tbl-posto-dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--pc, var(--ink3)); margin-right:7px; vertical-align:1px; }
+.sigos-vhoje .vh-eq-dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--ec, var(--ink3)); margin-right:6px; vertical-align:1px; box-shadow:0 0 0 2px var(--paper2); }
 .sigos-vhoje .vh-tbl-lic { display:inline-flex; vertical-align:-2px; margin-right:6px; color:var(--mark); }
 .sigos-vhoje .vh-tbl-lic svg { width:12px; height:12px; }
 .sigos-vhoje .vh-tbl-cobertura-tag { display:inline-block; margin-left:6px; padding:1px 7px; border-radius:999px;
