@@ -100,6 +100,7 @@
   "valor_subsidio_chefia_posto",
   "valor_subsidio_canino",
   "turno_equipa_activo",
+  "admissao_automatica_activo",
   "posto_interno_por_omissao",
   "nao_herdar_salario_por_omissao"
  ],
@@ -701,6 +702,13 @@
    "label": "Escala: Turno da Equipa",
    "default": "0",
    "description": "Quando activo, mostra a coluna Turno da Equipa (Link) na tabela de vigilantes do posto e na escala gerada, dentro de Escala do Vigilante. É apenas um agrupamento/etiqueta (ex: Equipa A, B, C) — não altera a rotação, que continua definida pelo Turno Inicial de cada vigilante."
+  },
+  {
+   "fieldname": "admissao_automatica_activo",
+   "fieldtype": "Check",
+   "label": "Vigilante: Admissão Automática (sem RH)",
+   "default": "0",
+   "description": "Quando activo, um novo Vigilante salta o passo \"Admitir (RH)\" — a Data de Admissão é preenchida automaticamente com hoje e o Funcionário é criado logo na criação, tal como já acontecia depois de admitido. A Operações passa directamente para \"Ativar\"/\"Ativar em Reserva\", sem intervenção do RH. Os campos exclusivos do RH (dados bancários, INSS, salário base, empresa) continuam bloqueados a Aprovador RH exactamente como antes — só o botão de admissão deixa de ser necessário. Requer Empresa Padrão definida no separador Sistema."
   },
   {
    "fieldname": "posto_interno_por_omissao",

@@ -46,6 +46,7 @@ class Vigilante(Document):
 
 	def before_insert(self):
 		self._calcular_idade()
+		self._auto_admitir_sem_rh()
 
 	def before_save(self):
 		self._calcular_idade()
@@ -316,6 +317,28 @@ class Vigilante(Document):
 			_, aviso = adicionar_vigilante_a_escala_reserva(self.name, self.delegacao, turno_inicial=turno_vago)
 			if aviso:
 				frappe.msgprint(aviso, indicator="orange", alert=True)
+
+	# ─── Auto-admission (customer-specific) ────────────────────────────────────────
+
+	def _auto_admitir_sem_rh(self):
+		"""
+		Customer-specific (SIGOS Settings.admissao_automatica_activo): skip the
+		Admitir (RH) gate entirely so Operações can create-and-activate a Vigilante
+		end to end. Only touches a brand-new doc still at the default Pre-Adimissão
+		RH status — fills in the one field (Data de Admissão) that's mandatory to
+		get past _validar_data_admissao, then Employee creation happens exactly as
+		it always has (_criar_employee_se_necessario, triggered by status alone).
+		RH-only fields (banking, INSS, salário, empresa) are untouched and stay
+		permlevel-2-locked to Aprovador RH — this only removes the button click,
+		not the field protection.
+		"""
+		if not frappe.db.get_single_value("SIGOS Settings", "admissao_automatica_activo"):
+			return
+		if self.status != "Pre-Adimissão RH":
+			return
+		self.status = "Pre-Adimissão"
+		if not self.data_admissao:
+			self.data_admissao = today()
 
 	# ─── Auto-activation ─────────────────────────────────────────────────────────
 

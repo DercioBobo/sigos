@@ -118,6 +118,14 @@ frappe.ui.form.on("Vigilante", {
 					}
 				);
 			}, __("Acções"));
+
+			// Straight to Reserva — no posto/regime needed (only Activo requires one,
+			// see _validar_status_com_posto), so this skips the old detour of Ativar
+			// with a throwaway posto just to immediately bench the guard via Rotatividade.
+			frm.add_custom_button(__("Ativar em Reserva"), () => {
+				_mudar_estado_op(frm, "colocar_em_reserva", __("Ativar em Reserva"),
+					__("O vigilante fica empregado e disponível para redistribuição, sem posto atribuído — não passa por Activo."));
+			}, __("Acções"));
 		}
 
 		// Definir Salário — RH/managers only; works for any employed guard (has Funcionário).
