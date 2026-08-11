@@ -94,7 +94,14 @@ sigos.VigilantesHoje = class VigilantesHoje {
 					this.state.periodo = "Único";
 					this.$root.find('.vh-seg[data-role="periodo"] button').removeClass("on");
 					this.$root.find('.vh-seg[data-role="periodo"] button[data-p="Único"]').addClass("on");
-					this.refresh();
+					// The page's own initial refresh() (fired for "Manhã") may still be
+					// in flight — calling refresh() again right now would silently no-op
+					// against its _loading guard, so wait for it to clear first.
+					const aguardarERefrescar = () => {
+						if (this._loading) { setTimeout(aguardarERefrescar, 150); return; }
+						this.refresh();
+					};
+					aguardarERefrescar();
 				}
 			},
 		});
