@@ -648,7 +648,7 @@ def get_turnos_do_regime_query(doctype, txt, searchfield, start, page_len, filte
 
 
 @frappe.whitelist()
-def get_vigilantes_da_escala(data, periodo, grupo_delegados=None, excluir_doc=None, incluir_folga=0):
+def get_vigilantes_da_escala(data, periodo=None, grupo_delegados=None, excluir_doc=None, incluir_folga=0):
 	"""
 	Return every vigilante expected on shift for data+periodo,
 	enriched with posto, turno, regime, delegacao and nome_completo.
@@ -665,9 +665,17 @@ def get_vigilantes_da_escala(data, periodo, grupo_delegados=None, excluir_doc=No
 	match rather than the periodo filter itself. Default 0 reproduces the exact
 	previous query (folga rows never match a real periodo, so they're excluded
 	exactly as before) — existing callers (Ausencias quick-add) are unaffected.
+
+	periodo: pass None/empty for "Todos" — every guard scheduled that date, working
+	or folga, regardless of período (useful for a grupo mixing regime types, e.g.
+	classic Manhã/Noite postos alongside team-rostered Único ones).
 	"""
 	frappe.only_for(PAPEIS_INTERNOS)
-	folga_clause = "OR t.e_folga = 1" if int(incluir_folga or 0) else ""
+	if periodo:
+		folga_clause = "OR t.e_folga = 1" if int(incluir_folga or 0) else ""
+		periodo_where = f"AND (t.periodo = %(periodo)s {folga_clause})"
+	else:
+		periodo_where = ""
 	base_sql = """
 		SELECT
 			te.name AS escala_row,
@@ -697,11 +705,13 @@ def get_vigilantes_da_escala(data, periodo, grupo_delegados=None, excluir_doc=No
 		LEFT JOIN `tabPosto De Vigilancia` p ON p.name = te.posto
 		WHERE e.estado = 'Activo'
 		  AND te.data = %(data)s
-		  AND (t.periodo = %(periodo)s {folga_clause})
+		  {periodo_where}
 		{extra}
 		ORDER BY v.delegacao, v.nome_completo
 	"""
-	params = {"data": data, "periodo": periodo}
+	params = {"data": data}
+	if periodo:
+		params["periodo"] = periodo
 
 	extra = ""
 	if grupo_delegados:
@@ -716,7 +726,7 @@ def get_vigilantes_da_escala(data, periodo, grupo_delegados=None, excluir_doc=No
 			params["delegacoes"] = tuple(delegacoes)
 			extra = "AND v.delegacao IN %(delegacoes)s"
 
-	rows = frappe.db.sql(base_sql.format(extra=extra, folga_clause=folga_clause), params, as_dict=True)
+	rows = frappe.db.sql(base_sql.format(extra=extra, periodo_where=periodo_where), params, as_dict=True)
 	_marcar_ja_registados(rows, data, periodo, excluir_doc)
 	_marcar_licencas(rows, data)
 	_marcar_coberturas(rows)
@@ -724,7 +734,7 @@ def get_vigilantes_da_escala(data, periodo, grupo_delegados=None, excluir_doc=No
 
 
 @frappe.whitelist()
-def get_vagas_desfalcadas(periodo, grupo_delegados=None):
+def get_vagas_desfalcadas(periodo=None, grupo_delegados=None):
 	"""
 	Open Vaga De Posto slots (posto+regime+turno a Rotatividade vacated with no
 	substituto) whose turno matches this periodo. Vigilantes de Hoje shows these
@@ -732,8 +742,11 @@ def get_vagas_desfalcadas(periodo, grupo_delegados=None):
 	A vaga has no date of its own — it stays open across every day/periodo view
 	until someone actually lands on that exact slot (auto-closed by
 	escala_do_vigilante._adicionar_vigilante_a_escala).
+
+	periodo: pass None/empty for "Todos" — every open vaga regardless of período.
 	"""
 	frappe.only_for(PAPEIS_INTERNOS)
+	periodo_where = "AND t.periodo = %(periodo)s" if periodo else ""
 	base_sql = """
 		SELECT
 			vp.name,
@@ -746,11 +759,13 @@ def get_vagas_desfalcadas(periodo, grupo_delegados=None):
 		JOIN `tabTurno` t ON t.name = vp.turno
 		LEFT JOIN `tabPosto De Vigilancia` p ON p.name = vp.posto_de_vigilancia
 		WHERE vp.estado = 'Aberta'
-		  AND t.periodo = %(periodo)s
+		  {periodo_where}
 		{extra}
 		ORDER BY p.nome_do_posto
 	"""
-	params = {"periodo": periodo}
+	params = {}
+	if periodo:
+		params["periodo"] = periodo
 
 	extra = ""
 	if grupo_delegados:
@@ -764,7 +779,7 @@ def get_vagas_desfalcadas(periodo, grupo_delegados=None):
 			params["delegacoes"] = tuple(delegacoes)
 			extra = "AND vp.delegacao IN %(delegacoes)s"
 
-	return frappe.db.sql(base_sql.format(extra=extra), params, as_dict=True)
+	return frappe.db.sql(base_sql.format(extra=extra, periodo_where=periodo_where), params, as_dict=True)
 
 
 @frappe.whitelist()
@@ -856,18 +871,26 @@ def _marcar_ja_registados(rows, data, periodo, excluir_doc=None):
 	so a caller (Vigilantes de Hoje) can pre-fill an edit form in one round trip —
 	purely additive, the Ausencias quick-add dialog only reads ja_registado_em/
 	ja_registado_estado and ignores the rest.
+
+	periodo: when None (the "Todos" view spans every período at once), conflicts
+	are matched per-row by (vigilante, período) instead of a single shared value —
+	one row may be Único while another is Manhã if the grupo mixes regime types.
 	"""
 	vigs = [r.vigilante for r in rows if r.get("vigilante")]
 	if not vigs:
 		return
-	params = {"d": data, "p": periodo, "vigs": tuple(vigs)}
+	params = {"d": data, "vigs": tuple(vigs)}
 	excl = ""
 	if excluir_doc:
 		excl = "AND a.name != %(excl)s"
 		params["excl"] = excluir_doc
+	periodo_clause = ""
+	if periodo:
+		periodo_clause = "AND a.periodo = %(p)s"
+		params["p"] = periodo
 	conflitos = frappe.db.sql(
 		f"""
-		SELECT ta.vigilante, a.name AS doc, a.docstatus,
+		SELECT ta.vigilante, a.periodo, a.name AS doc, a.docstatus,
 		       ta.name AS ja_ausencia_row, ta.tipo_de_ausencia, ta.subtipo_falta,
 		       ta.tipo_justificacao, ta.jutificativo, ta.proxima_accao,
 		       ta.vigilante_substituto, ta.vigilante_a_dobrar, ta.vigilante_a_meia_dobra,
@@ -881,18 +904,19 @@ def _marcar_ja_registados(rows, data, periodo, excluir_doc=None):
 		LEFT JOIN `tabVigilante` v_mdb ON v_mdb.name = ta.vigilante_a_meia_dobra
 		LEFT JOIN `tabVigilante` v_adi ON v_adi.name = ta.vigilante_a_adiantar
 		LEFT JOIN `tabVigilante` v_he  ON v_he.name = ta.vigilante_a_horas_extras
-		WHERE a.docstatus < 2 AND a.data = %(d)s AND a.periodo = %(p)s
+		WHERE a.docstatus < 2 AND a.data = %(d)s {periodo_clause}
 		  AND ta.vigilante IN %(vigs)s {excl}
 		""",
 		params,
 		as_dict=True,
 	)
-	por_vig = {}
+	por_chave = {}
 	for c in conflitos:
-		if c.vigilante not in por_vig or c.docstatus > por_vig[c.vigilante].docstatus:
-			por_vig[c.vigilante] = c
+		chave = (c.vigilante, c.periodo)
+		if chave not in por_chave or c.docstatus > por_chave[chave].docstatus:
+			por_chave[chave] = c
 	for r in rows:
-		c = por_vig.get(r.vigilante)
+		c = por_chave.get((r.vigilante, r.periodo))
 		if c:
 			r["ja_registado_em"] = c.doc
 			r["ja_registado_estado"] = "Submetido" if c.docstatus == 1 else "Rascunho"

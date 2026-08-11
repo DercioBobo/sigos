@@ -807,7 +807,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 								excluir: row.vigilante || "",
 								excluir_lista: JSON.stringify([]),
 								grupo_delegados: this.state.grupo_delegados || "",
-								data: this.state.data || "", periodo: this.state.periodo || "",
+								data: this.state.data || "", periodo: this.state.periodo || row.periodo || "",
 								excluir_doc: row.ja_ausencia_doc || "",
 							} };
 						}
@@ -897,7 +897,9 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		const args = {
 			vigilante: row.vigilante,
 			data: this.state.data,
-			periodo: this.state.periodo,
+			// "Todos" view has no single período tab — file under the guard's own
+			// actual scheduled período instead (matches Ausencias' identity rule).
+			periodo: this.state.periodo || row.periodo,
 			regime: row.regime,
 			turno: row.turno,
 			grupo_delegados: this.state.grupo_delegados || null,
@@ -965,6 +967,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 						<button data-p="Manhã" class="on">${__("Manhã")}</button>
 						<button data-p="Noite">${__("Noite")}</button>
 						<button data-p="Único" style="display:none">${__("Único")}</button>
+						<button data-p="">${__("Todos")}</button>
 					</div>
 					<div id="vh-ctrl-grupo"></div>
 					<select class="vh-select" data-role="estado-filtro">
