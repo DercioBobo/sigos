@@ -62,6 +62,13 @@ function _toggle_turno_equipa(frm) {
 		frm.fields_dict.tab_vigilante_do_posto?.grid.toggle_display("tipo_de_vigilante", !show);
 		// "Atribuir Equipas em Bloco" only makes sense in team mode — same toggle.
 		frm.fields_dict.deck_escala?.$wrapper.find('[data-act="equipas"]').toggle(show);
+		// The async Settings fetch below usually resolves AFTER the grid has already
+		// painted with the default column set — toggle_display alone can leave
+		// already-rendered rows stale/misaligned for a flash. Force a clean re-layout
+		// once the real column state is known, instead of waiting for some other
+		// trigger to happen to refresh it.
+		frm.fields_dict.tab_vigilante_do_posto?.grid.refresh();
+		frm.fields_dict.tabela_de_escala?.grid.refresh();
 	};
 	if (_turno_equipa_activo === null) {
 		frappe.db.get_single_value("SIGOS Settings", "turno_equipa_activo").then((v) => {
