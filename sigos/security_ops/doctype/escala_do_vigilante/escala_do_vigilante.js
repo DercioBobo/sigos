@@ -9,7 +9,7 @@ frappe.ui.form.on("Escala Do Vigilante", {
 			["sec_cabecalho", "naming_series", "tipo_de_escala", "posto_de_vigilancia", "delegacao",
 			 "col_break_1", "cliente", "estado",
 			 "sec_config", "regime_do_vigilante", "data_de_inicio", "col_break_per", "gerado_ate",
-			 "sincronizar_vigilantes", "distribuir_turnos", "btn_gerar", "btn_limpar_futuro"]
+			 "sincronizar_vigilantes", "distribuir_turnos", "atribuir_equipas", "btn_gerar", "btn_limpar_futuro"]
 				.forEach(f => frm.set_df_property(f, "hidden", 1));
 			_render_deck(frm);
 		}
@@ -41,6 +41,8 @@ frappe.ui.form.on("Escala Do Vigilante", {
 
 	distribuir_turnos(frm) { _distribuir_turnos(frm); },
 
+	atribuir_equipas(frm) { _atribuir_equipas(frm); },
+
 	btn_gerar(frm) { _gerar_escala(frm); },
 
 	btn_limpar_futuro(frm) { _limpar_futuro(frm); },
@@ -57,6 +59,11 @@ function _toggle_turno_equipa(frm) {
 		const show = !!_turno_equipa_activo;
 		frm.fields_dict.tab_vigilante_do_posto?.grid.toggle_display("turno_equipa", show);
 		frm.fields_dict.tabela_de_escala?.grid.toggle_display("turno_equipa", show);
+		// Tipo (Vigilante/Supervisor/Chefe...) is redundant once teams are in play —
+		// swap it out for Turno da Equipa on the roster grid, same toggle.
+		frm.fields_dict.tab_vigilante_do_posto?.grid.toggle_display("tipo_de_vigilante", !show);
+		// "Atribuir Equipas em Bloco" only makes sense in team mode — same toggle.
+		frm.fields_dict.deck_escala?.$wrapper.find('[data-act="equipas"]').toggle(show);
 	};
 	if (_turno_equipa_activo === null) {
 		frappe.db.get_single_value("SIGOS Settings", "turno_equipa_activo").then((v) => {
@@ -387,6 +394,78 @@ function _distribuir_turnos(frm) {
 				// Stagger by unit order: unit i → sequence[i % L]
 				unidades.forEach((u, i) => {
 					d.set_value(`t_${i}`, seq[i % seq.length].turno);
+				});
+			},
+		});
+		d.show();
+	});
+}
+
+// ─── Bulk equipa assignment (customer-specific, turno_equipa_activo) ──────────
+// Companion to Distribuir Turnos: this tags each guard with a Turno Da Equipa;
+// once tagged, Distribuir Turnos automatically groups them by team (one Select
+// per equipa instead of per guard) and the server keeps every member of a team
+// on the same turno_inicial (_sincronizar_turno_por_equipa) — so this is the
+// "assign the team" half, Distribuir Turnos is the "assign the team's turno" half.
+function _atribuir_equipas(frm) {
+	const guards = frm.doc.tab_vigilante_do_posto || [];
+	if (!guards.length) {
+		frappe.msgprint(__("Sincronize ou adicione vigilantes primeiro."));
+		return;
+	}
+
+	frappe.db.get_list("Turno Da Equipa", {
+		filters: { activo: 1 },
+		fields: ["name"],
+		order_by: "name asc",
+		limit: 0,
+	}).then(equipas => {
+		if (!equipas.length) {
+			frappe.msgprint(__("Nenhuma Turno da Equipa activa. Crie as equipas primeiro (ex: Equipa A, B, C)."));
+			return;
+		}
+		const nomes = equipas.map(e => e.name);
+		const opts = "\n" + nomes.join("\n");
+
+		// One Select per guard, pre-filled with the current equipa (if any)
+		const fields = [
+			{
+				fieldname: "info", fieldtype: "HTML",
+				options: `<div style="margin-bottom:6px;color:#555;">
+					${__("Atribua a equipa de cada vigilante. Use <b>Distribuir Automaticamente</b> para repartir em sequência. Depois, use <b>Distribuir Turnos</b> para atribuir o turno de cada equipa.")}
+				</div>`,
+			},
+		];
+		guards.forEach((g, i) => {
+			fields.push({
+				fieldname: `e_${i}`,
+				fieldtype: "Select",
+				label: g.nome_completo || g.vigilante,
+				options: opts,
+				default: g.turno_equipa || "",
+			});
+		});
+
+		const d = new frappe.ui.Dialog({
+			title: __("Atribuir Equipas em Bloco"),
+			fields,
+			primary_action_label: __("Aplicar"),
+			primary_action(v) {
+				guards.forEach((g, i) => {
+					frappe.model.set_value(g.doctype, g.name, "turno_equipa", v[`e_${i}`] || null);
+				});
+				frm.refresh_field("tab_vigilante_do_posto");
+				frappe.show_alert({
+					message: __("Equipas atribuídas. Use Distribuir Turnos para dar o turno a cada equipa, depois guarde."),
+					indicator: "green",
+				}, 6);
+				d.hide();
+			},
+			secondary_action_label: __("Distribuir Automaticamente"),
+			secondary_action() {
+				// Split guards evenly across the available equipas, round-robin by row order.
+				guards.forEach((g, i) => {
+					d.set_value(`e_${i}`, nomes[i % nomes.length]);
 				});
 			},
 		});
@@ -829,6 +908,7 @@ function _build_deck_shell(frm, w, editable, key) {
 			<div class="escd-tiles" data-escd-tiles></div>
 			<div class="escd-actions">
 				<button type="button" class="escd-btn" data-act="sync">${__("Sincronizar Vigilantes")}</button>
+				<button type="button" class="escd-btn" data-act="equipas">${__("Atribuir Equipas")}</button>
 				<button type="button" class="escd-btn" data-act="dist">${__("Distribuir Turnos")}</button>
 				<button type="button" class="escd-btn escd-btn-danger" data-act="limpar">${__("Limpar Futuro")}</button>
 				<span class="escd-spacer"></span>
@@ -904,6 +984,7 @@ function _build_deck_shell(frm, w, editable, key) {
 	if (frm.doc.data_de_inicio) c_inicio.set_value(frm.doc.data_de_inicio);
 
 	w.find('[data-act="sync"]').on("click", () => _sincronizar_vigilantes(frm));
+	w.find('[data-act="equipas"]').on("click", () => _atribuir_equipas(frm));
 	w.find('[data-act="dist"]').on("click", () => _distribuir_turnos(frm));
 	w.find('[data-act="limpar"]').on("click", () => _limpar_futuro(frm));
 	w.find('[data-act="gerar"]').on("click", () => _gerar_escala(frm));

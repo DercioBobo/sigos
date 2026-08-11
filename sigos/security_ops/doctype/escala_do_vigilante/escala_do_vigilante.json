@@ -27,6 +27,7 @@
   "sec_vigilantes",
   "sincronizar_vigilantes",
   "distribuir_turnos",
+  "atribuir_equipas",
   "tab_vigilante_do_posto",
   "sec_grid",
   "btn_gerar",
@@ -170,6 +171,12 @@
    "fieldname": "distribuir_turnos",
    "fieldtype": "Button",
    "label": "Distribuir Turnos em Bloco"
+  },
+  {
+   "fieldname": "atribuir_equipas",
+   "fieldtype": "Button",
+   "label": "Atribuir Equipas em Bloco",
+   "description": "Turno da Equipa (customer-specific) — só aparece quando SIGOS Settings.turno_equipa_activo está ligado."
   },
   {
    "fieldname": "tab_vigilante_do_posto",
