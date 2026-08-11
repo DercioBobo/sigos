@@ -36,7 +36,7 @@ const VH_PROBLEMA = new Set(["Desfalcado", "Falta", "Suspensão", "Atraso", "Sa�
 // and to sort by that column (click header to sort, click again to reverse).
 const VH_TBL_COLS = [
 	{ key: "nome", label: "Vigilante", val: (r) => (r.nome_completo || r.vigilante || "").toLowerCase() },
-	{ key: "posto", label: "Posto", val: (r) => (r.nome_do_posto || r.posto || "").toLowerCase() },
+	{ key: "posto", label: "Posto", val: (r) => (r.indicativo ? `${r.indicativo} - ` : "") + (r.nome_do_posto || r.posto || "").toLowerCase() },
 	{ key: "turno", label: "Turno", val: (r) => (r.turno || "").toLowerCase() },
 	{ key: "regime", label: "Regime", val: (r) => (r.regime || "").toLowerCase() },
 	{ key: "estado", label: "Estado", val: (r) => VH_SEVERIDADE[r._status] ?? 4 },
@@ -179,6 +179,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 				escala_row: `vaga:${v.name}`,
 				posto: v.posto,
 				nome_do_posto: v.nome_do_posto,
+				indicativo: v.indicativo,
 				turno: v.turno,
 				regime: v.regime,
 				delegacao: v.delegacao,
@@ -217,17 +218,17 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		this.rows.forEach((r) => { r._status = this._status_de(r); });
 		const filtradas = this.rows.filter((r) => {
 			if (this.state.statusFiltro && r._status !== this.state.statusFiltro) return false;
-			if (this.state.postoFiltro && (r.nome_do_posto || r.posto) !== this.state.postoFiltro) return false;
+			if (this.state.postoFiltro && this._posto_label(r) !== this.state.postoFiltro) return false;
 			if (!q) return true;
 			return (r.nome_completo || "").toLowerCase().includes(q)
 				|| (r.mecanografico || "").toLowerCase().includes(q)
-				|| (r.nome_do_posto || r.posto || "").toLowerCase().includes(q);
+				|| this._posto_label(r).toLowerCase().includes(q);
 		});
 
 		const grupos = new Map();
 		filtradas.forEach((r) => {
 			const key = r.posto || "sem_posto";
-			if (!grupos.has(key)) grupos.set(key, { label: r.nome_do_posto || r.posto || __("Sem Posto"), rows: [] });
+			if (!grupos.has(key)) grupos.set(key, { label: this._posto_label(r) || __("Sem Posto"), rows: [] });
 			grupos.get(key).rows.push(r);
 		});
 		grupos.forEach((g) => {
@@ -306,6 +307,12 @@ sigos.VigilantesHoje = class VigilantesHoje {
 
 	// "24" + Turno da Equipa "Equipa A" -> "24 - A"; no equipa -> just the turno.
 	// Team membership is right there on the roster line — no equipa is a no-op.
+	// "H2" + "Hotel Xxxxx" -> "H2 - Hotel Xxxxx"; no indicativo -> just the name.
+	_posto_label(row) {
+		const nome = row.nome_do_posto || row.posto || "";
+		return row.indicativo ? `${row.indicativo} - ${nome}` : nome;
+	}
+
 	_turno_label(row) {
 		if (!row.turno_equipa) return row.turno || "";
 		const lbl = this.equipaLabel[row.turno_equipa] || row.turno_equipa;
@@ -469,7 +476,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 	_render_table_row($tbody, row) {
 		if (row._isVaga) return this._render_vaga_table_row($tbody, row);
 		const status = row._status;
-		const postoNome = row.nome_do_posto || row.posto || "";
+		const postoNome = this._posto_label(row);
 		const temAccao = row.ja_proxima_accao && row.ja_proxima_accao !== "Sem Ação";
 		const accaoLine = temAccao
 			? `↳ ${frappe.utils.escape_html(row.ja_proxima_accao)}${row.ja_actor_nome ? `: <b>${frappe.utils.escape_html(row.ja_actor_nome)}</b>` : ""}`
@@ -514,7 +521,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 	// Table-view counterpart of _render_vaga_row — no vigilante, so no name link,
 	// no menu, no phone: nothing here is actionable, it's just a "go fill this" flag.
 	_render_vaga_table_row($tbody, row) {
-		const postoNome = row.nome_do_posto || row.posto || "";
+		const postoNome = this._posto_label(row);
 		$(`
 			<tr class="vh-tbl-row vh-tbl-row-vaga${row._grupoAlt ? " vh-tbl-alt" : ""}" data-status="Desfalcado" style="--pc:${this._posto_color(postoNome)}">
 				<td class="vh-tbl-name vh-tbl-stripe"><span class="vh-vaga-lbl">${__("Desfalcado")}</span></td>
@@ -682,7 +689,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		const isFolga = row._status === "Folga";
 		const isMarcado = !!row.ja_ausencia_row;
 		const isSubmetida = row.ja_registado_estado === "Submetido";
-		const meta = [row.mecanografico, row.nome_do_posto || row.posto, this._turno_label(row), row.regime, row.delegacao]
+		const meta = [row.mecanografico, this._posto_label(row), this._turno_label(row), row.regime, row.delegacao]
 			.filter(Boolean).join(" · ");
 		const val = (v) => (v || v === 0) ? frappe.utils.escape_html(String(v)) : "—";
 		const telLink = (v) => v ? `<a href="tel:${v.replace(/\s/g, "")}">${frappe.utils.escape_html(v)}</a>` : "—";
@@ -749,7 +756,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 	_abrir_marcar_dialog(row) {
 		const isEdit = !!row.ja_ausencia_row;
 		const showSubtipo = !!this.settingsFlags.faltas_normal_vermelha_activo;
-		const meta = [row.mecanografico, this._turno_label(row), row.regime, row.nome_do_posto || row.posto].filter(Boolean).join(" · ");
+		const meta = [row.mecanografico, this._turno_label(row), row.regime, this._posto_label(row)].filter(Boolean).join(" · ");
 
 		const d = new frappe.ui.Dialog({
 			title: isEdit ? __("Rever Marcação") : __("Marcar Ausência"),
@@ -1105,7 +1112,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		const $sel = this.$root.find('[data-role="posto-filtro"]');
 		if (!$sel.length) return;
 		const actual = this.state.postoFiltro;
-		const postos = [...new Set(this.rows.map((r) => r.nome_do_posto || r.posto).filter(Boolean))].sort();
+		const postos = [...new Set(this.rows.map((r) => this._posto_label(r)).filter(Boolean))].sort();
 		$sel.empty().append(`<option value="">${__("Todos os Postos")}</option>`);
 		postos.forEach((p) => $sel.append(`<option value="${frappe.utils.escape_html(p)}">${frappe.utils.escape_html(p)}</option>`));
 		if (actual && postos.includes(actual)) $sel.val(actual);

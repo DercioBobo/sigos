@@ -690,6 +690,7 @@ def get_vigilantes_da_escala(data, periodo=None, grupo_delegados=None, excluir_d
 			v.supervisor,
 			te.posto,
 			p.nome_do_posto,
+			p.indicativo,
 			te.turno,
 			te.turno_equipa,
 			te.regime,
@@ -752,6 +753,7 @@ def get_vagas_desfalcadas(periodo=None, grupo_delegados=None):
 			vp.name,
 			vp.posto_de_vigilancia AS posto,
 			p.nome_do_posto,
+			p.indicativo,
 			vp.turno,
 			vp.regime,
 			vp.delegacao
