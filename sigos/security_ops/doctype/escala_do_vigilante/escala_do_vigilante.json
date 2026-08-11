@@ -1,7 +1,6 @@
 {
  "actions": [],
  "allow_rename": 0,
- "autoname": "naming_series:",
  "creation": "2026-06-02 00:00:00.000000",
  "doctype": "DocType",
  "document_type": "Document",
@@ -11,7 +10,6 @@
   "sec_deck",
   "deck_escala",
   "sec_cabecalho",
-  "naming_series",
   "tipo_de_escala",
   "posto_de_vigilancia",
   "delegacao",
@@ -49,14 +47,6 @@
   {
    "fieldname": "sec_cabecalho",
    "fieldtype": "Section Break"
-  },
-  {
-   "fieldname": "naming_series",
-   "fieldtype": "Select",
-   "label": "Série",
-   "options": "ESC-.##",
-   "reqd": 1,
-   "set_only_once": 1
   },
   {
    "fieldname": "tipo_de_escala",
@@ -223,7 +213,7 @@
  "modified_by": "Administrator",
  "module": "Security Ops",
  "name": "Escala Do Vigilante",
- "naming_rule": "By \"Naming Series\" field",
+ "naming_rule": "Expression (old style)",
  "owner": "Administrator",
  "permissions": [
   {

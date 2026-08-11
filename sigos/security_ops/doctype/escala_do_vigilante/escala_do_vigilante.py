@@ -6,6 +6,36 @@ from frappe.utils import getdate, nowdate, add_days, add_months, get_first_day, 
 
 class EscalaDoVigilante(Document):
 
+	def autoname(self):
+		# Posto+regime (or delegação+regime, for Reserva) is already enforced unique
+		# elsewhere (_validar_um_por_posto / _validar_um_por_delegacao) — mutable
+		# fields, so a sequential ESC-01 series never meant anything durable anyway.
+		# Named directly from them instead (mirrors Posto De Vigilancia's own
+		# autoname): readable at a glance, e.g. "ESC-BH-H24". The numeric suffix only
+		# kicks in for the edge case of two postos sharing the same indicativo on the
+		# same regime — same pattern as Posto's own PT-{indicativo}-{##}.
+		if not self.regime_do_vigilante:
+			frappe.throw(_("Defina o <b>Regime</b> antes de gravar."))
+
+		if self.tipo_de_escala == "Reserva":
+			if not self.delegacao:
+				frappe.throw(_("Defina a <b>Delegação</b> antes de gravar."))
+			base = f"ESC-RES-{self.delegacao}-{self.regime_do_vigilante}"
+		else:
+			if not self.posto_de_vigilancia:
+				frappe.throw(_("Defina o <b>Posto de Vigilância</b> antes de gravar."))
+			indicativo = frappe.db.get_value(
+				"Posto De Vigilancia", self.posto_de_vigilancia, "indicativo"
+			)
+			base = f"ESC-{indicativo or self.posto_de_vigilancia}-{self.regime_do_vigilante}"
+
+		self.name = base
+		if frappe.db.exists("Escala Do Vigilante", self.name):
+			n = 2
+			while frappe.db.exists("Escala Do Vigilante", f"{base}-{n}"):
+				n += 1
+			self.name = f"{base}-{n}"
+
 	def validate(self):
 		self._validar_um_por_posto()
 		self._validar_um_por_delegacao()

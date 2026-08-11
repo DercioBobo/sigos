@@ -6,7 +6,7 @@ frappe.ui.form.on("Escala Do Vigilante", {
 		// Only hide the natives once the deck field actually exists on this site
 		// (it arrives via migrate) — otherwise keep the classic form fully usable.
 		if (frm.fields_dict.deck_escala) {
-			["sec_cabecalho", "naming_series", "tipo_de_escala", "posto_de_vigilancia", "delegacao",
+			["sec_cabecalho", "tipo_de_escala", "posto_de_vigilancia", "delegacao",
 			 "col_break_1", "cliente", "estado",
 			 "sec_config", "regime_do_vigilante", "data_de_inicio", "col_break_per", "gerado_ate",
 			 "sincronizar_vigilantes", "distribuir_turnos", "atribuir_equipas", "btn_gerar", "btn_limpar_futuro"]
@@ -23,8 +23,6 @@ frappe.ui.form.on("Escala Do Vigilante", {
 
 	onload(frm) {
 		frm.set_query("posto_de_vigilancia", () => ({ filters: { estado: "Activo" } }));
-		// naming_series is hidden by the deck — make sure new docs still get it
-		if (frm.is_new() && !frm.doc.naming_series) frm.set_value("naming_series", "ESC-.####");
 	},
 
 	posto_de_vigilancia(frm) {
@@ -1066,7 +1064,7 @@ function _build_deck_shell(frm, w, editable, key) {
 
 	// Tipo de Escala: Posto (normal) vs Reserva (delegação-scoped, no posto at
 	// all — see escala_do_vigilante.py._validar_um_por_delegacao). Locked after
-	// the first save, same as naming_series — switching tipo on an escala that
+	// the first save (set_only_once) — switching tipo on an escala that
 	// may already have generated rows tied to a real posto would be confusing
 	// at best, so it's a one-time choice made when the escala is created.
 	const _toggle_tipo_wrap = () => {
