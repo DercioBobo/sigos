@@ -32,6 +32,17 @@ frappe.ui.form.on("Ausencias", {
 	onload(frm) {
 		// Pre-pick período from the clock (Manhã <12:00, Noite from 12:00). New docs only.
 		if (frm.is_new() && !frm.doc.periodo) frm.set_value("periodo", _periodo_automatico());
+		// Auto-pick the grupo too when there's only one site-wide — a customer with a
+		// single Grupo De Delegados never needs to choose, same idea as período above.
+		// Ambiguous (2+ grupos) is left alone, same as marcar_ausencia_rapida's own
+		// _resolver_grupo_delegados fallback on Vigilantes de Hoje.
+		if (frm.is_new() && !frm.doc.grupo_delegados) {
+			frappe.db.get_list("Grupo De Delegados", { fields: ["name"], limit_page_length: 2 }).then((r) => {
+				if (frm.is_new() && !frm.doc.grupo_delegados && r && r.length === 1) {
+					frm.set_value("grupo_delegados", r[0].name);
+				}
+			});
+		}
 		_setup_substituto_query(frm);
 	},
 

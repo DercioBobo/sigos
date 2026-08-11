@@ -241,7 +241,7 @@
    "fieldname": "data_admissao",
    "fieldtype": "Date",
    "label": "Data de Admissão",
-   "permlevel": 2
+   "description": "Editável por RH e por Operações — as restantes secções RH (bancários, INSS, salário, empresa) continuam exclusivas do RH."
   },
   {
    "fieldname": "col_break_prof",
