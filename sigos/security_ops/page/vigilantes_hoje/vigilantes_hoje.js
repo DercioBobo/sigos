@@ -373,6 +373,15 @@ sigos.VigilantesHoje = class VigilantesHoje {
 	// default posto/severity order); click a different header to switch column.
 	// Every row action (incl. Ligar) lives in the "⋯" menu.
 	_render_table($wrap, gruposOrdenados) {
+		// Zebra by POSTO group, not by raw row position — every row of the same
+		// posto shares a shade, alternating from one posto to the next. Tagged here
+		// (independent of any later column sort) so the shading still reflects the
+		// posto grouping even when the table is temporarily flattened/re-sorted.
+		gruposOrdenados.forEach(([, g], gi) => {
+			const alt = gi % 2 === 1;
+			g.rows.forEach((r) => { r._grupoAlt = alt; });
+		});
+
 		let rows;
 		if (this.tableSort.campo) {
 			const col = VH_TBL_COLS.find((c) => c.key === this.tableSort.campo);
@@ -431,7 +440,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		const tel = (row.contacto || "").replace(/\s/g, "");
 
 		const $tr = $(`
-			<tr class="vh-tbl-row" data-status="${status}" style="--pc:${this._posto_color(postoNome)}">
+			<tr class="vh-tbl-row${row._grupoAlt ? " vh-tbl-alt" : ""}" data-status="${status}" style="--pc:${this._posto_color(postoNome)}">
 				<td class="vh-tbl-name vh-tbl-stripe">
 					${row.em_licenca ? `<span class="vh-tbl-lic" title="${__("Licença aprovada")}">${this._icon("flag")}</span>` : ""}
 					${row.cobertura_papel ? `<span class="vh-tbl-lic" title="${frappe.utils.escape_html(row.cobertura_par || "")}">${this._icon("flag")}</span>` : ""}
@@ -470,7 +479,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 	_render_vaga_table_row($tbody, row) {
 		const postoNome = row.nome_do_posto || row.posto || "";
 		$(`
-			<tr class="vh-tbl-row vh-tbl-row-vaga" data-status="Desfalcado" style="--pc:${this._posto_color(postoNome)}">
+			<tr class="vh-tbl-row vh-tbl-row-vaga${row._grupoAlt ? " vh-tbl-alt" : ""}" data-status="Desfalcado" style="--pc:${this._posto_color(postoNome)}">
 				<td class="vh-tbl-name vh-tbl-stripe"><span class="vh-vaga-lbl">${__("Desfalcado")}</span></td>
 				<td><span class="vh-tbl-posto-dot"></span>${frappe.utils.escape_html(postoNome || "—")}</td>
 				<td>${frappe.utils.escape_html(row.turno || "—")}</td>
@@ -1263,7 +1272,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 .sigos-vhoje .vh-tbl-sort-ico { display:inline-block; width:11px; font-size:9px; margin-left:4px; color:var(--ink3); opacity:.6; }
 .sigos-vhoje .vh-tbl-sortable.active .vh-tbl-sort-ico { color:var(--accent); opacity:1; font-size:10px; }
 .sigos-vhoje .vh-tbl-row td { padding:11px 14px; border-top:1px solid var(--line); font-size:12.5px; color:var(--ink); vertical-align:middle; white-space:nowrap; }
-.sigos-vhoje .vh-tbl-row:nth-child(even) td { background:var(--paper3); }
+.sigos-vhoje .vh-tbl-row.vh-tbl-alt td { background:var(--paper3); }
 .sigos-vhoje .vh-tbl-row:hover td { background:var(--accent-soft); }
 .sigos-vhoje .vh-tbl-row td.mono { font-family:var(--mono); font-size:11.5px; color:var(--ink3); }
 .sigos-vhoje .vh-tbl-name { font-weight:600; }
@@ -1279,7 +1288,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 .sigos-vhoje .vh-tbl-accao b { color:var(--ink); font-weight:700; }
 .sigos-vhoje .vh-tbl-tel { font-family:var(--mono); font-size:11.5px; color:var(--ink2); text-decoration:none; }
 .sigos-vhoje .vh-tbl-tel:hover { color:var(--accent); text-decoration:underline; }
-.sigos-vhoje .vh-tbl-row-vaga td, .sigos-vhoje .vh-tbl-row-vaga:nth-child(even) td { background:var(--falta-soft); }
+.sigos-vhoje .vh-tbl-row-vaga td, .sigos-vhoje .vh-tbl-row-vaga.vh-tbl-alt td { background:var(--falta-soft); }
 .sigos-vhoje .vh-tbl-row[data-status="Desfalcado"] .vh-status-txt { color:var(--falta); font-weight:700; }
 .sigos-vhoje .vh-tbl-row[data-status="Falta"] .vh-status-txt, .sigos-vhoje .vh-tbl-row[data-status="Suspensão"] .vh-status-txt { color:var(--falta); font-weight:700; }
 .sigos-vhoje .vh-tbl-row[data-status="Atraso"] .vh-status-txt, .sigos-vhoje .vh-tbl-row[data-status="Saída Antecipada"] .vh-status-txt, .sigos-vhoje .vh-tbl-row[data-status="Outro"] .vh-status-txt { color:var(--mark); font-weight:700; }
