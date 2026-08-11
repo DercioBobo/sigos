@@ -611,6 +611,17 @@ def limpar_futuro_escala(escala_name):
 
 
 @frappe.whitelist()
+def limpar_tudo_escala(escala_name):
+	"""Full reset of the generated calendar (roster untouched) — the alternative
+	to deleting the whole Escala just to rebuild it from scratch."""
+	frappe.only_for(PAPEIS_OPERACOES)
+	escala = frappe.get_doc("Escala Do Vigilante", escala_name)
+	escala.limpar_tudo()
+	escala.save(ignore_permissions=True)
+	return {"linhas": len(escala.tabela_de_escala)}
+
+
+@frappe.whitelist()
 def get_regime_turnos(regime):
 	"""
 	Return the ordered turno sequence for a regime.

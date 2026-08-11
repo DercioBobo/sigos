@@ -308,6 +308,18 @@ class EscalaDoVigilante(Document):
 		]
 		self.set("tabela_de_escala", mantidas)
 
+	def limpar_tudo(self):
+		"""
+		Full reset of the GENERATED CALENDAR (manual button) — unlike limpar_futuro
+		(future non-override rows only), this drops every row, past and future.
+		The roster (tab_vigilante_do_posto — guards, turno_inicial, turno_equipa) is
+		left untouched; this is the alternative to deleting the whole Escala just to
+		rebuild the calendar from scratch. Click Gerar / Estender Escala afterwards
+		to regenerate it fresh from the current roster.
+		"""
+		self.set("tabela_de_escala", [])
+		self.gerado_ate = None
+
 
 # ─── Pure date-math turno resolver ───────────────────────────────────────────
 

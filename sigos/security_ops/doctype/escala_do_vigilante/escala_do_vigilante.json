@@ -30,6 +30,7 @@
   "sec_grid",
   "btn_gerar",
   "btn_limpar_futuro",
+  "btn_limpar_tudo",
   "grid_escala",
   "sec_dados",
   "tabela_de_escala"
@@ -188,6 +189,12 @@
    "fieldname": "btn_limpar_futuro",
    "fieldtype": "Button",
    "label": "Limpar Futuro"
+  },
+  {
+   "fieldname": "btn_limpar_tudo",
+   "fieldtype": "Button",
+   "label": "Limpar Escala",
+   "description": "Remove todo o calendário gerado (vigilantes e turnos atribuídos são mantidos) — alternativa a eliminar a escala inteira para a reconstruir do zero. Não pode ser desfeito."
   },
   {
    "fieldname": "grid_escala",

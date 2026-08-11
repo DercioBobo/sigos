@@ -9,7 +9,8 @@ frappe.ui.form.on("Escala Do Vigilante", {
 			["sec_cabecalho", "tipo_de_escala", "posto_de_vigilancia", "delegacao",
 			 "col_break_1", "cliente", "estado",
 			 "sec_config", "regime_do_vigilante", "data_de_inicio", "col_break_per", "gerado_ate",
-			 "sincronizar_vigilantes", "distribuir_turnos", "atribuir_equipas", "btn_gerar", "btn_limpar_futuro"]
+			 "sincronizar_vigilantes", "distribuir_turnos", "atribuir_equipas", "btn_gerar",
+			 "btn_limpar_futuro", "btn_limpar_tudo"]
 				.forEach(f => frm.set_df_property(f, "hidden", 1));
 			_render_deck(frm);
 		}
@@ -44,6 +45,8 @@ frappe.ui.form.on("Escala Do Vigilante", {
 	btn_gerar(frm) { _gerar_escala(frm); },
 
 	btn_limpar_futuro(frm) { _limpar_futuro(frm); },
+
+	btn_limpar_tudo(frm) { _limpar_tudo(frm); },
 });
 
 // ─── Turno da Equipa (customer-specific, SIGOS Settings.turno_equipa_activo) ──────
@@ -101,6 +104,26 @@ function _limpar_futuro(frm) {
 			method: "sigos.api.limpar_futuro_escala",
 			args: { escala_name: frm.doc.name },
 			freeze: true,
+			callback: () => frm.reload_doc(),
+		})
+	);
+}
+
+// Full reset of the GENERATED CALENDAR only — the roster (guards, turno_inicial,
+// turno_equipa) is left untouched, unlike limpar_futuro (future non-override rows
+// only) this drops every day, past and future. The alternative to deleting the
+// whole Escala just to rebuild the calendar from scratch; reload_doc() afterwards
+// is what actually clears the deck's calendar view too (editing the native "Dados"
+// table alone doesn't re-render it). Click Gerar / Estender Escala after to rebuild.
+function _limpar_tudo(frm) {
+	if (frm.is_new()) { frappe.show_alert({ message: __("Grave a escala primeiro."), indicator: "orange" }, 3); return; }
+	frappe.confirm(
+		__("Limpar todo o calendário gerado desta escala? Os vigilantes e os turnos atribuídos são mantidos — só o calendário é apagado. Esta acção não pode ser desfeita."),
+		() => frappe.call({
+			method: "sigos.api.limpar_tudo_escala",
+			args: { escala_name: frm.doc.name },
+			freeze: true,
+			freeze_message: __("A limpar escala..."),
 			callback: () => frm.reload_doc(),
 		})
 	);
@@ -1069,6 +1092,7 @@ function _build_deck_shell(frm, w, editable, key) {
 				<button type="button" class="escd-btn" data-act="equipas">${__("Equipas & Turnos")}</button>
 				<button type="button" class="escd-btn" data-act="dist">${__("Distribuir Turnos")}</button>
 				<button type="button" class="escd-btn escd-btn-danger" data-act="limpar">${__("Limpar Futuro")}</button>
+				<button type="button" class="escd-btn escd-btn-danger" data-act="limpar-tudo">${__("Limpar Escala")}</button>
 				<span class="escd-spacer"></span>
 				<button type="button" class="escd-btn escd-btn-primary" data-act="gerar">${__("Gerar / Estender Escala")}</button>
 			</div>
@@ -1145,6 +1169,7 @@ function _build_deck_shell(frm, w, editable, key) {
 	w.find('[data-act="equipas"]').on("click", () => _atribuir_equipas(frm));
 	w.find('[data-act="dist"]').on("click", () => _distribuir_turnos(frm));
 	w.find('[data-act="limpar"]').on("click", () => _limpar_futuro(frm));
+	w.find('[data-act="limpar-tudo"]').on("click", () => _limpar_tudo(frm));
 	w.find('[data-act="gerar"]').on("click", () => _gerar_escala(frm));
 }
 
