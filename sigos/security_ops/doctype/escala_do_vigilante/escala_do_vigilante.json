@@ -175,7 +175,7 @@
   {
    "fieldname": "atribuir_equipas",
    "fieldtype": "Button",
-   "label": "Atribuir Equipas em Bloco",
+   "label": "Equipas & Turnos",
    "description": "Turno da Equipa (customer-specific) — só aparece quando SIGOS Settings.turno_equipa_activo está ligado."
   },
   {

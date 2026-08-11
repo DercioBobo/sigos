@@ -401,76 +401,187 @@ function _distribuir_turnos(frm) {
 	});
 }
 
-// ─── Bulk equipa assignment (customer-specific, turno_equipa_activo) ──────────
-// Companion to Distribuir Turnos: this tags each guard with a Turno Da Equipa;
-// once tagged, Distribuir Turnos automatically groups them by team (one Select
-// per equipa instead of per guard) and the server keeps every member of a team
-// on the same turno_inicial (_sincronizar_turno_por_equipa) — so this is the
-// "assign the team" half, Distribuir Turnos is the "assign the team's turno" half.
+// ─── Combined Equipas & Turnos modal (customer-specific, turno_equipa_activo) ──
+// One live-updating view that does both halves at once: tag each guard into a
+// Turno Da Equipa, AND set each team's shared turno_inicial — every member's
+// turno updates on screen the instant their team's turno changes, before
+// anything is written back to the form. (_sincronizar_turno_por_equipa remains
+// the server-side authority; this is just a nicer way to arrive at the same
+// end-state in one pass instead of two separate dialogs.)
 function _atribuir_equipas(frm) {
 	const guards = frm.doc.tab_vigilante_do_posto || [];
 	if (!guards.length) {
 		frappe.msgprint(__("Sincronize ou adicione vigilantes primeiro."));
 		return;
 	}
+	if (!frm.doc.regime_do_vigilante) {
+		frappe.msgprint(__("Defina o Regime primeiro."));
+		return;
+	}
 
-	frappe.db.get_list("Turno Da Equipa", {
-		filters: { activo: 1 },
-		fields: ["name"],
-		order_by: "name asc",
-		limit: 0,
-	}).then(equipas => {
-		if (!equipas.length) {
+	Promise.all([
+		frappe.xcall("sigos.api.get_regime_turnos", { regime: frm.doc.regime_do_vigilante }),
+		frappe.db.get_list("Turno Da Equipa", { filters: { activo: 1 }, fields: ["name"], order_by: "name asc", limit: 0 }),
+	]).then(([seq, equipasRaw]) => {
+		seq = seq || [];
+		if (!seq.length) { frappe.msgprint(__("Regime sem turnos.")); return; }
+		if (!equipasRaw.length) {
 			frappe.msgprint(__("Nenhuma Turno da Equipa activa. Crie as equipas primeiro (ex: Equipa A, B, C)."));
 			return;
 		}
-		const nomes = equipas.map(e => e.name);
-		const opts = "\n" + nomes.join("\n");
 
-		// One Select per guard, pre-filled with the current equipa (if any)
-		const fields = [
-			{
-				fieldname: "info", fieldtype: "HTML",
-				options: `<div style="margin-bottom:6px;color:#555;">
-					${__("Atribua a equipa de cada vigilante. Use <b>Distribuir Automaticamente</b> para repartir em sequência. Depois, use <b>Distribuir Turnos</b> para atribuir o turno de cada equipa.")}
-				</div>`,
-			},
-		];
-		guards.forEach((g, i) => {
-			fields.push({
-				fieldname: `e_${i}`,
-				fieldtype: "Select",
-				label: g.nome_completo || g.vigilante,
-				options: opts,
-				default: g.turno_equipa || "",
-			});
+		_inject_equipas_modal_css();
+
+		const CORES = ["#7a5ee0", "#1f9d7c", "#d6336c", "#c9821a", "#3a7ec5", "#5a3fc0"];
+		const equipas = equipasRaw.map((e, i) => ({ nome: e.name, cor: CORES[i % CORES.length], turno: null }));
+		const equipaByName = new Map(equipas.map(e => [e.nome, e]));
+		const turnoOpts = seq.map(t => t.turno);
+
+		const model = guards.map(g => ({ row: g, nome: g.nome_completo || g.vigilante, equipa: g.turno_equipa || null }));
+		// Seed each equipa's turno from whichever member already has one set, so
+		// re-opening the dialog picks up where the roster currently stands.
+		model.forEach(m => {
+			if (m.equipa && m.row.turno_inicial && equipaByName.has(m.equipa) && !equipaByName.get(m.equipa).turno) {
+				equipaByName.get(m.equipa).turno = m.row.turno_inicial;
+			}
 		});
 
 		const d = new frappe.ui.Dialog({
-			title: __("Atribuir Equipas em Bloco"),
-			fields,
+			title: __("Equipas & Turnos"),
+			size: "large",
+			fields: [{ fieldname: "body", fieldtype: "HTML" }],
 			primary_action_label: __("Aplicar"),
-			primary_action(v) {
-				guards.forEach((g, i) => {
-					frappe.model.set_value(g.doctype, g.name, "turno_equipa", v[`e_${i}`] || null);
+			primary_action() {
+				model.forEach(m => {
+					const turno = m.equipa ? (equipaByName.get(m.equipa)?.turno || null) : m.row.turno_inicial;
+					frappe.model.set_value(m.row.doctype, m.row.name, "turno_equipa", m.equipa || null);
+					frappe.model.set_value(m.row.doctype, m.row.name, "turno_inicial", turno || null);
 				});
 				frm.refresh_field("tab_vigilante_do_posto");
-				frappe.show_alert({
-					message: __("Equipas atribuídas. Use Distribuir Turnos para dar o turno a cada equipa, depois guarde."),
-					indicator: "green",
-				}, 6);
+				frappe.show_alert({ message: __("Equipas e turnos atribuídos. Guarde para gerar."), indicator: "green" }, 5);
 				d.hide();
-			},
-			secondary_action_label: __("Distribuir Automaticamente"),
-			secondary_action() {
-				// Split guards evenly across the available equipas, round-robin by row order.
-				guards.forEach((g, i) => {
-					d.set_value(`e_${i}`, nomes[i % nomes.length]);
-				});
 			},
 		});
 		d.show();
+		_render_equipas_modal(d.fields_dict.body.$wrapper, { model, equipas, equipaByName, turnoOpts });
 	});
+}
+
+function _render_equipas_modal($body, ctx) {
+	const { model, equipas, equipaByName, turnoOpts } = ctx;
+	const esc = frappe.utils.escape_html;
+
+	const turnoOptsHtml = `<option value="">${__("— turno —")}</option>` +
+		turnoOpts.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join("");
+	const equipaOptsHtml = `<option value="">${__("— sem equipa —")}</option>` +
+		equipas.map(e => `<option value="${esc(e.nome)}">${esc(e.nome)}</option>`).join("");
+
+	$body.html(`
+		<div id="sigos-eq-modal">
+			<div class="eqm-hint">${__("Atribua cada vigilante a uma equipa e o turno de cada equipa — os membros herdam automaticamente o turno da sua equipa.")}</div>
+			<div class="eqm-quick">
+				<button type="button" class="eqm-qbtn" data-qact="split">${__("Repartir Equipas Automaticamente")}</button>
+				<button type="button" class="eqm-qbtn" data-qact="stagger">${__("Escalonar Turnos das Equipas")}</button>
+			</div>
+			<div class="eqm-teams" data-eqm-teams></div>
+			<table class="eqm-table">
+				<thead><tr><th>${__("Vigilante")}</th><th>${__("Equipa")}</th><th>${__("Turno")}</th></tr></thead>
+				<tbody data-eqm-rows></tbody>
+			</table>
+		</div>
+	`);
+
+	const $teams = $body.find("[data-eqm-teams]");
+	const $rows = $body.find("[data-eqm-rows]");
+	const turnoDe = (m) => m.equipa ? (equipaByName.get(m.equipa)?.turno || null) : m.row.turno_inicial;
+
+	function redrawTeams() {
+		$teams.empty();
+		equipas.forEach(e => {
+			const n = model.filter(m => m.equipa === e.nome).length;
+			const $card = $(`
+				<div class="eqm-team" style="--eqm-c:${e.cor}">
+					<span class="eqm-team-dot"></span>
+					<span class="eqm-team-name">${esc(e.nome)}</span>
+					<span class="eqm-team-n">${n} ${n === 1 ? __("vigilante") : __("vigilantes")}</span>
+					<select class="eqm-team-turno">${turnoOptsHtml}</select>
+				</div>
+			`);
+			$card.find("select").val(e.turno || "").on("change", function () {
+				e.turno = $(this).val() || null;
+				redrawRows();
+			});
+			$teams.append($card);
+		});
+	}
+
+	function redrawRows() {
+		$rows.empty();
+		model.forEach((m) => {
+			const turno = turnoDe(m);
+			const cor = m.equipa ? (equipaByName.get(m.equipa)?.cor || "") : "";
+			const $tr = $(`
+				<tr>
+					<td>${esc(m.nome)}</td>
+					<td><select class="eqm-row-equipa">${equipaOptsHtml}</select></td>
+					<td><span class="eqm-row-turno"${cor ? ` style="--eqm-c:${cor}"` : ""}>${turno ? esc(turno) : "—"}</span></td>
+				</tr>
+			`);
+			$tr.find("select").val(m.equipa || "").on("change", function () {
+				m.equipa = $(this).val() || null;
+				redrawTeams();
+				redrawRows();
+			});
+			$rows.append($tr);
+		});
+	}
+
+	$body.find('[data-qact="split"]').on("click", () => {
+		model.forEach((m, i) => { m.equipa = equipas[i % equipas.length].nome; });
+		redrawTeams();
+		redrawRows();
+	});
+	$body.find('[data-qact="stagger"]').on("click", () => {
+		equipas.forEach((e, i) => { e.turno = turnoOpts[i % turnoOpts.length]; });
+		redrawRows();
+	});
+
+	redrawTeams();
+	redrawRows();
+}
+
+function _inject_equipas_modal_css() {
+	if (document.getElementById("sigos-eq-modal-css")) return;
+	const css = `
+#sigos-eq-modal { font-size: 13px; }
+.eqm-hint { color: var(--text-muted, #8d99a6); margin-bottom: 12px; font-size: .92em; }
+.eqm-quick { display: flex; gap: 8px; margin-bottom: 14px; }
+.eqm-qbtn {
+	border: 1px solid var(--border-color, #d1d8dd); background: var(--fg-color, #fff);
+	border-radius: 8px; padding: 6px 12px; font-size: .82em; font-weight: 600; cursor: pointer;
+}
+.eqm-qbtn:hover { border-color: #7a5ee0; color: #7a5ee0; }
+.eqm-teams { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+.eqm-team {
+	display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 10px;
+	background: var(--fg-color, #fff); border: 1px solid var(--border-color, #d1d8dd);
+	flex: 1 1 220px; min-width: 210px;
+}
+.eqm-team-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--eqm-c, #999); flex: none; }
+.eqm-team-name { font-weight: 700; flex: 1; }
+.eqm-team-n { font-size: .78em; color: var(--text-muted, #8d99a6); white-space: nowrap; }
+.eqm-team-turno { border: 1px solid var(--border-color, #d1d8dd); border-radius: 6px; padding: 3px 6px; font-size: .85em; max-width: 110px; }
+.eqm-table { width: 100%; border-collapse: collapse; }
+.eqm-table th {
+	text-align: left; font-size: .75em; text-transform: uppercase; letter-spacing: .04em;
+	color: var(--text-muted, #8d99a6); padding: 4px 8px; border-bottom: 1px solid var(--border-color, #d1d8dd);
+}
+.eqm-table td { padding: 5px 8px; border-bottom: 1px solid var(--border-color, #ecf0f2); }
+.eqm-row-equipa { width: 100%; border: 1px solid var(--border-color, #d1d8dd); border-radius: 6px; padding: 3px 6px; font-size: .85em; }
+.eqm-row-turno { font-weight: 700; font-size: .85em; }
+.eqm-row-turno[style*="--eqm-c"] { color: var(--eqm-c); }
+`;
+	$(`<style id="sigos-eq-modal-css">${css}</style>`).appendTo("head");
 }
 
 // ─── Grid render (loads regime info first for the coverage row) ───────────────
@@ -908,7 +1019,7 @@ function _build_deck_shell(frm, w, editable, key) {
 			<div class="escd-tiles" data-escd-tiles></div>
 			<div class="escd-actions">
 				<button type="button" class="escd-btn" data-act="sync">${__("Sincronizar Vigilantes")}</button>
-				<button type="button" class="escd-btn" data-act="equipas">${__("Atribuir Equipas")}</button>
+				<button type="button" class="escd-btn" data-act="equipas">${__("Equipas & Turnos")}</button>
 				<button type="button" class="escd-btn" data-act="dist">${__("Distribuir Turnos")}</button>
 				<button type="button" class="escd-btn escd-btn-danger" data-act="limpar">${__("Limpar Futuro")}</button>
 				<span class="escd-spacer"></span>
