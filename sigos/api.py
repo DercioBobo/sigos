@@ -699,6 +699,7 @@ def get_vigilantes_da_escala(data, periodo=None, grupo_delegados=None, excluir_d
 			v.contacto_alternativo,
 			v.residencia,
 			v.supervisor,
+			v.cobertura_de_posto_activa,
 			te.posto,
 			p.nome_do_posto,
 			p.indicativo,
@@ -750,7 +751,9 @@ def get_vagas_desfalcadas(periodo=None, grupo_delegados=None):
 	"""
 	Open Vaga De Posto slots (posto+regime+turno a Rotatividade vacated with no
 	substituto) whose turno matches this periodo. Vigilantes de Hoje shows these
-	as a nameless "Desfalcado" line so ops knows the spot still needs filling.
+	as a nameless "Desfalque" line so ops knows the spot still needs filling —
+	enriched with who left and why (vigilante_anterior + the origin Rotatividade's
+	motivo/operação) when the vaga was opened by one, which is most of them.
 	A vaga has no date of its own — it stays open across every day/periodo view
 	until someone actually lands on that exact slot (auto-closed by
 	escala_do_vigilante._adicionar_vigilante_a_escala).
@@ -767,10 +770,19 @@ def get_vagas_desfalcadas(periodo=None, grupo_delegados=None):
 			p.indicativo,
 			vp.turno,
 			vp.regime,
-			vp.delegacao
+			vp.delegacao,
+			vp.vigilante_anterior,
+			va.nome_completo AS vigilante_anterior_nome,
+			vp.origem_rotatividade,
+			r.motivo AS rotatividade_motivo,
+			oper.operacao AS rotatividade_operacao,
+			vp.data_abertura
 		FROM `tabVaga De Posto` vp
 		JOIN `tabTurno` t ON t.name = vp.turno
 		LEFT JOIN `tabPosto De Vigilancia` p ON p.name = vp.posto_de_vigilancia
+		LEFT JOIN `tabVigilante` va ON va.name = vp.vigilante_anterior
+		LEFT JOIN `tabRotatividade` r ON r.name = vp.origem_rotatividade
+		LEFT JOIN `tabOperacao De Rotatividade` oper ON oper.name = r.abreviatura_op
 		WHERE vp.estado = 'Aberta'
 		  {periodo_where}
 		{extra}
@@ -1715,6 +1727,91 @@ def atribuir_vigilantes_ao_posto(posto, vigilantes, regime=None):
 			erros.append(f"{v}: erro interno.")
 
 	return {"atribuidos": atribuidos, "erros": erros}
+
+
+@frappe.whitelist()
+def preencher_vaga(vaga_name, vigilante):
+	"""
+	Deploy a Reserva guard directly onto an open Vaga De Posto's exact slot (Vigilantes
+	de Hoje "Preencher" action). Setting posto/regime + the vacated turno_inicial and
+	saving is enough — Vigilante._migrar_escala_se_mudou cascades into
+	migrar_escala_vigilante -> _adicionar_vigilante_a_escala -> fechar_vaga on its own
+	(same "escala follows the guard" keystone every other posto/regime change uses), so
+	the vaga closes and vigilante_preenchido/data_preenchimento stamp themselves. Posto
+	capacity/state are already enforced by Vigilante.validate() — not duplicated here.
+	"""
+	frappe.only_for(PAPEIS_OPERACOES)
+	vaga = frappe.get_doc("Vaga De Posto", vaga_name)
+	if vaga.estado != "Aberta":
+		frappe.throw(
+			_("Esta vaga já não está <b>Aberta</b> (estado actual: <b>{0}</b>).").format(vaga.estado),
+			title=_("Vaga Indisponível"),
+		)
+
+	vig = frappe.get_doc("Vigilante", vigilante)
+	if vig.status != "Reserva":
+		frappe.throw(
+			_("{0} não está em <b>Reserva</b> (estado actual: <b>{1}</b>).").format(
+				vig.nome_completo, vig.status
+			),
+			title=_("Vigilante Indisponível"),
+		)
+	if not vig.funcionario:
+		frappe.throw(
+			_("{0} não tem Funcionário associado — use Admitir (RH) primeiro.").format(vig.nome_completo),
+			title=_("Funcionário em Falta"),
+		)
+
+	posto_doc = frappe.get_doc("Posto De Vigilancia", vaga.posto_de_vigilancia)
+	nome_proj = (
+		frappe.db.get_value("Project", posto_doc.project, "project_name")
+		if posto_doc.project else None
+	)
+
+	vig.posto_de_vigilancia = vaga.posto_de_vigilancia
+	vig.regime_do_vigilante = vaga.regime
+	vig.tipo_de_posto       = posto_doc.tipo_de_posto
+	vig.cliente             = posto_doc.cliente
+	vig.projecto            = posto_doc.project
+	vig.nome_do_projecto    = nome_proj
+	vig.flags.turno_inicial_preferido = vaga.turno
+	vig.save(ignore_permissions=True)
+
+	return {"vigilante": vig.name, "posto": vaga.posto_de_vigilancia, "turno": vaga.turno}
+
+
+@frappe.whitelist()
+def destacar_cobridor(vigilante_coberto, tipo_cobertura, vigilante_cobridor):
+	"""
+	Create AND deploy a Cobertura De Posto in one call (Vigilantes de Hoje "Destacar
+	Cobridor" action) — today Cobertura only ever gets created automatically from a
+	Pedido De Licença/Processo Disciplinar approval (see those doctypes'
+	_criar_cobertura_se_necessario); a guard marked Licença/Suspensão directly on the
+	board has no Cobertura yet, so this covers that gap the same way, then reuses the
+	doctype's own whitelisted atribuir_cobridor (validates estado, calls
+	escala_do_vigilante.deployar_cobridor) instead of duplicating its logic.
+	"""
+	frappe.only_for(PAPEIS_OPERACOES)
+	existente = frappe.db.exists(
+		"Cobertura De Posto",
+		{"vigilante_coberto": vigilante_coberto, "estado": ["in", ["Por Atribuir", "Activa"]]},
+	)
+	if existente:
+		frappe.throw(
+			_("Já existe uma Cobertura De Posto <b>{0}</b> em curso para este vigilante.").format(existente),
+			title=_("Cobertura Já Existe"),
+		)
+
+	cob = frappe.get_doc({
+		"doctype": "Cobertura De Posto",
+		"vigilante_coberto": vigilante_coberto,
+		"tipo_cobertura": tipo_cobertura,
+		"estado": "Por Atribuir",
+	})
+	cob.insert(ignore_permissions=True)
+	cob.atribuir_cobridor(vigilante_cobridor)
+
+	return {"cobertura": cob.name}
 
 
 @frappe.whitelist()

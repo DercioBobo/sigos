@@ -161,12 +161,18 @@ sigos.VigilantesHoje = class VigilantesHoje {
 			}
 			const vagaRows = (vagas || []).map((v) => ({
 				escala_row: `vaga:${v.name}`,
+				vaga_name: v.name,
 				posto: v.posto,
 				nome_do_posto: v.nome_do_posto,
 				indicativo: v.indicativo,
 				turno: v.turno,
 				regime: v.regime,
 				delegacao: v.delegacao,
+				vigilante_anterior: v.vigilante_anterior,
+				vigilante_anterior_nome: v.vigilante_anterior_nome,
+				origem_rotatividade: v.origem_rotatividade,
+				rotatividade_motivo: v.rotatividade_motivo,
+				rotatividade_operacao: v.rotatividade_operacao,
 				_isVaga: true,
 			}));
 			this.rows = [...escala, ...vagaRows];
@@ -297,6 +303,18 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		return row.indicativo ? `${row.indicativo} - ${nome}` : nome;
 	}
 
+	// Why a Desfalque vaga exists — most are opened by a Rotatividade (guard left
+	// via RVP/APV/DEM/... with no substituto), so surface who left and the
+	// operation's motivo instead of leaving ops guessing. "" when the vaga was
+	// opened some other way (no origem_rotatividade to explain it from).
+	_vaga_nota(row) {
+		if (!row.origem_rotatividade) return "";
+		const nome = row.vigilante_anterior_nome || row.vigilante_anterior || __("vigilante não registado");
+		const detalhes = [row.rotatividade_operacao, row.rotatividade_motivo ? `${__("motivo")}: ${row.rotatividade_motivo}` : null]
+			.filter(Boolean).join(" · ");
+		return `${__("Saiu")}: ${nome} — ${__("Rotatividade")} ${row.origem_rotatividade}${detalhes ? ` (${detalhes})` : ""}`;
+	}
+
 	_turno_label(row) {
 		if (!row.turno_equipa) return row.turno || "";
 		const lbl = this.equipaLabel[row.turno_equipa] || row.turno_equipa;
@@ -369,24 +387,29 @@ sigos.VigilantesHoje = class VigilantesHoje {
 	// except go find someone to cover it.
 	_render_vaga_row($parent, row) {
 		const metaLine = `<b>${frappe.utils.escape_html(row.turno || "")}</b><span class="dot">·</span>${frappe.utils.escape_html(row.regime || "")}<span class="dot">·</span>${frappe.utils.escape_html(row.delegacao || "")}`;
-		$(`
+		const nota = this._vaga_nota(row);
+		const $row = $(`
 			<div class="vh-row vh-row-vaga" data-status="Desfalcado">
 				<div class="vh-rowhead vh-rowhead-vaga">
 					<span class="vh-ring"></span>
 					<div class="vh-info">
 						<div class="vh-idline">
-							<span class="vh-name vh-vaga-lbl">${__("Desfalcado")}</span>
+							<span class="vh-name vh-vaga-lbl">${__("Desfalque")}</span>
 						</div>
 						<div class="vh-meta">${metaLine}</div>
+						${nota ? `<span class="vh-vaga-note">${this._icon("info")} ${frappe.utils.escape_html(nota)}</span>` : ""}
 					</div>
 					<div class="vh-right">
-						<div class="vh-status">
-							<span class="vh-status-txt">${__("Desfalcado")}</span>
-						</div>
+						<button type="button" class="vh-actbtn primary vh-vaga-fill-btn">${__("Preencher")}</button>
 					</div>
 				</div>
 			</div>
 		`).appendTo($parent);
+
+		$row.find(".vh-vaga-fill-btn").on("click", (e) => {
+			e.stopPropagation();
+			this._abrir_preencher_vaga_dialog(row);
+		});
 	}
 
 	_toggle_row(key) {
@@ -503,21 +526,30 @@ sigos.VigilantesHoje = class VigilantesHoje {
 	}
 
 	// Table-view counterpart of _render_vaga_row — no vigilante, so no name link,
-	// no menu, no phone: nothing here is actionable, it's just a "go fill this" flag.
+	// no phone, no ⋯ menu: the one available action (Preencher) gets its own button.
 	_render_vaga_table_row($tbody, row) {
 		const postoNome = this._posto_label(row);
-		$(`
+		const nota = this._vaga_nota(row);
+		const $tr = $(`
 			<tr class="vh-tbl-row vh-tbl-row-vaga${row._grupoAlt ? " vh-tbl-alt" : ""}" data-status="Desfalcado" style="--pc:${this._posto_color(postoNome)}">
-				<td class="vh-tbl-name vh-tbl-stripe"><span class="vh-vaga-lbl">${__("Desfalcado")}</span></td>
+				<td class="vh-tbl-name vh-tbl-stripe">
+					<span class="vh-vaga-lbl">${__("Desfalque")}</span>
+					${nota ? `<span class="vh-tbl-lic" title="${frappe.utils.escape_html(nota)}">${this._icon("info")}</span>` : ""}
+				</td>
 				<td><span class="vh-tbl-posto-dot"></span>${frappe.utils.escape_html(postoNome || "—")}</td>
 				<td>${frappe.utils.escape_html(row.turno || "—")}</td>
 				<td>${frappe.utils.escape_html(row.regime || "—")}</td>
-				<td><span class="vh-status-txt">${__("Desfalcado")}</span></td>
-				<td class="vh-tbl-accao">—</td>
+				<td><span class="vh-status-txt">${__("Desfalque")}</span></td>
+				<td class="vh-tbl-accao"><button type="button" class="vh-tbl-fill-btn vh-vaga-fill-btn">${__("Preencher")}</button></td>
 				<td class="mono">—</td>
 				<td class="vh-tbl-menu-cell"></td>
 			</tr>
 		`).appendTo($tbody);
+
+		$tr.find(".vh-vaga-fill-btn").on("click", (e) => {
+			e.stopPropagation();
+			this._abrir_preencher_vaga_dialog(row);
+		});
 	}
 
 	// ---- Row actions menu (custom — used by table view) --------------------
@@ -547,6 +579,18 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		} else {
 			$menu.append(this._menu_btn(row.ja_ausencia_row ? __("Rever Marcação") : __("Marcar Ausência"), () => this._abrir_marcar_dialog(row)));
 		}
+
+		// Destacar Cobridor: only once a Licença/Suspensão is actually on record for
+		// today AND nobody's covering yet (cobertura_de_posto_activa empty) — a guard
+		// marked directly on this board (not via Pedido De Licença/Processo
+		// Disciplinar) has no Cobertura at all otherwise.
+		if (!isFolga && ["Licença", "Suspensão"].includes(row.ja_tipo_de_ausencia) && !row.cobertura_de_posto_activa) {
+			$menu.append(this._menu_btn(__("Destacar Cobridor"), () => this._abrir_destacar_cobridor_dialog(row)));
+		}
+		// Lançar Rotatividade: available regardless of today's status — a transfer/
+		// demotion/etc isn't tied to whether the guard is present today.
+		$menu.append(this._menu_btn(__("Lançar Rotatividade"), () => sigos.rotatividade_wizard({ vigilante: row.vigilante })));
+
 		$menu.append(`<span class="vh-menu-item disabled">+ ${__("Ocorrência")} <span class="soon">${__("Em breve")}</span></span>`);
 		$menu.append(`<span class="vh-menu-item disabled">${__("Ver Histórico")} <span class="soon">${__("Em breve")}</span></span>`);
 
@@ -577,6 +621,99 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		const $b = $(`<button type="button" class="vh-menu-item">${label}</button>`);
 		$b.on("click", () => { this._close_menu(); onClick(); });
 		return $b;
+	}
+
+	// ============================================================ RESERVA ACTIONS
+	// Shared Reserva-guard picker for both Preencher (fill a vaga) and Destacar
+	// Cobridor — fetches every Reserva guard (grupo_delegados is being phased out
+	// for this customer, so this deliberately doesn't hard-filter by it) and sorts
+	// matches from the target delegação first, rather than excluding everyone else.
+	_abrir_reserva_picker(opts) {
+		frappe.call({
+			method: "sigos.api.get_vigilantes_reserva",
+			freeze: true,
+			callback: (r) => {
+				const candidatos = r.message || [];
+				if (!candidatos.length) {
+					frappe.msgprint(__("Não há vigilantes em Reserva disponíveis."));
+					return;
+				}
+				candidatos.sort((a, b) => {
+					const pa = a.delegacao === opts.delegacao ? 0 : 1;
+					const pb = b.delegacao === opts.delegacao ? 0 : 1;
+					return pa - pb || (a.nome_completo || "").localeCompare(b.nome_completo || "");
+				});
+
+				const d = new frappe.ui.Dialog({
+					title: opts.titulo,
+					fields: [
+						{ fieldtype: "HTML", options: `<p class="text-muted" style="margin-bottom:8px">${opts.aviso}</p>` },
+						{
+							fieldname: "vigilante", fieldtype: "Autocomplete", label: __("Vigilante em Reserva"), reqd: 1,
+							options: candidatos.map((v) => ({
+								label: `${v.nome_completo || v.vigilante}${v.delegacao ? ` — ${v.delegacao}` : ""}`,
+								value: v.vigilante,
+							})),
+						},
+					],
+					primary_action_label: __("Confirmar"),
+					primary_action: (vals) => {
+						if (!vals.vigilante) { frappe.msgprint(__("Escolha um vigilante.")); return; }
+						d.hide();
+						opts.onConfirm(vals.vigilante);
+					},
+				});
+				d.show();
+			},
+		});
+	}
+
+	_abrir_preencher_vaga_dialog(row) {
+		this._abrir_reserva_picker({
+			titulo: __("Preencher Vaga"),
+			aviso: __("Escolha um vigilante em Reserva para ocupar {0} — {1} ({2}).", [
+				frappe.utils.escape_html(this._posto_label(row)),
+				frappe.utils.escape_html(row.turno || ""),
+				frappe.utils.escape_html(row.regime || ""),
+			]),
+			delegacao: row.delegacao,
+			onConfirm: (vigilante) => {
+				frappe.call({
+					method: "sigos.api.preencher_vaga",
+					args: { vaga_name: row.vaga_name, vigilante },
+					freeze: true,
+					freeze_message: __("A preencher vaga..."),
+					callback: () => {
+						frappe.show_alert({ message: __("Vaga preenchida."), indicator: "green" }, 4);
+						this.refresh();
+					},
+				});
+			},
+		});
+	}
+
+	_abrir_destacar_cobridor_dialog(row) {
+		const tipo_cobertura = row.ja_tipo_de_ausencia === "Suspensão" ? "Suspensão/Investigação" : "Licença";
+		this._abrir_reserva_picker({
+			titulo: __("Destacar Cobridor"),
+			aviso: __("Escolha um vigilante em Reserva para cobrir {0} enquanto estiver em {1}.", [
+				frappe.utils.escape_html(row.nome_completo || row.vigilante),
+				frappe.utils.escape_html(row.ja_tipo_de_ausencia || ""),
+			]),
+			delegacao: row.delegacao,
+			onConfirm: (vigilante) => {
+				frappe.call({
+					method: "sigos.api.destacar_cobridor",
+					args: { vigilante_coberto: row.vigilante, tipo_cobertura, vigilante_cobridor: vigilante },
+					freeze: true,
+					freeze_message: __("A destacar cobridor..."),
+					callback: () => {
+						frappe.show_alert({ message: __("Cobridor destacado."), indicator: "green" }, 4);
+						this.refresh();
+					},
+				});
+			},
+		});
 	}
 
 	// ============================================================ EXPANDED PANEL
@@ -958,7 +1095,18 @@ sigos.VigilantesHoje = class VigilantesHoje {
 			callback: () => {
 				d.hide();
 				frappe.show_alert({ message: __("Ausência registada."), indicator: "green" }, 4);
-				this.refresh();
+				// Offer the Cobridor follow-up right here instead of making them reopen
+				// the row menu — only for the two types Cobertura De Posto actually
+				// models (Licença/Suspensão), and only if nobody's covering yet.
+				if (["Licença", "Suspensão"].includes(state.tipo) && !row.cobertura_de_posto_activa) {
+					frappe.confirm(
+						__("Destacar um Cobridor agora para {0}?", [frappe.utils.escape_html(row.nome_completo || row.vigilante)]),
+						() => { row.ja_tipo_de_ausencia = state.tipo; this._abrir_destacar_cobridor_dialog(row); },
+						() => this.refresh(),
+					);
+				} else {
+					this.refresh();
+				}
 			},
 			error: (r) => {
 				const msg = [
@@ -1009,7 +1157,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 					<div id="vh-ctrl-grupo"></div>
 					<select class="vh-select" data-role="estado-filtro">
 						<option value="">${__("Todos os Estados")}</option>
-						<option value="Desfalcado">${__("Desfalcado")}</option>
+						<option value="Desfalcado">${__("Desfalque")}</option>
 						<option value="Falta">${__("Falta")}</option>
 						<option value="Atraso">${__("Atraso")}</option>
 						<option value="Saída Antecipada">${__("Saída Antecipada")}</option>
@@ -1032,7 +1180,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 					<div class="vh-pill tot vh-sum-total"><b class="num">0</b><span>${__("Escalados")}</span></div>
 					<div class="vh-pill done vh-sum-done"><b class="num">0</b><span>${__("Já Registados")}</span></div>
 					<div class="vh-pill bad vh-sum-faltas"><b class="num">0</b><span>${__("Faltas Hoje")}</span></div>
-					<div class="vh-pill bad vh-sum-vagas"><b class="num">0</b><span>${__("Desfalcado")}</span></div>
+					<div class="vh-pill bad vh-sum-vagas"><b class="num">0</b><span>${__("Desfalque")}</span></div>
 				</div>
 
 				<div class="vh-roster"></div>
@@ -1274,7 +1422,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 .vh-row[data-open="true"] .vh-panel { display:block; }
 .vh-panel { display:none; }
 
-/* Desfalcado — vacated posto/turno/regime slot, no vigilante attached. Not
+/* Desfalque — vacated posto/turno/regime slot, no vigilante attached. Not
    interactive (no click, no chevron, no call button), so it gets its own
    non-hover header and a dashed left edge instead of the usual solid ring. */
 .vh-row-vaga { background:var(--falta-soft); }
@@ -1374,9 +1522,18 @@ sigos.VigilantesHoje = class VigilantesHoje {
 .vh-actbtn.primary.on { background:var(--ink); border-color:var(--ink); color:var(--paper2); }
 .vh-actbtn.ghost { background:transparent; border:1px dashed var(--line2); color:var(--ink3); cursor:default; }
 .vh-actbtn.ghost .soon { font-size:9px; text-transform:uppercase; letter-spacing:.05em; background:var(--paper3); border-radius:999px; padding:1px 6px; }
+/* Compact table-cell counterpart of .vh-actbtn.primary — same accent, tighter fit. */
+.vh-tbl-fill-btn { font-family:var(--body); font-size:11px; font-weight:700; border-radius:999px;
+  padding:4px 12px; cursor:pointer; background:var(--mark); border:1px solid var(--mark); color:#3a2c05; }
+.vh-tbl-fill-btn:hover { filter:brightness(1.05); }
 .vh-folga-note { display:inline-flex; align-items:center; gap:7px; font-size:12px; font-weight:600; color:var(--folga);
   background:var(--folga-soft); border:1px solid var(--line2); border-radius:999px; padding:7px 14px 7px 12px; }
 .vh-folga-note svg { width:14px; height:14px; flex:none; }
+/* Desfalque origin note (usually a Rotatividade) — informational, not alarming
+   like the Desfalque label itself already is, so muted ink rather than --falta. */
+.vh-vaga-note { display:inline-flex; align-items:center; gap:6px; font-size:11.5px; font-weight:600; color:var(--ink3);
+  margin-top:4px; }
+.vh-vaga-note svg { width:13px; height:13px; flex:none; }
 
 /* Mark dialog body — a Dialog mounts at document.body, outside .vh-root, so the
    design tokens are redefined here rather than inherited. .theme-dark is added
