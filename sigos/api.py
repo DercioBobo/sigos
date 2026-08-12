@@ -1278,6 +1278,88 @@ def get_vigilante_dash(vigilante):
 
 
 @frappe.whitelist()
+def buscar_vigilantes_similares(nome, numero_documento=None, excluir=None):
+	"""
+	Duplicate hint for the Vigilante form: as RH/Ops type a name, surface any
+	existing guard that looks like the same person — a mistyped re-entry
+	("Dercio Anselmo" while "Dercio Anselmo Bobo" already exists) is the
+	common failure mode this catches, not exact matches (the naming series
+	means no unique-name constraint exists to lean on).
+
+	Two independent signals, returned separately so the caller can weight them:
+	- por_documento: EXACT numero_documento match — the strongest signal,
+	  same BI/Passport can't belong to two people.
+	- por_nome: fuzzy name match (token overlap + string similarity) — a
+	  hint, not proof; common names can collide legitimately.
+
+	Never blocks anything — purely advisory, capped and cheap (SQL LIKE
+	pre-filter on name tokens before any Python-side scoring).
+	"""
+	frappe.only_for(PAPEIS_INTERNOS)
+	import re
+	import unicodedata
+	from difflib import SequenceMatcher
+
+	def normalizar(s):
+		s = unicodedata.normalize("NFKD", s or "").encode("ascii", "ignore").decode()
+		s = re.sub(r"[^a-zA-Z\s]", " ", s).lower()
+		return re.sub(r"\s+", " ", s).strip()
+
+	campos = ["name", "nome_completo", "status", "delegacao", "mecanografico"]
+	excluir = excluir or "__novo__"
+
+	por_documento = []
+	if numero_documento:
+		rows = frappe.get_all(
+			"Vigilante",
+			filters={"numero_documento": numero_documento, "name": ["!=", excluir]},
+			fields=campos,
+			limit=5,
+		)
+		por_documento = rows
+
+	nome_norm = normalizar(nome)
+	tokens = [t for t in nome_norm.split() if len(t) >= 3]
+
+	por_nome = []
+	if tokens:
+		conditions, values = [], {"excluir": excluir}
+		for i, t in enumerate(tokens[:4]):
+			conditions.append(f"nome_completo like %(t{i})s")
+			values[f"t{i}"] = f"%{t}%"
+
+		candidatos = frappe.db.sql(
+			f"""
+			select name, nome_completo, status, delegacao, mecanografico
+			from `tabVigilante`
+			where ({" or ".join(conditions)}) and name != %(excluir)s
+			limit 200
+			""",
+			values,
+			as_dict=True,
+		)
+
+		tokens_novo = set(tokens)
+		for c in candidatos:
+			nome_c = normalizar(c.nome_completo)
+			if not nome_c:
+				continue
+			tokens_c = set(t for t in nome_c.split() if len(t) >= 3)
+			overlap = tokens_novo & tokens_c
+			score = SequenceMatcher(None, nome_norm, nome_c).ratio()
+			if len(overlap) >= 2:
+				score = max(score, 0.75)
+			if score >= 0.6:
+				c["score"] = round(score, 2)
+				por_nome.append(c)
+
+		por_nome.sort(key=lambda r: -r["score"])
+		por_nome = por_nome[:5]
+
+	return {"por_nome": por_nome, "por_documento": por_documento}
+
+
+@frappe.whitelist()
 def get_contexto_faltas(data, linhas):
 	"""
 	Falta context for the Ausencias deck cards, in one batch call.

@@ -50,6 +50,14 @@ frappe.ui.form.on("Vigilante", {
 		_calcular_idade(frm);
 	},
 
+	nome_completo(frm) {
+		_verificar_duplicados(frm);
+	},
+
+	numero_documento(frm) {
+		_verificar_duplicados(frm);
+	},
+
 	delegacao(frm) {
 		frm.set_value("posto_de_vigilancia", "");
 		frm.set_query("posto_de_vigilancia", () => ({
@@ -59,8 +67,8 @@ frappe.ui.form.on("Vigilante", {
 
 	// ─── Internal triggers ─────────────────────────────────────────────────────
 	_aplicar_permissoes(frm) {
-		// HR-only section: mecanografico, funcionario, data_admissao, empresa
-		const campos_rh = ["mecanografico", "funcionario", "data_admissao", "empresa", "motivo_de_admissao"];
+		// HR-only section: mecanografico, funcionario, empresa
+		const campos_rh = ["mecanografico", "funcionario", "empresa", "motivo_de_admissao"];
 		const campos_ops = ["posto_de_vigilancia", "categoria", "tipo_de_vigilante", "regime_do_vigilante", "delegacao"];
 
 		const is_rh  = frappe.user.has_role("Aprovador RH")  || frappe.user.has_role("System Manager") || frappe.user.has_role("SIGOS Manager");
@@ -68,6 +76,12 @@ frappe.ui.form.on("Vigilante", {
 
 		campos_rh.forEach(f  => frm.set_df_property(f, "read_only", is_rh  ? 0 : 1));
 		campos_ops.forEach(f => frm.set_df_property(f, "read_only", is_ops ? 0 : 1));
+
+		// Data de Admissão: editable by RH AND Operações (its own description says
+		// so) — Operações needs it open when SIGOS Settings.admissao_automatica_activo
+		// lets them create-and-activate a guard end to end without RH ever touching
+		// the record, otherwise the auto-filled today() default is stuck read-only.
+		frm.set_df_property("data_admissao", "read_only", (is_rh || is_ops) ? 0 : 1);
 
 		// funcionario always read-only (system-managed)
 		frm.set_df_property("funcionario", "read_only", 1);
@@ -377,6 +391,92 @@ function _inject_dash_css() {
 `;
 	const s = document.createElement("style");
 	s.id = "sigos-vig-dash-css";
+	s.textContent = css;
+	document.head.appendChild(s);
+}
+
+// ─── Possible-duplicate hint (fuzzy name + exact document number) ────────────
+// Debounced live lookup as RH/Ops types the name — catches the common failure
+// mode of re-entering an existing guard under a slightly different spelling
+// ("Dercio Anselmo" vs. the existing "Dercio Anselmo Bobo"). Purely advisory:
+// never blocks save, just links to the likely match. Server side in
+// sigos.api.buscar_vigilantes_similares; the exact-document-number case is
+// also re-checked non-blockingly on save itself (vigilante.py, catches
+// API/Data Import too).
+let _dup_timer = null;
+function _verificar_duplicados(frm) {
+	clearTimeout(_dup_timer);
+	frm.$wrapper.find(".sigos-vig-dup-warn").remove();
+
+	const nome = (frm.doc.nome_completo || "").trim();
+	if (nome.split(/\s+/).filter(Boolean).length < 2) return; // need at least 2 name parts to bother
+
+	_dup_timer = setTimeout(() => {
+		frappe.call({
+			method: "sigos.api.buscar_vigilantes_similares",
+			args: {
+				nome,
+				numero_documento: frm.doc.numero_documento || null,
+				excluir: frm.is_new() ? null : frm.doc.name,
+			},
+		}).then((r) => _render_duplicados(frm, r.message || {}));
+	}, 600);
+}
+
+function _render_duplicados(frm, data) {
+	frm.$wrapper.find(".sigos-vig-dup-warn").remove();
+
+	const porDoc = data.por_documento || [];
+	const porNome = (data.por_nome || []).filter((r) => !porDoc.some((d) => d.name === r.name));
+	if (!porDoc.length && !porNome.length) return;
+
+	_inject_dup_css();
+	const esc = frappe.utils.escape_html;
+
+	const linha = (r, forte) => `
+		<div class="sigos-dup-row" data-name="${esc(r.name)}">
+			<span class="sigos-dup-nome">${esc(r.nome_completo)}</span>
+			<span class="sigos-dup-meta">${esc(r.name)} · ${esc(r.status || "")}${r.delegacao ? " · " + esc(r.delegacao) : ""}</span>
+			${forte ? `<span class="sigos-dup-badge">${__("Mesmo Documento")}</span>` : ""}
+		</div>`;
+
+	const linhas = porDoc.map((r) => linha(r, true)).join("") + porNome.map((r) => linha(r, false)).join("");
+	const titulo = porDoc.length
+		? __("Já existe um vigilante com o mesmo número de documento:")
+		: __("Possível duplicado — nome semelhante a vigilante(s) já existente(s):");
+
+	const $warn = $(`
+		<div class="sigos-vig-dup-warn ${porDoc.length ? "is-forte" : ""}">
+			<div class="sigos-dup-title">⚠ ${titulo}</div>
+			${linhas}
+		</div>`);
+
+	$warn.find(".sigos-dup-row").on("click", function () {
+		frappe.set_route("Form", "Vigilante", $(this).data("name"));
+	});
+
+	const $campo = frm.get_field("nome_completo") && frm.get_field("nome_completo").$wrapper;
+	if ($campo && $campo.length) $campo.after($warn);
+	else (frm.layout?.wrapper ? $(frm.layout.wrapper) : frm.$wrapper.find(".form-layout")).prepend($warn);
+}
+
+function _inject_dup_css() {
+	if (document.getElementById("sigos-vig-dup-css")) return;
+	const css = `
+.sigos-vig-dup-warn { margin: 8px 0 14px; padding: 10px 14px; border-radius: 10px;
+	background: #fff8e6; border: 1px solid #ffe08a; }
+.sigos-vig-dup-warn.is-forte { background: #fdecef; border-color: #f5c2c9; }
+.sigos-dup-title { font-weight: 700; font-size: .84em; color: #8a6d1a; margin-bottom: 6px; }
+.sigos-vig-dup-warn.is-forte .sigos-dup-title { color: #b02a37; }
+.sigos-dup-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; cursor: pointer; font-size: .86em; }
+.sigos-dup-row:hover .sigos-dup-nome { text-decoration: underline; }
+.sigos-dup-nome { font-weight: 600; color: #1a3a5c; }
+.sigos-dup-meta { color: #6b7280; }
+.sigos-dup-badge { margin-left: auto; padding: 1px 8px; border-radius: 999px; font-size: .72em;
+	font-weight: 700; background: #f5c2c9; color: #842029; white-space: nowrap; }
+`;
+	const s = document.createElement("style");
+	s.id = "sigos-vig-dup-css";
 	s.textContent = css;
 	document.head.appendChild(s);
 }

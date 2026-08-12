@@ -263,7 +263,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		const nFalta = rows.filter((r) => r._status === "Falta").length;
 		const nVaga = rows.filter((r) => r._isVaga).length;
 		const partes = [];
-		if (nVaga) partes.push(`${nVaga} ${__("desfalcado")}${nVaga > 1 ? "s" : ""}`);
+		if (nVaga) partes.push(`${nVaga} ${__("desfalque")}${nVaga > 1 ? "s" : ""}`);
 		if (nFalta) partes.push(`${nFalta} falta${nFalta > 1 ? "s" : ""}`);
 		return partes.length ? `<span class="vh-group-cov critical">${partes.join(", ")}</span>` : "";
 	}

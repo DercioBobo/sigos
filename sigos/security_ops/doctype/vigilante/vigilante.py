@@ -61,6 +61,7 @@ class Vigilante(Document):
 		self._guardar_mudanca_regime()
 		self._aplicar_salario_padrao_reserva()
 		self._reter_salario_mais_alto()
+		self._avisar_duplicado_por_documento()
 
 	def on_update(self):
 		self._atualizar_ocupacao_postos()
@@ -494,6 +495,31 @@ class Vigilante(Document):
 					"<b>{1}</b> vigilante(s). Não é possível adicionar mais."
 				).format(self.posto_de_vigilancia, max_vagas),
 				title=_("Posto no Limite Máximo"),
+			)
+
+	def _avisar_duplicado_por_documento(self):
+		"""
+		Non-blocking heads-up when this Vigilante shares an exact document number
+		with another record — a much stronger duplicate signal than a name match
+		(the form's live fuzzy-name hint, see buscar_vigilantes_similares in
+		api.py), so it's worth catching even outside the form UI (Data Import,
+		API-created records). Never blocks save — RH/Ops decide whether it's a
+		real duplicate or a coincidence (blank/placeholder document numbers).
+		"""
+		if not self.numero_documento:
+			return
+		outro = frappe.db.get_value(
+			"Vigilante",
+			{"numero_documento": self.numero_documento, "name": ["!=", self.name or "__new__"]},
+			["name", "nome_completo"],
+		)
+		if outro:
+			frappe.msgprint(
+				_("Atenção: já existe um vigilante com o mesmo número de documento — "
+				  "<b>{0}</b> ({1}). Verifique se não é um duplicado.").format(outro[1], outro[0]),
+				title=_("Possível Duplicado"),
+				indicator="orange",
+				alert=True,
 			)
 
 	# ─── Occupation tracking ───────────────────────────────────────────────────
