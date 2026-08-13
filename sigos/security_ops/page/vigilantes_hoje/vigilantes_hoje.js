@@ -64,6 +64,14 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		this.equipaColor = {};  // Turno Da Equipa name -> dot colour, shared across every posto (A is always the same colour everywhere)
 		this._dialogOpen = false;
 
+		// Same roster as Ausencias.json's own submit:1 permissions — mirrored here
+		// so the board's bulk-submit button only ever appears for someone who
+		// could already submit from the classic form (server re-checks anyway,
+		// this is just so the button isn't a dead end for everyone else).
+		this._podeSubmeter = frappe.user.has_role("Aprovador Operações")
+			|| frappe.user.has_role("SIGOS Manager")
+			|| frappe.user.has_role("System Manager");
+
 		this.THEME_KEY = "sigos_vhoje_theme";
 		this.theme = localStorage.getItem(this.THEME_KEY) || "light";
 		this.VIEW_KEY = "sigos_vhoje_view";
@@ -236,6 +244,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		this.$root.find(".vh-sum-done b").text(registados);
 		this.$root.find(".vh-sum-faltas b").text(faltasHoje);
 		this.$root.find(".vh-sum-vagas b").text(vagasAbertas);
+		this._atualizar_submit_btn();
 
 		const $wrap = this.$root.find(".vh-roster").empty();
 		const $empty = this.$root.find(".vh-empty");
@@ -1143,6 +1152,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 						</div>
 						<button class="vh-theme-btn" title="${__("Alternar tema")}">${this._icon("sun", "i-sun")}${this._icon("moon", "i-moon")}</button>
 						<button class="vh-refresh-btn">${__("Actualizar")}</button>
+						${this._podeSubmeter ? `<button class="vh-submit-btn" style="display:none">${__("Submeter Folhas")} <span class="vh-submit-count"></span></button>` : ""}
 					</div>
 				</div>
 
@@ -1238,6 +1248,62 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		}, 200));
 		this.$root.find(".vh-refresh-btn").on("click", () => this.refresh());
 		this.$root.find(".vh-theme-btn").on("click", () => this._toggle_theme());
+		this.$root.find(".vh-submit-btn").on("click", () => this._submeter_folhas());
+	}
+
+	// ============================================================ SUBMIT
+	// Distinct draft Ausencias sheets behind what's currently on screen —
+	// each roster row already carries ja_ausencia_doc/ja_registado_estado from
+	// _marcar_ja_registados (api.py), so no extra round trip is needed just to
+	// know what's pending.
+	_folhas_pendentes() {
+		const nomes = this.rows
+			.filter((r) => r.ja_ausencia_doc && r.ja_registado_estado === "Rascunho")
+			.map((r) => r.ja_ausencia_doc);
+		return [...new Set(nomes)];
+	}
+
+	_atualizar_submit_btn() {
+		const $btn = this.$root.find(".vh-submit-btn");
+		if (!$btn.length) return; // hidden entirely for users without submit rights
+		const pendentes = this._folhas_pendentes();
+		$btn.toggle(pendentes.length > 0);
+		$btn.find(".vh-submit-count").text(pendentes.length ? `(${pendentes.length})` : "");
+	}
+
+	_submeter_folhas() {
+		const pendentes = this._folhas_pendentes();
+		if (!pendentes.length) return;
+
+		frappe.confirm(
+			__("Submeter {0} folha(s) de ausências em rascunho ({1})? Isto fecha-as para edição — só o formulário Ausencias poderá alterá-las depois.",
+				[pendentes.length, pendentes.join(", ")]),
+			() => {
+				frappe.call({
+					method: "sigos.api.submeter_folhas_ausencias",
+					args: { docs: pendentes },
+					freeze: true,
+					freeze_message: __("A submeter…"),
+				}).then((r) => {
+					const { submetidas = [], falhas = [] } = r.message || {};
+					if (submetidas.length) {
+						frappe.show_alert({
+							message: __("{0} folha(s) submetida(s): {1}", [submetidas.length, submetidas.join(", ")]),
+							indicator: "green",
+						}, 6);
+					}
+					if (falhas.length) {
+						const detalhe = falhas.map((f) => `<li><b>${frappe.utils.escape_html(f.doc)}</b> — ${frappe.utils.escape_html(f.razao)}</li>`).join("");
+						frappe.msgprint({
+							title: __("Algumas folhas não foram submetidas"),
+							indicator: "orange",
+							message: `<ul>${detalhe}</ul>`,
+						});
+					}
+					this.refresh();
+				});
+			}
+		);
 	}
 
 	_populate_posto_filter() {
@@ -1336,8 +1402,11 @@ sigos.VigilantesHoje = class VigilantesHoje {
 .vh-theme-btn .i-moon { display:none; }
 .sigos-vhoje.theme-dark .vh-theme-btn .i-sun { display:none; }
 .sigos-vhoje.theme-dark .vh-theme-btn .i-moon { display:block; }
-.vh-refresh-btn { font-size:13px; padding:11px 16px; }
+.vh-refresh-btn, .vh-submit-btn { font-size:13px; padding:11px 16px; }
 .vh-theme-btn:hover, .vh-refresh-btn:hover { border-color:var(--accent); color:var(--accent); }
+.vh-submit-btn { background:var(--done); border-color:var(--done); color:#fff; }
+.vh-submit-btn:hover { filter:brightness(1.08); }
+.vh-submit-btn .vh-submit-count { font-family:var(--mono); opacity:.85; }
 
 .vh-bar { background:var(--paper2); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--shadow);
   padding:14px 16px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:16px; }

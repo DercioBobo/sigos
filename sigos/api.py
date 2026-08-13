@@ -1210,6 +1210,58 @@ def marcar_ausencia_rapida(
 
 
 @frappe.whitelist()
+def submeter_folhas_ausencias(docs):
+	"""
+	Bulk "submit" action for the Vigilantes de Hoje board: takes every distinct
+	draft Ausencias sheet touched by what's currently on screen and closes each
+	one out — a customer with no Workflow attached to Ausencias gets a straight
+	docstatus submit(); a customer with one (Rascunho/Pendente/Aprovado, or any
+	other shape — Workflow config is per-customer, not a code constant) gets the
+	single available transition applied instead, mirroring Ausencias.js's own
+	_tem_workflow/_cta_click detection. Never uses ignore_permissions — each doc
+	goes through the normal submit/workflow permission check for the calling
+	user, so a sheet they can't act on fails for that sheet alone, everything
+	else in the batch still goes through.
+	"""
+	frappe.only_for(PAPEIS_INTERNOS)
+	import json
+	from frappe.model.workflow import apply_workflow, get_transitions
+
+	if isinstance(docs, str):
+		docs = json.loads(docs)
+
+	tem_workflow = frappe.get_meta("Ausencias").has_field("workflow_state")
+
+	submetidas, falhas = [], []
+	for nome in dict.fromkeys(docs or []):  # de-dup, preserve order
+		if not nome or not frappe.db.exists("Ausencias", nome):
+			continue
+		try:
+			doc = frappe.get_doc("Ausencias", nome)
+			if doc.docstatus != 0:
+				continue  # already submitted/cancelled — nothing to do
+
+			if tem_workflow:
+				transicoes = get_transitions(doc)
+				if not transicoes:
+					falhas.append({"doc": nome, "razao": _("Sem ação de workflow disponível para si nesta folha.")})
+					continue
+				if len(transicoes) > 1:
+					falhas.append({"doc": nome, "razao": _("Mais do que uma ação possível — use o formulário Ausencias.")})
+					continue
+				apply_workflow(doc, transicoes[0]["action"])
+			else:
+				doc.submit()
+			submetidas.append(nome)
+		except frappe.PermissionError:
+			falhas.append({"doc": nome, "razao": _("Sem permissão para submeter esta folha.")})
+		except Exception as e:
+			falhas.append({"doc": nome, "razao": str(e)})
+
+	return {"submetidas": submetidas, "falhas": falhas}
+
+
+@frappe.whitelist()
 def remover_marca_ausencia(ausencia_doc, ausencia_row):
 	"""
 	Undo one guard's mark from a draft Ausencias sheet (Vigilantes de Hoje's
