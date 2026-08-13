@@ -18,6 +18,9 @@ frappe.pages["diretorio-colaboradores"].on_page_show = function (wrapper) {
 };
 
 const DC_MESES_PT = ["", "Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+// Must match sigos.api.get_employee_directory's limit_page_length — used here only
+// to detect "there may be more" and warn, not to enforce the cap itself.
+const DC_LIST_LIMIT = 500;
 
 sigos.DiretorioColaboradores = class DiretorioColaboradores {
 	constructor(page, wrapper) {
@@ -35,8 +38,16 @@ sigos.DiretorioColaboradores = class DiretorioColaboradores {
 		this.refresh();
 	}
 
+	// Re-entering the page (on_page_show) also re-syncs selection from the route —
+	// this is what makes a bookmarked/shared #diretorio-colaboradores/EMP-0001 link
+	// (and browser back/forward between two employees) actually restore the profile,
+	// not just the list. The route is a mirror of `selected`, never its driver: a
+	// row click sets `selected` first and pushes the route as a side effect, so this
+	// sync is idempotent (set_route to the already-active route is a no-op).
 	refresh() {
 		this._load_list();
+		const routeEmp = frappe.get_route()[1];
+		if (routeEmp && routeEmp !== this.selected) this._select(routeEmp);
 	}
 
 	// ───────────────────────────────────────────────────────── shell + controls
@@ -130,7 +141,15 @@ sigos.DiretorioColaboradores = class DiretorioColaboradores {
 	}
 
 	_render_rows() {
-		this.$count.text(__("{0} colaborador(es)", [this.employees.length]));
+		// get_employee_directory silently caps at DC_LIST_LIMIT — at that exact count
+		// there's no way to tell "exactly 500 people" from "500+, rest hidden", so
+		// warn either way rather than implying it's a complete, trustworthy total.
+		const atLimit = this.employees.length >= DC_LIST_LIMIT;
+		this.$count
+			.toggleClass("at-limit", atLimit)
+			.text(atLimit
+				? __("{0}+ colaborador(es) — refine a pesquisa", [DC_LIST_LIMIT])
+				: __("{0} colaborador(es)", [this.employees.length]));
 		if (!this.employees.length) {
 			this.$rows.html(`<div class="dc-list-msg">${__("Nenhum colaborador encontrado.")}</div>`);
 			return;
@@ -159,6 +178,7 @@ sigos.DiretorioColaboradores = class DiretorioColaboradores {
 		this.selected = name;
 		this.activeTab = "faltas";
 		this.historico = null;   // lazy-loaded per employee, see _render_tab_body
+		frappe.set_route("diretorio-colaboradores", name);
 		this.$rows.find(".dc-row").removeClass("is-active");
 		this.$rows.find(`[data-emp="${name}"]`).addClass("is-active");
 		this.$profile.html(`<div class="dc-list-msg">${__("A carregar perfil…")}</div>`);
@@ -197,20 +217,25 @@ sigos.DiretorioColaboradores = class DiretorioColaboradores {
 					<a class="dc-open-link" href="${frappe.utils.get_form_link("Employee", data.employee)}" target="_blank">${__("Abrir Employee")} ${_dc_icon_arrow()}</a>
 				</div>
 				<div class="dc-kpis">
-					${_dc_kpi(__("Faltas Este Mês"), data.vigilante ? data.faltas.mes_atual : "—", "aus")}
-					${_dc_kpi(__("Saldo de Férias"), _dc_ferias_resumo(data.ferias), "fer")}
-					${_dc_kpi(__("Salário Base"), format_currency(data.salario.base_resolvida), "sal")}
-					${_dc_kpi(__("Deduções/Empréstimos"), _dc_deducoes_resumo(data), "ded")}
+					${_dc_kpi(__("Faltas Este Mês"), data.vigilante ? data.faltas.mes_atual : "—", "aus",
+						data.vigilante ? _dc_delta_chip(data.faltas.mes_atual - data.faltas.mes_anterior, true) : "",
+						data.vigilante ? __("vs {0} no mês anterior", [data.faltas.mes_anterior]) : "")}
+					${_dc_kpi(__("Saldo de Férias"), _dc_ferias_resumo(data.ferias), "fer", "",
+						(data.ferias || []).length === 1 ? __("dias disponíveis") : "")}
+					${_dc_kpi(__("Salário Base"), format_currency(data.salario.base_resolvida), "sal", "",
+						data.salario.ssa_atual ? __("desde {0}", [frappe.datetime.str_to_user(data.salario.ssa_atual.from_date)]) : "")}
+					${_dc_kpi(__("Deduções/Empréstimos"), _dc_deducoes_resumo(data), "ded", "",
+						__("{0} dedução(ões) · {1} empréstimo(s)", [(data.deducoes || []).length, (data.emprestimos || []).length]))}
 				</div>
 				<div class="dc-actions">
-					<button type="button" class="dc-act" data-act="salario">${__("Definir Salário")}</button>
-					<button type="button" class="dc-act" data-act="deducao">${__("Nova Dedução")}</button>
-					<button type="button" class="dc-act" data-act="emprestimo">${__("Novo Empréstimo")}</button>
-					<button type="button" class="dc-act" data-act="remuneracao">${__("Novo Provento")}</button>
-					<button type="button" class="dc-act" data-act="reclamacao">${__("Nova Reclamação")}</button>
-					<button type="button" class="dc-act dc-act-ghost" data-act="participacao">${__("Nova Participação")}</button>
-					<button type="button" class="dc-act dc-act-ghost" data-act="processo">${__("Novo Processo Disciplinar")}</button>
-					<button type="button" class="dc-act dc-act-ghost" data-act="rotatividade">${__("Nova Rotatividade")}</button>
+					${_dc_act_btn("salario", __("Definir Salário"), false, !data.vigilante)}
+					${_dc_act_btn("deducao", __("Nova Dedução"), false, false)}
+					${_dc_act_btn("emprestimo", __("Novo Empréstimo"), false, false)}
+					${_dc_act_btn("remuneracao", __("Novo Provento"), false, false)}
+					${_dc_act_btn("reclamacao", __("Nova Reclamação"), false, false)}
+					${_dc_act_btn("participacao", __("Nova Participação"), true, !data.vigilante)}
+					${_dc_act_btn("processo", __("Novo Processo Disciplinar"), true, !data.vigilante)}
+					${_dc_act_btn("rotatividade", __("Nova Rotatividade"), true, !data.vigilante)}
 				</div>
 				<div class="dc-tabs">
 					${tabs.map(([k, l]) => `<button type="button" class="dc-tab ${k === this.activeTab ? "is-active" : ""}" data-tab="${k}">${l}</button>`).join("")}
@@ -322,6 +347,7 @@ sigos.DiretorioColaboradores = class DiretorioColaboradores {
 .dc-up { font-family:var(--body); text-transform:uppercase; letter-spacing:.12em; font-size:10px; color:var(--ink3); font-weight:600; margin-bottom:2px; }
 .dc-h1 { font-family:var(--display); font-weight:600; font-size:24px; line-height:1.1; letter-spacing:-.02em; margin:0; color:var(--ink); }
 .dc-count { font-size:12px; color:var(--ink3); font-weight:600; }
+.dc-count.at-limit { color:var(--amber); font-weight:700; }
 
 /* layout: list left, profile right */
 .dc-layout { display:grid; grid-template-columns:340px 1fr; gap:16px; align-items:start; }
@@ -370,18 +396,27 @@ sigos.DiretorioColaboradores = class DiretorioColaboradores {
 
 .dc-kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:16px; }
 .dc-kpi { background:var(--paper3); border:1px solid var(--line); border-radius:12px; padding:12px 14px; display:flex; flex-direction:column; gap:4px; min-width:0; }
+.dc-kpi-top { display:flex; align-items:center; justify-content:space-between; gap:6px; min-height:16px; }
 .dc-kpi-lbl { font-size:9.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--ink3); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .dc-kpi-val { font-family:var(--display); font-weight:600; font-size:22px; line-height:1.1; letter-spacing:-.02em; color:var(--ink); font-feature-settings:"tnum" 1; }
+.dc-kpi-sub { font-size:9.5px; color:var(--ink3); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .dc-kpi.tone-aus .dc-kpi-val { color:var(--bad); }
 .dc-kpi.tone-fer .dc-kpi-val { color:var(--good); }
 .dc-kpi.tone-sal .dc-kpi-val { color:var(--accentInk); }
 .dc-kpi.tone-ded .dc-kpi-val { color:var(--amber); }
+.dc-delta { font-family:var(--body); font-size:10px; font-weight:700; padding:1px 7px; border-radius:999px; white-space:nowrap; flex:none; }
+.dc-delta.good { color:var(--good); background:var(--goodWash); }
+.dc-delta.bad { color:var(--bad); background:var(--badWash); }
+.dc-delta.flat { color:var(--ink3); background:var(--paper3); }
 
 .dc-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
 .dc-act { font-family:var(--body); font-size:11.5px; font-weight:600; letter-spacing:.01em; border:1px solid var(--accent); background:var(--accent); color:#fff; padding:8px 14px; border-radius:9px; cursor:pointer; transition:.15s; }
 .dc-act:hover { background:var(--accentInk); border-color:var(--accentInk); }
 .dc-act-ghost { background:var(--paper2); color:var(--ink2); border-color:var(--line2); }
 .dc-act-ghost:hover { border-color:var(--accent); color:var(--accent); background:var(--paper2); }
+.dc-act-off { opacity:.42; }
+.dc-act-off:hover { background:var(--accent); border-color:var(--accent); }
+.dc-act-ghost.dc-act-off:hover { background:var(--paper2); border-color:var(--line2); color:var(--ink2); }
 
 .dc-tabs { display:flex; flex-wrap:wrap; gap:4px; margin-top:20px; border-bottom:1px solid var(--line); padding-bottom:0; }
 .dc-tab { font-family:var(--body); font-size:12px; font-weight:600; color:var(--ink3); background:transparent; border:none; border-bottom:2px solid transparent; padding:8px 4px; margin-right:14px; cursor:pointer; }
@@ -470,8 +505,32 @@ function _dc_deducoes_resumo(data) {
 	return linhas.length ? String(linhas.length) : "0";
 }
 
-function _dc_kpi(label, value, tone) {
-	return `<div class="dc-kpi tone-${tone}"><div class="dc-kpi-lbl">${label}</div><div class="dc-kpi-val">${value}</div></div>`;
+function _dc_kpi(label, value, tone, deltaHtml, sub) {
+	return `<div class="dc-kpi tone-${tone}">
+		<div class="dc-kpi-top"><span class="dc-kpi-lbl">${label}</span>${deltaHtml || ""}</div>
+		<div class="dc-kpi-val">${value}</div>
+		${sub ? `<span class="dc-kpi-sub">${sub}</span>` : ""}
+	</div>`;
+}
+
+// Operations Daylight's signature delta pill (same treatment as Painel Estatístico's
+// hero KPIs) — up/down arrow + magnitude, tone-coded. `invert` flips good/bad (a rise
+// in faltas is bad, not good, unlike a rise in headcount).
+function _dc_delta_chip(n, invert) {
+	if (!n) return `<span class="dc-delta flat">&plusmn;0</span>`;
+	const up = n > 0;
+	const good = invert ? !up : up;
+	return `<span class="dc-delta ${good ? "good" : "bad"}">${up ? "&#9650;" : "&#9660;"} ${Math.abs(n)}</span>`;
+}
+
+// Quick-action button — visually soft-disabled (not the native `disabled` attribute,
+// which blocks hover/title in some browsers) when its prerequisite (a linked
+// Vigilante) is missing. _run_action still guards the actual click as the real
+// safety net; this only avoids the round-trip-to-find-out for the common case.
+function _dc_act_btn(act, label, ghost, off) {
+	const cls = `dc-act${ghost ? " dc-act-ghost" : ""}${off ? " dc-act-off" : ""}`;
+	const title = off ? ` title="${__("Requer um Vigilante (SIGOS) associado")}"` : "";
+	return `<button type="button" class="${cls}" data-act="${act}"${title}>${frappe.utils.escape_html(label)}</button>`;
 }
 
 function _dc_empty_state(texto) {

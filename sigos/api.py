@@ -3014,11 +3014,15 @@ def get_employee_hr360(employee):
 	vigilante = emp.custom_vigilante
 	today = getdate(nowdate())
 	inicio_mes, fim_mes = get_first_day(today), get_last_day(today)
+	mes_ant = add_months(today, -1)
+	inicio_mes_ant, fim_mes_ant = get_first_day(mes_ant), get_last_day(mes_ant)
 
 	# ─── Faltas (Vigilante-keyed) ──────────────────────────────────────────────
-	faltas = {"mes_atual": 0, "recentes": []}
+	# mes_anterior feeds the Diretório profile's month-over-month delta pill.
+	faltas = {"mes_atual": 0, "mes_anterior": 0, "recentes": []}
 	if vigilante:
 		faltas["mes_atual"] = calcular_faltas_vigilante(vigilante, inicio_mes, fim_mes)
+		faltas["mes_anterior"] = calcular_faltas_vigilante(vigilante, inicio_mes_ant, fim_mes_ant)
 		detalhe = calcular_faltas_detalhado(vigilante, add_months(today, -3), today)
 		faltas["recentes"] = list(reversed(detalhe))[:15]
 
