@@ -3131,6 +3131,69 @@ def get_employee_disciplinar(employee):
 
 
 @frappe.whitelist()
+def get_employee_historico(employee):
+	"""
+	Full chronological history for the Diretório de Colaboradores' Histórico tab —
+	one place for "everything that makes a record" on a guard. Doesn't recompute
+	anything: every operational doctype that changes a guard's situation already
+	writes an Info Comment on the Vigilante via sigos.timeline.registar (see that
+	module's docstring for the full list — Rotatividade, Ausências, Participação,
+	Processo Disciplinar, Troca De Regime/Categoria, Demissão, Readmissão, Férias,
+	Turnos Extras, Alocação De Material...); this just reads that same feed back in
+	chronological order, bookended by a synthetic Admissão entry (data_admissao
+	isn't itself ever written as a timeline Comment) and a live "current status"
+	snapshot pulled straight off the Vigilante record — the natural "last thing
+	that happened" a free-text log entry can't be trusted to always spell out.
+	Capped at the 200 most recent entries — plenty for any guard's real history,
+	and keeps this fast for someone with years of tenure.
+	"""
+	frappe.only_for(PAPEIS_INTERNOS)
+	vigilante_name = frappe.db.get_value("Employee", employee, "custom_vigilante")
+	if not vigilante_name:
+		return {"vigilante": None, "eventos": [], "actual": None}
+
+	vig = frappe.db.get_value(
+		"Vigilante", vigilante_name,
+		["status", "data_admissao", "posto_de_vigilancia", "nome_do_projecto",
+		 "regime_do_vigilante", "categoria", "delegacao", "cliente"],
+		as_dict=True,
+	)
+
+	eventos = []
+	if vig.data_admissao:
+		eventos.append({"data": vig.data_admissao, "texto": _("Admissão do vigilante.")})
+
+	comentarios = frappe.get_all(
+		"Comment",
+		filters={"reference_doctype": "Vigilante", "reference_name": vigilante_name, "comment_type": "Info"},
+		fields=["content", "creation"],
+		order_by="creation desc",
+		limit=200,
+	)
+	for c in reversed(comentarios):
+		eventos.append({"data": c.creation, "texto": c.content})
+
+	posto_nome = (
+		frappe.db.get_value("Posto De Vigilancia", vig.posto_de_vigilancia, "nome_do_posto")
+		if vig.posto_de_vigilancia else None
+	)
+
+	return {
+		"vigilante": vigilante_name,
+		"eventos": eventos,
+		"actual": {
+			"status": vig.status,
+			"posto": posto_nome,
+			"projecto": vig.nome_do_projecto,
+			"regime": vig.regime_do_vigilante,
+			"categoria": vig.categoria,
+			"delegacao": vig.delegacao,
+			"cliente": vig.cliente,
+		},
+	}
+
+
+@frappe.whitelist()
 def get_employee_directory(filters=None):
 	"""
 	Lightweight, filterable/searchable Employee list for the Diretório de
