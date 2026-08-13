@@ -164,7 +164,7 @@
   {
    "fieldname": "motivo",
    "fieldtype": "Select",
-   "label": "Motivo",
+   "label": "Tipo de Rotatividade",
    "options": "\nTransferência\nReserva\nDemissão\nDisciplinar\nOutro",
    "in_list_view": 1
   },
@@ -271,13 +271,13 @@
   {
    "fieldname": "motivo_3meses",
    "fieldtype": "Small Text",
-   "label": "Motivo (< 3 Meses)",
+   "label": "Justificação (Antes do Prazo Mínimo)",
    "read_only": 1
   },
   {
    "fieldname": "motivo_rotatividade",
    "fieldtype": "Small Text",
-   "label": "Motivo de Continuar com a Rotatividade",
+   "label": "Justificação da Rotatividade",
    "read_only": 1,
    "reqd": 1
   },
@@ -292,7 +292,7 @@
    "fieldname": "motiv_demi",
    "fieldtype": "Select",
    "label": "Motivo de Demissão",
-   "options": "\nAbandono\nRescisão\nOutro"
+   "options": "\nAbandono\nRescisão\nDisciplinar\nFim de Contrato\nOutro"
   },
   {
    "fieldname": "uniforme",

@@ -210,7 +210,7 @@ class Rotatividade(Document):
 			frappe.throw(
 				_("Está a transferir o vigilante para um posto de <b>outro contrato</b> "
 				  "(<b>{0}</b> → <b>{1}</b>). Justifique a transferência no campo "
-				  "<b>Motivo de Continuar com a Rotatividade</b>.").format(old_proj, new_proj),
+				  "<b>Justificação da Rotatividade</b>.").format(old_proj, new_proj),
 				title=_("Transferência Entre Contratos"),
 			)
 
@@ -237,48 +237,57 @@ class Rotatividade(Document):
 		"""Guard must have spent N days at the post before rotating, unless motivo_3meses is filled."""
 		if not self.vigilante:
 			return
-		# Involuntary moves (demissão / posto closed → reserva) aren't churn — exempt.
 		op = self._get_operacao()
-		if op and (op.demite or op.get("enviar_reserva")):
-			return
+		info = regra_3meses_info(self.vigilante, op, excluir_doc=self.name)
 
-		dias_minimos = (
-			frappe.db.get_single_value("SIGOS Settings", "dias_minimos_rotatividade") or 90
-		)
-
-		# Last applied rotation for this guard (submitted = applied; workflow-agnostic)
-		ultima = frappe.get_all(
-			"Rotatividade",
-			filters={
-				"vigilante": self.vigilante,
-				"docstatus": 1,
-				"name": ["!=", self.name],
-			},
-			fields=["data"],
-			order_by="data desc",
-			limit=1,
-		)
-
-		data_base = getdate(ultima[0].data) if ultima else None
-
-		if not data_base:
-			data_base_raw = frappe.db.get_value("Vigilante", self.vigilante, "data_admissao")
-			data_base = getdate(data_base_raw) if data_base_raw else None
-
-		if not data_base:
-			return  # No reference date — allow rotation
-
-		diff = date_diff(today(), data_base)
-
-		if diff < dias_minimos and not self.motivo_3meses:
+		if info["aplica"] and not self.motivo_3meses:
 			frappe.throw(
 				_("O vigilante <b>{0}</b> ainda não completou <b>{1}</b> dias desde a última "
 				  "rotatividade/admissão (<b>{2}</b>). Faltam <b>{3}</b> dias. "
-				  "Preencha o campo <b>Motivo de Rotatividade Antes de 3 Meses</b> para continuar.").format(
+				  "Preencha o campo <b>Justificação (Antes do Prazo Mínimo)</b> para continuar.").format(
 					self.vigilante,
-					dias_minimos,
-					data_base,
-					dias_minimos - diff,
+					info["dias_minimos"],
+					info["data_base"],
+					info["dias_restantes"],
 				),
 				title=_("Regra dos 3 Meses"),
 			)
+
+
+def regra_3meses_info(vigilante, op=None, excluir_doc=None):
+	"""
+	Whether Rotatividade.motivo_3meses is actually required for this vigilante +
+	operação, and how many days remain if so. One source of truth shared by
+	Rotatividade._validar_regra_3meses (throws on submit), the wizard's dry-run
+	preview (sigos.api.preview_rotatividade) and the wizard's own field-visibility
+	check (sigos.api.rotatividade_regra_3meses) — so the field's shown/hidden state
+	always agrees with what submit will actually enforce.
+	"""
+	# Involuntary moves (demissão / posto closed → reserva) aren't churn — exempt.
+	if op and (op.demite or op.get("enviar_reserva")):
+		return {"aplica": False}
+
+	dias_minimos = frappe.db.get_single_value("SIGOS Settings", "dias_minimos_rotatividade") or 90
+
+	# Last applied rotation for this guard (submitted = applied; workflow-agnostic)
+	filters = {"vigilante": vigilante, "docstatus": 1}
+	if excluir_doc:
+		filters["name"] = ["!=", excluir_doc]
+	ultima = frappe.get_all(
+		"Rotatividade", filters=filters, fields=["data"], order_by="data desc", limit=1,
+	)
+
+	data_base = getdate(ultima[0].data) if ultima else None
+	if not data_base:
+		data_base_raw = frappe.db.get_value("Vigilante", vigilante, "data_admissao")
+		data_base = getdate(data_base_raw) if data_base_raw else None
+	if not data_base:
+		return {"aplica": False}  # No reference date — allow rotation
+
+	diff = date_diff(today(), data_base)
+	return {
+		"aplica": diff < dias_minimos,
+		"dias_restantes": max(dias_minimos - diff, 0),
+		"dias_minimos": dias_minimos,
+		"data_base": data_base,
+	}

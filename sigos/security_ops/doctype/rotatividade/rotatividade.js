@@ -210,7 +210,7 @@ function _summary_mode(frm, mode) {
 		// still be sitting in docData even after backing up and picking a different,
 		// non-demissão op. Only show it when this really was a demissão.
 		return `
-			${d.motivo ? `<div class="rotw-block"><div class="rotw-block-h">${__("Motivo")}</div>
+			${d.motivo ? `<div class="rotw-block"><div class="rotw-block-h">${__("Tipo de Rotatividade")}</div>
 				<div class="rotw-sub">${frappe.utils.escape_html(d.motivo)}${(souDemissao && d.motiv_demi) ? " · " + frappe.utils.escape_html(d.motiv_demi) : ""}${(souDemissao && d.data_de_demissao) ? " · " + __("Demissão em") + " " + (frappe.datetime.str_to_user(d.data_de_demissao) || "") : ""}</div></div>` : ""}
 			${d.motivo_rotatividade ? `<div class="rotw-block"><div class="rotw-block-h">${__("Justificação")}</div>
 				<div class="rotw-sub">${frappe.utils.escape_html(d.motivo_rotatividade)}</div></div>` : ""}`;

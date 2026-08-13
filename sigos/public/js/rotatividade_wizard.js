@@ -242,7 +242,7 @@ sigos.build_rotatividade_wizard = function (opts) {
 		}
 		if (key === "preview") {
 			if (!S.motivo_rotatividade || !S.motivo_rotatividade.trim()) {
-				_toast(__("Indique o motivo para continuar com a rotatividade."));
+				_toast(__("Indique a justificação da rotatividade."));
 				return false;
 			}
 		}
@@ -274,7 +274,7 @@ sigos.build_rotatividade_wizard = function (opts) {
 					${(S.flags.demite || S.motivo === "Demissão")
 						? `<div class="rotw2-field"><label>${__("Data de Demissão")}</label><div id="ctrl-data_de_demissao"></div></div>` : ""}
 				</div>
-				<div class="rotw2-field"><label class="rotw2-req">${__("Motivo de Continuar com a Rotatividade")}</label><div id="ctrl-motivo_rotatividade"></div></div>
+				<div class="rotw2-field"><label class="rotw2-req">${__("Justificação da Rotatividade")}</label><div id="ctrl-motivo_rotatividade"></div></div>
 			</div>`;
 
 		const last = S.step >= steps.length - 1;
@@ -393,12 +393,16 @@ sigos.build_rotatividade_wizard = function (opts) {
 			<div class="rotw-sec-num">${__("O que muda para")} <b>${frappe.utils.escape_html(S.vig.nome_completo || S.vig.name)}</b></div>
 			${reservaNote}
 			<div class="rotw2-changes">${rows.join("") || (S.flags.enviar_reserva ? "" : `<div class="rotw-none">${__("Esta operação não altera posto ou regime directamente.")}</div>`)}</div>
-			<div class="rotw2-field"><label>${__("Motivo")}</label><div id="ctrl-motivo"></div></div>
+			<div class="rotw2-field"><label>${__("Tipo de Rotatividade")}</label><div id="ctrl-motivo"></div></div>
 			<div id="rotw-demfields" style="${demite ? "" : "display:none"}">
 				<div class="rotw2-field"><label>${__("Motivo de Demissão")}</label><div id="ctrl-motiv_demi"></div></div>
 				<div class="rotw2-field"><label>${__("Uniforme")}</label><div id="ctrl-uniforme"></div></div>
 			</div>
-			<div class="rotw2-field"><label>${__("Justificação (se antes do mínimo de dias)")}</label><div id="ctrl-motivo_3meses"></div></div>`;
+			<div id="rotw-just3m" class="rotw2-field" style="display:none">
+				<label>${__("Justificação (Antes do Prazo Mínimo)")}</label>
+				<div class="rotw2-hint" style="padding:0 0 6px">${__("Este vigilante ainda não completou o intervalo mínimo desde a última rotatividade/admissão.")}</div>
+				<div id="ctrl-motivo_3meses"></div>
+			</div>`;
 	}
 	function _changeRow(label, from, fieldname) {
 		return `<div class="rotw2-change-row">
@@ -417,9 +421,35 @@ sigos.build_rotatividade_wizard = function (opts) {
 			const demite = S.flags.demite || S.motivo === "Demissão";
 			$body().find("#rotw-demfields").toggle(!!demite);
 		});
-		_mountSelect("motiv_demi", "\nFim de Contrato\nAbandono\nJusta Causa\nAcordo Mútuo\nOutro");
+		_mountSelect("motiv_demi", "\nAbandono\nRescisão\nDisciplinar\nFim de Contrato\nOutro");
 		_mountSelect("uniforme", "\nEntregue\nNão Entregue");
-		_mountSmallText("motivo_3meses");
+		// Fill-once: when this is present, it's almost always answering the same
+		// "why" as the always-required Justificação da Rotatividade too — pre-fill
+		// that with it so the user isn't asked to explain the same thing twice. Only
+		// when the target is still empty — never overwrites something already typed.
+		_mountSmallText("motivo_3meses", () => {
+			if (S.motivo_3meses && !S.motivo_rotatividade) S.motivo_rotatividade = S.motivo_3meses;
+		});
+		_atualizarJustificacao3Meses();
+	}
+
+	// Only show the "before the minimum interval" justification when it actually
+	// applies (same rule the server enforces on submit) — otherwise it sat there
+	// unconditionally, indistinguishable from the always-required Justificação da
+	// Rotatividade in the next step, which was the whole source of the confusion.
+	function _atualizarJustificacao3Meses() {
+		S._regra3m = null;
+		const $box = $body().find("#rotw-just3m");
+		$box.hide();
+		if (!S.vig || !S.op) return;
+		frappe.call({
+			method: "sigos.api.rotatividade_regra_3meses",
+			args: { vigilante: S.vig.name, abreviatura_op: S.op.name },
+			callback: (r) => {
+				S._regra3m = r.message || { aplica: false };
+				$body().find("#rotw-just3m").toggle(!!S._regra3m.aplica);
+			},
+		});
 	}
 
 	// ════════ STEP 3 — Substituto ════════
@@ -452,8 +482,12 @@ sigos.build_rotatividade_wizard = function (opts) {
 
 	// ── shared: guard search + result rows + chosen card ──
 	function _searchGuards(txt, $res, soSub, onPick) {
-		// Main guard comes from the reserve pool for a "Destacar da Reserva" op; else Activo.
-		const status = soSub ? "Activo" : (S.flags.de_reserva ? "Reserva" : "Activo");
+		// Main guard comes from the reserve pool for a "Destacar da Reserva" op; a
+		// Demissão can apply to either an active or a benched (Reserva) guard; else Activo.
+		const status = soSub ? "Activo"
+			: S.flags.de_reserva ? "Reserva"
+			: S.flags.demite ? ["Activo", "Reserva"]
+			: "Activo";
 		frappe.call({
 			method: "sigos.api.search_vigilantes_rich",
 			args: { txt, status, delegacao: (soSub && S.vig) ? S.vig.delegacao : null,
@@ -515,9 +549,9 @@ sigos.build_rotatividade_wizard = function (opts) {
 		if (S[fieldname]) ctrl.set_value(S[fieldname]);
 		controls[fieldname] = ctrl;
 	}
-	function _mountSmallText(fieldname) {
+	function _mountSmallText(fieldname, onchange) {
 		const ctrl = frappe.ui.form.make_control({
-			df: { fieldtype: "Small Text", fieldname, onchange: () => { S[fieldname] = ctrl.get_value(); } },
+			df: { fieldtype: "Small Text", fieldname, onchange: () => { S[fieldname] = ctrl.get_value(); onchange && onchange(); } },
 			parent: $body().find(`#ctrl-${fieldname}`), render_input: true,
 		});
 		if (S[fieldname]) ctrl.set_value(S[fieldname]);
@@ -574,7 +608,7 @@ sigos.build_rotatividade_wizard = function (opts) {
 			motivo: S.motivo,
 			motiv_demi: demite ? S.motiv_demi : null,
 			uniforme: demite ? S.uniforme : null,
-			motivo_3meses: S.motivo_3meses,
+			motivo_3meses: (S._regra3m && S._regra3m.aplica) ? S.motivo_3meses : null,
 			data_de_demissao: demite ? S.data_de_demissao : null,
 			motivo_rotatividade: S.motivo_rotatividade,
 		};

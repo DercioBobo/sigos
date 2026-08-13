@@ -2249,14 +2249,31 @@ def preview_rotatividade(vigilante, abreviatura_op=None, novo_posto=None, novo_r
 		cat_sub = frappe.db.get_value("Vigilante", novo_vigilante, "categoria")
 		if cat_vig and cat_sub and cat_vig != cat_sub:
 			out["avisos"].append("Categorias diferentes ({0} vs {1}) — faça primeiro uma Troca De Categoria.".format(cat_vig, cat_sub))
-	dias_min = frappe.db.get_single_value("SIGOS Settings", "dias_minimos_rotatividade") or 90
-	base = frappe.db.get_value("Vigilante", vigilante, "data_admissao")
-	if base and not motivo_3meses:
-		from frappe.utils import date_diff, today as _today
-		if date_diff(_today(), base) < dias_min:
-			out["avisos"].append("Vigilante ainda não completou {0} dias desde a admissão — exige justificação.".format(dias_min))
+	from sigos.security_ops.doctype.rotatividade.rotatividade import regra_3meses_info
+	info = regra_3meses_info(vigilante, op)
+	if info["aplica"] and not motivo_3meses:
+		out["avisos"].append(
+			"Vigilante ainda não completou {0} dias desde a última rotatividade/admissão — "
+			"exige justificação ({1} dia(s) em falta).".format(info["dias_minimos"], info["dias_restantes"])
+		)
 
 	return out
+
+
+@frappe.whitelist()
+def rotatividade_regra_3meses(vigilante, abreviatura_op=None):
+	"""Whether the wizard's 'Justificação (Antes do Prazo Mínimo)' field is actually
+	needed for this vigilante + operação — lets the Mudanças step show it only when
+	it applies, instead of unconditionally next to the always-required Justificação
+	da Rotatividade (the confusion that prompted this endpoint)."""
+	frappe.only_for(PAPEIS_INTERNOS)
+	from sigos.security_ops.doctype.rotatividade.rotatividade import regra_3meses_info
+
+	op = None
+	if abreviatura_op and frappe.db.exists("Operacao De Rotatividade", abreviatura_op):
+		op = frappe.get_doc("Operacao De Rotatividade", abreviatura_op)
+	info = regra_3meses_info(vigilante, op)
+	return {"aplica": info["aplica"], "dias_restantes": info.get("dias_restantes", 0)}
 
 
 @frappe.whitelist()
@@ -2271,6 +2288,10 @@ def search_vigilantes_rich(txt="", status="Activo", delegacao=None, excluir=None
 		# We surface guards in Reserva and never pull one from an active posto. Categoria-
 		# match to the vacancy is enforced at submit (see _validar_substituto_categoria).
 		cond.append("v.status = 'Reserva'")
+	elif isinstance(status, (list, tuple)):
+		# e.g. Demissão applies to both Activo and Reserva guards — the wizard passes
+		# a list rather than a single exact status in that case.
+		cond.append("v.status IN %(status)s"); params["status"] = tuple(status)
 	else:
 		cond.append("v.status = %(status)s"); params["status"] = status
 	if delegacao:
