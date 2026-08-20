@@ -2463,8 +2463,9 @@ def _aplicar_salario_base_vigilante(v, estrutura, from_date):
 
 	# Effective date of the assignment. The FIRST SSA must start at the employee's
 	# date_of_joining so the joining-month salary slip can be generated; later changes
-	# (raises) take effect at the change date passed in (today). It can never be before
-	# the joining date — ERPNext rejects an SSA from_date earlier than date_of_joining.
+	# (raises) take effect at the caller-supplied from_date (defaults to the 1st of the
+	# current month — see aplicar_salario_base). It can never be before the joining
+	# date — ERPNext rejects an SSA from_date earlier than date_of_joining.
 	doj, company = frappe.db.get_value("Employee", funcionario, ["date_of_joining", "company"])
 	efetiva = from_date if existing else (doj or from_date)
 	if doj and getdate(efetiva) < getdate(doj):
@@ -2509,16 +2510,26 @@ def _aplicar_salario_base_vigilante(v, estrutura, from_date):
 
 
 @frappe.whitelist()
-def aplicar_salario_base(project=None, vigilante=None, vigilantes=None, silent=False):
+def aplicar_salario_base(project=None, vigilante=None, vigilantes=None, silent=False, from_date=None):
 	"""
 	Assign the resolved base salary to the Salary Structure Assignment of every
 	active vigilante on a contract (Project), a single vigilante, or an explicit
 	list of vigilantes. Used by the Project button (bulk), onboarding (single,
 	silent), and the Ajuste de Salários page (filtered bulk). Idempotent.
+
+	from_date is the SSA's effective date for anyone who ALREADY has one (a raise);
+	it's ignored for a guard's first-ever SSA, which always starts at date_of_joining
+	(see _aplicar_salario_base_vigilante). Defaults to the 1st of the current month
+	rather than today — a change dated mid-month only prorates from that day onward
+	(partial-month proration), so applying it today would silently short the rest of
+	the current payroll period. Callers who want a genuine mid-month effective date
+	(e.g. a raise negotiated to start on the 15th) pass an explicit from_date.
 	"""
 	frappe.only_for(PAPEIS_SALARIO)
-	from frappe.utils import today
+	from frappe.utils import get_first_day, getdate, today
 	import json as _json
+
+	from_date = getdate(from_date) if from_date else getdate(get_first_day(today()))
 
 	estrutura = frappe.db.get_single_value("SIGOS Settings", "estrutura_salarial_padrao")
 	if not estrutura:
@@ -2551,7 +2562,7 @@ def aplicar_salario_base(project=None, vigilante=None, vigilantes=None, silent=F
 	ignorados = []
 	for v in vigs:
 		try:
-			status, detalhe = _aplicar_salario_base_vigilante(v, estrutura, today())
+			status, detalhe = _aplicar_salario_base_vigilante(v, estrutura, from_date)
 		except Exception as e:
 			status, detalhe = "ignorado", _("{0}: erro — {1}").format(v.get("name"), e)
 			frappe.log_error(f"aplicar_salario_base {v.get('name')}: {e}", "SIGOS Salario Base")

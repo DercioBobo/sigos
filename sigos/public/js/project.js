@@ -21,25 +21,44 @@ frappe.ui.form.on("Project", {
 		}
 
 		frm.add_custom_button(__("Aplicar Salário Base"), () => {
-			frappe.warn(
-				__("Aplicar Salário Base"),
-				__(
-					"Isto vai atribuir o salário base (por regime, definido neste contrato) " +
-					"a todos os vigilantes <b>Activos</b> deste contrato, criando/actualizando " +
-					"a respectiva Salary Structure Assignment.<br><br>" +
-					"Vigilantes com <b>Salário Base (manual)</b> mantêm o valor manual. Continuar?"
-				),
-				() => {
+			const d = new frappe.ui.Dialog({
+				title: __("Aplicar Salário Base"),
+				fields: [
+					{
+						fieldname: "aviso",
+						fieldtype: "HTML",
+						options: `<p>${__(
+							"Isto vai atribuir o salário base (por regime, definido neste contrato) " +
+							"a todos os vigilantes <b>Activos</b> deste contrato, criando/actualizando " +
+							"a respectiva Salary Structure Assignment.<br><br>" +
+							"Vigilantes com <b>Salário Base (manual)</b> mantêm o valor manual."
+						)}</p>`,
+					},
+					{
+						fieldname: "from_date",
+						label: __("Data de Efeito"),
+						fieldtype: "Date",
+						reqd: 1,
+						default: frappe.datetime.month_start(),
+						description: __(
+							"Para quem já tem Salary Structure Assignment (ajuste, não 1ª atribuição). " +
+							"Use o 1º dia do mês para que a folha do mês inteiro reflicta o novo valor " +
+							"— uma data a meio do mês só se aplica a partir desse dia em diante."
+						),
+					},
+				],
+				primary_action_label: __("Aplicar"),
+				primary_action(vals) {
+					d.hide();
 					frappe.call({
 						method: "sigos.api.aplicar_salario_base",
-						args: { project: frm.doc.name },
+						args: { project: frm.doc.name, from_date: vals.from_date },
 						freeze: true,
 						freeze_message: __("A atribuir salário base…"),
 					});
 				},
-				__("Aplicar"),
-				true
-			);
+			});
+			d.show();
 		}, __("SIGOS"));
 	},
 });
