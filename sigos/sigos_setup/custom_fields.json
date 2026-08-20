@@ -472,11 +472,21 @@
   "doctype": "Custom Field",
   "dt": "Payroll Entry",
   "module": "SIGOS Setup",
+  "fieldname": "custom_customer_group",
+  "fieldtype": "Link",
+  "options": "Customer Group",
+  "label": "Filtrar por Grupo de Cliente",
+  "insert_after": "custom_delegacao"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Payroll Entry",
+  "module": "SIGOS Setup",
   "fieldname": "custom_customer",
   "fieldtype": "Link",
   "options": "Customer",
   "label": "Filtrar por Cliente",
-  "insert_after": "custom_delegacao"
+  "insert_after": "custom_customer_group"
  },
  {
   "doctype": "Custom Field",

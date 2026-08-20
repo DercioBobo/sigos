@@ -17,7 +17,23 @@ frappe.ui.form.on("Payroll Entry", {
 	refresh(frm) {
 		if (frm.doc.docstatus !== 0) return;
 		frm.add_custom_button(__("Sugerir Período (Dia de Corte)"), () => _sugerir_periodo(frm));
+		_set_customer_query(frm);
 		_set_project_query(frm);
+	},
+
+	// Grupo de Cliente só restringe a lista de Clientes — o inverso (Cliente
+	// determina Grupo) já é resolvido pelo próprio Customer, não precisa de eco
+	// aqui. Um Cliente já escolhido fora do novo grupo é limpo (o que já dispara,
+	// em cascata, a limpeza do Projecto via o handler custom_customer abaixo).
+	custom_customer_group(frm) {
+		_set_customer_query(frm);
+		if (!frm.doc.custom_customer_group || !frm.doc.custom_customer) return;
+		frappe.db.get_value("Customer", frm.doc.custom_customer, "customer_group").then((r) => {
+			const grupo = r.message && r.message.customer_group;
+			if (grupo && grupo !== frm.doc.custom_customer_group) {
+				frm.set_value("custom_customer", "");
+			}
+		});
 	},
 
 	// Projecto determina Cliente de forma inequívoca (1 Projecto = 1 Customer) —
@@ -49,6 +65,12 @@ frappe.ui.form.on("Payroll Entry", {
 		});
 	},
 });
+
+function _set_customer_query(frm) {
+	frm.set_query("custom_customer", () => ({
+		filters: frm.doc.custom_customer_group ? { customer_group: frm.doc.custom_customer_group } : {},
+	}));
+}
 
 function _set_project_query(frm) {
 	frm.set_query("custom_project", () => ({

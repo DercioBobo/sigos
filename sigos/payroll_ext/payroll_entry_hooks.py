@@ -7,14 +7,13 @@ Structure Assignments use (see sigos.api._aplicar_salario_base_vigilante). We
 only fill it when blank, so a deliberate per-run choice in the UI is never
 clobbered.
 
-(2) Narrows the "Get Employees" result by Cliente / Delegação / Projecto /
-Situação (custom_customer / custom_delegacao / custom_project / custom_situacao
-— SIGOS Setup custom fields). Deliberately does NOT touch HRMS's own
-employee-fetch query (its internals aren't something we want to depend on
-across upgrades) — instead it
-PRUNES the `employees` child table after HRMS has already populated it, right
-before save. Re-run "Get Employee Details" after changing a filter so the table
-is refetched before pruning.
+(2) Narrows the "Get Employees" result by Grupo de Cliente / Cliente / Delegação /
+Projecto / Situação (custom_customer_group / custom_customer / custom_delegacao /
+custom_project / custom_situacao — SIGOS Setup custom fields). Deliberately does
+NOT touch HRMS's own employee-fetch query (its internals aren't something we want
+to depend on across upgrades) — instead it PRUNES the `employees` child table
+after HRMS has already populated it, right before save. Re-run "Get Employee
+Details" after changing a filter so the table is refetched before pruning.
 
 Wire-up (hooks.py):
     "Payroll Entry": {
@@ -40,10 +39,11 @@ def _default_payroll_payable_account(doc):
 
 def _filtrar_employees_por_criterio(doc):
 	delegacao = doc.get("custom_delegacao")
+	grupo_cliente = doc.get("custom_customer_group")
 	cliente = doc.get("custom_customer")
 	projecto = doc.get("custom_project")
 	situacao = doc.get("custom_situacao") or "Activos"
-	if not (delegacao or cliente or projecto or situacao != "Todos"):
+	if not (delegacao or grupo_cliente or cliente or projecto or situacao != "Todos"):
 		return
 
 	linhas = doc.get("employees") or []
@@ -61,12 +61,23 @@ def _filtrar_employees_por_criterio(doc):
 	cliente_by_vig = {}
 	status_vig_by_vig = {}
 	vig_names = [e.custom_vigilante for e in info_by_emp.values() if e.custom_vigilante]
-	if vig_names and (cliente or situacao == "Reserva"):
+	if vig_names and (cliente or grupo_cliente or situacao == "Reserva"):
 		for v in frappe.get_all(
 			"Vigilante", filters={"name": ["in", vig_names]}, fields=["name", "cliente", "status"],
 		):
 			cliente_by_vig[v.name] = v.cliente
 			status_vig_by_vig[v.name] = v.status
+
+	# Grupo de Cliente lives on Customer, not Vigilante — resolve it once per
+	# distinct cliente already gathered above, only when the filter is active.
+	grupo_by_cliente = {}
+	if grupo_cliente:
+		clientes = {c for c in cliente_by_vig.values() if c}
+		if clientes:
+			for c in frappe.get_all(
+				"Customer", filters={"name": ["in", list(clientes)]}, fields=["name", "customer_group"],
+			):
+				grupo_by_cliente[c.name] = c.customer_group
 
 	def mantem(employee):
 		info = info_by_emp.get(employee)
@@ -77,6 +88,8 @@ def _filtrar_employees_por_criterio(doc):
 		if projecto and info.custom_project != projecto:
 			return False
 		if cliente and cliente_by_vig.get(info.custom_vigilante) != cliente:
+			return False
+		if grupo_cliente and grupo_by_cliente.get(cliente_by_vig.get(info.custom_vigilante)) != grupo_cliente:
 			return False
 		if situacao == "Activos" and info.status != "Active":
 			return False
