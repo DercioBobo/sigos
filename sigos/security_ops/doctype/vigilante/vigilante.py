@@ -67,6 +67,7 @@ class Vigilante(Document):
 		self._atualizar_ocupacao_postos()
 		self._migrar_escala_se_mudou()
 		self._seed_salario_base()
+		self._seed_deducao_uniforme()
 
 	def _aplicar_salario_padrao_reserva(self):
 		"""
@@ -226,6 +227,51 @@ class Vigilante(Document):
 			aplicar_salario_base(vigilante=self.name, silent=True)
 		except Exception as e:
 			frappe.log_error(f"seed salario base {self.name}: {e}", "SIGOS Salario Base")
+
+	def _seed_deducao_uniforme(self):
+		"""
+		Auto-create the "Uniforme" Outras Deducoes the moment a brand-new guard gets
+		their Employee (see _criar_employee_se_necessario) — the uniform cost is
+		owed from day one, not something RH has to remember to key in by hand.
+		Fires exactly once per guard: gated on funcionario going from unset to set
+		(the real onboarding transition, not a later posto/regime move), with a
+		defensive existence check in case on_update ever re-fires for the same
+		save. Same defaults ("Uniforme" / valor_padrao_uniforme / meses_padrao_uniforme
+		in SIGOS Settings) Outras Deducoes' own form prefills when that component is
+		picked by hand — see outras_deducoes.js's _ded_aplicar_valores_uniforme.
+		Silent: a missing/misconfigured componente_uniforme, or any insert error,
+		must never block the guard's own save.
+		"""
+		if not self.funcionario:
+			return
+		before = self.get_doc_before_save()
+		if before and before.funcionario:
+			return  # not the onboarding transition — already had a Funcionário
+
+		try:
+			from frappe.utils import cint, flt
+			componente = frappe.db.get_single_value("SIGOS Settings", "componente_uniforme") or "Uniforme"
+			valor = flt(frappe.db.get_single_value("SIGOS Settings", "valor_padrao_uniforme")) or 3240
+			meses = cint(frappe.db.get_single_value("SIGOS Settings", "meses_padrao_uniforme")) or 6
+			if valor <= 0 or meses <= 0:
+				return
+			if frappe.db.exists("Outras Deducoes", {"funcionario": self.funcionario, "tipo": componente}):
+				return
+
+			doc = frappe.get_doc({
+				"doctype": "Outras Deducoes",
+				"funcionario": self.funcionario,
+				"tipo": componente,
+				"tipo_de_pagamento": "Em Prestações",
+				"valor_a_pagar": valor,
+				"meses_a_pagar": meses,
+				"data_de_inicio": today(),
+				"descricao": _("Dedução automática de Uniforme — gerada na admissão."),
+			})
+			doc.insert(ignore_permissions=True)
+			doc.submit()
+		except Exception as e:
+			frappe.log_error(f"seed deducao uniforme {self.name}: {e}", "SIGOS Dedução Uniforme")
 
 	# ─── Keystone: escala follows the guard ──────────────────────────────────────
 
