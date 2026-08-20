@@ -145,6 +145,39 @@ data+período (draft or submitted, by anyone) — grey them out in the UI. The
 write endpoint enforces this server-side too, but checking here first avoids
 a round-trip failure.
 
+### `GET mobile_api.get_candidatos?posto=<posto>&proxima_accao=<proxima_accao>&vigilante=<vigilante>&data=YYYY-MM-DD&periodo=<periodo>`
+Candidate vigilantes for whichever companion field the chosen `proxima_accao`
+needs on `marcar_ausencia` — call this right before showing that picker, with
+the same `posto`/`vigilante`/`data`/`periodo` you're about to send there.
+`vigilante`, `data`, `periodo` are all optional (`vigilante` just excludes that
+guard from their own candidate pool; `data`/`periodo` default the same way
+`get_escalados_hoje` does).
+
+Each `proxima_accao` pulls from a different pool:
+- `Substituto` → benched (Reserva) guards in this posto's own delegação.
+- `Dobra de Turno` / `Meia Dobra` → guards already scheduled at THIS posto today
+  (they're on site and can double up; Meia Dobra reuses the same pool, just
+  priced for half a shift in payroll).
+- `Horas Extras` → guards on FOLGA (day off) today, scoped to the posto's
+  delegação, not the posto itself — any folga guard in the delegação can be
+  called in, not just ones normally posted here.
+- `Adiantamento de Turno` → other Activo guards at this SAME posto (one of them
+  brings their own shift forward).
+- `Sem Ação` → always `[]` (no companion field to fill).
+
+```json
+[
+  { "vigilante": "VIG-00456", "nome_completo": "Carlos Machava", "categoria": "Vigilante" }
+]
+```
+(Exact fields vary slightly per pool — Substituto/Adiantamento include
+`categoria`; Dobra/Meia Dobra/Horas Extras include `turno` instead.)
+
+Only *submitted* absences are excluded from these pools (same rule the
+equivalent Desk pickers use) — a same-período double-booking across two still-
+draft calls isn't caught here; `marcar_ausencia`'s own idempotency (by
+`vigilante`+`data`+`periodo`) is what actually prevents duplicate rows.
+
 ### `POST mobile_api.marcar_ausencia`
 Creates or updates one guard's absence row for the day. Always saved as a
 **draft** — the SIGOS integration user has write but not submit permission

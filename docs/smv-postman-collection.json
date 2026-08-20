@@ -74,7 +74,26 @@
       }
     },
     {
-      "name": "5. marcar_ausencia (Falta simples)",
+      "name": "5. get_candidatos (Substituto)",
+      "request": {
+        "method": "GET",
+        "auth": { "type": "inherit" },
+        "url": {
+          "raw": "{{base_url}}/api/method/sigos.mobile_api.get_candidatos?posto={{posto}}&proxima_accao=Substituto&vigilante={{vigilante}}",
+          "host": ["{{base_url}}"],
+          "path": ["api", "method", "sigos.mobile_api.get_candidatos"],
+          "query": [
+            { "key": "posto", "value": "{{posto}}" },
+            { "key": "proxima_accao", "value": "Substituto", "description": "Sem Ação | Substituto | Dobra de Turno | Meia Dobra | Adiantamento de Turno | Horas Extras" },
+            { "key": "vigilante", "value": "{{vigilante}}", "description": "opcional — exclui este guarda do próprio pool de candidatos" },
+            { "key": "data", "value": "", "disabled": true, "description": "YYYY-MM-DD, opcional — omitir usa hoje" },
+            { "key": "periodo", "value": "", "disabled": true, "description": "Manhã | Noite, opcional — omitir usa o período actual" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "6. marcar_ausencia (Falta simples)",
       "request": {
         "method": "POST",
         "auth": { "type": "inherit" },
@@ -91,7 +110,7 @@
       }
     },
     {
-      "name": "6. marcar_ausencia (Falta com Substituto)",
+      "name": "7. marcar_ausencia (Falta com Substituto)",
       "request": {
         "method": "POST",
         "auth": { "type": "inherit" },
@@ -108,7 +127,7 @@
       }
     },
     {
-      "name": "7. remover_marca",
+      "name": "8. remover_marca",
       "request": {
         "method": "POST",
         "auth": { "type": "inherit" },

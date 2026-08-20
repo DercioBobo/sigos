@@ -131,6 +131,134 @@ def get_escalados_hoje(posto, data=None):
 	return {"periodo_actual": periodo, "escalados": rows}
 
 
+# ─── Candidate pools for each proxima_accao's companion field ──────────────────
+# Mirrors the same pools the Desk pickers use (sigos.api.get_substitutos_disponiveis
+# / get_escalados_no_posto_dia / get_vigilantes_de_folga_na_delegacao_dia, and
+# ausencias.js's inline Adiantamento filter) but scoped to a single posto instead
+# of a grupo_delegados/unsaved-doc context SMV has no concept of, and returned as
+# plain dicts (as_dict) rather than the Desk's Link-search tuple format. Only
+# SUBMITTED absences are excluded, same as those Desk queries — a same-período
+# double-booking across two still-draft SMV calls is a pre-existing gap there too,
+# not something introduced here.
+
+@frappe.whitelist()
+def get_candidatos(posto, proxima_accao, vigilante=None, data=None, periodo=None):
+	"""
+	Candidate vigilantes for whichever companion field `proxima_accao` needs on
+	marcar_ausencia — call this before showing that picker, with the same
+	posto/vigilante/data/periodo you're about to send there. `vigilante` (the
+	guard being marked absent) is excluded from every pool so nobody can cover
+	their own absence. "Sem Ação" needs no companion field and always returns [].
+	"""
+	frappe.only_for((PAPEL_SMV, "System Manager"))
+	info = _get_posto_activo(posto)
+	data = data or nowdate()
+	periodo = periodo or _periodo_actual()
+
+	if proxima_accao == "Sem Ação":
+		return []
+	if proxima_accao == "Substituto":
+		return _candidatos_substituto(info.delegacao, vigilante, data, periodo)
+	if proxima_accao in ("Dobra de Turno", "Meia Dobra"):
+		return _candidatos_dobra(posto, vigilante, data)
+	if proxima_accao == "Horas Extras":
+		return _candidatos_horas_extras(info.delegacao, vigilante, data)
+	if proxima_accao == "Adiantamento de Turno":
+		return _candidatos_adiantamento(posto, vigilante)
+	frappe.throw(_("Próxima Acção desconhecida: {0}").format(proxima_accao))
+
+
+def _candidatos_substituto(delegacao, vigilante_ausente, data, periodo):
+	"""Reserva pool for 'Substituto' — benched guards in this posto's own
+	delegação, minus anyone already absent or already booked as substituto
+	elsewhere this data+periodo (submitted docs only — see module note above)."""
+	excl = tuple(v for v in [vigilante_ausente] if v) or ("",)
+	return frappe.db.sql(
+		"""
+		SELECT v.name AS vigilante, v.nome_completo, v.categoria
+		FROM `tabVigilante` v
+		WHERE v.status = 'Reserva' AND v.delegacao = %(delegacao)s
+		  AND (v.cobertura_de_posto_activa IS NULL OR v.cobertura_de_posto_activa = '')
+		  AND v.name NOT IN %(excl)s
+		  AND NOT EXISTS (
+			SELECT 1 FROM `tabTabela Ausencia` ta
+			JOIN `tabAusencias` a ON a.name = ta.parent
+			WHERE a.docstatus = 1 AND a.data = %(data)s
+			  AND (ta.vigilante = v.name
+			       OR (ta.vigilante_substituto = v.name AND a.periodo = %(periodo)s))
+		  )
+		ORDER BY v.nome_completo
+		""",
+		{"delegacao": delegacao, "excl": excl, "data": data, "periodo": periodo},
+		as_dict=True,
+	)
+
+
+def _candidatos_dobra(posto, vigilante_ausente, data):
+	"""Guards already ESCALADOS at this same posto today — pool for 'Dobra de
+	Turno'/'Meia Dobra' (Meia Dobra reuses the same real-world pool, just priced
+	for half a shift in payroll)."""
+	excl = tuple(v for v in [vigilante_ausente] if v) or ("",)
+	return frappe.db.sql(
+		"""
+		SELECT DISTINCT te.vigilante, v.nome_completo, te.turno
+		FROM `tabTabela De Escala De Vigilante` te
+		JOIN `tabVigilante` v ON v.name = te.vigilante
+		WHERE te.posto = %(posto)s AND te.data = %(data)s
+		  AND te.vigilante NOT IN %(excl)s
+		  AND NOT EXISTS (
+			SELECT 1 FROM `tabTabela Ausencia` tax
+			JOIN `tabAusencias` ax ON ax.name = tax.parent
+			WHERE ax.docstatus = 1 AND ax.data = %(data)s AND tax.vigilante = te.vigilante
+		  )
+		ORDER BY v.nome_completo
+		""",
+		{"posto": posto, "data": data, "excl": excl},
+		as_dict=True,
+	)
+
+
+def _candidatos_horas_extras(delegacao, vigilante_ausente, data):
+	"""Guards on FOLGA (day off) today, scoped to this posto's delegação (not the
+	posto itself — a folga guard from any posto in the delegação can be called
+	in) — pool for 'Horas Extras'."""
+	excl = tuple(v for v in [vigilante_ausente] if v) or ("",)
+	return frappe.db.sql(
+		"""
+		SELECT DISTINCT te.vigilante, v.nome_completo, te.turno
+		FROM `tabTabela De Escala De Vigilante` te
+		JOIN `tabVigilante` v ON v.name = te.vigilante
+		JOIN `tabEscala Do Vigilante` e ON e.name = te.parent AND e.estado = 'Activo'
+		JOIN `tabTurno` t ON t.name = te.turno
+		WHERE v.delegacao = %(delegacao)s AND te.data = %(data)s AND t.e_folga = 1
+		  AND te.vigilante NOT IN %(excl)s
+		  AND NOT EXISTS (
+			SELECT 1 FROM `tabTabela Ausencia` tax
+			JOIN `tabAusencias` ax ON ax.name = tax.parent
+			WHERE ax.docstatus = 1 AND ax.data = %(data)s AND tax.vigilante = te.vigilante
+		  )
+		ORDER BY v.nome_completo
+		""",
+		{"delegacao": delegacao, "data": data, "excl": excl},
+		as_dict=True,
+	)
+
+
+def _candidatos_adiantamento(posto, vigilante_ausente):
+	"""Activo guards at this SAME posto — pool for 'Adiantamento de Turno' (one
+	of them brings their own shift forward to cover the gap)."""
+	excl = [v for v in [vigilante_ausente] if v]
+	return frappe.get_all(
+		"Vigilante",
+		filters={
+			"posto_de_vigilancia": posto, "status": "Activo",
+			"name": ["not in", excl or [""]],
+		},
+		fields=["name as vigilante", "nome_completo", "categoria"],
+		order_by="nome_completo",
+	)
+
+
 @frappe.whitelist()
 def marcar_ausencia(
 	posto, vigilante, tipo_de_ausencia, data=None, periodo=None,
