@@ -2,10 +2,14 @@
 //
 // The custom_subsidios child table only ever defines WHAT subsídios exist on a
 // contract and at what rate (salary_component + amount) — it no longer decides
-// WHO gets them. That's this modal's job: a full vigilante × subsídio matrix,
-// click a cell to grant/revoke, with row/column bulk toggles and a live search,
-// so HR can go from "nobody" to "just these 12 of 200" to "everyone" in a few
-// clicks. Saved as a full-replace via sigos.api.salvar_project_subsidio_matrix.
+// WHO gets them, or how much each of them gets. That's this modal's job: a full
+// vigilante × subsídio matrix, click a cell to grant/revoke, with row/column
+// bulk toggles and a live search, so HR can go from "nobody" to "just these 12
+// of 200" to "everyone" in a few clicks. Each checked cell also carries an
+// optional valor override — blank uses the component's project-wide rate
+// (shown under the column header), a typed value replaces it for just that
+// vigilante — for the projects where not everyone is paid the same amount of
+// a given subsídio. Saved as a full-replace via sigos.api.salvar_project_subsidio_matrix.
 
 frappe.provide("sigos.project_subsidios");
 
@@ -35,6 +39,7 @@ function _psm_mostrar(frm, dados) {
 	const componentes = dados.componentes || [];
 	const vigilantes = dados.vigilantes || [];
 	const activos = new Set(dados.aplicacoes || []);
+	const overrides = dados.overrides || {};
 	const chave = (vig, comp) => `${vig}::${comp}`;
 
 	if (!vigilantes.length) {
@@ -55,11 +60,16 @@ function _psm_mostrar(frm, dados) {
 
 	const linhas = vigilantes.map((v) => {
 		const celulas = componentes.map((c) => {
-			const on = activos.has(chave(v.name, c.salary_component));
+			const k = chave(v.name, c.salary_component);
+			const on = activos.has(k);
+			const override = overrides[k];
 			return `<td class="psm-cell ${on ? "on" : ""}"
 				data-vig="${frappe.utils.escape_html(v.name)}"
 				data-comp="${frappe.utils.escape_html(c.salary_component)}">
 				<span class="psm-mark">${on ? "✓" : ""}</span>
+				<input type="number" step="0.01" class="psm-override" placeholder="${fmt(c.amount)}"
+					value="${override != null ? override : ""}" ${on ? "" : "disabled"}
+					title="${__("Valor de excepção para este vigilante — vazio usa o valor padrão do componente.")}">
 			</td>`;
 		}).join("");
 
@@ -120,12 +130,19 @@ function _psm_mostrar(frm, dados) {
 				.psm-table tbody td.psm-cell {
 					border-bottom: 1px solid var(--border-color, #ecf0f2);
 					border-right: 1px solid var(--border-color, #f3f5f6);
-					text-align: center; cursor: pointer; width: 90px; height: 34px;
+					text-align: center; cursor: pointer; width: 90px; min-height: 34px; padding: 4px 0;
 					transition: background-color .12s ease;
 				}
 				.psm-cell:hover { background: var(--fg-hover-color, #f5f7f9); }
 				.psm-cell.on { background: rgba(94, 100, 255, .12); }
 				.psm-cell.on .psm-mark { color: var(--primary, #5e64ff); font-weight: 700; }
+				.psm-cell .psm-override {
+					display: none; width: 76px; margin: 2px auto 0; padding: 1px 4px;
+					font-size: 11px; text-align: center; border: 1px solid var(--border-color, #d1d8dd);
+					border-radius: 4px; cursor: text; background: var(--fg-color, #fff);
+				}
+				.psm-cell.on .psm-override { display: inline-block; }
+				.psm-cell .psm-override:focus { outline: none; border-color: var(--primary, #5e64ff); }
 				.psm-row.psm-hidden { display: none; }
 			</style>
 			<div class="psm-toolbar">
@@ -156,12 +173,16 @@ function _psm_mostrar(frm, dados) {
 		primary_action_label: __("Guardar"),
 		primary_action() {
 			const pares = [];
+			const overrides = {};
 			d.$wrapper.find("td.psm-cell.on").each(function () {
-				pares.push(`${$(this).attr("data-vig")}::${$(this).attr("data-comp")}`);
+				const par = `${$(this).attr("data-vig")}::${$(this).attr("data-comp")}`;
+				pares.push(par);
+				const valor = $(this).find(".psm-override").val();
+				if (valor !== "" && valor != null) overrides[par] = flt(valor);
 			});
 			frappe.call({
 				method: "sigos.api.salvar_project_subsidio_matrix",
-				args: { project: frm.doc.name, pares: JSON.stringify(pares) },
+				args: { project: frm.doc.name, pares: JSON.stringify(pares), overrides: JSON.stringify(overrides) },
 				freeze: true,
 				freeze_message: __("A guardar…"),
 			}).then(() => d.hide());
@@ -176,9 +197,19 @@ function _psm_mostrar(frm, dados) {
 		$w.find(".psm-contador").text(__("{0} de {1} atribuições marcadas", [marcadas, total]));
 	};
 
-	$w.on("click", "td.psm-cell", function () {
-		$(this).toggleClass("on");
-		$(this).find(".psm-mark").text($(this).hasClass("on") ? "✓" : "");
+	// Keep class, mark, and the override input's disabled state in lockstep —
+	// the input must never be editable (or tab-focusable) while its cell is off,
+	// even though the CSS already hides it, so a stray value can't sneak into
+	// the save from a cell nobody meant to check.
+	const _setCells = (cells, on) => {
+		cells.toggleClass("on", on)
+			.find(".psm-mark").text(on ? "✓" : "").end()
+			.find(".psm-override").prop("disabled", !on);
+	};
+
+	$w.on("click", "td.psm-cell", function (e) {
+		if ($(e.target).is(".psm-override")) return;   // typing/clicking the value field must not toggle
+		_setCells($(this), !$(this).hasClass("on"));
 		atualizarContador();
 	});
 
@@ -188,7 +219,7 @@ function _psm_mostrar(frm, dados) {
 		const col = $w.find(`td.psm-cell[data-comp="${CSS.escape(comp)}"]:not(.psm-hidden-col)`)
 			.filter((_, td) => $(td).closest("tr").is(":visible"));
 		const todasLigadas = col.length && col.filter(".on").length === col.length;
-		col.toggleClass("on", !todasLigadas).find(".psm-mark").text(!todasLigadas ? "✓" : "");
+		_setCells(col, !todasLigadas);
 		atualizarContador();
 	});
 
@@ -197,7 +228,7 @@ function _psm_mostrar(frm, dados) {
 		const row = $(this).closest("tr");
 		const celulas = row.find("td.psm-cell");
 		const todasLigadas = celulas.length && celulas.filter(".on").length === celulas.length;
-		celulas.toggleClass("on", !todasLigadas).find(".psm-mark").text(!todasLigadas ? "✓" : "");
+		_setCells(celulas, !todasLigadas);
 		atualizarContador();
 	});
 
@@ -211,12 +242,12 @@ function _psm_mostrar(frm, dados) {
 
 	$w.on("click", ".psm-todos", (e) => {
 		e.preventDefault();
-		$w.find(".psm-row:visible td.psm-cell").addClass("on").find(".psm-mark").text("✓");
+		_setCells($w.find(".psm-row:visible td.psm-cell"), true);
 		atualizarContador();
 	});
 	$w.on("click", ".psm-nenhum", (e) => {
 		e.preventDefault();
-		$w.find(".psm-row:visible td.psm-cell").removeClass("on").find(".psm-mark").text("");
+		_setCells($w.find(".psm-row:visible td.psm-cell"), false);
 		atualizarContador();
 	});
 

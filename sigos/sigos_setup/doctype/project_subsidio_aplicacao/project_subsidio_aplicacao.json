@@ -10,7 +10,8 @@
  "field_order": [
   "project",
   "salary_component",
-  "vigilante"
+  "vigilante",
+  "valor_override"
  ],
  "fields": [
   {
@@ -41,6 +42,13 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "search_index": 1
+  },
+  {
+   "fieldname": "valor_override",
+   "fieldtype": "Currency",
+   "label": "Valor (Excepção)",
+   "in_list_view": 1,
+   "description": "Vazio = usa o valor padrão do componente definido no Projecto. Preenchido = substitui o valor padrão só para este vigilante."
   }
  ],
  "in_create": 1,

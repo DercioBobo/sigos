@@ -1701,9 +1701,11 @@ def get_project_subsidio_matrix(project):
 	"""
 	Everything the "Gerir Subsídios" matrix modal needs in one call: the
 	project's subsídio components (component + amount, as configured in
-	Project.custom_subsidios), every Activo vigilante on the project, and the
+	Project.custom_subsidios), every Activo vigilante on the project, the
 	current applicability matrix (as "vigilante::salary_component" keys) so the
-	modal can pre-check the right cells.
+	modal can pre-check the right cells, and any per-vigilante valor overrides
+	(same keys, only for cells that don't use the component's default rate) so
+	the modal can pre-fill those too.
 	"""
 	if not project:
 		frappe.throw(_("Projecto obrigatório."))
@@ -1720,24 +1722,32 @@ def get_project_subsidio_matrix(project):
 	aplicacoes = frappe.get_all(
 		"Project Subsidio Aplicacao",
 		filters={"project": project},
-		fields=["vigilante", "salary_component"],
+		fields=["vigilante", "salary_component", "valor_override"],
 	)
 
 	return {
 		"componentes": componentes,
 		"vigilantes": vigilantes,
 		"aplicacoes": [f"{a.vigilante}::{a.salary_component}" for a in aplicacoes],
+		"overrides": {
+			f"{a.vigilante}::{a.salary_component}": a.valor_override
+			for a in aplicacoes if a.valor_override
+		},
 	}
 
 
 @frappe.whitelist()
-def salvar_project_subsidio_matrix(project, pares):
+def salvar_project_subsidio_matrix(project, pares, overrides=None):
 	"""
 	Full-replace save for the "Gerir Subsídios" matrix: `pares` is the
 	JSON-encoded list of "vigilante::salary_component" keys that should be ON —
 	everything else for this project is OFF. One atomic delete + bulk-insert per
 	save, so there's never a diffing step to get wrong; the matrix simply always
-	matches whatever was checked in the modal.
+	matches whatever was checked in the modal. `overrides` is an optional
+	JSON-encoded {"vigilante::salary_component": valor} dict for the (usually
+	few) cells where this vigilante's amount deviates from the component's
+	project-wide default rate — see salary_slip_hooks._componentes_aplicaveis,
+	which is what actually reads valor_override back out at payroll time.
 	"""
 	import json as _json
 
@@ -1748,6 +1758,9 @@ def salvar_project_subsidio_matrix(project, pares):
 
 	if isinstance(pares, str):
 		pares = _json.loads(pares) if pares else []
+	if isinstance(overrides, str):
+		overrides = _json.loads(overrides) if overrides else {}
+	overrides = overrides or {}
 
 	vistos = set()
 	rows = []
@@ -1763,7 +1776,12 @@ def salvar_project_subsidio_matrix(project, pares):
 			continue
 		vistos.add(chave)
 		rows.append([
+			# 0 means "no override" (bulk_insert writes a real column value, never
+			# NULL, for a Currency field) — an explicit zero-out is redundant with
+			# simply leaving the cell unchecked (that already means "receives
+			# nothing"), so collapsing blank/0 together here loses nothing real.
 			frappe.generate_hash(length=10), project, salary_component, vigilante,
+			frappe.utils.flt(overrides.get(par)),
 			frappe.session.user, frappe.session.user, agora, agora,
 		])
 
@@ -1771,7 +1789,10 @@ def salvar_project_subsidio_matrix(project, pares):
 	if rows:
 		frappe.db.bulk_insert(
 			"Project Subsidio Aplicacao",
-			fields=["name", "project", "salary_component", "vigilante", "owner", "modified_by", "creation", "modified"],
+			fields=[
+				"name", "project", "salary_component", "vigilante", "valor_override",
+				"owner", "modified_by", "creation", "modified",
+			],
 			values=rows,
 		)
 

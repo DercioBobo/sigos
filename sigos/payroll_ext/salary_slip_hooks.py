@@ -201,16 +201,21 @@ def _vigilante_em_reserva(doc):
 def _componentes_aplicaveis(project, vigilante):
 	"""Which of the project's subsídio components this specific guard is opted
 	into, per the HR-managed matrix (Project Subsidio Aplicacao — see the "Gerir
-	Subsídios" button on the Project form). No row for a given (project,
-	vigilante, component) means that guard simply doesn't receive it — the
-	matrix has full control, there's no implicit "everyone gets it" default."""
+	Subsídios" button on the Project form), mapped to that guard's own valor
+	override (0/falsy when the row has no override — use the project's default
+	rate for the component instead; a genuine "this guard gets none of it" is
+	expressed by simply leaving the cell unchecked, not a 0 override). No row
+	for a given (project, vigilante, component) means that guard simply doesn't
+	receive it — the matrix has full control, there's no implicit "everyone
+	gets it" default."""
 	if not vigilante:
-		return set()
-	return set(frappe.get_all(
+		return {}
+	rows = frappe.get_all(
 		"Project Subsidio Aplicacao",
 		filters={"project": project, "vigilante": vigilante},
-		pluck="salary_component",
-	))
+		fields=["salary_component", "valor_override"],
+	)
+	return {r.salary_component: r.valor_override for r in rows}
 
 
 def _add_project_subsidios(doc):
@@ -230,9 +235,10 @@ def _add_project_subsidios(doc):
 				continue
 			if row.salary_component not in aplicaveis:
 				continue
+			override = aplicaveis[row.salary_component]
 			doc.append("earnings", {
 				"salary_component": row.salary_component,
-				"amount": row.amount,
+				"amount": override or row.amount,
 			})
 			existentes.add(row.salary_component)
 	except Exception as e:
