@@ -18,5 +18,25 @@ frappe.query_reports["File"] = {
 			fieldtype: "Link",
 			options: "Company",
 		},
+		{
+			fieldname: "customer",
+			label: __("Cliente"),
+			fieldtype: "Link",
+			options: "Customer",
+			on_change: (report) => {
+				report.set_filter_value("project", "");
+				report.refresh();
+			},
+		},
+		{
+			fieldname: "project",
+			label: __("Projecto"),
+			fieldtype: "Link",
+			options: "Project",
+			get_query: () => {
+				const cliente = frappe.query_report.get_filter_value("customer");
+				return cliente ? { filters: { customer: cliente } } : {};
+			},
+		},
 	],
 };
