@@ -2280,6 +2280,15 @@ def rotatividade_regra_3meses(vigilante, abreviatura_op=None):
 def search_vigilantes_rich(txt="", status="Activo", delegacao=None, excluir=None, so_substitutos=0):
 	"""Rich vigilante search for the Rotatividade wizard pickers — returns name + current posto/regime/categoria."""
 	frappe.only_for(PAPEIS_INTERNOS)
+	import json as _json
+
+	# frappe.call serializes a JS array to a JSON string over the wire — the
+	# Demissão flow passes status=["Activo", "Reserva"], which otherwise arrives
+	# here as the literal string '["Activo", "Reserva"]', missing the list branch
+	# below and matching zero vigilantes (v.status = that whole string).
+	if isinstance(status, str) and status.startswith("["):
+		status = _json.loads(status)
+
 	cond = []
 	params = {"txt": "%" + (txt or "") + "%"}
 	substituto = int(so_substitutos or 0)
