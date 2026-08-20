@@ -19,10 +19,34 @@ frappe.query_reports["File"] = {
 			options: "Company",
 		},
 		{
+			fieldname: "customer_group",
+			label: __("Grupo de Cliente"),
+			fieldtype: "Link",
+			options: "Customer Group",
+			on_change: (report) => {
+				const grupo = report.get_filter_value("customer_group");
+				const cliente = report.get_filter_value("customer");
+				if (grupo && cliente) {
+					frappe.db.get_value("Customer", cliente, "customer_group").then((r) => {
+						if (r.message && r.message.customer_group !== grupo) {
+							report.set_filter_value("customer", "");
+							report.refresh();
+						}
+					});
+				} else {
+					report.refresh();
+				}
+			},
+		},
+		{
 			fieldname: "customer",
 			label: __("Cliente"),
 			fieldtype: "Link",
 			options: "Customer",
+			get_query: () => {
+				const grupo = frappe.query_report.get_filter_value("customer_group");
+				return grupo ? { filters: { customer_group: grupo } } : {};
+			},
 			on_change: (report) => {
 				report.set_filter_value("project", "");
 				report.refresh();

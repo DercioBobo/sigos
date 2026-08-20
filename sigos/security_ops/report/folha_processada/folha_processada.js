@@ -3,7 +3,36 @@ frappe.query_reports["Folha Processada"] = {
 		{ fieldname: "start_date", label: __("Início do Período"), fieldtype: "Date", reqd: 1 },
 		{ fieldname: "end_date", label: __("Fim do Período"), fieldtype: "Date", reqd: 1 },
 		{ fieldname: "delegacao", label: __("Delegação"), fieldtype: "Link", options: "Delegacao" },
-		{ fieldname: "cliente", label: __("Cliente"), fieldtype: "Link", options: "Customer" },
+		{
+			fieldname: "customer_group",
+			label: __("Grupo de Cliente"),
+			fieldtype: "Link",
+			options: "Customer Group",
+			on_change: (report) => {
+				const grupo = report.get_filter_value("customer_group");
+				const cliente = report.get_filter_value("cliente");
+				if (grupo && cliente) {
+					frappe.db.get_value("Customer", cliente, "customer_group").then((r) => {
+						if (r.message && r.message.customer_group !== grupo) {
+							report.set_filter_value("cliente", "");
+							report.refresh();
+						}
+					});
+				} else {
+					report.refresh();
+				}
+			},
+		},
+		{
+			fieldname: "cliente",
+			label: __("Cliente"),
+			fieldtype: "Link",
+			options: "Customer",
+			get_query: () => {
+				const grupo = frappe.query_report.get_filter_value("customer_group");
+				return grupo ? { filters: { customer_group: grupo } } : {};
+			},
+		},
 		{ fieldname: "posto", label: __("Posto"), fieldtype: "Link", options: "Posto De Vigilancia" },
 		{ fieldname: "project", label: __("Projecto"), fieldtype: "Link", options: "Project" },
 		{

@@ -99,6 +99,22 @@ def _resolver_funcionarios(filters):
 	emp_filters = {}
 	if filters.get("delegacao"):
 		emp_filters["custom_delegacao"] = filters.delegacao
+
+	# Grupo de Cliente lives on Customer, not Employee — resolve it to the set of
+	# Customers in that group first. Combined with an explicit cliente filter,
+	# the two must agree (an empty result set here means the picked cliente
+	# doesn't belong to the picked group), never OR together.
+	if filters.get("customer_group"):
+		clientes_no_grupo = frappe.get_all(
+			"Customer", filters={"customer_group": filters.customer_group}, pluck="name",
+		)
+		if filters.get("cliente"):
+			if filters.cliente not in clientes_no_grupo:
+				return []
+		elif not clientes_no_grupo:
+			return []
+		else:
+			emp_filters["custom_cliente"] = ["in", clientes_no_grupo]
 	if filters.get("cliente"):
 		emp_filters["custom_cliente"] = filters.cliente
 

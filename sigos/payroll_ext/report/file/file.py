@@ -25,11 +25,16 @@ def execute(filters=None):
 	if filters.get("customer"):
 		cond += " AND proj.customer = %(customer)s"
 		params["customer"] = filters["customer"]
+	if filters.get("customer_group"):
+		cond += " AND cust.customer_group = %(customer_group)s"
+		params["customer_group"] = filters["customer_group"]
 
 	# custom_contanib (NIB) lives on Employee, not Salary Slip — the old script
 	# assumed it was on the slip itself, which never worked; joined here instead.
 	# Project is joined (left, since custom_projecto can be blank) to filter by
-	# customer — a Salary Slip only carries the project, not the customer.
+	# customer — a Salary Slip only carries the project, not the customer. Customer
+	# is joined (left, off Project) to filter by customer_group — neither the slip
+	# nor the project carries the group directly.
 	rows = frappe.db.sql(
 		f"""
 		SELECT
@@ -39,6 +44,7 @@ def execute(filters=None):
 		FROM `tabSalary Slip` ss
 		INNER JOIN `tabEmployee` emp ON emp.name = ss.employee
 		LEFT JOIN `tabProject` proj ON proj.name = ss.custom_projecto
+		LEFT JOIN `tabCustomer` cust ON cust.name = proj.customer
 		WHERE ss.docstatus = 1
 		  AND ss.posting_date BETWEEN %(de)s AND %(ate)s
 		  {cond}
