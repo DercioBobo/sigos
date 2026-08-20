@@ -7,9 +7,12 @@
 // bulk toggles and a live search, so HR can go from "nobody" to "just these 12
 // of 200" to "everyone" in a few clicks. Each checked cell also carries an
 // optional valor override — blank uses the component's project-wide rate
-// (shown under the column header), a typed value replaces it for just that
-// vigilante — for the projects where not everyone is paid the same amount of
-// a given subsídio. Saved as a full-replace via sigos.api.salvar_project_subsidio_matrix.
+// (shown under the column header); click the small badge in a checked cell to
+// type a value that replaces it for just that vigilante — for the projects
+// where not everyone is paid the same amount of a given subsídio. The badge is
+// a separate click target from the cell itself specifically so editing a value
+// never fights with toggling the cell on/off. Saved as a full-replace via
+// sigos.api.salvar_project_subsidio_matrix.
 
 frappe.provide("sigos.project_subsidios");
 
@@ -65,11 +68,11 @@ function _psm_mostrar(frm, dados) {
 			const override = overrides[k];
 			return `<td class="psm-cell ${on ? "on" : ""}"
 				data-vig="${frappe.utils.escape_html(v.name)}"
-				data-comp="${frappe.utils.escape_html(c.salary_component)}">
+				data-comp="${frappe.utils.escape_html(c.salary_component)}"
+				data-override="${override != null ? override : ""}">
 				<span class="psm-mark">${on ? "✓" : ""}</span>
-				<input type="number" step="0.01" class="psm-override" placeholder="${fmt(c.amount)}"
-					value="${override != null ? override : ""}" ${on ? "" : "disabled"}
-					title="${__("Valor de excepção para este vigilante — vazio usa o valor padrão do componente.")}">
+				<span class="psm-badge ${override ? "has-val" : ""}"
+					title="${__("Clique para definir um valor de excepção para este vigilante — vazio usa o valor padrão do componente.")}">${override ? fmt(override) : ""}</span>
 			</td>`;
 		}).join("");
 
@@ -136,13 +139,24 @@ function _psm_mostrar(frm, dados) {
 				.psm-cell:hover { background: var(--fg-hover-color, #f5f7f9); }
 				.psm-cell.on { background: rgba(94, 100, 255, .12); }
 				.psm-cell.on .psm-mark { color: var(--primary, #5e64ff); font-weight: 700; }
-				.psm-cell .psm-override {
-					display: none; width: 76px; margin: 2px auto 0; padding: 1px 4px;
-					font-size: 11px; text-align: center; border: 1px solid var(--border-color, #d1d8dd);
-					border-radius: 4px; cursor: text; background: var(--fg-color, #fff);
+				.psm-badge {
+					display: none; margin: 2px auto 0; min-width: 34px; height: 15px; line-height: 15px;
+					padding: 0 5px; font-size: 10px; color: var(--text-muted, #8d99a6);
+					border: 1px dashed var(--border-color, #d1d8dd); border-radius: 8px; cursor: pointer;
 				}
-				.psm-cell.on .psm-override { display: inline-block; }
-				.psm-cell .psm-override:focus { outline: none; border-color: var(--primary, #5e64ff); }
+				.psm-cell.on .psm-badge { display: inline-block; }
+				.psm-badge:empty::after { content: "✎"; opacity: .5; }
+				.psm-badge:hover { border-color: var(--primary, #5e64ff); color: var(--primary, #5e64ff); }
+				.psm-badge.has-val {
+					border-style: solid; border-color: var(--primary, #5e64ff);
+					background: var(--fg-color, #fff); color: var(--primary, #5e64ff); font-weight: 600;
+				}
+				.psm-cell .psm-override-input {
+					display: block; width: 76px; margin: 2px auto 0; padding: 1px 4px;
+					font-size: 11px; text-align: center; border: 1px solid var(--primary, #5e64ff);
+					border-radius: 4px; background: var(--fg-color, #fff);
+				}
+				.psm-cell .psm-override-input:focus { outline: none; }
 				.psm-row.psm-hidden { display: none; }
 			</style>
 			<div class="psm-toolbar">
@@ -177,8 +191,8 @@ function _psm_mostrar(frm, dados) {
 			d.$wrapper.find("td.psm-cell.on").each(function () {
 				const par = `${$(this).attr("data-vig")}::${$(this).attr("data-comp")}`;
 				pares.push(par);
-				const valor = $(this).find(".psm-override").val();
-				if (valor !== "" && valor != null) overrides[par] = flt(valor);
+				const valor = $(this).attr("data-override");
+				if (valor) overrides[par] = flt(valor);
 			});
 			frappe.call({
 				method: "sigos.api.salvar_project_subsidio_matrix",
@@ -197,20 +211,54 @@ function _psm_mostrar(frm, dados) {
 		$w.find(".psm-contador").text(__("{0} de {1} atribuições marcadas", [marcadas, total]));
 	};
 
-	// Keep class, mark, and the override input's disabled state in lockstep —
-	// the input must never be editable (or tab-focusable) while its cell is off,
-	// even though the CSS already hides it, so a stray value can't sneak into
-	// the save from a cell nobody meant to check.
 	const _setCells = (cells, on) => {
-		cells.toggleClass("on", on)
-			.find(".psm-mark").text(on ? "✓" : "").end()
-			.find(".psm-override").prop("disabled", !on);
+		cells.toggleClass("on", on).find(".psm-mark").text(on ? "✓" : "");
 	};
 
+	// The badge is a separate click target (guarded below, in its own handler)
+	// from the cell body — this toggle only fires for clicks landing outside it,
+	// so checking/unchecking a cell never fights with editing its override value.
 	$w.on("click", "td.psm-cell", function (e) {
-		if ($(e.target).is(".psm-override")) return;   // typing/clicking the value field must not toggle
+		if ($(e.target).closest(".psm-badge, .psm-override-input").length) return;
 		_setCells($(this), !$(this).hasClass("on"));
 		atualizarContador();
+	});
+
+	// Click the badge (only reachable on a checked cell — CSS hides it otherwise)
+	// to swap it for a small input in place: Enter/blur commits, Escape cancels.
+	// The committed value lives on the cell's data-override attribute, which is
+	// what primary_action() reads back at save time — the badge/input is purely
+	// the editing surface.
+	$w.on("click", ".psm-badge", function (e) {
+		e.stopPropagation();
+		const $td = $(this).closest("td.psm-cell");
+		if (!$td.hasClass("on") || $td.find(".psm-override-input").length) return;
+		const $badge = $(this).hide();
+		const atual = $td.attr("data-override") || "";
+		const $input = $(`<input type="number" step="0.01" class="psm-override-input">`)
+			.val(atual)
+			.appendTo($td);
+		$input.trigger("focus");
+		$input[0].select();
+
+		const commit = (cancelar) => {
+			if (!cancelar) {
+				const novo = $input.val();
+				const valor = novo !== "" ? flt(novo) : "";
+				$td.attr("data-override", valor);
+				$badge.text(valor ? fmt(valor) : "").toggleClass("has-val", !!valor);
+			}
+			$input.remove();
+			$badge.show();
+		};
+		$input.on("blur", () => commit(false));
+		$input.on("keydown", (ev) => {
+			if (ev.key === "Enter") { ev.preventDefault(); $input.trigger("blur"); }
+			// Unbind blur first — removing a focused input can itself fire a native
+			// blur, which would re-run commit(false) right after this cancel and
+			// silently resurrect whatever was typed.
+			if (ev.key === "Escape") { ev.preventDefault(); $input.off("blur"); commit(true); }
+		});
 	});
 
 	$w.on("click", ".psm-col-toggle", function (e) {
