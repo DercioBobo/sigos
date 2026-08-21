@@ -1162,7 +1162,15 @@ def marcar_ausencia_rapida(
 				  "para alterações a uma folha submetida.").format(nome),
 				title=_("Folha Já Submetida"),
 			)
-		doc = frappe.get_doc("Ausencias", nome)
+		if existente_docstatus == 2:
+			# Cancelled — amend it (same as the standard Frappe "Amend" flow) instead
+			# of editing the cancelled doc directly, which check_docstatus_transition
+			# rejects. copy_doc + amended_from makes Frappe name the new doc
+			# "<nome>-1" and bypass our fixed-name autoname (see Ausencias.autoname).
+			doc = frappe.copy_doc(frappe.get_doc("Ausencias", nome))
+			doc.amended_from = nome
+		else:
+			doc = frappe.get_doc("Ausencias", nome)
 	else:
 		doc = frappe.new_doc("Ausencias")
 		doc.data = data
