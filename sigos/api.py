@@ -13,7 +13,7 @@ PAPEIS_INTERNOS = (
 	"System Manager", "SIGOS Manager", "Aprovador RH",
 	"Aprovador Operações", "Operações SIGOS", "Supervisor SIGOS",
 )  # baseline — every real SIGOS user holds at least one of these; no portal/guest access exists.
-PAPEIS_OPERACOES = ("System Manager", "SIGOS Manager", "Aprovador Operações")
+PAPEIS_OPERACOES = ("System Manager", "SIGOS Manager", "Aprovador Operações", "Operações SIGOS")
 # ^ matches Vigilante/Escala Do Vigilante/Posto De Vigilancia's own write roster.
 PAPEIS_SALARIO = ("System Manager", "SIGOS Manager", "Aprovador RH", "RH Normal")
 # ^ matches Vigilante's permlevel-2 (salário/dados bancários) write roster.
