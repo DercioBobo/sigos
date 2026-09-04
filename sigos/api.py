@@ -1514,14 +1514,19 @@ def fundir_vigilante_duplicado(duplicado, correto, confirmar=0):
 
 	dup_funcionario, cor_funcionario = dup.funcionario, cor.funcionario
 
+	# No ignore_permissions kwarg here — this Frappe build's rename_doc() doesn't
+	# take one (older signature than the current version-15 tip). Not needed
+	# anyway: the frappe.only_for check above already restricts this to
+	# System Manager/SIGOS Manager, who hold write permission on both doctypes,
+	# so rename_doc's own internal permission check passes on its own.
 	# Vigilante first: repoints everything (Rotatividade, Participação, escala
 	# rows, ..., AND Employee.custom_vigilante) from dup -> cor, then deletes dup.
-	frappe.rename_doc("Vigilante", dup.name, cor.name, merge=True, force=True, ignore_permissions=True)
+	frappe.rename_doc("Vigilante", dup.name, cor.name, merge=True, force=True)
 
 	if dup_funcionario and cor_funcionario and dup_funcionario != cor_funcionario:
 		# Both had an Employee — consolidate onto the correct one (payroll/leave
 		# history included), then delete the duplicate's.
-		frappe.rename_doc("Employee", dup_funcionario, cor_funcionario, merge=True, force=True, ignore_permissions=True)
+		frappe.rename_doc("Employee", dup_funcionario, cor_funcionario, merge=True, force=True)
 	elif dup_funcionario and not cor_funcionario:
 		# Only the duplicate got as far as having an Employee — adopt it onto the
 		# correct Vigilante rather than orphaning/losing it.
