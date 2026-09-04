@@ -58,6 +58,10 @@ frappe.ui.form.on("Vigilante", {
 		_verificar_duplicados(frm);
 	},
 
+	mecanografico(frm) {
+		_verificar_duplicados(frm);
+	},
+
 	delegacao(frm) {
 		frm.set_value("posto_de_vigilancia", "");
 		frm.set_query("posto_de_vigilancia", () => ({
@@ -409,7 +413,10 @@ function _verificar_duplicados(frm) {
 	frm.$wrapper.find(".sigos-vig-dup-warn").remove();
 
 	const nome = (frm.doc.nome_completo || "").trim();
-	if (nome.split(/\s+/).filter(Boolean).length < 2) return; // need at least 2 name parts to bother
+	const temNome = nome.split(/\s+/).filter(Boolean).length >= 2; // need at least 2 name parts for the fuzzy hint to bother
+	// numero_documento/mecanografico are exact-match lookups — worth checking even
+	// while the name itself is still too short (e.g. RH keys the mecanográfico first).
+	if (!temNome && !frm.doc.numero_documento && !frm.doc.mecanografico) return;
 
 	_dup_timer = setTimeout(() => {
 		frappe.call({
@@ -417,6 +424,7 @@ function _verificar_duplicados(frm) {
 			args: {
 				nome,
 				numero_documento: frm.doc.numero_documento || null,
+				mecanografico: frm.doc.mecanografico || null,
 				excluir: frm.is_new() ? null : frm.doc.name,
 			},
 		}).then((r) => _render_duplicados(frm, r.message || {}));
@@ -427,26 +435,40 @@ function _render_duplicados(frm, data) {
 	frm.$wrapper.find(".sigos-vig-dup-warn").remove();
 
 	const porDoc = data.por_documento || [];
-	const porNome = (data.por_nome || []).filter((r) => !porDoc.some((d) => d.name === r.name));
-	if (!porDoc.length && !porNome.length) return;
+	const porMec = data.por_mecanografico || [];
+	const exactos = new Set([...porDoc.map((r) => r.name), ...porMec.map((r) => r.name)]);
+	const porNome = (data.por_nome || []).filter((r) => !exactos.has(r.name));
+	if (!porDoc.length && !porMec.length && !porNome.length) return;
 
 	_inject_dup_css();
 	const esc = frappe.utils.escape_html;
 
-	const linha = (r, forte) => `
+	const linha = (r, badge) => `
 		<div class="sigos-dup-row" data-name="${esc(r.name)}">
 			<span class="sigos-dup-nome">${esc(r.nome_completo)}</span>
 			<span class="sigos-dup-meta">${esc(r.name)} · ${esc(r.status || "")}${r.delegacao ? " · " + esc(r.delegacao) : ""}</span>
-			${forte ? `<span class="sigos-dup-badge">${__("Mesmo Documento")}</span>` : ""}
+			${badge ? `<span class="sigos-dup-badge">${badge}</span>` : ""}
 		</div>`;
 
-	const linhas = porDoc.map((r) => linha(r, true)).join("") + porNome.map((r) => linha(r, false)).join("");
-	const titulo = porDoc.length
-		? __("Já existe um vigilante com o mesmo número de documento:")
-		: __("Possível duplicado — nome semelhante a vigilante(s) já existente(s):");
+	// mecanografico is a HARD block on save (see vigilante.py
+	// _bloquear_mecanografico_duplicado) — numero_documento stays advisory-only,
+	// like the fuzzy name hint, so the wording only promises "won't save" for the
+	// mecanografico case.
+	const linhas = porMec.map((r) => linha(r, __("Mesmo Nº Mecanográfico"))).join("")
+		+ porDoc.map((r) => linha(r, __("Mesmo Documento"))).join("")
+		+ porNome.map((r) => linha(r, null)).join("");
+
+	let titulo;
+	if (porMec.length) {
+		titulo = __("Já existe um vigilante com este número mecanográfico — não será possível guardar até corrigir:");
+	} else if (porDoc.length) {
+		titulo = __("Já existe um vigilante com o mesmo número de documento:");
+	} else {
+		titulo = __("Possível duplicado — nome semelhante a vigilante(s) já existente(s):");
+	}
 
 	const $warn = $(`
-		<div class="sigos-vig-dup-warn ${porDoc.length ? "is-forte" : ""}">
+		<div class="sigos-vig-dup-warn ${(porDoc.length || porMec.length) ? "is-forte" : ""}">
 			<div class="sigos-dup-title">⚠ ${titulo}</div>
 			${linhas}
 		</div>`);

@@ -1338,7 +1338,7 @@ def get_vigilante_dash(vigilante):
 
 
 @frappe.whitelist()
-def buscar_vigilantes_similares(nome, numero_documento=None, excluir=None):
+def buscar_vigilantes_similares(nome, numero_documento=None, mecanografico=None, excluir=None):
 	"""
 	Duplicate hint for the Vigilante form: as RH/Ops type a name, surface any
 	existing guard that looks like the same person — a mistyped re-entry
@@ -1346,14 +1346,19 @@ def buscar_vigilantes_similares(nome, numero_documento=None, excluir=None):
 	common failure mode this catches, not exact matches (the naming series
 	means no unique-name constraint exists to lean on).
 
-	Two independent signals, returned separately so the caller can weight them:
-	- por_documento: EXACT numero_documento match — the strongest signal,
-	  same BI/Passport can't belong to two people.
+	Three independent signals, returned separately so the caller can weight them:
+	- por_documento: EXACT numero_documento match — a strong signal (same
+	  BI/Passport can't belong to two people), advisory only.
+	- por_mecanografico: EXACT mecanografico match — the strongest signal,
+	  it's the guard's permanent personnel number (1:1 with Employee via
+	  sync.py). This one is ALSO enforced as a hard block on save, see
+	  Vigilante._bloquear_mecanografico_duplicado in vigilante.py — this
+	  lookup just lets the form warn before the user even hits save.
 	- por_nome: fuzzy name match (token overlap + string similarity) — a
 	  hint, not proof; common names can collide legitimately.
 
-	Never blocks anything — purely advisory, capped and cheap (SQL LIKE
-	pre-filter on name tokens before any Python-side scoring).
+	Never blocks anything on its own — purely advisory, capped and cheap
+	(SQL LIKE pre-filter on name tokens before any Python-side scoring).
 	"""
 	frappe.only_for(PAPEIS_INTERNOS)
 	import re
@@ -1377,6 +1382,16 @@ def buscar_vigilantes_similares(nome, numero_documento=None, excluir=None):
 			limit=5,
 		)
 		por_documento = rows
+
+	por_mecanografico = []
+	if mecanografico:
+		rows = frappe.get_all(
+			"Vigilante",
+			filters={"mecanografico": mecanografico, "name": ["!=", excluir]},
+			fields=campos,
+			limit=5,
+		)
+		por_mecanografico = rows
 
 	nome_norm = normalizar(nome)
 	tokens = [t for t in nome_norm.split() if len(t) >= 3]
@@ -1416,7 +1431,146 @@ def buscar_vigilantes_similares(nome, numero_documento=None, excluir=None):
 		por_nome.sort(key=lambda r: -r["score"])
 		por_nome = por_nome[:5]
 
-	return {"por_nome": por_nome, "por_documento": por_documento}
+	return {"por_nome": por_nome, "por_documento": por_documento, "por_mecanografico": por_mecanografico}
+
+
+def _contar_ligacoes(doctype, name):
+	"""
+	Read-only preview of what currently links to `name` — every OTHER doctype
+	(including child tables) with a Link field pointing at `doctype`, counted.
+	Reuses Frappe's own `get_link_fields`, the exact same field discovery
+	`rename_doc(..., merge=True)` uses internally to know what to repoint, so
+	this report matches reality. Only fieldtype "Link" is covered (not
+	"Dynamic Link" — SIGOS itself never uses those against Vigilante/Employee;
+	a stray core one, e.g. Contact/Address, would still be handled correctly
+	by the merge itself, just wouldn't show up in this preview).
+	"""
+	from frappe.model.rename_doc import get_link_fields
+
+	ligacoes = {}
+	for lf in get_link_fields(doctype):
+		if lf.get("issingle"):
+			continue
+		n = frappe.db.count(lf["parent"], {lf["fieldname"]: name})
+		if n:
+			ligacoes[f"{lf['parent']}.{lf['fieldname']}"] = n
+	return ligacoes
+
+
+@frappe.whitelist()
+def fundir_vigilante_duplicado(duplicado, correto, confirmar=0):
+	"""
+	One-off cleanup for an accidental duplicate Vigilante confirmed AFTER the
+	fact (buscar_vigilantes_similares above is the before-the-fact warning).
+	A plain delete_doc() can't get through: Vigilante and its own Employee
+	reference each other (funcionario / Employee.custom_vigilante), and ~15
+	other SIGOS doctypes link to Vigilante while several more link to Employee
+	(Salary Slip / Salary Structure Assignment included, on the core side).
+
+	Instead of hand-rolling reassignment across every one of those, this uses
+	Frappe's own document-merge machinery (frappe.rename_doc(..., merge=True)):
+	it bulk-repoints EVERY Link field across the whole system — including
+	child tables like Tabela De Escala De Vigilante — from `duplicado` to
+	`correto`, then deletes `duplicado`. So a duplicate that already
+	accumulated real escala/faltas/salary history doesn't lose it — that
+	history lands on the correct record instead. Runs it twice: once for the
+	two Vigilante docs, once for their two Employee docs (only if both/either
+	have one — plenty of duplicates are still Pré-Admissão with no Employee
+	yet, nothing to merge on that side).
+
+	allow_rename=0 on Vigilante would normally block this — force=True is the
+	documented bypass for exactly that flag, nothing else.
+
+	System Manager / SIGOS Manager only. DRY RUN by default (confirmar=0):
+	returns a report of the two records plus everything currently linked to
+	the duplicate, without touching anything — read that first. Pass
+	confirmar=1 to actually execute. Irreversible.
+	"""
+	frappe.only_for(("System Manager", "SIGOS Manager"))
+
+	if duplicado == correto:
+		frappe.throw(_("Duplicado e correto não podem ser o mesmo registo."))
+
+	dup = frappe.get_doc("Vigilante", duplicado)
+	cor = frappe.get_doc("Vigilante", correto)
+
+	relatorio = {
+		"duplicado": {
+			"name": dup.name, "nome_completo": dup.nome_completo,
+			"status": dup.status, "funcionario": dup.funcionario,
+		},
+		"correto": {
+			"name": cor.name, "nome_completo": cor.nome_completo,
+			"status": cor.status, "funcionario": cor.funcionario,
+		},
+		"vigilante_ligacoes": _contar_ligacoes("Vigilante", dup.name),
+	}
+	if dup.funcionario:
+		relatorio["employee_ligacoes"] = _contar_ligacoes("Employee", dup.funcionario)
+
+	if not int(confirmar):
+		relatorio["dry_run"] = True
+		return relatorio
+
+	dup_funcionario, cor_funcionario = dup.funcionario, cor.funcionario
+
+	# Vigilante first: repoints everything (Rotatividade, Participação, escala
+	# rows, ..., AND Employee.custom_vigilante) from dup -> cor, then deletes dup.
+	frappe.rename_doc("Vigilante", dup.name, cor.name, merge=True, force=True, ignore_permissions=True)
+
+	if dup_funcionario and cor_funcionario and dup_funcionario != cor_funcionario:
+		# Both had an Employee — consolidate onto the correct one (payroll/leave
+		# history included), then delete the duplicate's.
+		frappe.rename_doc("Employee", dup_funcionario, cor_funcionario, merge=True, force=True, ignore_permissions=True)
+	elif dup_funcionario and not cor_funcionario:
+		# Only the duplicate got as far as having an Employee — adopt it onto the
+		# correct Vigilante rather than orphaning/losing it.
+		frappe.db.set_value("Employee", dup_funcionario, "custom_vigilante", cor.name, update_modified=False)
+		frappe.db.set_value("Vigilante", cor.name, "funcionario", dup_funcionario, update_modified=False)
+
+	frappe.db.commit()
+
+	from sigos.timeline import registar
+	registar(cor.name, _("Vigilante duplicado <b>{0}</b> fundido neste registo (dados associados transferidos) e removido.").format(dup.name))
+
+	relatorio["executado"] = True
+	return relatorio
+
+
+@frappe.whitelist()
+def listar_vigilantes_duplicados_exatos():
+	"""
+	Cheap, indexed group-by scan for EXACT duplicate signals across the whole
+	Vigilante table — mecanografico or numero_documento shared by 2+ records.
+	Feeds the "Duplicados De Vigilante" page's auto-detected list, so RH/ops
+	don't have to already know the record names before using
+	fundir_vigilante_duplicado. Deliberately does NOT do a fuzzy near-duplicate
+	name scan here (that's O(n^2) over the whole table) — the form's live hint
+	(buscar_vigilantes_similares) already catches those going forward; this is
+	only about cheaply surfacing EXISTING exact-match duplicates.
+	"""
+	frappe.only_for(("System Manager", "SIGOS Manager"))
+	campos = ["name", "nome_completo", "status", "delegacao", "mecanografico", "numero_documento"]
+
+	grupos = []
+	for campo in ("mecanografico", "numero_documento"):
+		valores = frappe.db.sql(
+			f"""
+			select `{campo}` as valor, count(*) as n
+			from `tabVigilante`
+			where `{campo}` is not null and `{campo}` != ''
+			group by `{campo}`
+			having count(*) > 1
+			""",
+			as_dict=True,
+		)
+		for v in valores:
+			membros = frappe.get_all(
+				"Vigilante", filters={campo: v.valor}, fields=campos, order_by="creation asc"
+			)
+			grupos.append({"tipo": campo, "valor": v.valor, "membros": membros})
+
+	return grupos
 
 
 @frappe.whitelist()

@@ -1,0 +1,14 @@
+{
+ "content": null,
+ "doctype": "Page",
+ "module": "Security Ops",
+ "name": "duplicados-de-vigilante",
+ "page_name": "duplicados-de-vigilante",
+ "standard": "Yes",
+ "system_page": 0,
+ "title": "Duplicados De Vigilante",
+ "roles": [
+  { "role": "System Manager" },
+  { "role": "SIGOS Manager" }
+ ]
+}

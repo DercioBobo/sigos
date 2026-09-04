@@ -53,6 +53,7 @@ class Vigilante(Document):
 
 	def validate(self):
 		self._validar_data_admissao()           # required before admission/Employee creation
+		self._bloquear_mecanografico_duplicado()  # hard stop — before an Employee gets created for a dupe
 		self._criar_employee_se_necessario()    # must run before the link check
 		self._auto_activar_com_posto()
 		self._validar_status_com_posto()
@@ -415,6 +416,32 @@ class Vigilante(Document):
 				_("Preencha a <b>Data de Admissão</b> antes de admitir o vigilante — "
 				  "é a data de início (Date of Joining) do Funcionário."),
 				title=_("Data de Admissão Obrigatória"),
+			)
+
+	def _bloquear_mecanografico_duplicado(self):
+		"""
+		Hard stop — unlike _avisar_duplicado_por_documento below (numero_documento)
+		and the form's fuzzy-name hint (buscar_vigilantes_similares in api.py),
+		which are both advisory only, mecanografico is the guard's permanent
+		personnel number and is mirrored 1:1 onto Employee.custom_mecanografico
+		(sync.py) plus used as the VIG<->FUNC number mirror at Employee creation.
+		Two Vigilantes sharing one would make payroll/HR reports and that mirror
+		ambiguous, so this actually blocks the save (checked across ALL statuses,
+		including Demitido — a departed guard's number is not up for reuse).
+		"""
+		if not self.mecanografico:
+			return
+		outro = frappe.db.get_value(
+			"Vigilante",
+			{"mecanografico": self.mecanografico, "name": ["!=", self.name or "__new__"]},
+			["name", "nome_completo"],
+		)
+		if outro:
+			frappe.throw(
+				_("Já existe um vigilante com o número mecanográfico <b>{0}</b> — "
+				  "<b>{1}</b> ({2}). Cada vigilante deve ter um número mecanográfico único.")
+				.format(self.mecanografico, outro[1], outro[0]),
+				title=_("Número Mecanográfico Duplicado"),
 			)
 
 	def _guardar_mudanca_regime(self):
