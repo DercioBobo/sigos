@@ -121,13 +121,21 @@ class Ausencias(Document):
 			# for the same data/período/grupo, alongside the normal roster sheet — each
 			# one a separate, independently-filed record. Not a duplicate sheet.
 			return
-		existe = frappe.db.exists("Ausencias", {
+		# Only ONE normal roster sheet per data/período/grupo — but special records
+		# (Abandono de Posto, Falta de Reserva) sitting on the same data/período/grupo
+		# are NOT that sheet and must never block it. Filter them out in Python so a
+		# NULL tipo_de_registo (legacy normal sheets) still counts as a real duplicate.
+		candidatos = frappe.get_all("Ausencias", filters={
 			"data": self.data,
 			"periodo": self.periodo,
 			"grupo_delegados": self.grupo_delegados,
 			"docstatus": ["<", 2],
 			"name": ["!=", self.name],
-		})
+		}, fields=["name", "tipo_de_registo"])
+		existe = next(
+			(c.name for c in candidatos if (c.tipo_de_registo or "") not in TIPOS_DE_REGISTO_ESPECIAIS),
+			None,
+		)
 		if existe:
 			frappe.throw(
 				_("Já existe a folha <b>{0}</b> para este dia, período e grupo.").format(existe),
