@@ -75,8 +75,11 @@ frappe.ui.form.on("Ausencias", {
 
 	before_save(frm) {
 		// Stamp the hora ONLY on actually-late saves — on-time docs keep it empty.
+		// Maputo time, same basis as the server (see _agora_local / _hms_maputo).
 		if (_atraso_estado === "tardia") {
-			frm.set_value("hora_submissao_tardia", new Date().toLocaleTimeString("pt-PT", { hour12: false }));
+			const t = _hms_maputo();
+			const pad = (n) => String(n).padStart(2, "0");
+			frm.set_value("hora_submissao_tardia", `${pad(t.h)}:${pad(t.m)}:${pad(t.s)}`);
 		}
 	},
 });
@@ -945,9 +948,11 @@ function _verificar_horario(frm) {
 
 	const aplicar = (hora_limite) => {
 		// numeric compare — the setting may arrive as "9:30:00" (timedelta serialized
-		// without leading zero), which breaks string comparison
-		const agora = new Date();
-		const agora_s = agora.getHours() * 3600 + agora.getMinutes() * 60 + agora.getSeconds();
+		// without leading zero), which breaks string comparison.
+		// Time is read in Africa/Maputo (not the browser's zone, not the site's
+		// System Settings zone) so this preview and the server enforcer always agree.
+		const agora = _hms_maputo();
+		const agora_s = agora.h * 3600 + agora.m * 60 + agora.s;
 		const limite_s = _segundos(hora_limite);
 		if (agora_s > limite_s) {
 			_atraso_estado = "tardia";
@@ -969,6 +974,23 @@ function _verificar_horario(frm) {
 function _segundos(hms) {
 	const p = String(hms || "0:0:0").split(":");
 	return (+p[0] || 0) * 3600 + (+p[1] || 0) * 60 + (+p[2] || 0);
+}
+
+// Current wall-clock time in Mozambique (Africa/Maputo), independent of the
+// browser's own time zone — mirrors _agora_local() on the server so the late
+// chip and the save-time enforcer never disagree.
+function _hms_maputo() {
+	try {
+		const s = new Intl.DateTimeFormat("en-GB", {
+			timeZone: "Africa/Maputo", hour12: false,
+			hour: "2-digit", minute: "2-digit", second: "2-digit",
+		}).format(new Date());
+		const [h, m, sec] = s.split(":").map(Number);
+		return { h, m, s: sec };
+	} catch (e) {
+		const d = new Date();
+		return { h: d.getHours(), m: d.getMinutes(), s: d.getSeconds() };
+	}
 }
 
 function _pintar_estado(frm) {

@@ -2,10 +2,26 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 from frappe.model.naming import make_autoname
-from frappe.utils import now_datetime
 from sigos.utils import calcular_n_faltas_efetivo
 
 TIPOS_DE_REGISTO_ESPECIAIS = ("Abandono de Posto", "Falta de Reserva")
+
+
+def _agora_local():
+	"""Wall-clock time in Mozambique (Africa/Maputo, UTC+2, no DST) regardless of
+	the site's System Settings time zone. The late-submission cutoff is compared
+	against this on the server AND previewed on the deck from the operator's
+	browser clock — the two must agree, so both are pinned to Maputo."""
+	from datetime import datetime
+
+	try:
+		from zoneinfo import ZoneInfo
+
+		return datetime.now(ZoneInfo("Africa/Maputo"))
+	except Exception:
+		from datetime import timedelta, timezone
+
+		return datetime.now(timezone(timedelta(hours=2)))
 
 
 class Ausencias(Document):
@@ -427,17 +443,19 @@ class Ausencias(Document):
 		"""
 		Block save if submission is late and no motivo_atraso was provided.
 		The JS guides the user to fill motivo_atraso; this is the server enforcer.
+		Time is evaluated in Africa/Maputo (see _agora_local) so the server and the
+		deck's live chip never disagree because of a misconfigured site time zone.
 		"""
 		if self.motivo_atraso:
 			if not self.hora_submissao_tardia:
-				self.hora_submissao_tardia = now_datetime().strftime("%H:%M:%S")
+				self.hora_submissao_tardia = _agora_local().strftime("%H:%M:%S")
 			return
 
 		limite_str = self._hora_limite()
 		if not limite_str:
 			return
 
-		agora = now_datetime().strftime("%H:%M:%S")
+		agora = _agora_local().strftime("%H:%M:%S")
 		if agora > limite_str:
 			frappe.throw(
 				_("Submissão fora do horário (<b>{0}</b>). Limite: <b>{1}</b>. "
