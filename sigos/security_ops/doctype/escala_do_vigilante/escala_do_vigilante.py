@@ -37,6 +37,7 @@ class EscalaDoVigilante(Document):
 			self.name = f"{base}-{n}"
 
 	def validate(self):
+		self._bloquear_mudanca_de_identidade()
 		self._validar_um_por_posto()
 		self._validar_um_por_delegacao()
 		self._sincronizar_turno_por_equipa()
@@ -46,6 +47,39 @@ class EscalaDoVigilante(Document):
 		self.reconciliar_escala()
 
 	# ─── Validation ────────────────────────────────────────────────────────────
+
+	def _bloquear_mudanca_de_identidade(self):
+		"""
+		posto / delegação / regime are the escala's IDENTITY (its name, its generated
+		rows' posto+regime, the Vigilante↔escala keystone lookup, Vaga De Posto and
+		billing all key on the pair) — editing them on a saved escala silently
+		desyncs all of those. Locked after the first save, same as tipo_de_escala;
+		enforced here (not only in the deck) so the API/list-view can't bypass it.
+		Guards move between pairs via Troca De Regime / Rotatividade / Atribuir —
+		the keystone migrates the escala for them.
+		"""
+		before = self.get_doc_before_save()
+		if not before:
+			return
+		campos = {
+			"posto_de_vigilancia": _("Posto"),
+			"delegacao": _("Delegação"),
+			"regime_do_vigilante": _("Regime"),
+		}
+		mudados = [
+			rotulo for campo, rotulo in campos.items()
+			if (self.get(campo) or None) != (before.get(campo) or None)
+		]
+		if mudados:
+			frappe.throw(
+				_("Não é possível alterar <b>{0}</b> de uma escala já criada — o posto e o regime "
+				  "definem a identidade da escala (calendário, cobertura, vagas, faturação).<br><br>"
+				  "Para mudar um vigilante de regime ou de posto use <b>Troca De Regime</b>, "
+				  "<b>Rotatividade</b> ou <b>Atribuir Vigilantes</b> — a escala acompanha o vigilante "
+				  "automaticamente. Se a escala foi criada com o posto/regime errado, arquive-a e "
+				  "crie uma nova.").format(", ".join(mudados)),
+				title=_("Identidade da Escala Bloqueada"),
+			)
 
 	def _auto_arquivar_se_vazia(self):
 		"""

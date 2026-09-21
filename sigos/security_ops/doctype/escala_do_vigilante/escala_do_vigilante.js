@@ -1086,6 +1086,7 @@ function _build_deck_shell(frm, w, editable, key) {
 				<div class="escd-field"><label>${__("Regime")}</label><div id="escd-c-regime"></div></div>
 				<div class="escd-field"><label>${__("Início do Ciclo")}</label><div id="escd-c-inicio"></div></div>
 			</div>
+			${!frm.is_new() && editable ? `<div class="escd-hint" style="margin-top:8px">${__("Posto e regime não podem ser alterados numa escala criada. Para mudar um vigilante use Troca De Regime, Rotatividade ou Atribuir Vigilantes — a escala acompanha-o.")}</div>` : ""}
 			<div class="escd-tiles" data-escd-tiles></div>
 			<div class="escd-actions">
 				<button type="button" class="escd-btn" data-act="sync">${__("Sincronizar Vigilantes")}</button>
@@ -1125,7 +1126,7 @@ function _build_deck_shell(frm, w, editable, key) {
 	_toggle_tipo_wrap();
 
 	const c_posto = frappe.ui.form.make_control({
-		df: { fieldtype: "Link", fieldname: "posto_de_vigilancia", options: "Posto De Vigilancia", read_only: ro,
+		df: { fieldtype: "Link", fieldname: "posto_de_vigilancia", options: "Posto De Vigilancia", read_only: ro || !frm.is_new() ? 1 : 0,
 			get_query: () => ({ filters: { estado: "Activo" } }),
 			onchange: () => {
 				const v = c_posto.get_value();
@@ -1136,7 +1137,7 @@ function _build_deck_shell(frm, w, editable, key) {
 	if (frm.doc.posto_de_vigilancia) c_posto.set_value(frm.doc.posto_de_vigilancia);
 
 	const c_delegacao = frappe.ui.form.make_control({
-		df: { fieldtype: "Link", fieldname: "delegacao", options: "Delegacao", read_only: ro,
+		df: { fieldtype: "Link", fieldname: "delegacao", options: "Delegacao", read_only: ro || !frm.is_new() ? 1 : 0,
 			onchange: () => {
 				const v = c_delegacao.get_value();
 				if ((v || "") !== (frm.doc.delegacao || "")) frm.set_value("delegacao", v || null).then(() => _deck_identity(frm));
@@ -1146,7 +1147,7 @@ function _build_deck_shell(frm, w, editable, key) {
 	if (frm.doc.delegacao) c_delegacao.set_value(frm.doc.delegacao);
 
 	const c_regime = frappe.ui.form.make_control({
-		df: { fieldtype: "Link", fieldname: "regime_do_vigilante", options: "Regime", read_only: ro,
+		df: { fieldtype: "Link", fieldname: "regime_do_vigilante", options: "Regime", read_only: ro || !frm.is_new() ? 1 : 0,
 			onchange: () => {
 				const v = c_regime.get_value();
 				if ((v || "") !== (frm.doc.regime_do_vigilante || "")) frm.set_value("regime_do_vigilante", v || null).then(() => { _deck_identity(frm); _load_and_render(frm); });
