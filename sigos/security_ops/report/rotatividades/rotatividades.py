@@ -49,6 +49,7 @@ def execute(filters=None):
 			v.nome_completo             AS nome_vigilante,
 			r.mecanografico             AS mecanografico,
 			r.categoria_vigilante      AS categoria,
+			op.operacao                AS operacao,
 			r.motivo                   AS motivo,
 			r.antigo_posto              AS antigo_posto,
 			r.antigo_posto_nome         AS antigo_posto_nome,
@@ -62,6 +63,7 @@ def execute(filters=None):
 			r.docstatus                 AS docstatus
 		FROM `tabRotatividade` r
 		LEFT JOIN `tabVigilante` v ON v.name = r.vigilante
+		LEFT JOIN `tabOperacao De Rotatividade` op ON op.name = r.abreviatura_op
 		{where}
 		ORDER BY r.data DESC, r.creation DESC
 		""",
@@ -93,6 +95,7 @@ def _columns():
 		{"label": _("Vigilante"), "fieldname": "vigilante", "fieldtype": "Data", "width": 220},
 		{"label": _("Mecanográfico"), "fieldname": "mecanografico", "fieldtype": "Data", "width": 110},
 		{"label": _("Categoria"), "fieldname": "categoria", "fieldtype": "Data", "width": 130},
+		{"label": _("Operação"), "fieldname": "operacao", "fieldtype": "Data", "width": 200},
 		{"label": _("Tipo"), "fieldname": "motivo", "fieldtype": "Data", "width": 110},
 		{"label": _("Posto Antigo"), "fieldname": "antigo_posto", "fieldtype": "Data", "width": 220},
 		{"label": _("Posto Novo"), "fieldname": "novo_posto", "fieldtype": "Data", "width": 220},
