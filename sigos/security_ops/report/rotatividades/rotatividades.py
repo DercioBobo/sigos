@@ -49,7 +49,6 @@ def execute(filters=None):
 			v.nome_completo             AS nome_vigilante,
 			r.mecanografico             AS mecanografico,
 			r.categoria_vigilante      AS categoria,
-			r.abreviatura_op           AS operacao,
 			r.motivo                   AS motivo,
 			r.antigo_posto              AS antigo_posto,
 			r.antigo_posto_nome         AS antigo_posto_nome,
@@ -72,8 +71,17 @@ def execute(filters=None):
 
 	for row in data:
 		row["status"] = _(STATUS_POR_DOCSTATUS.get(row.pop("docstatus"), ""))
+		row["vigilante"] = _concat(row.pop("vigilante"), row.pop("nome_vigilante"))
+		row["antigo_posto"] = _concat(row.pop("antigo_posto"), row.pop("antigo_posto_nome"))
+		row["novo_posto"] = _concat(row.pop("novo_posto"), row.pop("novo_posto_nome"))
 
 	return _columns(), data
+
+
+def _concat(codigo, nome):
+	if codigo and nome:
+		return f"{codigo} - {nome}"
+	return codigo or nome or ""
 
 
 def _columns():
@@ -82,16 +90,12 @@ def _columns():
 		{"label": _("Data"), "fieldname": "data", "fieldtype": "Date", "width": 90},
 		{"label": _("Estado"), "fieldname": "status", "fieldtype": "Data", "width": 90},
 		{"label": _("Delegação"), "fieldname": "delegacao", "fieldtype": "Link", "options": "Delegacao", "width": 110},
-		{"label": _("Vigilante"), "fieldname": "vigilante", "fieldtype": "Link", "options": "Vigilante", "width": 110},
-		{"label": _("Nome do Vigilante"), "fieldname": "nome_vigilante", "fieldtype": "Data", "width": 180},
+		{"label": _("Vigilante"), "fieldname": "vigilante", "fieldtype": "Data", "width": 220},
 		{"label": _("Mecanográfico"), "fieldname": "mecanografico", "fieldtype": "Data", "width": 110},
 		{"label": _("Categoria"), "fieldname": "categoria", "fieldtype": "Data", "width": 130},
-		{"label": _("Operação"), "fieldname": "operacao", "fieldtype": "Link", "options": "Operacao De Rotatividade", "width": 130},
 		{"label": _("Tipo"), "fieldname": "motivo", "fieldtype": "Data", "width": 110},
-		{"label": _("Posto Antigo"), "fieldname": "antigo_posto", "fieldtype": "Link", "options": "Posto De Vigilancia", "width": 150},
-		{"label": _("Posto Novo"), "fieldname": "novo_posto", "fieldtype": "Link", "options": "Posto De Vigilancia", "width": 150},
-		{"label": _("Nome do Posto (Antigo)"), "fieldname": "antigo_posto_nome", "fieldtype": "Data", "width": 160},
-		{"label": _("Nome do Posto (Novo)"), "fieldname": "novo_posto_nome", "fieldtype": "Data", "width": 160},
+		{"label": _("Posto Antigo"), "fieldname": "antigo_posto", "fieldtype": "Data", "width": 220},
+		{"label": _("Posto Novo"), "fieldname": "novo_posto", "fieldtype": "Data", "width": 220},
 		{"label": _("Cliente Antigo"), "fieldname": "cliente_antigo_posto", "fieldtype": "Data", "width": 120},
 		{"label": _("Cliente Novo"), "fieldname": "cliente_novo_posto", "fieldtype": "Data", "width": 120},
 		{"label": _("Regime"), "fieldname": "regime", "fieldtype": "Data", "width": 90},
