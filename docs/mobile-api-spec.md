@@ -208,6 +208,11 @@ phone connection without dedup logic on your side.
   `Substituto`→`vigilante_substituto`, `Dobra de Turno`→`vigilante_a_dobrar`,
   `Meia Dobra`→`vigilante_a_meia_dobra`, `Adiantamento de Turno`→`vigilante_a_adiantar`,
   `Horas Extras`→`vigilante_a_horas_extras`. Send only the one that matches.
+- `motivo_atraso` (optional, free text) — required only when the mark is sent
+  after the período's submission cutoff (SIGOS Settings). Without it a late
+  call fails with "Submissão Tardia"; prompt the user for a reason and retry
+  with it filled. It's stored on the whole day's sheet (shared by the grupo),
+  not on the individual row.
 
 Response:
 ```json

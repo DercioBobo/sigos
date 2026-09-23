@@ -266,6 +266,7 @@ def marcar_ausencia(
 	proxima_accao=None,
 	vigilante_substituto=None, vigilante_a_dobrar=None, vigilante_a_meia_dobra=None,
 	vigilante_a_adiantar=None, vigilante_a_horas_extras=None,
+	motivo_atraso=None,
 ):
 	"""Mark one guard absent from `posto`. Always saved as a draft — the SMV
 	Integration role has no submit right on Ausencias, enforced by the
@@ -294,6 +295,7 @@ def marcar_ausencia(
 		vigilante_substituto=vigilante_substituto, vigilante_a_dobrar=vigilante_a_dobrar,
 		vigilante_a_meia_dobra=vigilante_a_meia_dobra, vigilante_a_adiantar=vigilante_a_adiantar,
 		vigilante_a_horas_extras=vigilante_a_horas_extras,
+		motivo_atraso=motivo_atraso,
 	)
 
 
