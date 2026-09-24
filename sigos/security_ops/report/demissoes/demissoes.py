@@ -56,7 +56,6 @@ def execute(filters=None):
 			d.motivo                AS motivo,
 			d.regime                AS regime,
 			d.uniforme              AS uniforme,
-			d.observacoes           AS observacoes,
 			v.data_admissao         AS data_admissao,
 			d.docstatus             AS docstatus,
 			(SELECT r.name FROM `tabRotatividade` r
@@ -66,11 +65,7 @@ def execute(filters=None):
 			(SELECT pd.name FROM `tabProcesso Disciplinar` pd
 				WHERE pd.vigilante = d.vigilante AND pd.docstatus = 1
 				AND pd.decisao = 'Demissão' AND pd.data = d.data_de_demissao
-				ORDER BY pd.creation DESC LIMIT 1) AS processo_disciplinar,
-			(SELECT rd.name FROM `tabReadimissao` rd
-				WHERE rd.vigilante = d.vigilante AND rd.docstatus = 1
-				AND rd.data >= d.data_de_demissao
-				ORDER BY rd.data ASC LIMIT 1) AS readmissao
+				ORDER BY pd.creation DESC LIMIT 1) AS processo_disciplinar
 		FROM `tabDemissao` d
 		LEFT JOIN `tabVigilante` v ON v.name = d.vigilante
 		{where}
@@ -150,13 +145,12 @@ def _summary(data):
 	aprovadas = [r for r in data if r.status == _("Aprovado")]
 	por_motivo = {}
 	for r in aprovadas:
+		if r.motivo == "Outro Motivo":
+			continue
 		chave = r.motivo or _("Sem Motivo")
 		por_motivo[chave] = por_motivo.get(chave, 0) + 1
 
 	summary = [
-		{"label": _("Demissões Aprovadas"), "value": len(aprovadas), "indicator": "Red", "datatype": "Int"},
-		{"label": _("Readmitidos"), "value": sum(1 for r in aprovadas if r.readmissao),
-			"indicator": "Green", "datatype": "Int"},
 		{"label": _("Uniforme Não Entregue"), "value": sum(1 for r in aprovadas if r.uniforme == "Não Entregue"),
 			"indicator": "Orange", "datatype": "Int"},
 	]
@@ -183,6 +177,4 @@ def _columns():
 		{"label": _("Uniforme"), "fieldname": "uniforme", "fieldtype": "Data", "width": 110},
 		{"label": _("Origem"), "fieldname": "origem_tipo", "fieldtype": "Data", "width": 140},
 		{"label": _("Documento de Origem"), "fieldname": "origem", "fieldtype": "Dynamic Link", "options": "origem_tipo", "width": 130},
-		{"label": _("Readmissão"), "fieldname": "readmissao", "fieldtype": "Link", "options": "Readimissao", "width": 120},
-		{"label": _("Observações"), "fieldname": "observacoes", "fieldtype": "Data", "width": 200},
 	]
