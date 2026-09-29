@@ -1,0 +1,19 @@
+{
+ "content": null,
+ "creation": "2026-09-29 00:00:00.000000",
+ "doctype": "Page",
+ "modified": "2026-09-29 00:00:00.000000",
+ "module": "Security Ops",
+ "name": "painel-geral",
+ "page_name": "painel-geral",
+ "standard": "Yes",
+ "system_page": 0,
+ "title": "Painel Geral",
+ "roles": [
+  { "role": "System Manager" },
+  { "role": "SIGOS Manager" },
+  { "role": "Aprovador Operações" },
+  { "role": "Aprovador RH" },
+  { "role": "Operações SIGOS" }
+ ]
+}
