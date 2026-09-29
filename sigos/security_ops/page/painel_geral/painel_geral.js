@@ -239,7 +239,7 @@ sigos.PainelGeral = class PainelGeral {
   </div>
 
   ${this._sec("Alertas & Relatórios", "Requer atenção", true)}
-  <div class="pg-row1">${this._ob_card("faltas", `Vigilantes com ${this.MIN_FALTAS} ou mais Faltas`, "Período seleccionado", "vigilantes",
+  <div class="pg-row1">${this._ob_card("faltas", `Vigilantes com mais de ${this.MIN_FALTAS} Faltas`, "Período seleccionado", "vigilantes",
 		["#", "Vigilante", "Nome", "Posto", "Delegação", { l: "Faltas", r: true }], 260, { status: true, periods: PG_P.faltas, csv: true })}</div>
 
   <div class="pg-card pg-users" id="pg-users-card">
@@ -409,12 +409,12 @@ sigos.PainelGeral = class PainelGeral {
 	// ============================================================ CARDS
 	_render_cards(d) {
 		if (!d) return;
-		// Regime KPIs are dynamic (one card per active regime) - rebuild them each refresh.
+		// One card per Regime in use - rebuilt each refresh.
 		this.$b.find(".pg-kpi[data-regime]").remove();
 		const $grid = this.$b.find("#pg-kpis");
 		(d.regimes || []).forEach((r) => {
 			const id = "regime-" + frappe.scrub(r.k);
-			$grid.append($(this._kpi(id, `${__("Regime")} ${frappe.utils.escape_html(r.k)}`, "amber")).attr("data-regime", r.k));
+			$grid.append($(this._kpi(id, `${__("Vigilantes")} ${frappe.utils.escape_html(r.k)}`, "amber")).attr("data-regime", r.k));
 			d[id] = r.n;
 		});
 		const max = Math.max(1, d.activos || 0);
@@ -519,14 +519,14 @@ sigos.PainelGeral = class PainelGeral {
 		if (reset) st.page = 0;
 		const q = (st.search || "").toLowerCase();
 		const filtered = q ? st.all_data.filter((r) =>
-			["nome_completo", "vigilante", "posto", "delegacao"].some((k) => (r[k] || "").toLowerCase().includes(q))
+			["nome_completo", "vigilante", "posto", "posto_nome", "delegacao"].some((k) => (r[k] || "").toLowerCase().includes(q))
 		) : st.all_data;
 		const rows = filtered.slice(0, (st.page + 1) * this.PAGE_SIZE);
 		this.$b.find("#pg-ob-faltas-tbody").html(rows.length ? rows.map((r, i) => `
 <tr><td class="pg-muted">${i + 1}</td>
   <td><a class="pg-link pg-mono" href="/app/vigilante/${encodeURIComponent(r.vigilante)}">${esc(r.vigilante)}</a></td>
   <td>${esc(r.nome_completo || "-")}</td>
-  <td>${r.posto ? `<a class="pg-link pg-mono" href="/app/posto-de-vigilancia/${encodeURIComponent(r.posto)}">${esc(r.posto)}</a>` : "-"}</td>
+  <td>${r.posto ? `<a class="pg-link" href="/app/posto-de-vigilancia/${encodeURIComponent(r.posto)}">${esc(r.posto_nome || r.posto)}</a>` : "-"}</td>
   <td>${esc(r.delegacao || "-")}</td>
   <td class="pg-r pg-num pg-bad">${r.total_faltas}</td></tr>`).join("")
 			: `<tr><td colspan="6" class="pg-empty">${__("Nenhum vigilante encontrado.")}</td></tr>`);
@@ -537,7 +537,7 @@ sigos.PainelGeral = class PainelGeral {
 		const data = this._ob.faltas.all_data || [];
 		if (!data.length) return;
 		const hdr = ["Vigilante", "Nome", "Posto", "Delegação", "Total Faltas"];
-		const rows = data.map((r) => [r.vigilante, r.nome_completo, r.posto, r.delegacao, r.total_faltas]);
+		const rows = data.map((r) => [r.vigilante, r.nome_completo, r.posto_nome || r.posto, r.delegacao, r.total_faltas]);
 		const csv = "﻿" + [hdr, ...rows].map((r) => r.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
 		const a = Object.assign(document.createElement("a"), {
 			href: URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" })),

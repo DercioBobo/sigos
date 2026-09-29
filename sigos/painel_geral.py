@@ -33,6 +33,12 @@ _FONTES = {
 }
 
 
+# SIGOS categorias (Categoria Vigilante fixtures) + supervisor = tipo OR categoria.
+_CAT_ARMADOS = ("Vigilante Armado",)
+_CAT_NORMAIS = ("Vigilante Normal",)
+_SUPERVISOR = "(tipo_de_vigilante = 'Supervisor' OR categoria = 'Supervisor')"
+
+
 def _guard():
 	from sigos.api import PAPEIS_INTERNOS
 	frappe.only_for(PAPEIS_INTERNOS)
@@ -91,7 +97,7 @@ def _serie_semanal(fonte, weeks):
 		i = date_diff(d, inicio) // 7
 		if 0 <= i < weeks:
 			values[i] += n
-	labels = [add_days(inicio, 7 * i).strftime("%d/%m") for i in range(weeks)]
+	labels = ["Sem " + add_days(inicio, 7 * i).strftime("%d/%m") for i in range(weeks)]
 	return {"labels": labels, "values": values}
 
 
@@ -152,12 +158,13 @@ def get_cards_summary():
 		  SUM(status = 'Reserva')                                       AS reservas,
 		  SUM(status = 'Activo' AND sexo = 'Feminino')                  AS mulheres,
 		  SUM(status = 'Activo' AND sexo = 'Masculino')                 AS homens,
-		  SUM(status = 'Activo' AND categoria = 'Vigilante Armado')     AS armados,
-		  SUM(status = 'Activo' AND COALESCE(categoria, '') <> 'Vigilante Armado') AS simples,
-		  SUM(status = 'Activo' AND tipo_de_vigilante = 'Supervisor')   AS supervisores,
+		  SUM(status = 'Activo' AND categoria IN %(armados)s)           AS armados,
+		  SUM(status = 'Activo' AND categoria IN %(normais)s)           AS simples,
+		  SUM(status = 'Activo' AND {sup})                              AS supervisores,
 		  COUNT(DISTINCT CASE WHEN status = 'Activo' AND COALESCE(cliente, '') <> '' THEN cliente END) AS clientes
 		FROM `tabVigilante`
-		""",
+		""".format(sup=_SUPERVISOR),
+		{"armados": _CAT_ARMADOS, "normais": _CAT_NORMAIS},
 		as_dict=True,
 	)[0]
 	postos = frappe.db.sql(
@@ -169,6 +176,7 @@ def get_cards_summary():
 	administrativos = frappe.db.count(
 		"Employee", {"status": "Active", "custom_vigilante": ["is", "not set"]}
 	)
+	# One KPI per Regime actually in use (Regime is a configurable master).
 	regimes = frappe.db.sql(
 		"""SELECT regime_do_vigilante AS k, COUNT(*) AS n FROM `tabVigilante`
 		   WHERE status = 'Activo' AND COALESCE(regime_do_vigilante, '') <> ''
@@ -296,8 +304,10 @@ def _hbar(rows):
 def get_armas_por_delegacao():
 	_guard()
 	return _hbar(frappe.db.sql(
-		"""SELECT COALESCE(NULLIF(delegacao, ''), 'Sem delegacao') AS k, COUNT(*) AS n
-		   FROM `tabArma` GROUP BY k ORDER BY n DESC""",
+		"""SELECT COALESCE(NULLIF(a.delegacao, ''), NULLIF(p.delegacao, ''), 'Sem delegacao') AS k,
+		          COUNT(*) AS n
+		   FROM `tabArma` a LEFT JOIN `tabPosto De Vigilancia` p ON p.name = a.posto
+		   GROUP BY k ORDER BY n DESC""",
 		as_dict=True,
 	))
 
@@ -318,7 +328,7 @@ def get_supervisores_por_delegacao(status="Activo"):
 	cond, p = _status_cond(status)
 	return _hbar(frappe.db.sql(
 		f"""SELECT COALESCE(NULLIF(delegacao, ''), 'Sem delegacao') AS k, COUNT(*) AS n
-		    FROM `tabVigilante` WHERE tipo_de_vigilante = 'Supervisor' AND {cond}
+		    FROM `tabVigilante` WHERE {_SUPERVISOR} AND {cond}
 		    GROUP BY k ORDER BY n DESC""",
 		p, as_dict=True,
 	))
@@ -345,7 +355,7 @@ def get_feriadores_por_delegacao():
 
 @frappe.whitelist()
 def get_vigilantes_muitas_faltas(min_faltas=8, months=6, status="Activo"):
-	"""Guards with >= min_faltas effective faltas in the window (same counting as the
+	"""Guards with MORE THAN min_faltas effective faltas in the window (same counting as the
 	Cumulativo de Faltas report). Only guards with an absence in-window are computed."""
 	_guard()
 	min_faltas = _int(min_faltas, 8, 1, 365)
@@ -357,19 +367,20 @@ def get_vigilantes_muitas_faltas(min_faltas=8, months=6, status="Activo"):
 
 	vigs = frappe.db.sql(
 		f"""SELECT DISTINCT v.name, v.nome_completo, v.posto_de_vigilancia AS posto,
-		           v.delegacao, v.status
+		           pv.nome_do_posto AS posto_nome, v.delegacao, v.status
 		    FROM `tabTabela Ausencia` ta
 		    JOIN `tabAusencias` a ON a.name = ta.parent
 		    JOIN `tabVigilante` v ON v.name = ta.vigilante
+		    LEFT JOIN `tabPosto De Vigilancia` pv ON pv.name = v.posto_de_vigilancia
 		    WHERE a.docstatus = 1 AND a.data BETWEEN %(de)s AND %(ate)s AND {cond}""",
 		p, as_dict=True,
 	)
 	out = []
 	for v in vigs:
 		total = sum(r["n_de_faltas"] for r in calcular_faltas_detalhado(v.name, de, ate))
-		if total >= min_faltas:
+		if total > min_faltas:
 			out.append({
-				"vigilante": v.name, "nome_completo": v.nome_completo, "posto": v.posto,
+				"vigilante": v.name, "nome_completo": v.nome_completo, "posto": v.posto, "posto_nome": v.posto_nome,
 				"delegacao": v.delegacao, "status": v.status, "total_faltas": total,
 			})
 	out.sort(key=lambda r: r["total_faltas"], reverse=True)
