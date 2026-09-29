@@ -4,7 +4,9 @@ called in to cover in one payroll month.
 
 A cover is a submitted Ausencias row (Tabela Ausencia) whose proxima_accao names a
 covering guard: Dobra de Turno / Meia Dobra / Horas Extras. Substituto (a Reserva
-guard filling a post) and Adiantamento de Turno are excluded — neither is paid extra.
+guard filling a post) is never paid. Adiantamento de Turno is counted as a Dobra only
+when SIGOS Settings.pagar_adiantamento_como_dobra is on (default off), same rule as
+utils.calcular_dobras_vigilante / the Salary Slip.
 
 The period is the payroll period of the chosen Mês/Ano (utils.resolver_periodo_folha,
 honours dia_corte_folha). Pricing is always proportional to each guard's own base
@@ -25,7 +27,9 @@ ACCOES = {
 	"Meia Dobra":            "vigilante_a_meia_dobra",
 	"Horas Extras":          "vigilante_a_horas_extras",
 }
+ADIANTAMENTO = ("Adiantamento de Turno", "vigilante_a_adiantar")
 _COL = {
+	"Adiantamento de Turno": "dobras",      # paid as a dobra when the setting is on
 	"Dobra de Turno": "dobras",
 	"Meia Dobra": "meias_dobras",
 	"Horas Extras": "horas_extras",
@@ -45,9 +49,12 @@ def execute(filters=None):
 	ano = int(filters.get("ano") or hoje.year)
 	de, ate = resolver_periodo_folha(mes, ano)
 
+	accoes = dict(ACCOES)
+	if frappe.db.get_single_value("SIGOS Settings", "pagar_adiantamento_como_dobra"):
+		accoes[ADIANTAMENTO[0]] = ADIANTAMENTO[1]
 
 	linhas = {}
-	for r in _coberturas(de, ate, filters):
+	for r in _coberturas(de, ate, filters, accoes):
 		l = linhas.setdefault(r.cobridor, {
 			"vigilante": r.cobridor, "nome_do_vigilante": r.nome,
 			"delegacao": r.delegacao, "categoria": r.categoria, "funcionario": r.funcionario,
@@ -73,9 +80,14 @@ def execute(filters=None):
 
 # ─────────────────────────────────────────────────────────────── data
 
-def _coberturas(de, ate, filters):
-	accoes = [filters["accao"]] if filters.get("accao") in ACCOES else list(ACCOES)
-	case = " ".join(f"WHEN '{a}' THEN ta.{ACCOES[a]}" for a in accoes)
+def _coberturas(de, ate, filters, mapa):
+	if filters.get("accao") == "Dobra de Turno":
+		accoes = [a for a in mapa if _COL[a] == "dobras"]      # incl. adiantamento if paid
+	elif filters.get("accao") in mapa:
+		accoes = [filters["accao"]]
+	else:
+		accoes = list(mapa)
+	case = " ".join(f"WHEN '{a}' THEN ta.{mapa[a]}" for a in accoes)
 	params = {"de": de, "ate": ate, "accoes": tuple(accoes)}
 
 	cond = ""

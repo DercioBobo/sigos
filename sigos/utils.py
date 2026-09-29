@@ -257,23 +257,28 @@ def calcular_faltas_vermelhas_vigilante(vigilante: str, start_date, end_date) ->
 
 def calcular_dobras_vigilante(vigilante: str, start_date, end_date) -> int:
 	"""
-	Number of EXTRA shifts a guard covered (Dobra / Adiantamento) in [start, end],
-	from SUBMITTED Ausencias. Each covered row = one extra shift worked on top of the
+	Number of paid EXTRA shifts a guard covered (Dobra de Turno) in [start, end], from
+	SUBMITTED Ausencias. Each covered row = one extra shift worked on top of the
 	guard's own — the earnings mirror of a falta. Substituto is deliberately excluded
 	(a planned replacement filling a post, not extra effort beyond one's own shift).
+	Adiantamento de Turno counts as a dobra ONLY when SIGOS Settings.
+	pagar_adiantamento_como_dobra is on (default off — not paid).
 	Single source so the slip and any report agree, like calcular_faltas_vigilante.
 	"""
 	if not vigilante:
 		return 0
+	adiantamento = ""
+	if frappe.db.get_single_value("SIGOS Settings", "pagar_adiantamento_como_dobra"):
+		adiantamento = "OR (ta.proxima_accao = 'Adiantamento de Turno' AND ta.vigilante_a_adiantar = %(v)s)"
 	row = frappe.db.sql(
-		"""
+		f"""
 		SELECT COUNT(*)
 		FROM `tabTabela Ausencia` ta
 		JOIN `tabAusencias` a ON a.name = ta.parent
 		WHERE a.docstatus = 1 AND a.data BETWEEN %(s)s AND %(e)s
 		  AND (
 		    (ta.proxima_accao = 'Dobra de Turno' AND ta.vigilante_a_dobrar = %(v)s)
-		    OR (ta.proxima_accao = 'Adiantamento de Turno' AND ta.vigilante_a_adiantar = %(v)s)
+		    {adiantamento}
 		  )
 		""",
 		{"v": vigilante, "s": getdate(start_date), "e": getdate(end_date)},

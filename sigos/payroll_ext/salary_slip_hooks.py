@@ -744,7 +744,8 @@ def _add_faltas_deduction(doc):
 
 def _add_dobras(doc):
 	"""
-	Credit a guard for EXTRA shifts covered — Dobra/Adiantamento — the earnings mirror
+	Credit a guard for EXTRA shifts covered — Dobra (+ Adiantamento only when SIGOS
+	Settings.pagar_adiantamento_como_dobra is on) — the earnings mirror
 	of the Faltas deduction. Toggled by SIGOS Settings 'dobras_activo' (default OFF), so
 	nothing changes until you enable it. Valuation mirrors faltas:
 	  Proporcional ao Salário → (base / dias_de_trabalho) × nº dobras

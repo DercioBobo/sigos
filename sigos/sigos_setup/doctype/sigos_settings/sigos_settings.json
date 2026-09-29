@@ -54,6 +54,7 @@
   "valor_subsidio_arma",
   "sec_ss_dobra",
   "dobras_activo",
+  "pagar_adiantamento_como_dobra",
   "metodo_calculo_dobra",
   "componente_dobra",
   "componente_meia_dobra",
@@ -394,9 +395,17 @@
   {
    "fieldname": "dobras_activo",
    "fieldtype": "Check",
-   "label": "Activar Pagamento de Dobras/Adiantamentos",
+   "label": "Activar Pagamento de Dobras",
    "default": "0",
-   "description": "Quando activo, o vigilante que cobre turnos de ausentes (Dobra de Turno, Meia Dobra ou Adiantamento de Turno na Tabela de Ausências) recebe um pagamento extra na Salary Slip. Substitutos não são pagos por aqui."
+   "description": "Quando activo, o vigilante que cobre turnos de ausentes (Dobra de Turno ou Meia Dobra na Tabela de Ausências) recebe um pagamento extra na Salary Slip. Substitutos não são pagos. Adiantamentos só são pagos se a opção abaixo estiver activa."
+  },
+  {
+   "fieldname": "pagar_adiantamento_como_dobra",
+   "fieldtype": "Check",
+   "label": "Pagar Adiantamento de Turno como Dobra",
+   "default": "0",
+   "depends_on": "eval:doc.dobras_activo",
+   "description": "Quando activo, cada Adiantamento de Turno é contado e pago como uma Dobra (Salary Slip e relatório Cumulativo de Coberturas). Desactivado por defeito: adiantamentos não são pagos."
   },
   {
    "fieldname": "metodo_calculo_dobra",
