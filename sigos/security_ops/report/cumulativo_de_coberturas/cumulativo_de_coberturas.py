@@ -60,12 +60,12 @@ def execute(filters=None):
 	for l in linhas.values():
 		base = flt(bases.get(l["funcionario"]))
 		diario = base / dias if dias else 0
+		l["total_dias"] = l["dobras"] + l["adiantamentos"] + l["meias_dobras"] + l["horas_extras"]
 		l["salario_base"] = base
-		l["valor_diario"] = round(diario, 2)
-		l["valor_dobras"] = _valor_dobras(s, l["dobras"] + l["adiantamentos"], diario)
-		l["valor_meias_dobras"] = _valor_meias(s, l["meias_dobras"], diario)
-		l["valor_horas_extras"] = _valor_he(s, l["horas_extras"], diario)
-		l["valor_extra"] = round(l["valor_dobras"] + l["valor_meias_dobras"] + l["valor_horas_extras"], 2)
+		l["valor_extra"] = round(
+			_valor_dobras(s, l["dobras"] + l["adiantamentos"], diario)
+			+ _valor_meias(s, l["meias_dobras"], diario)
+			+ _valor_he(s, l["horas_extras"], diario), 2)
 		l["total"] = round(base + l["valor_extra"], 2)
 
 	data = sorted(linhas.values(), key=lambda l: (-l["valor_extra"], l["nome_do_vigilante"] or ""))
@@ -179,21 +179,16 @@ def _mensagem(s, de, ate, dias):
 
 
 def _columns():
-	cur = {"fieldtype": "Currency", "width": 120}
 	return [
 		{"label": _("Vigilante"), "fieldname": "vigilante", "fieldtype": "Link", "options": "Vigilante", "width": 120},
-		{"label": _("Nome do Vigilante"), "fieldname": "nome_do_vigilante", "fieldtype": "Data", "width": 190},
-		{"label": _("Delegação"), "fieldname": "delegacao", "fieldtype": "Link", "options": "Delegacao", "width": 110},
-		{"label": _("Categoria"), "fieldname": "categoria", "fieldtype": "Data", "width": 120},
-		{"label": _("Dobras"), "fieldname": "dobras", "fieldtype": "Int", "width": 75},
-		{"label": _("Adiantamentos"), "fieldname": "adiantamentos", "fieldtype": "Int", "width": 105},
+		{"label": _("Nome do Vigilante"), "fieldname": "nome_do_vigilante", "fieldtype": "Data", "width": 220},
+		{"label": _("Delegação"), "fieldname": "delegacao", "fieldtype": "Link", "options": "Delegacao", "width": 120},
+		{"label": _("Total Dias"), "fieldname": "total_dias", "fieldtype": "Int", "width": 100},
+		{"label": _("Dobras"), "fieldname": "dobras", "fieldtype": "Int", "width": 80},
+		{"label": _("Adiantamentos"), "fieldname": "adiantamentos", "fieldtype": "Int", "width": 110},
 		{"label": _("Meias Dobras"), "fieldname": "meias_dobras", "fieldtype": "Int", "width": 100},
 		{"label": _("Horas Extras"), "fieldname": "horas_extras", "fieldtype": "Int", "width": 100},
-		{"label": _("Salário Base"), "fieldname": "salario_base", **cur},
-		{"label": _("Valor Diário"), "fieldname": "valor_diario", **cur, "width": 105},
-		{"label": _("Valor Dobras"), "fieldname": "valor_dobras", **cur, "width": 110},
-		{"label": _("Valor Meias Dobras"), "fieldname": "valor_meias_dobras", **cur, "width": 130},
-		{"label": _("Valor Horas Extras"), "fieldname": "valor_horas_extras", **cur, "width": 130},
-		{"label": _("Valor Extra"), "fieldname": "valor_extra", **cur},
-		{"label": _("Total (Base + Extra)"), "fieldname": "total", **cur, "width": 140},
+		{"label": _("Salário Base"), "fieldname": "salario_base", "fieldtype": "Currency", "width": 140},
+		{"label": _("Total Extras"), "fieldname": "valor_extra", "fieldtype": "Currency", "width": 140},
+		{"label": _("Total (Base + Extras)"), "fieldname": "total", "fieldtype": "Currency", "width": 160},
 	]
