@@ -16,7 +16,7 @@ frappe.query_reports["Cumulativo de Coberturas"] = {
 		{ fieldname: "vigilante", label: __("Vigilante"), fieldtype: "Link", options: "Vigilante" },
 		{
 			fieldname: "accao", label: __("Acção"), fieldtype: "Select",
-			options: ["", "Dobra de Turno", "Adiantamento de Turno", "Meia Dobra", "Horas Extras"].join("\n"),
+			options: ["", "Dobra de Turno", "Meia Dobra", "Horas Extras"].join("\n"),
 		},
 	],
 };

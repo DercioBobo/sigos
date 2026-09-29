@@ -3,9 +3,8 @@ Cumulativo de Coberturas — what RH owes each guard for the extra shifts they w
 called in to cover in one payroll month.
 
 A cover is a submitted Ausencias row (Tabela Ausencia) whose proxima_accao names a
-covering guard: Dobra de Turno / Adiantamento de Turno / Meia Dobra / Horas Extras.
-Substituto is excluded — that's a Reserva guard filling a post, not paid extra (same
-rule as utils.calcular_dobras_vigilante).
+covering guard: Dobra de Turno / Meia Dobra / Horas Extras. Substituto (a Reserva
+guard filling a post) and Adiantamento de Turno are excluded — neither is paid extra.
 
 The period is the payroll period of the chosen Mês/Ano (utils.resolver_periodo_folha,
 honours dia_corte_folha). Pricing is always proportional to each guard's own base
@@ -23,13 +22,11 @@ from sigos.utils import resolver_periodo_folha
 # proxima_accao -> Tabela Ausencia field holding the covering guard
 ACCOES = {
 	"Dobra de Turno":        "vigilante_a_dobrar",
-	"Adiantamento de Turno": "vigilante_a_adiantar",
 	"Meia Dobra":            "vigilante_a_meia_dobra",
 	"Horas Extras":          "vigilante_a_horas_extras",
 }
 _COL = {
 	"Dobra de Turno": "dobras",
-	"Adiantamento de Turno": "adiantamentos",
 	"Meia Dobra": "meias_dobras",
 	"Horas Extras": "horas_extras",
 }
@@ -51,7 +48,7 @@ def execute(filters=None):
 		l = linhas.setdefault(r.cobridor, {
 			"vigilante": r.cobridor, "nome_do_vigilante": r.nome,
 			"delegacao": r.delegacao, "categoria": r.categoria, "funcionario": r.funcionario,
-			"dobras": 0, "adiantamentos": 0, "meias_dobras": 0, "horas_extras": 0,
+			"dobras": 0, "meias_dobras": 0, "horas_extras": 0,
 		})
 		l[_COL[r.accao]] += int(r.n)
 
@@ -59,10 +56,10 @@ def execute(filters=None):
 	for l in linhas.values():
 		base = flt(bases.get(l["funcionario"]))
 		diario = base / dias if dias else 0
-		l["total_dias"] = l["dobras"] + l["adiantamentos"] + l["meias_dobras"] + l["horas_extras"]
+		l["total_dias"] = l["dobras"] + l["meias_dobras"] + l["horas_extras"]
 		l["salario_base"] = base
 		# Every cover = one day's pay (base / days in the period); Meia Dobra = half.
-		dias_pagos = l["dobras"] + l["adiantamentos"] + l["horas_extras"] + 0.5 * l["meias_dobras"]
+		dias_pagos = l["dobras"] + l["horas_extras"] + 0.5 * l["meias_dobras"]
 		l["valor_extra"] = round(diario * dias_pagos, 2)
 		l["total"] = round(base + l["valor_extra"], 2)
 
@@ -148,7 +145,6 @@ def _columns():
 		{"label": _("Delegação"), "fieldname": "delegacao", "fieldtype": "Link", "options": "Delegacao", "width": 120},
 		{"label": _("Total Dias"), "fieldname": "total_dias", "fieldtype": "Int", "width": 100},
 		{"label": _("Dobras"), "fieldname": "dobras", "fieldtype": "Int", "width": 80},
-		{"label": _("Adiantamentos"), "fieldname": "adiantamentos", "fieldtype": "Int", "width": 110},
 		{"label": _("Meias Dobras"), "fieldname": "meias_dobras", "fieldtype": "Int", "width": 100},
 		{"label": _("Horas Extras"), "fieldname": "horas_extras", "fieldtype": "Int", "width": 100},
 		{"label": _("Salário Base"), "fieldname": "salario_base", "fieldtype": "Currency", "width": 140},
