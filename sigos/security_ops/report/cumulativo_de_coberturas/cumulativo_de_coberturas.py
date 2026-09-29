@@ -8,13 +8,13 @@ guard filling a post) and Adiantamento de Turno are excluded — neither is paid
 
 The period is the payroll period of the chosen Mês/Ano (utils.resolver_periodo_folha,
 honours dia_corte_folha). Pricing is always proportional to each guard's own base
-(latest submitted Salary Structure Assignment): every covered day = base / days in
-the period, Meia Dobra = half. SIGOS Settings gates/métodos/fixed values are
+(latest submitted Salary Structure Assignment): every covered day = base / 30 (fixed,
+like the monthly base itself), Meia Dobra = half. SIGOS Settings gates/métodos/fixed values are
 deliberately NOT applied here yet (a Settings-driven variant is planned).
 """
 import frappe
 from frappe import _
-from frappe.utils import getdate, date_diff, flt, nowdate, formatdate
+from frappe.utils import getdate, flt, nowdate, formatdate
 
 from sigos.utils import resolver_periodo_folha
 
@@ -30,6 +30,10 @@ _COL = {
 	"Meia Dobra": "meias_dobras",
 	"Horas Extras": "horas_extras",
 }
+# Fixed commercial month: the base is the same every month, so the daily value is
+# too (7 300 / 30 = 243,33 whether the period has 28 or 31 days).
+DIAS_MES = 30
+
 MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho",
          "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
 
@@ -41,7 +45,6 @@ def execute(filters=None):
 	ano = int(filters.get("ano") or hoje.year)
 	de, ate = resolver_periodo_folha(mes, ano)
 
-	dias = date_diff(ate, de) + 1
 
 	linhas = {}
 	for r in _coberturas(de, ate, filters):
@@ -55,7 +58,7 @@ def execute(filters=None):
 	bases = _bases(filter(None, (l["funcionario"] for l in linhas.values())), ate)
 	for l in linhas.values():
 		base = flt(bases.get(l["funcionario"]))
-		diario = base / dias if dias else 0
+		diario = base / DIAS_MES
 		l["total_dias"] = l["dobras"] + l["meias_dobras"] + l["horas_extras"]
 		l["salario_base"] = base
 		# Every cover = one day's pay (base / days in the period); Meia Dobra = half.
@@ -65,7 +68,7 @@ def execute(filters=None):
 
 	data = sorted(linhas.values(), key=lambda l: (-l["valor_extra"], l["nome_do_vigilante"] or ""))
 	sem_base = sum(1 for l in data if not l["salario_base"])
-	return _columns(), data, _mensagem(de, ate, dias, sem_base)
+	return _columns(), data, _mensagem(de, ate, sem_base)
 
 
 # ─────────────────────────────────────────────────────────────── data
@@ -128,10 +131,10 @@ def _bases(funcionarios, ate):
 
 # ──────────────────────────────────────────────────────────── output
 
-def _mensagem(de, ate, dias, sem_base):
-	partes = [_("Período de folha: <b>{0}</b> a <b>{1}</b> ({2} dias). "
+def _mensagem(de, ate, sem_base):
+	partes = [_("Período de folha: <b>{0}</b> a <b>{1}</b>. "
 	            "Cada dia coberto = Salário Base / {2}; Meia Dobra = metade.").format(
-		formatdate(de), formatdate(ate), dias)]
+		formatdate(de), formatdate(ate), DIAS_MES)]
 	if sem_base:
 		partes.append(_("<b>{0}</b> vigilante(s) sem Salário Base (sem Salary Structure Assignment "
 		                "submetido) — extras a 0.").format(sem_base))
