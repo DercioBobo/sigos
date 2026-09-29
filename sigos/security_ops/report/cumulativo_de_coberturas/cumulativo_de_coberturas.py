@@ -8,10 +8,10 @@ Substituto is excluded — that's a Reserva guard filling a post, not paid extra
 rule as utils.calcular_dobras_vigilante).
 
 The period is the payroll period of the chosen Mês/Ano (utils.resolver_periodo_folha,
-honours dia_corte_folha) and the pricing mirrors salary_slip_hooks._add_dobras /
-_add_meia_dobra / _add_horas_extras exactly — same SIGOS Settings gates, métodos and
-fixed values, base = the guard's Salary Structure Assignment base (what the slip
-pays on) — so this report shows what the Salary Slip will credit.
+honours dia_corte_folha). Pricing is always proportional to each guard's own base
+(latest submitted Salary Structure Assignment): every covered day = base / days in
+the period, Meia Dobra = half. SIGOS Settings gates/métodos/fixed values are
+deliberately NOT applied here yet (a Settings-driven variant is planned).
 """
 import frappe
 from frappe import _
@@ -44,8 +44,7 @@ def execute(filters=None):
 	ano = int(filters.get("ano") or hoje.year)
 	de, ate = resolver_periodo_folha(mes, ano)
 
-	s = frappe.get_single("SIGOS Settings")
-	dias = _dias_do_periodo(s, de, ate)
+	dias = date_diff(ate, de) + 1
 
 	linhas = {}
 	for r in _coberturas(de, ate, filters):
@@ -62,14 +61,14 @@ def execute(filters=None):
 		diario = base / dias if dias else 0
 		l["total_dias"] = l["dobras"] + l["adiantamentos"] + l["meias_dobras"] + l["horas_extras"]
 		l["salario_base"] = base
-		l["valor_extra"] = round(
-			_valor_dobras(s, l["dobras"] + l["adiantamentos"], diario)
-			+ _valor_meias(s, l["meias_dobras"], diario)
-			+ _valor_he(s, l["horas_extras"], diario), 2)
+		# Every cover = one day's pay (base / days in the period); Meia Dobra = half.
+		dias_pagos = l["dobras"] + l["adiantamentos"] + l["horas_extras"] + 0.5 * l["meias_dobras"]
+		l["valor_extra"] = round(diario * dias_pagos, 2)
 		l["total"] = round(base + l["valor_extra"], 2)
 
 	data = sorted(linhas.values(), key=lambda l: (-l["valor_extra"], l["nome_do_vigilante"] or ""))
-	return _columns(), data, _mensagem(s, de, ate, dias)
+	sem_base = sum(1 for l in data if not l["salario_base"])
+	return _columns(), data, _mensagem(de, ate, dias, sem_base)
 
 
 # ─────────────────────────────────────────────────────────────── data
@@ -130,51 +129,15 @@ def _bases(funcionarios, ate):
 	return {r.employee: r.base for r in rows}   # latest-created wins on a same-day tie
 
 
-# ───────────────────────────────────────── pricing (mirror of the slip)
-
-def _dias_do_periodo(s, de, ate):
-	# Slip divisor = days in the period ("Dias do Mês"). "Dias Úteis (HRMS)" depends on
-	# the slip's own holiday list, so the report approximates it with period days too.
-	return date_diff(ate, de) + 1
-
-
-def _proporcional(metodo):
-	return (metodo or "Proporcional ao Salário") == "Proporcional ao Salário"
-
-
-def _valor_dobras(s, n, diario):
-	if not s.dobras_activo or n <= 0:
-		return 0
-	if _proporcional(s.metodo_calculo_dobra):
-		return round(diario * n, 2)
-	return round(n * flt(s.valor_fixo_por_dobra), 2)
-
-
-def _valor_meias(s, n, diario):
-	if not s.dobras_activo or n <= 0:
-		return 0
-	if _proporcional(s.metodo_calculo_dobra):
-		return round(diario * n * 0.5, 2)
-	return round(n * flt(s.valor_fixo_por_meia_dobra), 2)
-
-
-def _valor_he(s, n, diario):
-	if not s.horas_extras_activo or n <= 0:
-		return 0
-	if _proporcional(s.metodo_calculo_horas_extras):
-		return round(diario * n, 2)
-	return round(n * flt(s.valor_fixo_por_horas_extras), 2)
-
-
 # ──────────────────────────────────────────────────────────── output
 
-def _mensagem(s, de, ate, dias):
-	partes = [_("Período de folha: <b>{0}</b> a <b>{1}</b> ({2} dias).").format(
+def _mensagem(de, ate, dias, sem_base):
+	partes = [_("Período de folha: <b>{0}</b> a <b>{1}</b> ({2} dias). "
+	            "Cada dia coberto = Salário Base / {2}; Meia Dobra = metade.").format(
 		formatdate(de), formatdate(ate), dias)]
-	if not s.dobras_activo:
-		partes.append(_("Dobras / Adiantamentos / Meias Dobras estão <b>desactivados</b> em SIGOS Settings — valor 0."))
-	if not s.horas_extras_activo:
-		partes.append(_("Horas Extras estão <b>desactivadas</b> em SIGOS Settings — valor 0."))
+	if sem_base:
+		partes.append(_("<b>{0}</b> vigilante(s) sem Salário Base (sem Salary Structure Assignment "
+		                "submetido) — extras a 0.").format(sem_base))
 	return "<br>".join(partes)
 
 
