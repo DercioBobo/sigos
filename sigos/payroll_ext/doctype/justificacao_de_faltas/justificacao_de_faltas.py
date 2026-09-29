@@ -39,6 +39,19 @@ class JustificacaoDeFaltas(Document):
 
 		self.numero = real
 
+		# Nothing to justify → nothing to save. Only once the guard + window are known
+		# (before that the form is still being filled and required-field checks apply).
+		if self.vigilante and self.dia_de_inicio and self.dia_de_fim and real <= 0:
+			frappe.throw(
+				_("O vigilante {0} não tem faltas entre {1} e {2}. "
+				  "Não é possível registar uma Justificação de Faltas sem faltas.").format(
+					frappe.bold(self.vigilante),
+					frappe.format(self.dia_de_inicio, {"fieldtype": "Date"}),
+					frappe.format(self.dia_de_fim, {"fieldtype": "Date"}),
+				),
+				title=_("Sem Faltas a Justificar"),
+			)
+
 	def _validar_prazo(self):
 		if not self.dia_de_fim or not self.data_do_justificativo:
 			return

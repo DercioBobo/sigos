@@ -91,6 +91,13 @@ function _jf_buscar_faltas(frm) {
 		callback(res) {
 			frm.set_value("numero", res.message || 0);
 			frm.refresh_field("numero");
+			// Warn early - the server refuses to save a justification with 0 faltas.
+			if (!res.message) {
+				frappe.show_alert({
+					message: __("Este vigilante não tem faltas neste período - não é possível guardar."),
+					indicator: "orange",
+				}, 6);
+			}
 		},
 	});
 }
