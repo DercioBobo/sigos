@@ -4,7 +4,8 @@ Salary Slip hooks for SIGOS.
 Payroll model:
   - Escala is purely operational and is NEVER read here.
   - Faltas come exclusively from Ausencias (sum of n_de_faltas).
-  - custom_dias_de_trabalho = the monthly divisor (days in the period, HRMS-style).
+  - custom_dias_de_trabalho = the daily-value divisor (SIGOS Settings.base_dias_de_trabalho;
+    default a fixed 30-day commercial month, so base/30 is the same every month).
   - The faltas deduction method is configurable in SIGOS Settings:
         "Proporcional ao Salário" → (base / dias_de_trabalho) × faltas_nao_justificadas
         "Valor Fixo por Falta"     → faltas_nao_justificadas × valor_fixo_por_falta
@@ -376,13 +377,18 @@ def _add_remuneracoes(doc):
 
 def _set_dias_de_trabalho(doc):
 	"""
-	custom_dias_de_trabalho is the monthly divisor for proportional deductions.
-	  "Dias do Mês"        → total days in the slip period (e.g. 30)
-	  "Dias Úteis (HRMS)"  → the slip's total_working_days
+	custom_dias_de_trabalho is the divisor for every proportional value (faltas,
+	dobras, meias dobras, horas extras):
+	  "30 Dias (Mês Comercial)" → always 30 — the base is fixed monthly, so the daily
+	                               value is too (default)
+	  "Dias do Mês"             → total days in the slip period (28-31)
+	  "Dias Úteis (HRMS)"       → the slip's total_working_days
 	"""
-	base_setting = frappe.db.get_single_value("SIGOS Settings", "base_dias_de_trabalho") or "Dias do Mês"
+	base_setting = frappe.db.get_single_value("SIGOS Settings", "base_dias_de_trabalho") or "30 Dias (Mês Comercial)"
 
-	if base_setting == "Dias Úteis (HRMS)" and doc.total_working_days:
+	if base_setting == "30 Dias (Mês Comercial)":
+		doc.custom_dias_de_trabalho = 30
+	elif base_setting == "Dias Úteis (HRMS)" and doc.total_working_days:
 		doc.custom_dias_de_trabalho = doc.total_working_days
 	elif doc.start_date and doc.end_date:
 		doc.custom_dias_de_trabalho = date_diff(doc.end_date, doc.start_date) + 1

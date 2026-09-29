@@ -345,9 +345,9 @@
    "fieldname": "base_dias_de_trabalho",
    "fieldtype": "Select",
    "label": "Base de Dias de Trabalho",
-   "options": "Dias do Mês\nDias Úteis (HRMS)",
-   "default": "Dias do Mês",
-   "description": "Dias do Mês: total de dias do período (ex: 30). Dias Úteis: usa o total_working_days do HRMS."
+   "options": "30 Dias (Mês Comercial)\nDias do Mês\nDias Úteis (HRMS)",
+   "default": "30 Dias (Mês Comercial)",
+   "description": "Divisor do valor diário (faltas, dobras, meias dobras, horas extras). 30 Dias: sempre Salário Base / 30, igual em todos os meses. Dias do Mês: total de dias do período (28-31). Dias Úteis: usa o total_working_days do HRMS."
   },
   {
    "fieldname": "n_faltas_abandono_posto",
@@ -727,7 +727,7 @@
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-06-02 00:00:00.000000",
+ "modified": "2026-09-29 16:00:00.000000",
  "modified_by": "Administrator",
  "module": "SIGOS Setup",
  "name": "SIGOS Settings",
