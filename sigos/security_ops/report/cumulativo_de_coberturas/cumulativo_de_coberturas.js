@@ -1,18 +1,22 @@
+const SIGOS_MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho",
+	"Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+
 frappe.query_reports["Cumulativo de Coberturas"] = {
 	filters: [
 		{
-			fieldname: "de_data", label: __("De"), fieldtype: "Date",
-			default: frappe.datetime.year_start(), reqd: 1,
+			fieldname: "mes", label: __("Mês"), fieldtype: "Select", reqd: 1,
+			options: SIGOS_MESES.join("\n"),
+			default: SIGOS_MESES[new Date().getMonth()],
 		},
 		{
-			fieldname: "ate_data", label: __("Até"), fieldtype: "Date",
-			default: frappe.datetime.month_end(), reqd: 1,
+			fieldname: "ano", label: __("Ano"), fieldtype: "Int", reqd: 1,
+			default: new Date().getFullYear(),
 		},
 		{ fieldname: "delegacao", label: __("Delegação"), fieldtype: "Link", options: "Delegacao" },
-		{ fieldname: "vigilante", label: __("Vigilante (que cobriu)"), fieldtype: "Link", options: "Vigilante" },
+		{ fieldname: "vigilante", label: __("Vigilante"), fieldtype: "Link", options: "Vigilante" },
 		{
 			fieldname: "accao", label: __("Acção"), fieldtype: "Select",
-			options: ["", "Substituto", "Dobra de Turno", "Meia Dobra", "Adiantamento de Turno", "Horas Extras"].join("\n"),
+			options: ["", "Dobra de Turno", "Adiantamento de Turno", "Meia Dobra", "Horas Extras"].join("\n"),
 		},
 	],
 };

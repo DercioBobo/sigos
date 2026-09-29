@@ -9,7 +9,7 @@
  "idx": 0,
  "is_standard": "Yes",
  "letterhead": null,
- "modified": "2026-09-29 00:00:00.000000",
+ "modified": "2026-09-29 14:00:00.000000",
  "modified_by": "Administrator",
  "module": "Security Ops",
  "name": "Cumulativo de Coberturas",
@@ -22,7 +22,6 @@
   { "role": "System Manager" },
   { "role": "SIGOS Manager" },
   { "role": "Aprovador RH" },
-  { "role": "RH Normal" },
-  { "role": "Operações SIGOS" }
+  { "role": "RH Normal" }
  ]
 }
