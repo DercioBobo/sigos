@@ -8,24 +8,14 @@ frappe.ui.form.on("Justificacao De Faltas", {
 		frappe.db.get_single_value("SIGOS Settings", "justificativo_faltas_obrigatorio").then(val => {
 			frm.toggle_reqd("justificativo", val === undefined || val === null ? true : !!val);
 		});
-	},
 
-	validate(frm) {
-		if (frm.doc.dia_de_fim && frm.doc.data_do_justificativo) {
-			const data_fim = frappe.datetime.str_to_obj(frm.doc.dia_de_fim);
-			const data_just = frappe.datetime.str_to_obj(frm.doc.data_do_justificativo);
-			const diff_ms = data_just - data_fim;
-			const diff_dias = diff_ms / (1000 * 60 * 60 * 24);
-
-			if (diff_dias > 3) {
-				frappe.msgprint({
-					title: __("Prazo Expirado"),
-					message: __("Só é permitido justificar faltas em um período de 3 dias depois da falta."),
-					indicator: "red"
-				});
-				frappe.validated = false;
-			}
-		}
+		// The prazo itself is enforced server-side (_validar_prazo reads SIGOS Settings);
+		// here we only surface the configured value so the user knows the rule.
+		frappe.db.get_single_value("SIGOS Settings", "prazo_justificacao_faltas").then(val => {
+			const prazo = cint(val) || 3;
+			frm.set_df_property("data_do_justificativo", "description",
+				__("Prazo: até {0} dia(s) após o Dia de Fim da falta.", [prazo]));
+		});
 	},
 
 	dia_de_inicio(frm) {

@@ -1,7 +1,7 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import getdate, date_diff, flt
+from frappe.utils import getdate, date_diff, flt, cint
 
 from sigos.utils import calcular_faltas_vigilante
 
@@ -56,7 +56,9 @@ class JustificacaoDeFaltas(Document):
 		if not self.dia_de_fim or not self.data_do_justificativo:
 			return
 
-		prazo = frappe.db.get_single_value("SIGOS Settings", "prazo_justificacao_faltas") or 3
+		# Single source of truth for the deadline (the form no longer duplicates it).
+		# An unset/0 value falls back to the 3-day default.
+		prazo = cint(frappe.db.get_single_value("SIGOS Settings", "prazo_justificacao_faltas")) or 3
 
 		diff = date_diff(self.data_do_justificativo, self.dia_de_fim)
 		if diff > prazo:
@@ -64,10 +66,11 @@ class JustificacaoDeFaltas(Document):
 				_("O prazo para justificar faltas é de {0} dias após a falta. "
 				  "A data do justificativo ({1}) está {2} dias depois do fim da falta ({3}).").format(
 					prazo,
-					self.data_do_justificativo,
+					frappe.format(self.data_do_justificativo, {"fieldtype": "Date"}),
 					diff,
-					self.dia_de_fim
-				)
+					frappe.format(self.dia_de_fim, {"fieldtype": "Date"}),
+				),
+				title=_("Prazo Expirado"),
 			)
 
 	def _validar_justificativo(self):
