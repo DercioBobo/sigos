@@ -10,164 +10,16 @@ class FaturacaoMensal(Document):
 
 	@frappe.whitelist()
 	def preview(self):
-		"""
-		Build the billing lines per contract (Project) + regime. Each contract is
-		counted with its own método de faturação (Project.custom_metodo_faturacao,
-		'Predefinido' -> SIGOS Settings default):
-		  - Vigilantes Activos: Activo guards of the contract right now.
-		  - Contratual: the Nº de Vigilantes typed in the contract's Finance table.
-		The rate always comes from the contract's Finance table (Faturação por Regime).
-		Cliente is derived from the Project so it is always authoritative.
-		posto_interno / project-less guards are not billable.
-		"""
+		"""Compute the billing lines (see calcular_linhas) and store them on this run."""
 		frappe.only_for(PAPEIS_FATURACAO)
 		self.set("linhas", [])
 
-		filtros = {"customer": ["is", "set"]}
-		if self.cliente:
-			filtros["customer"] = self.cliente
-		contratos = frappe.get_all(
-			"Project", filters=filtros,
-			fields=["name", "project_name", "customer", "status", "custom_metodo_faturacao"],
-		)
-		padrao = (frappe.db.get_single_value("SIGOS Settings", "metodo_faturacao_padrao")
-			or "Vigilantes Activos")
-		metodo = {
-			c.name: (c.custom_metodo_faturacao
-				if c.custom_metodo_faturacao not in (None, "", "Predefinido") else padrao)
-			for c in contratos
-		}
-		cliente_de = {c.name: c.customer for c in contratos}
-		proj_nome = {c.name: c.project_name or c.name for c in contratos}
-		estado_de = {c.name: c.status for c in contratos}
-		detalhe = _detalhe_por_cliente(set(cliente_de.values()))
-
-		def por_posto(proj):
-			return detalhe.get(cliente_de.get(proj)) == "Por Posto"
-
-		# Contracted qty + rate + invoice text per (contract, regime), from the Finance table.
-		contratado = {}
-		if contratos:
-			for f in frappe.get_all(
-				"Project Faturacao Regime",
-				filters={"parenttype": "Project", "parent": ["in", list(metodo)]},
-				fields=["parent", "regime", "quantidade", "valor", "descricao"],
-				order_by="parent, idx",
-			):
-				contratado[(f.parent, f.regime)] = f
-
-		def texto(proj, regime, alvo=None, tipo_posto=None):
-			"""
-			Invoice line text (the month is appended at generation). The contract's
-			'Descrição na Factura' replaces the regime label when set:
-			  Por Contrato: '<descrição>'  or  '<regime> — <contrato>'
-			  Por Posto:    '<descrição or regime> — <nome financeiro / lista de postos>'
-			"""
-			c = contratado.get((proj, regime))
-			base = ((c.descricao if c else "") or "").strip()
-			if alvo:
-				t = f"{base or regime} — {alvo}"
-			else:
-				t = base or f"{regime} — {proj_nome.get(proj, proj)}"
-			if tipo_posto == "Temporário":
-				t += " [Temporário]"
-			return t
-
-		linhas = []
-
-		# ── Vigilantes Activos ──
-		# ALL active guards with a contract+regime — permanent AND temporary postos
-		# alike, grouped on posto type so temporary deployments show as their own,
-		# clearly-labelled, auditable lines (and on the posto itself for customers
-		# invoiced Por Posto).
-		# Active Cobridor shadows are excluded: they co-locate with the colleague
-		# they're covering (both Activo, same posto/regime) — billing only the
-		# covered guard's own row avoids double-charging the customer for one slot.
-		activos_contratos = [p for p, m in metodo.items() if m == "Vigilantes Activos"]
-		vistos = set()
-		if activos_contratos:
-			rows = frappe.db.sql("""
-				SELECT v.projecto AS project, v.regime_do_vigilante AS regime,
-				       COALESCE(pv.tipo_de_posto, 'Permanente') AS tipo_posto,
-				       v.posto_de_vigilancia AS posto,
-				       COALESCE(NULLIF(pv.nome_financeiro, ''), pv.nome_do_posto) AS nome_posto,
-				       COUNT(*) AS qtd
-				FROM `tabVigilante` v
-				LEFT JOIN `tabPosto De Vigilancia` pv ON pv.name = v.posto_de_vigilancia
-				WHERE v.status = 'Activo'
-				  AND v.projecto IN %(projectos)s
-				  AND v.regime_do_vigilante IS NOT NULL AND v.regime_do_vigilante != ''
-				  AND (v.cobertura_de_posto_activa IS NULL OR v.cobertura_de_posto_activa = '')
-				GROUP BY v.projecto, v.regime_do_vigilante, COALESCE(pv.tipo_de_posto, 'Permanente'),
-				         v.posto_de_vigilancia
-			""", {"projectos": tuple(activos_contratos)}, as_dict=True)
-
-			agrupado = {}
-			for r in rows:
-				posto = r.posto if por_posto(r.project) else None
-				k = (r.project, r.regime, r.tipo_posto, posto)
-				if k not in agrupado:
-					c = contratado.get((r.project, r.regime))
-					agrupado[k] = dict(
-						project=r.project, regime=r.regime, tipo_posto=r.tipo_posto, posto=posto,
-						descricao=texto(r.project, r.regime, r.nome_posto if posto else None, r.tipo_posto),
-						metodo="Vigilantes Activos", quantidade=0,
-						quantidade_contratada=c.quantidade if c else 0,
-						valor_unitario=c.valor if c else 0,
-					)
-				agrupado[k]["quantidade"] += r.qtd
-				vistos.add((r.project, r.regime))
-			linhas.extend(agrupado.values())
-
-			# Contracted regimes with nobody active: a 0-qty line so the shortfall is
-			# visible in the preview (never invoiced — gerar_faturas skips qty 0).
-			for (proj, regime), c in contratado.items():
-				if (metodo.get(proj) == "Vigilantes Activos" and (proj, regime) not in vistos
-						and c.quantidade and cliente_de.get(proj)
-						and estado_de.get(proj) not in ("Completed", "Cancelled")):
-					linhas.append(dict(
-						project=proj, regime=regime, tipo_posto="", posto=None,
-						descricao=texto(proj, regime), metodo="Vigilantes Activos",
-						quantidade=0, quantidade_contratada=c.quantidade, valor_unitario=c.valor,
-					))
-
-		# ── Contratual ── open contracts only; qty straight from the Finance table.
-		# The contracted qty is per regime, not per posto, so Por Posto customers get
-		# one line per regime listing the contract's active postos by nome financeiro.
-		contratuais = [p for p, m in metodo.items()
-			if m == "Contratual" and estado_de.get(p) not in ("Completed", "Cancelled")]
-		postos_de = {}
-		if any(por_posto(p) for p in contratuais):
-			for pv in frappe.get_all(
-				"Posto De Vigilancia",
-				filters={"project": ["in", contratuais], "estado": "Activo", "posto_interno": 0},
-				fields=["project", "nome_financeiro", "nome_do_posto"],
-				order_by="nome_financeiro, nome_do_posto",
-			):
-				postos_de.setdefault(pv.project, []).append(pv.nome_financeiro or pv.nome_do_posto)
-		for (proj, regime), c in contratado.items():
-			if proj not in contratuais or not c.quantidade:
-				continue
-			alvo = None
-			if por_posto(proj) and postos_de.get(proj):
-				alvo = _("Postos: {0}").format(", ".join(postos_de[proj]))
-			linhas.append(dict(
-				project=proj, regime=regime, tipo_posto="", posto=None,
-				descricao=texto(proj, regime, alvo), metodo="Contratual",
-				quantidade=c.quantidade, quantidade_contratada=c.quantidade,
-				valor_unitario=c.valor,
-			))
-
-		linhas.sort(key=lambda l: (cliente_de.get(l["project"]) or "", l["project"],
-			l["regime"], l["tipo_posto"] or "", l["descricao"] or ""))
+		linhas, activos_contratos = calcular_linhas(self.cliente)
 
 		total_geral = 0
 		total_vig = 0
 		sem_tarifa = []
 		for l in linhas:
-			l["cliente"] = cliente_de.get(l["project"])
-			l["valor_unitario"] = flt(l["valor_unitario"])
-			l["total"] = (l["quantidade"] or 0) * l["valor_unitario"]
 			if l["quantidade"] and not l["valor_unitario"]:
 				sem_tarifa.append(f"{l['cliente'] or '?'} / {l['project']} / {l['regime']}")
 			self.append("linhas", l)
@@ -280,6 +132,7 @@ class FaturacaoMensal(Document):
 				si.due_date = posting
 				si.ignore_pricing_rule = 1   # the contract rate is final — no Pricing Rule may alter it
 				si.custom_faturacao_mensal = self.name
+				si.custom_mes_referencia = get_first_day(getdate(self.mes_referencia))
 
 				total_vig = 0
 				for ln in lns:
@@ -331,6 +184,163 @@ class FaturacaoMensal(Document):
 				indicator="red" if falhas else "orange",
 			)
 		return {"faturas": criadas, "falhas": list(falhas)}
+
+
+def calcular_linhas(cliente=None):
+	"""
+	Billing lines per contract (Project) + regime — shared by the Faturacao Mensal
+	preview and the Sales Invoice 'Contratos SIGOS' fetch. Each contract is counted
+	with its own método de faturação (Project.custom_metodo_faturacao,
+	'Predefinido' -> SIGOS Settings default):
+	  - Vigilantes Activos: Activo guards of the contract right now.
+	  - Contratual: the Nº de Vigilantes typed in the contract's Finance table.
+	The rate always comes from the contract's Finance table (Faturação por Regime).
+	Cliente is derived from the Project so it is always authoritative.
+	posto_interno / project-less guards are not billable.
+	Returns (linhas, activos_contratos); each linha has cliente/total filled in.
+	"""
+	filtros = {"customer": ["is", "set"]}
+	if cliente:
+		filtros["customer"] = cliente
+	contratos = frappe.get_all(
+		"Project", filters=filtros,
+		fields=["name", "project_name", "customer", "status", "custom_metodo_faturacao"],
+	)
+	padrao = (frappe.db.get_single_value("SIGOS Settings", "metodo_faturacao_padrao")
+		or "Vigilantes Activos")
+	metodo = {
+		c.name: (c.custom_metodo_faturacao
+			if c.custom_metodo_faturacao not in (None, "", "Predefinido") else padrao)
+		for c in contratos
+	}
+	cliente_de = {c.name: c.customer for c in contratos}
+	proj_nome = {c.name: c.project_name or c.name for c in contratos}
+	estado_de = {c.name: c.status for c in contratos}
+	detalhe = _detalhe_por_cliente(set(cliente_de.values()))
+
+	def por_posto(proj):
+		return detalhe.get(cliente_de.get(proj)) == "Por Posto"
+
+	# Contracted qty + rate + invoice text per (contract, regime), from the Finance table.
+	contratado = {}
+	if contratos:
+		for f in frappe.get_all(
+			"Project Faturacao Regime",
+			filters={"parenttype": "Project", "parent": ["in", list(metodo)]},
+			fields=["parent", "regime", "quantidade", "valor", "descricao"],
+			order_by="parent, idx",
+		):
+			contratado[(f.parent, f.regime)] = f
+
+	def texto(proj, regime, alvo=None, tipo_posto=None):
+		"""
+		Invoice line text (the month is appended at generation). The contract's
+		'Descrição na Factura' replaces the regime label when set:
+		  Por Contrato: '<descrição>'  or  '<regime> — <contrato>'
+		  Por Posto:    '<descrição or regime> — <nome financeiro / lista de postos>'
+		"""
+		c = contratado.get((proj, regime))
+		base = ((c.descricao if c else "") or "").strip()
+		if alvo:
+			t = f"{base or regime} — {alvo}"
+		else:
+			t = base or f"{regime} — {proj_nome.get(proj, proj)}"
+		if tipo_posto == "Temporário":
+			t += " [Temporário]"
+		return t
+
+	linhas = []
+
+	# ── Vigilantes Activos ──
+	# ALL active guards with a contract+regime — permanent AND temporary postos
+	# alike, grouped on posto type so temporary deployments show as their own,
+	# clearly-labelled, auditable lines (and on the posto itself for customers
+	# invoiced Por Posto).
+	# Active Cobridor shadows are excluded: they co-locate with the colleague
+	# they're covering (both Activo, same posto/regime) — billing only the
+	# covered guard's own row avoids double-charging the customer for one slot.
+	activos_contratos = [p for p, m in metodo.items() if m == "Vigilantes Activos"]
+	vistos = set()
+	if activos_contratos:
+		rows = frappe.db.sql("""
+			SELECT v.projecto AS project, v.regime_do_vigilante AS regime,
+			       COALESCE(pv.tipo_de_posto, 'Permanente') AS tipo_posto,
+			       v.posto_de_vigilancia AS posto,
+			       COALESCE(NULLIF(pv.nome_financeiro, ''), pv.nome_do_posto) AS nome_posto,
+			       COUNT(*) AS qtd
+			FROM `tabVigilante` v
+			LEFT JOIN `tabPosto De Vigilancia` pv ON pv.name = v.posto_de_vigilancia
+			WHERE v.status = 'Activo'
+			  AND v.projecto IN %(projectos)s
+			  AND v.regime_do_vigilante IS NOT NULL AND v.regime_do_vigilante != ''
+			  AND (v.cobertura_de_posto_activa IS NULL OR v.cobertura_de_posto_activa = '')
+			GROUP BY v.projecto, v.regime_do_vigilante, COALESCE(pv.tipo_de_posto, 'Permanente'),
+			         v.posto_de_vigilancia
+		""", {"projectos": tuple(activos_contratos)}, as_dict=True)
+
+		agrupado = {}
+		for r in rows:
+			posto = r.posto if por_posto(r.project) else None
+			k = (r.project, r.regime, r.tipo_posto, posto)
+			if k not in agrupado:
+				c = contratado.get((r.project, r.regime))
+				agrupado[k] = dict(
+					project=r.project, regime=r.regime, tipo_posto=r.tipo_posto, posto=posto,
+					descricao=texto(r.project, r.regime, r.nome_posto if posto else None, r.tipo_posto),
+					metodo="Vigilantes Activos", quantidade=0,
+					quantidade_contratada=c.quantidade if c else 0,
+					valor_unitario=c.valor if c else 0,
+				)
+			agrupado[k]["quantidade"] += r.qtd
+			vistos.add((r.project, r.regime))
+		linhas.extend(agrupado.values())
+
+		# Contracted regimes with nobody active: a 0-qty line so the shortfall is
+		# visible in the preview (never invoiced — gerar_faturas skips qty 0).
+		for (proj, regime), c in contratado.items():
+			if (metodo.get(proj) == "Vigilantes Activos" and (proj, regime) not in vistos
+					and c.quantidade and cliente_de.get(proj)
+					and estado_de.get(proj) not in ("Completed", "Cancelled")):
+				linhas.append(dict(
+					project=proj, regime=regime, tipo_posto="", posto=None,
+					descricao=texto(proj, regime), metodo="Vigilantes Activos",
+					quantidade=0, quantidade_contratada=c.quantidade, valor_unitario=c.valor,
+				))
+
+	# ── Contratual ── open contracts only; qty straight from the Finance table.
+	# The contracted qty is per regime, not per posto, so Por Posto customers get
+	# one line per regime listing the contract's active postos by nome financeiro.
+	contratuais = [p for p, m in metodo.items()
+		if m == "Contratual" and estado_de.get(p) not in ("Completed", "Cancelled")]
+	postos_de = {}
+	if any(por_posto(p) for p in contratuais):
+		for pv in frappe.get_all(
+			"Posto De Vigilancia",
+			filters={"project": ["in", contratuais], "estado": "Activo", "posto_interno": 0},
+			fields=["project", "nome_financeiro", "nome_do_posto"],
+			order_by="nome_financeiro, nome_do_posto",
+		):
+			postos_de.setdefault(pv.project, []).append(pv.nome_financeiro or pv.nome_do_posto)
+	for (proj, regime), c in contratado.items():
+		if proj not in contratuais or not c.quantidade:
+			continue
+		alvo = None
+		if por_posto(proj) and postos_de.get(proj):
+			alvo = _("Postos: {0}").format(", ".join(postos_de[proj]))
+		linhas.append(dict(
+			project=proj, regime=regime, tipo_posto="", posto=None,
+			descricao=texto(proj, regime, alvo), metodo="Contratual",
+			quantidade=c.quantidade, quantidade_contratada=c.quantidade,
+			valor_unitario=c.valor,
+		))
+
+	linhas.sort(key=lambda l: (cliente_de.get(l["project"]) or "", l["project"],
+		l["regime"], l["tipo_posto"] or "", l["descricao"] or ""))
+	for l in linhas:
+		l["cliente"] = cliente_de.get(l["project"])
+		l["valor_unitario"] = flt(l["valor_unitario"])
+		l["total"] = (l["quantidade"] or 0) * l["valor_unitario"]
+	return linhas, activos_contratos
 
 
 PAPEIS_FATURACAO = ("System Manager", "SIGOS Manager", "Accounts Manager")
@@ -542,28 +552,30 @@ def _fmt_problemas(por_cliente):
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
-def _clientes_ja_faturados(company, mes_referencia, clientes):
+def _clientes_ja_faturados(company, mes_referencia, clientes, excluir=None):
 	"""
-	{cliente: [Sales Invoice]} for customers that already have a non-cancelled
-	invoice generated by a Faturacao Mensal run for the same company + month.
-	Manual Sales Invoices (no custom_faturacao_mensal) are not counted.
+	{cliente: [Sales Invoice]} for customers that already have a non-cancelled SIGOS
+	invoice for the same company + month — made by a Faturacao Mensal run or
+	directly on the Sales Invoice ('Contratos SIGOS'). Both stamp
+	custom_mes_referencia; older run invoices (before that field) are matched by
+	custom_faturacao_mensal + posting month. Manual invoices are not counted.
 	"""
 	clientes = [c for c in clientes if c]
 	if not (company and mes_referencia and clientes):
 		return {}
 	mes = getdate(mes_referencia)
-	rows = frappe.get_all(
-		"Sales Invoice",
-		filters={
-			"company": company,
-			"customer": ["in", clientes],
-			"docstatus": ["<", 2],
-			"custom_faturacao_mensal": ["is", "set"],
-			"posting_date": ["between", [get_first_day(mes), get_last_day(mes)]],
-		},
-		fields=["name", "customer"],
-		order_by="name",
-	)
+	rows = frappe.db.sql("""
+		SELECT name, customer FROM `tabSales Invoice`
+		WHERE company = %(company)s AND customer IN %(clientes)s
+		  AND docstatus < 2 AND name != %(excluir)s
+		  AND (custom_mes_referencia = %(mes)s
+		       OR (IFNULL(custom_faturacao_mensal, '') != ''
+		           AND posting_date BETWEEN %(mes)s AND %(fim)s))
+		ORDER BY name
+	""", {
+		"company": company, "clientes": tuple(clientes), "excluir": excluir or "",
+		"mes": get_first_day(mes), "fim": get_last_day(mes),
+	}, as_dict=True)
 	out = {}
 	for r in rows:
 		out.setdefault(r.customer, []).append(r.name)

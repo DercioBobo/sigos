@@ -25,6 +25,7 @@ app_include_js = [
 doctype_js = {
 	"Project": "public/js/project.js",
 	"Customer": "public/js/customer.js",
+	"Sales Invoice": "public/js/sales_invoice.js",
 	"Employee": "public/js/employee_hr360.js",
 	"Payroll Entry": "public/js/payroll_entry.js",
 	"Salary Structure Assignment": "public/js/salary_structure_assignment.js",
@@ -99,6 +100,9 @@ doc_events = {
 	"Project": {
 		"before_insert": "sigos.contract_naming.project_before_insert",
 		"validate": "sigos.contrato.project_validate",
+	},
+	"Sales Invoice": {
+		"validate": "sigos.faturacao.sales_invoice_validate",
 	},
 	"Salary Slip": {
 		"before_insert": "sigos.payroll_ext.salary_slip_hooks.before_insert",

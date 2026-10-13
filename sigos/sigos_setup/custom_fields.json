@@ -590,6 +590,17 @@
  },
  {
   "doctype": "Custom Field",
+  "dt": "Sales Invoice",
+  "module": "SIGOS Setup",
+  "fieldname": "custom_mes_referencia",
+  "fieldtype": "Date",
+  "label": "Mês de Referência (SIGOS)",
+  "read_only": 1,
+  "description": "Mês facturado pelos contratos SIGOS (1º dia). Só pode existir uma factura SIGOS por cliente e mês.",
+  "insert_after": "custom_faturacao_mensal"
+ },
+ {
+  "doctype": "Custom Field",
   "dt": "Project",
   "module": "SIGOS Setup",
   "fieldname": "custom_sec_sigos",
