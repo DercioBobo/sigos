@@ -9,7 +9,9 @@
   "cliente",
   "project",
   "regime",
+  "posto",
   "tipo_posto",
+  "descricao",
   "metodo",
   "quantidade",
   "quantidade_contratada",
@@ -45,11 +47,24 @@
    "columns": 2
   },
   {
+   "fieldname": "posto",
+   "fieldtype": "Link",
+   "label": "Posto",
+   "options": "Posto De Vigilancia",
+   "read_only": 1
+  },
+  {
    "fieldname": "tipo_posto",
    "fieldtype": "Data",
    "label": "Tipo de Posto",
    "read_only": 1,
    "columns": 1
+  },
+  {
+   "fieldname": "descricao",
+   "fieldtype": "Small Text",
+   "label": "Descrição na Factura",
+   "read_only": 1
   },
   {
    "fieldname": "metodo",

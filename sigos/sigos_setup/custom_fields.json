@@ -726,5 +726,17 @@
   "label": "Fim da Alocação (Férias SIGOS)",
   "description": "Data de fim (to_date) usada nas Leave Allocations rolantes de férias. Mantida num horizonte distante (ex.: 2099-12-31) para impedir a expiração automática do HRMS — a expiração/limite é gerida pelo motor de férias do SIGOS.",
   "insert_after": "max_leaves_allowed"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Customer",
+  "module": "SIGOS Setup",
+  "fieldname": "custom_detalhe_fatura",
+  "fieldtype": "Select",
+  "label": "Detalhe da Factura (SIGOS)",
+  "options": "Predefinido\nPor Contrato\nPor Posto",
+  "default": "Predefinido",
+  "description": "Faturação Mensal: uma linha por contrato, ou uma linha por posto com o Nome Financeiro. Predefinido segue as Definições SIGOS.",
+  "insert_after": "customer_group"
  }
 ]

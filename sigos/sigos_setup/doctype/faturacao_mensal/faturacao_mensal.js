@@ -19,8 +19,10 @@ frappe.ui.form.on("Faturacao Mensal", {
 
 		frm.add_custom_button(__("Pré-visualizar"), () => _previsualizar(frm));
 
-		if (temLinhas && !gerado) {
-			frm.add_custom_button(__("Gerar Faturas"), () => _gerar(frm))
+		// Stays available after a run: re-running only invoices the customers still
+		// missing (already-invoiced ones are skipped server-side).
+		if (temLinhas) {
+			frm.add_custom_button(gerado ? __("Gerar Faturas em Falta") : __("Gerar Faturas"), () => _gerar(frm))
 				.removeClass("btn-default").addClass("btn-primary");
 		}
 
@@ -40,13 +42,36 @@ function _previsualizar(frm) {
 }
 
 function _gerar(frm) {
-	frappe.confirm(
-		__("Gerar uma factura (rascunho) por cliente para <b>{0}</b>? Total: <b>{1}</b>.", [
+	// Pre-flight first (server re-checks on generate): show every problem in one go.
+	const run = () => frm.call("verificar").then(r => {
+		const v = r.message || {};
+		const erros = v.erros || [], avisos = v.avisos || [], clientes = v.clientes || {};
+		const nomes = Object.keys(clientes);
+		const lista = (arr) => `<ul style="margin:4px 0 10px 18px;padding:0">${arr.map(x => `<li>${x}</li>`).join("")}</ul>`;
+
+		if (erros.length) {
+			frappe.msgprint({
+				title: __("Não é possível gerar"),
+				indicator: "red",
+				message: lista(erros),
+			});
+			return;
+		}
+
+		let html = __("Gerar uma factura (rascunho) por cliente para <b>{0}</b>? Total: <b>{1}</b>.", [
 			frappe.format(frm.doc.mes_referencia, { fieldtype: "Date" }),
 			frappe.format(frm.doc.total_geral || 0, { fieldtype: "Currency" }),
-		]),
-		() => frm.call("gerar_faturas").then(() => frm.reload_doc()),
-	);
+		]);
+		if (nomes.length) {
+			html += `<br><br><b>${__("Clientes que serão ignorados:")}</b>` + lista(
+				nomes.map(c => `<b>${frappe.utils.escape_html(c)}</b>: ${clientes[c].join("; ")}`));
+		}
+		if (avisos.length) {
+			html += `<br><b>${__("Avisos:")}</b>` + lista(avisos);
+		}
+		frappe.confirm(html, () => frm.call("gerar_faturas").then(() => frm.reload_doc()));
+	});
+	(frm.is_dirty() ? frm.save() : Promise.resolve()).then(run);
 }
 
 // ─── Preview deck ─────────────────────────────────────────────────────────────
@@ -83,7 +108,7 @@ function _render_deck(frm) {
 			return `
 			<div class="fat-line">
 				<span class="fat-reg">${frappe.utils.escape_html(r.regime || "—")}${temp}${contr}</span>
-				<span class="fat-proj">${frappe.utils.escape_html(r.project || "")}</span>
+				<span class="fat-proj" title="${frappe.utils.escape_html(r.project || "")}">${frappe.utils.escape_html(r.descricao || r.project || "")}</span>
 				<span class="fat-q">${r.quantidade || 0} ${__("vig.")}${dif}</span>
 				<span class="fat-u">${fmtC(r.valor_unitario)}</span>
 				<span class="fat-t">${fmtC(r.total)}</span>

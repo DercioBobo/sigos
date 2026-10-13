@@ -83,6 +83,7 @@
   "payroll_payable_account",
   "tab_ss_fat",
   "metodo_faturacao_padrao",
+  "detalhe_fatura_padrao",
   "tab_ss_sis",
   "empresa_padrao",
   "col_ss_sis1",
@@ -747,6 +748,14 @@
    "options": "Vigilantes Activos\nContratual",
    "default": "Vigilantes Activos",
    "description": "Como a Faturação Mensal conta os vigilantes de cada contrato, quando o contrato (Projecto) está em \"Predefinido\". <b>Vigilantes Activos</b>: vigilantes Activos do contrato no momento da pré-visualização. <b>Contratual</b>: o Nº de Vigilantes escrito na tabela de Faturação do contrato. A tarifa vem sempre da tabela de Faturação do contrato."
+  },
+  {
+   "fieldname": "detalhe_fatura_padrao",
+   "fieldtype": "Select",
+   "label": "Detalhe da Factura Padrão",
+   "options": "Por Contrato\nPor Posto",
+   "default": "Por Contrato",
+   "description": "Como as linhas da factura são agrupadas, quando o Cliente está em \"Predefinido\". <b>Por Contrato</b>: uma linha por contrato e regime. <b>Por Posto</b>: uma linha por posto e regime, com o Nome Financeiro do posto (nos contratos Contratuais, uma linha por regime com a lista dos postos)."
   }
  ],
  "issingle": 1,
