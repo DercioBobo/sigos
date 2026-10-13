@@ -97,6 +97,7 @@ doc_events = {
 	},
 	"Project": {
 		"before_insert": "sigos.contract_naming.project_before_insert",
+		"validate": "sigos.contrato.project_validate",
 	},
 	"Salary Slip": {
 		"before_insert": "sigos.payroll_ext.salary_slip_hooks.before_insert",

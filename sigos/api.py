@@ -2513,16 +2513,38 @@ def search_vigilantes_rich(txt="", status="Activo", delegacao=None, excluir=None
 def get_regime_rate(project, regime):
 	"""
 	Monthly billed rate per vigilante for a regime under a contract (Project).
-	Reads the project's per-regime tariff table; falls back to the project's
-	default valor (custom_valor_do_contrato) when the regime has no specific rate.
+	Reads the contract's Finance table (Faturação por Regime). No fallback: a regime
+	without a row is unpriced (0) and Faturacao Mensal flags it.
 	"""
 	frappe.only_for(PAPEIS_INTERNOS)
+	return _get_regime_rate(project, regime)
+
+
+def _get_regime_rate(project, regime):
+	"""
+	Unguarded core of get_regime_rate for server-side callers that enforce their
+	own role gate (e.g. Faturacao Mensal, which Accounts Manager may run without
+	holding any SIGOS role — calling the whitelisted wrapper would reject them).
+	"""
 	if not project:
 		return 0
-	rate = frappe.db.get_value("Project Regime Rate", {"parent": project, "regime": regime}, "valor")
-	if rate:
-		return rate
-	return frappe.db.get_value("Project", project, "custom_valor_do_contrato") or 0
+	return frappe.db.get_value(
+		"Project Faturacao Regime",
+		{"parent": project, "parenttype": "Project", "regime": regime},
+		"valor",
+	) or 0
+
+
+def resolver_metodo_faturacao(project):
+	"""
+	Billing count method for a contract: the Project's own choice, or the SIGOS
+	Settings default when it is 'Predefinido'/unset. 'Vigilantes Activos' is the
+	historical behaviour, so it is also the last-resort default.
+	"""
+	metodo = frappe.db.get_value("Project", project, "custom_metodo_faturacao") if project else None
+	if metodo in (None, "", "Predefinido"):
+		metodo = frappe.db.get_single_value("SIGOS Settings", "metodo_faturacao_padrao")
+	return metodo or "Vigilantes Activos"
 
 
 # ─── Salário base por contrato/regime ────────────────────────────────────────────

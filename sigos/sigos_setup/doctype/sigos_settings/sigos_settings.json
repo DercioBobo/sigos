@@ -81,6 +81,8 @@
   "salario_base_padrao_reserva",
   "reter_salario_base_em_rotatividade",
   "payroll_payable_account",
+  "tab_ss_fat",
+  "metodo_faturacao_padrao",
   "tab_ss_sis",
   "empresa_padrao",
   "col_ss_sis1",
@@ -732,6 +734,19 @@
    "label": "Salário: Não Herdar do Contrato por Omissão",
    "default": "0",
    "description": "Quando activo, o diálogo \"Definir Salário Base\" abre sempre com a opção \"Herdar salário do contrato\" DESMARCADA por omissão (mesmo quando o vigilante ainda não tem override manual) — para clientes que preferem definir o salário caso a caso em vez de herdar do contrato/regime/categoria."
+  },
+  {
+   "fieldname": "tab_ss_fat",
+   "fieldtype": "Tab Break",
+   "label": "Faturação"
+  },
+  {
+   "fieldname": "metodo_faturacao_padrao",
+   "fieldtype": "Select",
+   "label": "Método de Faturação Padrão",
+   "options": "Vigilantes Activos\nContratual",
+   "default": "Vigilantes Activos",
+   "description": "Como a Faturação Mensal conta os vigilantes de cada contrato, quando o contrato (Projecto) está em \"Predefinido\". <b>Vigilantes Activos</b>: vigilantes Activos do contrato no momento da pré-visualização. <b>Contratual</b>: o Nº de Vigilantes escrito na tabela de Faturação do contrato. A tarifa vem sempre da tabela de Faturação do contrato."
   }
  ],
  "issingle": 1,

@@ -594,18 +594,8 @@
   "module": "SIGOS Setup",
   "fieldname": "custom_sec_sigos",
   "fieldtype": "Section Break",
-  "label": "Tarifas e Subsídios do Contrato",
+  "label": "Recursos Humanos (Salários e Subsídios)",
   "insert_after": "customer"
- },
- {
-  "doctype": "Custom Field",
-  "dt": "Project",
-  "module": "SIGOS Setup",
-  "fieldname": "custom_valor_do_contrato",
-  "fieldtype": "Currency",
-  "label": "Valor por Vigilante (predefinido)",
-  "description": "Preço usado quando um regime não tem tarifa específica na tabela abaixo.",
-  "insert_after": "custom_sec_sigos"
  },
  {
   "doctype": "Custom Field",
@@ -614,9 +604,9 @@
   "fieldname": "custom_regime_rates",
   "fieldtype": "Table",
   "options": "Project Regime Rate",
-  "label": "Tarifas por Regime",
-  "description": "Preço mensal por vigilante para cada regime, neste contrato.",
-  "insert_after": "custom_valor_do_contrato"
+  "label": "Salários por Regime",
+  "description": "Salário base por vigilante para cada regime, neste contrato (RH / Folha).",
+  "insert_after": "custom_sec_sigos"
  },
  {
   "doctype": "Custom Field",
@@ -627,6 +617,64 @@
   "options": "Project Subsidio Item",
   "label": "Subsídios do Projecto",
   "insert_after": "custom_regime_rates"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Project",
+  "module": "SIGOS Setup",
+  "fieldname": "custom_sec_faturacao",
+  "fieldtype": "Section Break",
+  "label": "Faturação (Finanças)",
+  "insert_after": "custom_subsidios"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Project",
+  "module": "SIGOS Setup",
+  "fieldname": "custom_metodo_faturacao",
+  "fieldtype": "Select",
+  "label": "Método de Faturação",
+  "options": "Predefinido\nVigilantes Activos\nContratual",
+  "default": "Predefinido",
+  "description": "Como a Faturação Mensal conta os vigilantes deste contrato. <b>Predefinido</b> segue as Definições SIGOS (separador Faturação).",
+  "insert_after": "custom_sec_faturacao"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Project",
+  "module": "SIGOS Setup",
+  "fieldname": "custom_col_faturacao",
+  "fieldtype": "Column Break",
+  "insert_after": "custom_metodo_faturacao"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Project",
+  "module": "SIGOS Setup",
+  "fieldname": "custom_total_contratual",
+  "fieldtype": "Currency",
+  "label": "Total Mensal Contratado",
+  "read_only": 1,
+  "insert_after": "custom_col_faturacao"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Project",
+  "module": "SIGOS Setup",
+  "fieldname": "custom_sec_faturacao_tab",
+  "fieldtype": "Section Break",
+  "insert_after": "custom_total_contratual"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Project",
+  "module": "SIGOS Setup",
+  "fieldname": "custom_faturacao_regimes",
+  "fieldtype": "Table",
+  "options": "Project Faturacao Regime",
+  "label": "Faturação por Regime",
+  "description": "Nº de vigilantes e preço mensal por vigilante, por regime. A tarifa da Faturação Mensal vem sempre daqui.",
+  "insert_after": "custom_sec_faturacao_tab"
  },
  {
   "doctype": "Custom Field",

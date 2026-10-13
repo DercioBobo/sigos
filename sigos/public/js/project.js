@@ -62,3 +62,24 @@ frappe.ui.form.on("Project", {
 		}, __("SIGOS"));
 	},
 });
+
+// Faturação por Regime (Finance): keep line totals + Total Mensal Contratado live.
+// The server (sigos.contrato.project_validate) recomputes the same on save.
+function _sigos_recalcular_faturacao(frm) {
+	let total = 0;
+	(frm.doc.custom_faturacao_regimes || []).forEach(r => {
+		const t = (cint(r.quantidade) || 0) * (flt(r.valor) || 0);
+		if (r.total !== t) frappe.model.set_value(r.doctype, r.name, "total", t);
+		total += t;
+	});
+	if (frm.fields_dict.custom_total_contratual) frm.set_value("custom_total_contratual", total);
+}
+
+frappe.ui.form.on("Project", {
+	custom_faturacao_regimes_remove: _sigos_recalcular_faturacao,
+});
+
+frappe.ui.form.on("Project Faturacao Regime", {
+	quantidade: _sigos_recalcular_faturacao,
+	valor: _sigos_recalcular_faturacao,
+});

@@ -127,22 +127,23 @@ def _set_employee_naming():
 
 def _seccionar_contrato():
 	"""
-	Put the SIGOS contract fields (valor, tarifas, subsídios) in their own section.
-	custom_valor_do_contrato may pre-date the custom_sec_sigos break, and
-	_load_custom_fields skips fields that already exist — so re-point it explicitly.
-	The other two already chain after it. Idempotent.
+	Contract (Project) layout: an RH section (Salários por Regime + Subsídios) and a
+	Finance section (método + Faturação por Regime). _load_custom_fields skips fields
+	that already exist, so the RH fields that pre-date the RH/Finance split get their
+	label/description/position re-synced from custom_fields.json here. Idempotent.
 	"""
 	try:
-		if not frappe.db.exists("Custom Field", {"dt": "Project", "fieldname": "custom_sec_sigos"}):
-			return
-		atual = frappe.db.get_value(
-			"Custom Field", {"dt": "Project", "fieldname": "custom_valor_do_contrato"}, "insert_after"
-		)
-		if atual and atual != "custom_sec_sigos":
-			frappe.db.set_value(
-				"Custom Field", {"dt": "Project", "fieldname": "custom_valor_do_contrato"},
-				"insert_after", "custom_sec_sigos",
-			)
+		path = os.path.join(os.path.dirname(__file__), "sigos_setup", "custom_fields.json")
+		with open(path, encoding="utf-8") as f:
+			defs = {d["fieldname"]: d for d in json.load(f) if d.get("dt") == "Project"}
+		for fieldname in ("custom_sec_sigos", "custom_regime_rates"):
+			nome = frappe.db.get_value("Custom Field", {"dt": "Project", "fieldname": fieldname})
+			if not nome or fieldname not in defs:
+				continue
+			for prop in ("label", "description", "insert_after"):
+				if defs[fieldname].get(prop) is not None:
+					frappe.db.set_value("Custom Field", nome, prop, defs[fieldname][prop],
+						update_modified=False)
 		frappe.clear_cache(doctype="Project")
 	except Exception as e:
 		frappe.log_error(f"SIGOS: seccionar contrato failed: {e}", "SIGOS Install")

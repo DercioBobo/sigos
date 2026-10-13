@@ -82,7 +82,7 @@ A vigilante and their Employee **share one number**: `VIG-02` ↔ `FUNC-02`. `FU
 A Posto's **ID is the codename you type** (e.g. `BC-59`, `H10`) — `autoname: "prompt"`. `nome_do_posto` is the descriptive name. Every doctype that links a Posto also carries a read-only `…_nome` field (`fetch_from`) so both the code and the human name show.
 
 ### Contract model
-`Customer → Project (Contract) → Posto → Vigilante`. You set `Posto.project`; `Posto.cliente` is fetched from it. Per-regime rates live in `Project.custom_regime_rates` (child rows), with `custom_valor_do_contrato` as the fallback. `posto_interno = 1` marks a company-owned post (no contract / not billed). Projects are named after the customer ("Access Bank 01"), not `PROJ-####`.
+`Customer → Project (Contract) → Posto → Vigilante`. You set `Posto.project`; `Posto.cliente` is fetched from it. The contract holds two per-regime tables: RH `custom_regime_rates` (Project Regime Rate — salário base) and Finance `custom_faturacao_regimes` (Project Faturacao Regime — Nº de vigilantes + billing rate, no fallback). `custom_metodo_faturacao` picks how Faturação Mensal counts guards (Vigilantes Activos | Contratual | Predefinido → SIGOS Settings `metodo_faturacao_padrao`). `posto_interno = 1` marks a company-owned post (no contract / not billed). Projects are named after the customer ("Access Bank 01"), not `PROJ-####`.
 
 ### Payroll
 Salary-Slip-driven (`payroll_ext/salary_slip_hooks.py`).

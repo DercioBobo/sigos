@@ -1,5 +1,6 @@
 // Faturação Mensal — snapshot billing run with a premium preview deck.
-// Pré-visualizar -> server snapshots active headcount per (contrato, regime) x tarifa.
+// Pré-visualizar -> server counts per (contrato, regime) by the contract's método
+//                   (Vigilantes Activos | Contratual) x the contract's Finance tariff.
 // Gerar Faturas  -> one DRAFT Sales Invoice per customer.
 
 frappe.ui.form.on("Faturacao Mensal", {
@@ -73,11 +74,17 @@ function _render_deck(frm) {
 		const regRows = rows.map(r => {
 			const temp = r.tipo_posto === "Temporário"
 				? `<span class="fat-temp">${__("Temp.")}</span>` : "";
+			const contr = r.metodo === "Contratual"
+				? `<span class="fat-metodo">${__("Contratual")}</span>` : "";
+			// Activos lines: flag a headcount that differs from the contract.
+			const dif = r.metodo !== "Contratual" && r.quantidade_contratada
+				&& r.quantidade_contratada !== r.quantidade
+				? `<span class="fat-dif" title="${__("Contratados no contrato")}">${__("contr.")} ${r.quantidade_contratada}</span>` : "";
 			return `
 			<div class="fat-line">
-				<span class="fat-reg">${frappe.utils.escape_html(r.regime || "—")}${temp}</span>
+				<span class="fat-reg">${frappe.utils.escape_html(r.regime || "—")}${temp}${contr}</span>
 				<span class="fat-proj">${frappe.utils.escape_html(r.project || "")}</span>
-				<span class="fat-q">${r.quantidade || 0} ${__("vig.")}</span>
+				<span class="fat-q">${r.quantidade || 0} ${__("vig.")}${dif}</span>
 				<span class="fat-u">${fmtC(r.valor_unitario)}</span>
 				<span class="fat-t">${fmtC(r.total)}</span>
 			</div>`;
@@ -139,9 +146,11 @@ function _inject_css() {
 .fat-card-h { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 6px; margin-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,.1); }
 .fat-cli { font-weight: 700; font-size: 1.02em; }
 .fat-cli-sub { font-family: var(--sigos-display, system-ui); font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; }
-.fat-line { display: grid; grid-template-columns: 70px 1fr 70px 110px 120px; gap: 8px; align-items: baseline; padding: 3px 0; font-size: .86em; }
+.fat-line { display: grid; grid-template-columns: 150px 1fr 80px 110px 120px; gap: 8px; align-items: baseline; padding: 3px 0; font-size: .86em; }
 .fat-reg { font-weight: 700; color: #f4cd84; }
 .fat-temp { margin-left: 6px; padding: 1px 6px; border-radius: 999px; font-size: .82em; font-weight: 700; background: rgba(232,160,32,.22); color: #f4cd84; border: 1px solid rgba(232,160,32,.45); }
+.fat-metodo { margin-left: 6px; padding: 1px 6px; border-radius: 999px; font-size: .82em; font-weight: 700; background: rgba(143,182,230,.18); color: #bcd6f2; border: 1px solid rgba(143,182,230,.4); }
+.fat-dif { display: block; font-size: .8em; color: #f4a28c; }
 .fat-proj { color: rgba(255,255,255,.7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .fat-q { color: rgba(255,255,255,.85); text-align: right; }
 .fat-u { color: rgba(255,255,255,.6); text-align: right; font-variant-numeric: tabular-nums; }
