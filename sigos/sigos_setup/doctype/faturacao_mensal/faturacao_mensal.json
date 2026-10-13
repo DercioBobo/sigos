@@ -23,7 +23,9 @@
   "col_totais",
   "total_geral",
   "sec_faturas",
-  "faturas_geradas"
+  "faturas_geradas",
+  "automatica",
+  "registo_automatico"
  ],
  "fields": [
   {
@@ -117,10 +119,25 @@
    "fieldtype": "Small Text",
    "label": "Facturas (rascunho)",
    "read_only": 1
+  },
+  {
+   "fieldname": "automatica",
+   "fieldtype": "Check",
+   "label": "Faturação Automática",
+   "read_only": 1,
+   "default": "0",
+   "description": "Criada pela faturação automática agendada (Definições SIGOS)."
+  },
+  {
+   "fieldname": "registo_automatico",
+   "fieldtype": "Small Text",
+   "label": "Registo da Execução Automática",
+   "read_only": 1,
+   "depends_on": "eval:doc.automatica"
   }
  ],
  "links": [],
- "modified": "2026-10-13 12:00:00.000000",
+ "modified": "2026-10-13 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "SIGOS Setup",
  "name": "Faturacao Mensal",

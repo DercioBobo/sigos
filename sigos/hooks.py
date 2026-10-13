@@ -144,4 +144,9 @@ scheduler_events = {
 	"daily": [
 		"sigos.tasks.daily",
 	],
+	# Automatic monthly billing (no-op unless enabled in SIGOS Settings) — long queue,
+	# it can create one Sales Invoice per customer.
+	"daily_long": [
+		"sigos.faturacao.executar_faturacao_automatica",
+	],
 }

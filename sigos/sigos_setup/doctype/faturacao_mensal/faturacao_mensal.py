@@ -79,16 +79,67 @@ class FaturacaoMensal(Document):
 	@frappe.whitelist()
 	def gerar_faturas(self):
 		# Money-generating action (real draft Sales Invoices via ignore_permissions=True
-		# below) — gate on role explicitly rather than relying on whatever incidental
+		# in _gerar) — gate on role explicitly rather than relying on whatever incidental
 		# read/write access this doctype happens to grant.
 		frappe.only_for(PAPEIS_FATURACAO)
 
-		v = _verificar(self)
-		if v["erros"]:
+		r = self._gerar()
+		if r["erros"]:
 			frappe.throw(
-				_("Corrija primeiro:<br>{0}").format("<br>".join(f"• {e}" for e in v["erros"])),
+				_("Corrija primeiro:<br>{0}").format("<br>".join(f"• {e}" for e in r["erros"])),
 				title=_("Verificação Falhou"),
 			)
+
+		mes_label = formatdate(self.mes_referencia, "MMMM yyyy")
+		ja, problemas, falhas = r["ja"], r["problemas"], r["falhas"]
+		if not (r["criadas"] or falhas):
+			msg = []
+			if ja:
+				msg.append(_("Já facturados em {0}:<br>{1}").format(mes_label, _fmt_ja_faturados(ja)))
+			if problemas:
+				msg.append(_("Com problemas:<br>{0}").format(_fmt_problemas(problemas)))
+			frappe.throw("<br><br>".join(msg) or _("Nada a facturar."), title=_("Nada a Facturar"))
+
+		if r["criadas"]:
+			frappe.msgprint(
+				_("<b>{0}</b> factura(s) criada(s) em rascunho.").format(len(r["criadas"])),
+				indicator="green",
+				alert=True,
+			)
+
+		ignorados = []
+		if ja:
+			ignorados.append(_("Já facturados em {0}:<br>{1}").format(mes_label, _fmt_ja_faturados(ja)))
+		if problemas:
+			ignorados.append(_("Problemas de configuração:<br>{0}").format(_fmt_problemas(problemas)))
+		if falhas:
+			ignorados.append(_("Falharam ao criar a factura:<br>{0}").format(_fmt_problemas(falhas)))
+		if ignorados:
+			frappe.msgprint(
+				"<br><br>".join(ignorados),
+				title=_("Clientes Não Facturados"),
+				indicator="red" if falhas else "orange",
+			)
+		return {"faturas": r["criadas"], "falhas": list(falhas)}
+
+	def _gerar(self, submeter=False):
+		"""
+		Create the run's Sales Invoices without raising — shared by Gerar Faturas (UI)
+		and the automatic billing job (sigos.faturacao). Returns what happened:
+		  erros          blocking pre-flight errors (nothing was created)
+		  ja             {cliente: [SI]} already invoiced this month -> skipped
+		  problemas      {cliente: [motivo]} pre-flight customer problems -> skipped
+		  falhas         {cliente: [motivo]} invoice insert failed (rolled back)
+		  criadas        [SI] created (draft, or submitted — see below)
+		  submetidas     [SI] also submitted (submeter=True only)
+		  nao_submetidas {cliente: [motivo]} created but the submit failed -> kept as draft
+		"""
+		res = dict(erros=[], ja={}, problemas={}, falhas={}, criadas=[], submetidas=[],
+			nao_submetidas={})
+		v = _verificar(self)
+		res["erros"], res["problemas"] = v["erros"], v["clientes"]
+		if v["erros"]:
+			return res
 
 		posting = get_last_day(getdate(self.mes_referencia))
 		mes_label = formatdate(self.mes_referencia, "MMMM yyyy")
@@ -100,15 +151,11 @@ class FaturacaoMensal(Document):
 		# pass of THIS run) is skipped. Drafts count too; cancelled ones don't, so
 		# cancel (or delete a draft) to re-bill.
 		ja = _clientes_ja_faturados(self.company, self.mes_referencia, set(por_cliente))
+		res["ja"] = ja
 		for cliente in list(ja) + list(v["clientes"]):
 			por_cliente.pop(cliente, None)
 		if not por_cliente:
-			msg = []
-			if ja:
-				msg.append(_("Já facturados em {0}:<br>{1}").format(mes_label, _fmt_ja_faturados(ja)))
-			if v["clientes"]:
-				msg.append(_("Com problemas:<br>{0}").format(_fmt_problemas(v["clientes"])))
-			frappe.throw("<br><br>".join(msg) or _("Nada a facturar."), title=_("Nada a Facturar"))
+			return res
 
 		# Items first, once per regime (outside the per-customer savepoints).
 		itens = {ln.regime: _item_para_regime(ln.regime)
@@ -118,7 +165,6 @@ class FaturacaoMensal(Document):
 
 		# One savepoint per customer: a failure rolls back only that customer's
 		# invoice, the others are kept and the failure is reported with its reason.
-		criadas, falhas = [], {}
 		for i, (cliente, lns) in enumerate(sorted(por_cliente.items())):
 			sp = f"sigos_fat_{i}"
 			n_msgs = len(frappe.local.message_log)
@@ -151,39 +197,36 @@ class FaturacaoMensal(Document):
 				if si.meta.has_field("custom_total_vigilantes"):
 					si.custom_total_vigilantes = total_vig
 
-				si.insert(ignore_permissions=True)   # left as DRAFT for review
-				criadas.append(si.name)
+				si.insert(ignore_permissions=True)   # DRAFT for review, unless submeter
+				res["criadas"].append(si.name)
 			except Exception as e:
 				frappe.db.rollback(save_point=sp)
-				# drop the failed insert's popups; the reason is reported below
+				# drop the failed insert's popups; the reason is reported instead
 				del frappe.local.message_log[n_msgs:]
-				falhas[cliente] = [strip_html(cstr(e)) or e.__class__.__name__]
+				res["falhas"][cliente] = [strip_html(cstr(e)) or e.__class__.__name__]
 				frappe.log_error(title=f"Faturacao Mensal {self.name}: {cliente}")
+				continue
 
-		if criadas:
+			if submeter:
+				# A failed submit (credit limit, mandatory dimension, ...) keeps the
+				# draft — it is still the month's invoice, just waiting for a human.
+				sp_sub = f"{sp}_sub"
+				n_msgs = len(frappe.local.message_log)
+				frappe.db.savepoint(sp_sub)
+				try:
+					si.flags.ignore_permissions = True
+					si.submit()
+					res["submetidas"].append(si.name)
+				except Exception as e:
+					frappe.db.rollback(save_point=sp_sub)
+					del frappe.local.message_log[n_msgs:]
+					res["nao_submetidas"][cliente] = [strip_html(cstr(e)) or e.__class__.__name__]
+
+		if res["criadas"]:
 			anteriores = [f.strip() for f in (self.faturas_geradas or "").split(",") if f.strip()]
-			self.faturas_geradas = ", ".join(anteriores + criadas)
+			self.faturas_geradas = ", ".join(anteriores + res["criadas"])
 			self.save(ignore_permissions=True)
-			frappe.msgprint(
-				_("<b>{0}</b> factura(s) criada(s) em rascunho.").format(len(criadas)),
-				indicator="green",
-				alert=True,
-			)
-
-		ignorados = []
-		if ja:
-			ignorados.append(_("Já facturados em {0}:<br>{1}").format(mes_label, _fmt_ja_faturados(ja)))
-		if v["clientes"]:
-			ignorados.append(_("Problemas de configuração:<br>{0}").format(_fmt_problemas(v["clientes"])))
-		if falhas:
-			ignorados.append(_("Falharam ao criar a factura:<br>{0}").format(_fmt_problemas(falhas)))
-		if ignorados:
-			frappe.msgprint(
-				"<br><br>".join(ignorados),
-				title=_("Clientes Não Facturados"),
-				indicator="red" if falhas else "orange",
-			)
-		return {"faturas": criadas, "falhas": list(falhas)}
+		return res
 
 
 def calcular_linhas(cliente=None):
@@ -630,9 +673,7 @@ def faturar_cliente(cliente, mes_referencia=None):
 		frappe.throw(_("Cliente {0} não existe.").format(cliente))
 
 	mes = getdate(mes_referencia or nowdate())
-	company = frappe.db.get_single_value("SIGOS Settings", "empresa_padrao") \
-		or frappe.defaults.get_user_default("Company") \
-		or frappe.db.get_single_value("Global Defaults", "default_company")
+	company = empresa_faturacao()
 	if not company:
 		frappe.throw(_("Defina a <b>Empresa Padrão</b> nas Definições SIGOS."))
 
@@ -654,3 +695,10 @@ def faturar_cliente(cliente, mes_referencia=None):
 
 	doc.preview()
 	return doc.name
+
+
+def empresa_faturacao():
+	"""Billing company: SIGOS Settings > user default > Global Defaults."""
+	return (frappe.db.get_single_value("SIGOS Settings", "empresa_padrao")
+		or frappe.defaults.get_user_default("Company")
+		or frappe.db.get_single_value("Global Defaults", "default_company"))

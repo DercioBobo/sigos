@@ -586,7 +586,8 @@
   "options": "Faturacao Mensal",
   "label": "Faturação Mensal (SIGOS)",
   "read_only": 1,
-  "insert_after": "custom_total_tdu"
+  "insert_after": "custom_total_tdu",
+  "no_copy": 1
  },
  {
   "doctype": "Custom Field",
@@ -597,7 +598,8 @@
   "label": "Mês de Referência (SIGOS)",
   "read_only": 1,
   "description": "Mês facturado pelos contratos SIGOS (1º dia). Só pode existir uma factura SIGOS por cliente e mês.",
-  "insert_after": "custom_faturacao_mensal"
+  "insert_after": "custom_faturacao_mensal",
+  "no_copy": 1
  },
  {
   "doctype": "Custom Field",
@@ -733,5 +735,41 @@
   "default": "Predefinido",
   "description": "Faturação Mensal: uma linha por contrato, ou uma linha por posto com o Nome Financeiro. Predefinido segue as Definições SIGOS.",
   "insert_after": "customer_group"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Customer",
+  "module": "SIGOS Setup",
+  "fieldname": "custom_faturacao_automatica",
+  "fieldtype": "Check",
+  "label": "Faturação Automática (SIGOS)",
+  "default": "0",
+  "description": "Factura este cliente automaticamente todos os meses (requer a Faturação Automática activa nas Definições SIGOS).",
+  "insert_after": "custom_detalhe_fatura"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Customer",
+  "module": "SIGOS Setup",
+  "fieldname": "custom_dia_faturacao",
+  "fieldtype": "Int",
+  "label": "Dia de Faturação",
+  "default": "0",
+  "depends_on": "eval:doc.custom_faturacao_automatica",
+  "description": "1–31; 0 = dia padrão das Definições SIGOS. Num mês mais curto, usa-se o último dia.",
+  "insert_after": "custom_faturacao_automatica"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Customer",
+  "module": "SIGOS Setup",
+  "fieldname": "custom_mes_faturado",
+  "fieldtype": "Select",
+  "label": "Mês Facturado",
+  "options": "Predefinido\nMês Corrente\nMês Anterior",
+  "default": "Predefinido",
+  "depends_on": "eval:doc.custom_faturacao_automatica",
+  "description": "Mês Corrente = adiantado; Mês Anterior = vencido. Predefinido segue as Definições SIGOS.",
+  "insert_after": "custom_dia_faturacao"
  }
 ]

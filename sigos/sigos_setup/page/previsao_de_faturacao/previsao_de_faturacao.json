@@ -1,0 +1,16 @@
+{
+ "content": null,
+ "creation": "2026-10-13 18:00:00.000000",
+ "doctype": "Page",
+ "module": "SIGOS Setup",
+ "name": "previsao-de-faturacao",
+ "page_name": "previsao-de-faturacao",
+ "standard": "Yes",
+ "system_page": 0,
+ "title": "Previsão de Faturação",
+ "roles": [
+  { "role": "System Manager" },
+  { "role": "SIGOS Manager" },
+  { "role": "Accounts Manager" }
+ ]
+}
