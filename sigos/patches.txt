@@ -27,3 +27,4 @@ sigos.patches.seed_project_subsidio_aplicacao
 sigos.patches.add_payroll_entry_customer_group_filter
 sigos.patches.divisor_folha_30_dias
 sigos.patches.separar_faturacao_do_contrato
+sigos.patches.sigos_stamp_fatura_no_copy
