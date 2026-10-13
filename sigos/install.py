@@ -136,7 +136,8 @@ def _seccionar_contrato():
 		path = os.path.join(os.path.dirname(__file__), "sigos_setup", "custom_fields.json")
 		with open(path, encoding="utf-8") as f:
 			defs = {d["fieldname"]: d for d in json.load(f) if d.get("dt") == "Project"}
-		for fieldname in ("custom_sec_sigos", "custom_regime_rates"):
+		for fieldname in ("custom_sec_sigos", "custom_regime_rates",
+				"custom_total_contratual", "custom_faturacao_regimes"):
 			nome = frappe.db.get_value("Custom Field", {"dt": "Project", "fieldname": fieldname})
 			if not nome or fieldname not in defs:
 				continue
@@ -144,6 +145,12 @@ def _seccionar_contrato():
 				if defs[fieldname].get(prop) is not None:
 					frappe.db.set_value("Custom Field", nome, prop, defs[fieldname][prop],
 						update_modified=False)
+		# Finance section is single-column now: drop the old layout breaks if a site
+		# already created them.
+		for fieldname in ("custom_col_faturacao", "custom_sec_faturacao_tab"):
+			nome = frappe.db.get_value("Custom Field", {"dt": "Project", "fieldname": fieldname})
+			if nome:
+				frappe.delete_doc("Custom Field", nome, ignore_permissions=True, force=True)
 		frappe.clear_cache(doctype="Project")
 	except Exception as e:
 		frappe.log_error(f"SIGOS: seccionar contrato failed: {e}", "SIGOS Install")

@@ -602,3 +602,43 @@ def _item_para_regime(regime):
 	item.flags.ignore_permissions = True
 	item.insert(set_name=code)
 	return code
+
+
+@frappe.whitelist()
+def faturar_cliente(cliente, mes_referencia=None):
+	"""
+	'Faturar Mês' shortcut (Customer / Project forms): open the customer's billing
+	run for that month, previewed and ready to review. Reuses the customer's run
+	for the month that hasn't generated invoices yet (so repeated clicks don't pile
+	up drafts); otherwise starts a new one. Runs are per CUSTOMER — all its
+	contracts together — because the double-billing guard is per customer + month.
+	"""
+	frappe.only_for(PAPEIS_FATURACAO)
+	if not frappe.db.exists("Customer", cliente):
+		frappe.throw(_("Cliente {0} não existe.").format(cliente))
+
+	mes = getdate(mes_referencia or nowdate())
+	company = frappe.db.get_single_value("SIGOS Settings", "empresa_padrao") \
+		or frappe.defaults.get_user_default("Company") \
+		or frappe.db.get_single_value("Global Defaults", "default_company")
+	if not company:
+		frappe.throw(_("Defina a <b>Empresa Padrão</b> nas Definições SIGOS."))
+
+	nome = frappe.db.get_value("Faturacao Mensal", {
+		"cliente": cliente,
+		"company": company,
+		"mes_referencia": ["between", [get_first_day(mes), get_last_day(mes)]],
+		"faturas_geradas": ["is", "not set"],
+	}, "name", order_by="modified desc")
+
+	if nome:
+		doc = frappe.get_doc("Faturacao Mensal", nome)
+	else:
+		doc = frappe.new_doc("Faturacao Mensal")
+		doc.cliente = cliente
+		doc.company = company
+		doc.mes_referencia = mes
+		doc.insert(ignore_permissions=True)
+
+	doc.preview()
+	return doc.name

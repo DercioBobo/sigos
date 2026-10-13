@@ -168,3 +168,38 @@ sigos.render_escala_bloco = function (esc, destacar) {
 	</div>`;
 	return html;
 };
+
+// "Faturar Mês" (Customer / Project forms): pick the month, then open the customer's
+// Faturação Mensal run already previewed. Runs are per customer (all its contracts).
+sigos.faturar_mes = function (cliente) {
+	if (!cliente) {
+		frappe.msgprint(__("Defina primeiro o Cliente."));
+		return;
+	}
+	const d = new frappe.ui.Dialog({
+		title: __("Faturar Mês — {0}", [cliente]),
+		fields: [
+			{
+				fieldname: "mes_referencia",
+				fieldtype: "Date",
+				label: __("Mês de Referência"),
+				reqd: 1,
+				default: frappe.datetime.get_today(),
+				description: __("Qualquer dia do mês a facturar. Inclui todos os contratos deste cliente."),
+			},
+		],
+		primary_action_label: __("Pré-visualizar"),
+		primary_action(vals) {
+			d.hide();
+			frappe.call({
+				method: "sigos.sigos_setup.doctype.faturacao_mensal.faturacao_mensal.faturar_cliente",
+				args: { cliente, mes_referencia: vals.mes_referencia },
+				freeze: true,
+				freeze_message: __("A calcular a facturação…"),
+			}).then(r => {
+				if (r.message) frappe.set_route("Form", "Faturacao Mensal", r.message);
+			});
+		},
+	});
+	d.show();
+};

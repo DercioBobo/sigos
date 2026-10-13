@@ -20,6 +20,9 @@ frappe.ui.form.on("Project", {
 			}, "top");
 		}
 
+		// Billing runs are per customer, so this bills ALL of the customer's contracts.
+		frm.add_custom_button(__("Faturar Mês"), () => sigos.faturar_mes(frm.doc.customer), __("SIGOS"));
+
 		frm.add_custom_button(__("Aplicar Salário Base"), () => {
 			const d = new frappe.ui.Dialog({
 				title: __("Aplicar Salário Base"),

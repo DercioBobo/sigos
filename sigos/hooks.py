@@ -24,6 +24,7 @@ app_include_js = [
 # Form scripts attached to standard (non-SIGOS) doctypes
 doctype_js = {
 	"Project": "public/js/project.js",
+	"Customer": "public/js/customer.js",
 	"Employee": "public/js/employee_hr360.js",
 	"Payroll Entry": "public/js/payroll_entry.js",
 	"Salary Structure Assignment": "public/js/salary_structure_assignment.js",
