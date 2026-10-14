@@ -340,7 +340,7 @@ sigos.PrevisaoFaturacao = class PrevisaoFaturacao {
 		}
 		if (c.sem_tarifa.length) {
 			blocos.push(`<div class="pf-note tone-bad"><b>${__("Sem tarifa (não facturados)")}:</b> ${c.sem_tarifa.map(esc).join(", ")}
-				— ${__("defina a Faturação por Regime no contrato.")}</div>`);
+				— ${__("defina o preço no contrato (Faturação por Regime) ou no Cliente (Tarifas por Regime).")}</div>`);
 		}
 		if (c.estado === "cancelado") {
 			blocos.push(`<div class="pf-note tone-muted">${__(
@@ -376,7 +376,7 @@ sigos.PrevisaoFaturacao = class PrevisaoFaturacao {
 						<td>${esc(l.metodo)}</td>
 						<td class="pf-num">${l.quantidade}</td>
 						<td class="pf-num">${l.quantidade_contratada || "—"}</td>
-						<td class="pf-num">${l.valor_unitario ? _pf_money(l.valor_unitario) : `<span class="pf-tone-bad">${__("sem tarifa")}</span>`}</td>
+						<td class="pf-num">${l.valor_unitario ? _pf_money(l.valor_unitario) : `<span class="pf-tone-bad">${__("sem tarifa")}</span>`}${l.origem_tarifa === "Cliente" ? ` <span class="pf-badge tone-info" title="${__("Tarifa por regime do cliente (o contrato não define preço)")}">${__("cliente")}</span>` : ""}</td>
 						<td class="pf-num">${_pf_money(l.total)}</td>
 					</tr>`).join("")}
 				</tbody>

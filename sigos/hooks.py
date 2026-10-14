@@ -97,6 +97,9 @@ doc_events = {
 	"Employee": {
 		"on_update": "sigos.sync.employee_to_vigilante",
 	},
+	"Customer": {
+		"validate": "sigos.contrato.customer_validate",
+	},
 	"Project": {
 		"before_insert": "sigos.contract_naming.project_before_insert",
 		"validate": "sigos.contrato.project_validate",

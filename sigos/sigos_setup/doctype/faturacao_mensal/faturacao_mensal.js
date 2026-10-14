@@ -110,7 +110,8 @@ function _render_deck(frm) {
 				<span class="fat-reg">${frappe.utils.escape_html(r.regime || "—")}${temp}${contr}</span>
 				<span class="fat-proj" title="${frappe.utils.escape_html(r.project || "")}">${frappe.utils.escape_html(r.descricao || r.project || "")}</span>
 				<span class="fat-q">${r.quantidade || 0} ${__("vig.")}${dif}</span>
-				<span class="fat-u">${fmtC(r.valor_unitario)}</span>
+				<span class="fat-u">${fmtC(r.valor_unitario)}${r.origem_tarifa === "Cliente"
+					? ` <span class="fat-metodo" title="${__("Tarifa por regime do cliente")}">${__("cliente")}</span>` : ""}</span>
 				<span class="fat-t">${fmtC(r.total)}</span>
 			</div>`;
 		}).join("");

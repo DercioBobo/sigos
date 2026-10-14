@@ -745,13 +745,40 @@
   "doctype": "Custom Field",
   "dt": "Customer",
   "module": "SIGOS Setup",
+  "fieldname": "custom_tab_faturacao_sigos",
+  "fieldtype": "Tab Break",
+  "insert_after": "disabled",
+  "label": "Faturação SIGOS"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Customer",
+  "module": "SIGOS Setup",
+  "fieldname": "custom_sec_fatura_cliente",
+  "fieldtype": "Section Break",
+  "insert_after": "custom_tab_faturacao_sigos",
+  "label": "Factura"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Customer",
+  "module": "SIGOS Setup",
   "fieldname": "custom_detalhe_fatura",
   "fieldtype": "Select",
   "label": "Detalhe da Factura (SIGOS)",
   "options": "Predefinido\nPor Contrato\nPor Posto",
   "default": "Predefinido",
-  "description": "Faturação Mensal: uma linha por contrato, ou uma linha por posto com o Nome Financeiro. Predefinido segue as Definições SIGOS.",
-  "insert_after": "customer_group"
+  "description": "Uma linha por contrato, ou uma linha por posto com o Nome Financeiro. Predefinido segue as Definições SIGOS.",
+  "insert_after": "custom_sec_fatura_cliente"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Customer",
+  "module": "SIGOS Setup",
+  "fieldname": "custom_sec_fat_auto_cliente",
+  "fieldtype": "Section Break",
+  "insert_after": "custom_detalhe_fatura",
+  "label": "Faturação Automática"
  },
  {
   "doctype": "Custom Field",
@@ -762,7 +789,15 @@
   "label": "Faturação Automática (SIGOS)",
   "default": "0",
   "description": "Factura este cliente automaticamente todos os meses (requer a Faturação Automática activa nas Definições SIGOS).",
-  "insert_after": "custom_detalhe_fatura"
+  "insert_after": "custom_sec_fat_auto_cliente"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Customer",
+  "module": "SIGOS Setup",
+  "fieldname": "custom_col_fat_auto_cliente",
+  "fieldtype": "Column Break",
+  "insert_after": "custom_faturacao_automatica"
  },
  {
   "doctype": "Custom Field",
@@ -774,7 +809,7 @@
   "default": "0",
   "depends_on": "eval:doc.custom_faturacao_automatica",
   "description": "1–31; 0 = dia padrão das Definições SIGOS. Num mês mais curto, usa-se o último dia.",
-  "insert_after": "custom_faturacao_automatica"
+  "insert_after": "custom_col_fat_auto_cliente"
  },
  {
   "doctype": "Custom Field",
@@ -788,5 +823,25 @@
   "depends_on": "eval:doc.custom_faturacao_automatica",
   "description": "Mês Corrente = adiantado; Mês Anterior = vencido. Predefinido segue as Definições SIGOS.",
   "insert_after": "custom_dia_faturacao"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Customer",
+  "module": "SIGOS Setup",
+  "fieldname": "custom_sec_tarifas_cliente",
+  "fieldtype": "Section Break",
+  "insert_after": "custom_mes_faturado",
+  "label": "Tarifas por Regime"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Customer",
+  "module": "SIGOS Setup",
+  "fieldname": "custom_tarifas_regime",
+  "fieldtype": "Table",
+  "insert_after": "custom_sec_tarifas_cliente",
+  "label": "Tarifas por Regime",
+  "options": "Customer Tarifa Regime",
+  "description": "Preço por vigilante e por regime para TODOS os contratos deste cliente. Um contrato que define o seu próprio Valor / Vigilante usa sempre o seu; os outros usam este. Um regime sem preço em nenhum dos dois não é facturado (aparece como 'sem tarifa')."
  }
 ]

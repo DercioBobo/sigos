@@ -67,11 +67,26 @@ frappe.ui.form.on("Project", {
 });
 
 // Faturação por Regime (Finance): keep line totals + Total Mensal Contratado live.
-// The server (sigos.contrato.project_validate) recomputes the same on save.
+// A row without its own price uses the customer's Tarifas por Regime (loaded once per
+// customer). The server (sigos.contrato.project_validate) recomputes the same on save.
+function _sigos_carregar_tarifas_cliente(frm) {
+	const cliente = frm.doc.customer;
+	if (!cliente) { frm._sigos_tarifas_cliente = {}; _sigos_recalcular_faturacao(frm); return; }
+	if (frm._sigos_tarifas_de === cliente) return;
+	frm._sigos_tarifas_de = cliente;
+	frappe.xcall("sigos.contrato.get_tarifas_cliente", { customer: cliente }).then(t => {
+		if (frm.doc.customer !== cliente) return;
+		frm._sigos_tarifas_cliente = t || {};
+		_sigos_recalcular_faturacao(frm);
+	});
+}
+
 function _sigos_recalcular_faturacao(frm) {
+	const do_cliente = frm._sigos_tarifas_cliente || {};
 	let total = 0;
 	(frm.doc.custom_faturacao_regimes || []).forEach(r => {
-		const t = (cint(r.quantidade) || 0) * (flt(r.valor) || 0);
+		const valor = flt(r.valor) || flt(do_cliente[r.regime]) || 0;
+		const t = (cint(r.quantidade) || 0) * valor;
 		if (r.total !== t) frappe.model.set_value(r.doctype, r.name, "total", t);
 		total += t;
 	});
@@ -79,10 +94,13 @@ function _sigos_recalcular_faturacao(frm) {
 }
 
 frappe.ui.form.on("Project", {
+	refresh: _sigos_carregar_tarifas_cliente,
+	customer: _sigos_carregar_tarifas_cliente,
 	custom_faturacao_regimes_remove: _sigos_recalcular_faturacao,
 });
 
 frappe.ui.form.on("Project Faturacao Regime", {
+	regime: _sigos_recalcular_faturacao,
 	quantidade: _sigos_recalcular_faturacao,
 	valor: _sigos_recalcular_faturacao,
 });

@@ -34,10 +34,9 @@
    "fieldname": "valor",
    "fieldtype": "Currency",
    "label": "Valor / Vigilante",
-   "reqd": 1,
    "in_list_view": 1,
    "columns": 2,
-   "description": "Preço mensal facturado por vigilante neste regime, para este contrato"
+   "description": "Preço mensal por vigilante neste regime, para este contrato. Vazio: usa a tarifa do Cliente (separador Faturação SIGOS)."
   },
   {
    "fieldname": "total",
@@ -45,7 +44,8 @@
    "label": "Total Mensal",
    "read_only": 1,
    "in_list_view": 1,
-   "columns": 2
+   "columns": 2,
+   "description": "Nº de Vigilantes × tarifa aplicada (a do contrato, ou a do Cliente)."
   },
   {
    "fieldname": "descricao",
@@ -53,12 +53,12 @@
    "label": "Descrição na Factura",
    "in_list_view": 1,
    "columns": 3,
-   "description": "Texto da linha na factura (o mês é acrescentado). Vazio: '<regime> — <contrato>'. Em clientes Por Posto substitui o regime: '<descrição> — <nome financeiro do posto>'."
+   "description": "Texto da linha na factura (o mês é acrescentado). Vazio: o do Cliente, ou '<regime> — <contrato>'. Em clientes Por Posto substitui o regime: '<descrição> — <nome financeiro do posto>'."
   }
  ],
  "istable": 1,
  "links": [],
- "modified": "2026-10-13 12:00:00.000000",
+ "modified": "2026-10-14 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "SIGOS Setup",
  "name": "Project Faturacao Regime",

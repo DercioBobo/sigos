@@ -3,6 +3,8 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import cint, cstr, flt, getdate, get_first_day, get_last_day, formatdate, nowdate, strip_html
 
+from sigos.contrato import resolver_tarifa, tarifas_dos_clientes
+
 
 class FaturacaoMensal(Document):
 
@@ -54,7 +56,7 @@ class FaturacaoMensal(Document):
 		if sem_tarifa:
 			frappe.msgprint(
 				_("Sem tarifa definida (valor 0) para: <br>{0}<br><br>"
-				  "Defina a <b>Faturação por Regime</b> no contrato (Projecto).").format(
+				  "Defina o preço no contrato (<b>Faturação por Regime</b>) ou no Cliente (<b>Tarifas por Regime</b>).").format(
 					"<br>".join(sem_tarifa)),
 				title=_("Tarifas em Falta"),
 				indicator="orange",
@@ -237,7 +239,9 @@ def calcular_linhas(cliente=None):
 	'Predefinido' -> SIGOS Settings default):
 	  - Vigilantes Activos: Activo guards of the contract right now.
 	  - Contratual: the Nº de Vigilantes typed in the contract's Finance table.
-	The rate always comes from the contract's Finance table (Faturação por Regime).
+	The rate comes from the contract's Finance table (Faturação por Regime), or — for a
+	row without a price, or a regime the contract doesn't list — from the customer's
+	Tarifas por Regime (resolver_tarifa). Each line says which (origem_tarifa).
 	Cliente is derived from the Project so it is always authoritative.
 	posto_interno / project-less guards are not billable.
 	Returns (linhas, activos_contratos); each linha has cliente/total filled in.
@@ -274,6 +278,12 @@ def calcular_linhas(cliente=None):
 			order_by="parent, idx",
 		):
 			contratado[(f.parent, f.regime)] = f
+	do_cliente = tarifas_dos_clientes(cliente_de.values())
+
+	def tarifa(proj, regime):
+		"""(valor, origem, descricao) — contract first, then the customer."""
+		return resolver_tarifa(contratado.get((proj, regime)),
+			do_cliente.get((cliente_de.get(proj), regime)))
 
 	def texto(proj, regime, alvo=None, tipo_posto=None):
 		"""
@@ -282,8 +292,7 @@ def calcular_linhas(cliente=None):
 		  Por Contrato: '<descrição>'  or  '<regime> — <contrato>'
 		  Por Posto:    '<descrição or regime> — <nome financeiro / lista de postos>'
 		"""
-		c = contratado.get((proj, regime))
-		base = ((c.descricao if c else "") or "").strip()
+		base = (tarifa(proj, regime)[2] or "").strip()
 		if alvo:
 			t = f"{base or regime} — {alvo}"
 		else:
@@ -327,12 +336,13 @@ def calcular_linhas(cliente=None):
 			k = (r.project, r.regime, r.tipo_posto, posto)
 			if k not in agrupado:
 				c = contratado.get((r.project, r.regime))
+				valor, origem, _desc = tarifa(r.project, r.regime)
 				agrupado[k] = dict(
 					project=r.project, regime=r.regime, tipo_posto=r.tipo_posto, posto=posto,
 					descricao=texto(r.project, r.regime, r.nome_posto if posto else None, r.tipo_posto),
 					metodo="Vigilantes Activos", quantidade=0,
 					quantidade_contratada=c.quantidade if c else 0,
-					valor_unitario=c.valor if c else 0,
+					valor_unitario=valor, origem_tarifa=origem,
 				)
 			agrupado[k]["quantidade"] += r.qtd
 			vistos.add((r.project, r.regime))
@@ -344,10 +354,12 @@ def calcular_linhas(cliente=None):
 			if (metodo.get(proj) == "Vigilantes Activos" and (proj, regime) not in vistos
 					and c.quantidade and cliente_de.get(proj)
 					and estado_de.get(proj) not in ("Completed", "Cancelled")):
+				valor, origem, _desc = tarifa(proj, regime)
 				linhas.append(dict(
 					project=proj, regime=regime, tipo_posto="", posto=None,
 					descricao=texto(proj, regime), metodo="Vigilantes Activos",
-					quantidade=0, quantidade_contratada=c.quantidade, valor_unitario=c.valor,
+					quantidade=0, quantidade_contratada=c.quantidade,
+					valor_unitario=valor, origem_tarifa=origem,
 				))
 
 	# ── Contratual ── open contracts only; qty straight from the Finance table.
@@ -370,11 +382,12 @@ def calcular_linhas(cliente=None):
 		alvo = None
 		if por_posto(proj) and postos_de.get(proj):
 			alvo = _("Postos: {0}").format(", ".join(postos_de[proj]))
+		valor, origem, _desc = tarifa(proj, regime)
 		linhas.append(dict(
 			project=proj, regime=regime, tipo_posto="", posto=None,
 			descricao=texto(proj, regime, alvo), metodo="Contratual",
 			quantidade=c.quantidade, quantidade_contratada=c.quantidade,
-			valor_unitario=c.valor,
+			valor_unitario=valor, origem_tarifa=origem,
 		))
 
 	linhas.sort(key=lambda l: (cliente_de.get(l["project"]) or "", l["project"],
@@ -430,19 +443,20 @@ def _verificar(doc):
 	if projectos:
 		for f in frappe.get_all("Project Faturacao Regime",
 				filters={"parenttype": "Project", "parent": ["in", projectos]},
-				fields=["parent", "regime", "quantidade", "valor"]):
+				fields=["parent", "regime", "quantidade", "valor", "descricao"]):
 			contratado[(f.parent, f.regime)] = f
 	cliente_actual = {p.name: p.customer for p in frappe.get_all("Project",
 		filters={"name": ["in", projectos or [""]]}, fields=["name", "customer"])}
+	do_cliente = tarifas_dos_clientes(cliente_actual.values())
 	for ln in doc.linhas:
 		if not ln.quantidade:
 			continue
 		c = contratado.get((ln.project, ln.regime))
+		valor = resolver_tarifa(c, do_cliente.get((cliente_actual.get(ln.project), ln.regime)))[0]
 		mudou = (
-			not c
-			or flt(c.valor) != flt(ln.valor_unitario)
+			flt(valor) != flt(ln.valor_unitario)
 			or cliente_actual.get(ln.project) != ln.cliente
-			or (ln.metodo == "Contratual" and cint(c.quantidade) != cint(ln.quantidade))
+			or (ln.metodo == "Contratual" and (not c or cint(c.quantidade) != cint(ln.quantidade)))
 		)
 		if mudou:
 			desactualizadas.append(f"{ln.project} / {ln.regime}")

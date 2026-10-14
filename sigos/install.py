@@ -12,6 +12,7 @@ def after_install():
 	_clean_payroll_entry_fields()
 	_add_situacao_options()
 	_seccionar_contrato()
+	_seccionar_cliente()
 	_set_employee_naming()
 	_ensure_ferias_leave_type()
 	_seed_settings_defaults()
@@ -31,6 +32,7 @@ def after_migrate():
 	_clean_payroll_entry_fields()
 	_add_situacao_options()
 	_seccionar_contrato()
+	_seccionar_cliente()
 	_set_employee_naming()
 	_ensure_ferias_leave_type()
 	_seed_settings_defaults()
@@ -155,6 +157,29 @@ def _seccionar_contrato():
 		frappe.clear_cache(doctype="Project")
 	except Exception as e:
 		frappe.log_error(f"SIGOS: seccionar contrato failed: {e}", "SIGOS Install")
+
+
+def _seccionar_cliente():
+	"""
+	Customer layout: every SIGOS field lives in one 'Faturação SIGOS' tab (Factura /
+	Faturação Automática / Tarifas por Regime). _load_custom_fields skips fields that
+	already exist, so the ones created before the tab (detalhe da factura, faturação
+	automática) are moved into it here. Idempotent.
+	"""
+	try:
+		path = os.path.join(os.path.dirname(__file__), "sigos_setup", "custom_fields.json")
+		with open(path, encoding="utf-8") as f:
+			defs = {d["fieldname"]: d for d in json.load(f) if d.get("dt") == "Customer"}
+		for fieldname, d in defs.items():
+			nome = frappe.db.get_value("Custom Field", {"dt": "Customer", "fieldname": fieldname})
+			if not nome:
+				continue
+			for prop in ("label", "description", "insert_after"):
+				if d.get(prop) is not None:
+					frappe.db.set_value("Custom Field", nome, prop, d[prop], update_modified=False)
+		frappe.clear_cache(doctype="Customer")
+	except Exception as e:
+		frappe.log_error(f"SIGOS: seccionar cliente failed: {e}", "SIGOS Install")
 
 
 def _fix_tab_vigilante_do_posto():

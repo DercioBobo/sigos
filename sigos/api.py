@@ -2513,8 +2513,8 @@ def search_vigilantes_rich(txt="", status="Activo", delegacao=None, excluir=None
 def get_regime_rate(project, regime):
 	"""
 	Monthly billed rate per vigilante for a regime under a contract (Project).
-	Reads the contract's Finance table (Faturação por Regime). No fallback: a regime
-	without a row is unpriced (0) and Faturacao Mensal flags it.
+	The contract's Finance table (Faturação por Regime), else the customer's Tarifas
+	por Regime (sigos.contrato.resolver_tarifa); neither -> 0, flagged by Faturacao Mensal.
 	"""
 	frappe.only_for(PAPEIS_INTERNOS)
 	return _get_regime_rate(project, regime)
@@ -2526,13 +2526,17 @@ def _get_regime_rate(project, regime):
 	own role gate (e.g. Faturacao Mensal, which Accounts Manager may run without
 	holding any SIGOS role — calling the whitelisted wrapper would reject them).
 	"""
+	from sigos.contrato import resolver_tarifa, tarifas_do_cliente
+
 	if not project:
 		return 0
-	return frappe.db.get_value(
+	linha = frappe.db.get_value(
 		"Project Faturacao Regime",
 		{"parent": project, "parenttype": "Project", "regime": regime},
-		"valor",
-	) or 0
+		["valor", "descricao"], as_dict=True,
+	)
+	cliente = frappe.db.get_value("Project", project, "customer")
+	return resolver_tarifa(linha, tarifas_do_cliente(cliente).get(regime))[0]
 
 
 def resolver_metodo_faturacao(project):

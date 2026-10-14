@@ -84,7 +84,7 @@ def obter_linhas_contrato(doc, mes_referencia, substituir=1):
 	if not linhas:
 		frappe.throw(
 			_("Nada a facturar para <b>{0}</b>: sem contratos com vigilantes e tarifa "
-			  "(Faturação por Regime no Projecto).").format(si.customer),
+			  "(Faturação por Regime no Projecto, ou Tarifas por Regime no Cliente).").format(si.customer),
 			title=_("Sem Linhas"),
 		)
 
@@ -126,7 +126,7 @@ def obter_linhas_contrato(doc, mes_referencia, substituir=1):
 
 	if sem_tarifa:
 		frappe.msgprint(
-			_("Sem tarifa (não incluídos): {0}. Defina a <b>Faturação por Regime</b> no contrato.").format(
+			_("Sem tarifa (não incluídos): {0}. Defina o preço no contrato (Faturação por Regime) ou no Cliente (Tarifas por Regime).").format(
 				", ".join(sem_tarifa)),
 			title=_("Tarifas em Falta"), indicator="orange")
 	if activos_contratos and get_last_day(mes) < getdate(nowdate()):
@@ -317,7 +317,8 @@ def get_previsao_faturacao(mes_referencia=None):
 			linhas=[dict(project=l["project"], regime=l["regime"], descricao=l["descricao"],
 				metodo=l["metodo"], quantidade=l["quantidade"],
 				quantidade_contratada=l["quantidade_contratada"],
-				valor_unitario=l["valor_unitario"], total=l["total"]) for l in lns],
+				valor_unitario=l["valor_unitario"], origem_tarifa=l.get("origem_tarifa") or "",
+				total=l["total"]) for l in lns],
 		))
 
 	return dict(
