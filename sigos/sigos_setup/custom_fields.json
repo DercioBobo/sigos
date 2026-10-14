@@ -666,12 +666,29 @@
   "doctype": "Custom Field",
   "dt": "Project",
   "module": "SIGOS Setup",
+  "fieldname": "custom_sec_faturacao_regimes",
+  "fieldtype": "Section Break",
+  "label": "Faturação por Regime",
+  "insert_after": "custom_total_contratual"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Project",
+  "module": "SIGOS Setup",
   "fieldname": "custom_faturacao_regimes",
   "fieldtype": "Table",
   "options": "Project Faturacao Regime",
-  "label": "Faturação por Regime",
+  "label": "Regimes e Tarifas",
   "description": "Nº de vigilantes e preço mensal por vigilante, por regime. A tarifa da Faturação Mensal vem sempre daqui.",
-  "insert_after": "custom_total_contratual"
+  "insert_after": "custom_sec_faturacao_regimes"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Project",
+  "module": "SIGOS Setup",
+  "fieldname": "custom_sec_faturacao_fim",
+  "fieldtype": "Section Break",
+  "insert_after": "custom_faturacao_regimes"
  },
  {
   "doctype": "Custom Field",

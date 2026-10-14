@@ -137,7 +137,8 @@ def _seccionar_contrato():
 		with open(path, encoding="utf-8") as f:
 			defs = {d["fieldname"]: d for d in json.load(f) if d.get("dt") == "Project"}
 		for fieldname in ("custom_sec_sigos", "custom_regime_rates",
-				"custom_total_contratual", "custom_faturacao_regimes"):
+				"custom_total_contratual", "custom_faturacao_regimes",
+				"custom_sec_faturacao_regimes", "custom_sec_faturacao_fim"):
 			nome = frappe.db.get_value("Custom Field", {"dt": "Project", "fieldname": fieldname})
 			if not nome or fieldname not in defs:
 				continue
