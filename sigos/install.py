@@ -164,7 +164,8 @@ def _seccionar_cliente():
 	Customer layout: every SIGOS field lives in one 'Faturação SIGOS' tab (Factura /
 	Faturação Automática / Tarifas por Regime). _load_custom_fields skips fields that
 	already exist, so the ones created before the tab (detalhe da factura, faturação
-	automática) are moved into it here. Idempotent.
+	automática) are moved into it here, and new Select options (Detalhe da Factura)
+	reach existing sites. Idempotent.
 	"""
 	try:
 		path = os.path.join(os.path.dirname(__file__), "sigos_setup", "custom_fields.json")
@@ -174,7 +175,7 @@ def _seccionar_cliente():
 			nome = frappe.db.get_value("Custom Field", {"dt": "Customer", "fieldname": fieldname})
 			if not nome:
 				continue
-			for prop in ("label", "description", "insert_after"):
+			for prop in ("label", "description", "insert_after", "options"):
 				if d.get(prop) is not None:
 					frappe.db.set_value("Custom Field", nome, prop, d[prop], update_modified=False)
 		frappe.clear_cache(doctype="Customer")

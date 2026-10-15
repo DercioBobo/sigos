@@ -23,9 +23,10 @@ from sigos.sigos_setup.doctype.faturacao_mensal.faturacao_mensal import (
 	UOM_FATURACAO,
 	_clientes_ja_faturados,
 	_fmt_problemas,
-	_item_para_regime,
+	_item_para_linha,
 	_verificar,
 	calcular_linhas,
+	codigo_item,
 	empresa_faturacao,
 )
 
@@ -88,8 +89,7 @@ def obter_linhas_contrato(doc, mes_referencia, substituir=1):
 			title=_("Sem Linhas"),
 		)
 
-	regimes = sorted({l["regime"] for l in linhas})
-	if any(not frappe.db.exists("Item", f"VIG-{r}") for r in regimes):
+	if any(not frappe.db.exists("Item", codigo_item(l)) for l in linhas):
 		erros = []
 		if not frappe.db.exists("Item Group", {"name": ITEM_GROUP_FATURACAO, "is_group": 0}):
 			erros.append(_("Falta o Grupo de Artigos <b>{0}</b>.").format(ITEM_GROUP_FATURACAO))
@@ -97,7 +97,7 @@ def obter_linhas_contrato(doc, mes_referencia, substituir=1):
 			erros.append(_("Falta a Unidade de Medida <b>{0}</b>.").format(UOM_FATURACAO))
 		if erros:
 			frappe.throw("<br>".join(erros), title=_("Configuração em Falta"))
-	itens = {r: _item_para_regime(r) for r in regimes}
+	itens = {codigo_item(l): _item_para_linha(l) for l in linhas}
 
 	if cint(substituir):
 		si.set("items", [])
@@ -108,8 +108,8 @@ def obter_linhas_contrato(doc, mes_referencia, substituir=1):
 			l["regime"], " [Temporário]" if l["tipo_posto"] == "Temporário" else "",
 			proj_nomes[l["project"]])
 		si.append("items", {
-			"item_code": itens[l["regime"]],
-			"qty": l["quantidade"],
+			"item_code": itens[codigo_item(l)],
+			"qty": 1 if l.get("linha_unica") else l["quantidade"],
 			"rate": l["valor_unitario"],
 			"description": f"{texto} ({mes_label})",
 			"project": l["project"],
@@ -118,8 +118,7 @@ def obter_linhas_contrato(doc, mes_referencia, substituir=1):
 	si.ignore_pricing_rule = 1   # the contract rate is final — no Pricing Rule may alter it
 	si.custom_mes_referencia = mes
 	if si.meta.has_field("custom_total_vigilantes"):
-		si.custom_total_vigilantes = sum(cint(d.qty) for d in si.items
-			if (d.item_code or "").startswith("VIG-"))
+		si.custom_total_vigilantes = sum(cint(l["quantidade"]) for l in linhas)
 
 	si.set_missing_values()
 	si.calculate_taxes_and_totals()
@@ -318,6 +317,7 @@ def get_previsao_faturacao(mes_referencia=None):
 				metodo=l["metodo"], quantidade=l["quantidade"],
 				quantidade_contratada=l["quantidade_contratada"],
 				valor_unitario=l["valor_unitario"], origem_tarifa=l.get("origem_tarifa") or "",
+				linha_unica=l.get("linha_unica") or 0,
 				total=l["total"]) for l in lns],
 		))
 

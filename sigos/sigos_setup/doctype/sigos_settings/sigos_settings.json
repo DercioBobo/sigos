@@ -759,9 +759,9 @@
    "fieldname": "detalhe_fatura_padrao",
    "fieldtype": "Select",
    "label": "Detalhe da Factura Padrão",
-   "options": "Por Contrato\nPor Posto",
+   "options": "Por Contrato\nPor Posto\nPor Posto (uma linha)",
    "default": "Por Contrato",
-   "description": "Como as linhas da factura são agrupadas, quando o Cliente está em \"Predefinido\". <b>Por Contrato</b>: uma linha por contrato e regime. <b>Por Posto</b>: uma linha por posto e regime, com o Nome Financeiro do posto (nos contratos Contratuais, uma linha por regime com a lista dos postos)."
+   "description": "Como as linhas da factura são agrupadas, quando o Cliente está em \"Predefinido\". <b>Por Contrato</b>: uma linha por contrato e regime. <b>Por Posto</b>: uma linha por posto e regime, com o Nome Financeiro do posto. <b>Por Posto (uma linha)</b>: uma única linha por posto (quantidade 1, valor = total do posto) com a composição no texto, ex. 'Agência Baixa — 2 × H24 + 1 × TDN'. Nos contratos Contratuais (sem vigilantes por posto), as duas opções Por Posto dão uma linha por regime com a lista dos postos."
   },
   {
    "fieldname": "sec_ss_fat_auto",
@@ -805,7 +805,7 @@
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-10-13 18:00:00.000000",
+ "modified": "2026-10-14 15:00:00.000000",
  "modified_by": "Administrator",
  "module": "SIGOS Setup",
  "name": "SIGOS Settings",

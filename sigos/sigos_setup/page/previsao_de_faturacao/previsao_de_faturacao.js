@@ -376,7 +376,7 @@ sigos.PrevisaoFaturacao = class PrevisaoFaturacao {
 						<td>${esc(l.metodo)}</td>
 						<td class="pf-num">${l.quantidade}</td>
 						<td class="pf-num">${l.quantidade_contratada || "—"}</td>
-						<td class="pf-num">${l.valor_unitario ? _pf_money(l.valor_unitario) : `<span class="pf-tone-bad">${__("sem tarifa")}</span>`}${l.origem_tarifa === "Cliente" ? ` <span class="pf-badge tone-info" title="${__("Tarifa por regime do cliente (o contrato não define preço)")}">${__("cliente")}</span>` : ""}</td>
+						<td class="pf-num">${l.linha_unica ? `<span class="pf-muted">${__("por posto")}</span>` : l.valor_unitario ? _pf_money(l.valor_unitario) : `<span class="pf-tone-bad">${__("sem tarifa")}</span>`}${l.origem_tarifa === "Cliente" ? ` <span class="pf-badge tone-info" title="${__("Tarifa por regime do cliente (o contrato não define preço)")}">${__("cliente")}</span>` : ""}</td>
 						<td class="pf-num">${_pf_money(l.total)}</td>
 					</tr>`).join("")}
 				</tbody>

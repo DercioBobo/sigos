@@ -107,7 +107,7 @@ function _render_deck(frm) {
 				? `<span class="fat-dif" title="${__("Contratados no contrato")}">${__("contr.")} ${r.quantidade_contratada}</span>` : "";
 			return `
 			<div class="fat-line">
-				<span class="fat-reg">${frappe.utils.escape_html(r.regime || "—")}${temp}${contr}</span>
+				<span class="fat-reg">${r.linha_unica ? __("Posto") : frappe.utils.escape_html(r.regime || "—")}${temp}${contr}</span>
 				<span class="fat-proj" title="${frappe.utils.escape_html(r.project || "")}">${frappe.utils.escape_html(r.descricao || r.project || "")}</span>
 				<span class="fat-q">${r.quantidade || 0} ${__("vig.")}${dif}</span>
 				<span class="fat-u">${fmtC(r.valor_unitario)}${r.origem_tarifa === "Cliente"

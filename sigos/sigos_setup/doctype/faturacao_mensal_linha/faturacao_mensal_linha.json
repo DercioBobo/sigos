@@ -17,7 +17,9 @@
   "quantidade_contratada",
   "valor_unitario",
   "origem_tarifa",
-  "total"
+  "total",
+  "linha_unica",
+  "composicao"
  ],
  "fields": [
   {
@@ -112,11 +114,25 @@
    "read_only": 1,
    "in_list_view": 1,
    "columns": 2
+  },
+  {
+   "fieldname": "linha_unica",
+   "fieldtype": "Check",
+   "label": "Linha Única do Posto",
+   "read_only": 1,
+   "description": "Detalhe 'Por Posto (uma linha)': facturada como 1 × total do posto (artigo VIG-POSTO)."
+  },
+  {
+   "fieldname": "composicao",
+   "fieldtype": "Data",
+   "label": "Composição",
+   "read_only": 1,
+   "description": "Regimes e vigilantes da linha única, ex. H24:2,TDN:1."
   }
  ],
  "istable": 1,
  "links": [],
- "modified": "2026-10-14 12:00:00.000000",
+ "modified": "2026-10-14 15:00:00.000000",
  "modified_by": "Administrator",
  "module": "SIGOS Setup",
  "name": "Faturacao Mensal Linha",

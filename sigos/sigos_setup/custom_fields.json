@@ -766,9 +766,9 @@
   "fieldname": "custom_detalhe_fatura",
   "fieldtype": "Select",
   "label": "Detalhe da Factura (SIGOS)",
-  "options": "Predefinido\nPor Contrato\nPor Posto",
+  "options": "Predefinido\nPor Contrato\nPor Posto\nPor Posto (uma linha)",
   "default": "Predefinido",
-  "description": "Uma linha por contrato, ou uma linha por posto com o Nome Financeiro. Predefinido segue as Definições SIGOS.",
+  "description": "Predefinido segue as Definições SIGOS. <b>Por Contrato</b>: uma linha por contrato e regime. <b>Por Posto</b>: uma linha por posto e regime, com o Nome Financeiro do posto. <b>Por Posto (uma linha)</b>: uma única linha por posto (quantidade 1, valor = total do posto) com a composição no texto, ex. 'Agência Baixa — 2 × H24 + 1 × TDN'. Nos contratos Contratuais (sem vigilantes por posto), as duas opções Por Posto dão uma linha por regime com a lista dos postos.",
   "insert_after": "custom_sec_fatura_cliente"
  },
  {

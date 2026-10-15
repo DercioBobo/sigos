@@ -160,7 +160,7 @@ class FaturacaoMensal(Document):
 			return res
 
 		# Items first, once per regime (outside the per-customer savepoints).
-		itens = {ln.regime: _item_para_regime(ln.regime)
+		itens = {codigo_item(ln): _item_para_linha(ln)
 			for lns in por_cliente.values() for ln in lns}
 		proj_nomes = {ln.project: frappe.db.get_value("Project", ln.project, "project_name") or ln.project
 			for lns in por_cliente.values() for ln in lns}
@@ -188,8 +188,8 @@ class FaturacaoMensal(Document):
 						ln.regime, " [Temporário]" if ln.tipo_posto == "Temporário" else "",
 						proj_nomes[ln.project])
 					si.append("items", {
-						"item_code": itens[ln.regime],
-						"qty": ln.quantidade,
+						"item_code": itens[codigo_item(ln)],
+						"qty": 1 if ln.linha_unica else ln.quantidade,
 						"rate": ln.valor_unitario,
 						"description": f"{texto} ({mes_label})",
 						"project": ln.project,
@@ -266,7 +266,10 @@ def calcular_linhas(cliente=None):
 	detalhe = _detalhe_por_cliente(set(cliente_de.values()))
 
 	def por_posto(proj):
-		return detalhe.get(cliente_de.get(proj)) == "Por Posto"
+		return detalhe.get(cliente_de.get(proj)) in (DETALHE_POR_POSTO, DETALHE_UMA_LINHA)
+
+	def uma_linha(proj):
+		return detalhe.get(cliente_de.get(proj)) == DETALHE_UMA_LINHA
 
 	# Contracted qty + rate + invoice text per (contract, regime), from the Finance table.
 	contratado = {}
@@ -331,8 +334,11 @@ def calcular_linhas(cliente=None):
 		""", {"projectos": tuple(activos_contratos)}, as_dict=True)
 
 		agrupado = {}
+		nome_posto = {}
 		for r in rows:
 			posto = r.posto if por_posto(r.project) else None
+			if posto:
+				nome_posto[(r.project, posto)] = r.nome_posto
 			k = (r.project, r.regime, r.tipo_posto, posto)
 			if k not in agrupado:
 				c = contratado.get((r.project, r.regime))
@@ -346,7 +352,36 @@ def calcular_linhas(cliente=None):
 				)
 			agrupado[k]["quantidade"] += r.qtd
 			vistos.add((r.project, r.regime))
-		linhas.extend(agrupado.values())
+
+		# 'Por Posto (uma linha)': each posto's priced regime lines become ONE line,
+		# billed 1 x the posto's total, its make-up in the text and in `composicao`
+		# (machine-readable, re-priced by the stale-preview check). An unpriced part
+		# stays its own line so it is still flagged 'sem tarifa', never hidden.
+		juntas = {}
+		for l in agrupado.values():
+			if not (l["posto"] and uma_linha(l["project"]) and l["quantidade"] and flt(l["valor_unitario"])):
+				linhas.append(l)
+				continue
+			juntas.setdefault((l["project"], l["posto"]), []).append(l)
+		for (proj, posto), partes in juntas.items():
+			partes.sort(key=lambda x: x["regime"])
+			origens = {x["origem_tarifa"] for x in partes}
+			temp = any(x["tipo_posto"] == "Temporário" for x in partes)
+			linhas.append(dict(
+				project=proj, regime="", posto=posto,
+				tipo_posto="Temporário" if temp else partes[0]["tipo_posto"],
+				descricao="{0} — {1}{2}".format(
+					nome_posto.get((proj, posto)) or posto,
+					" + ".join(f"{x['quantidade']} × {x['regime']}" for x in partes),
+					" [Temporário]" if temp else ""),
+				metodo="Vigilantes Activos",
+				quantidade=sum(x["quantidade"] for x in partes),
+				quantidade_contratada=0,
+				valor_unitario=sum(x["quantidade"] * flt(x["valor_unitario"]) for x in partes),
+				origem_tarifa=origens.pop() if len(origens) == 1 else "Contrato + Cliente",
+				linha_unica=1,
+				composicao=",".join(f"{x['regime']}:{x['quantidade']}" for x in partes),
+			))
 
 		# Contracted regimes with nobody active: a 0-qty line so the shortfall is
 		# visible in the preview (never invoiced — gerar_faturas skips qty 0).
@@ -395,13 +430,18 @@ def calcular_linhas(cliente=None):
 	for l in linhas:
 		l["cliente"] = cliente_de.get(l["project"])
 		l["valor_unitario"] = flt(l["valor_unitario"])
-		l["total"] = (l["quantidade"] or 0) * l["valor_unitario"]
+		# a merged posto line is billed once at the posto total; quantidade stays the
+		# guard count (totals, KPIs), not the invoice qty
+		l["total"] = l["valor_unitario"] if l.get("linha_unica") else (l["quantidade"] or 0) * l["valor_unitario"]
 	return linhas, activos_contratos
 
 
 PAPEIS_FATURACAO = ("System Manager", "SIGOS Manager", "Accounts Manager")
 ITEM_GROUP_FATURACAO = "Services"
 UOM_FATURACAO = "Unit"
+DETALHE_POR_POSTO = "Por Posto"
+DETALHE_UMA_LINHA = "Por Posto (uma linha)"
+ITEM_POSTO = "VIG-POSTO"
 
 
 # ─── Pre-flight ──────────────────────────────────────────────────────────────
@@ -451,8 +491,16 @@ def _verificar(doc):
 	for ln in doc.linhas:
 		if not ln.quantidade:
 			continue
+		cli = cliente_actual.get(ln.project)
+		if ln.linha_unica:
+			partes = [x.split(":") for x in (ln.composicao or "").split(",") if ":" in x]
+			valor = sum(cint(q) * resolver_tarifa(contratado.get((ln.project, reg)),
+				do_cliente.get((cli, reg)))[0] for reg, q in partes)
+			if flt(valor) != flt(ln.valor_unitario) or cli != ln.cliente:
+				desactualizadas.append(f"{ln.project} / {ln.descricao or ln.posto}")
+			continue
 		c = contratado.get((ln.project, ln.regime))
-		valor = resolver_tarifa(c, do_cliente.get((cliente_actual.get(ln.project), ln.regime)))[0]
+		valor = resolver_tarifa(c, do_cliente.get((cli, ln.regime)))[0]
 		mudou = (
 			flt(valor) != flt(ln.valor_unitario)
 			or cliente_actual.get(ln.project) != ln.cliente
@@ -489,9 +537,8 @@ def _verificar(doc):
 	except Exception:
 		pass
 
-	# ── Items (one per regime) ──
-	for regime in sorted({ln.regime for lns in por_cliente.values() for ln in lns}):
-		code = f"VIG-{regime}"
+	# ── Items (one per regime, + VIG-POSTO for merged posto lines) ──
+	for code in sorted({codigo_item(ln) for lns in por_cliente.values() for ln in lns}):
 		item = frappe.db.get_value("Item", code, ["disabled", "is_sales_item", "item_group"], as_dict=True)
 		if item:
 			if item.disabled or not item.is_sales_item:
@@ -579,6 +626,7 @@ def _detalhe_por_cliente(clientes):
 	the SIGOS Settings default when it is 'Predefinido'/unset.
 	  Por Contrato: one line per contract x regime
 	  Por Posto:    one line per posto x regime, labelled by the posto's nome financeiro
+	  Por Posto (uma linha): ONE line per posto (1 x posto total, regimes in the text)
 	"""
 	padrao = frappe.db.get_single_value("SIGOS Settings", "detalhe_fatura_padrao") or "Por Contrato"
 	clientes = [c for c in clientes if c]
@@ -644,29 +692,46 @@ def _fmt_ja_faturados(ja):
 		f"{frappe.bold(cli)}: {', '.join(nomes)}" for cli, nomes in sorted(ja.items()))
 
 
+def codigo_item(ln):
+	"""Item code of a billing line: VIG-<regime>, or VIG-POSTO for a merged posto line."""
+	return ITEM_POSTO if ln.get("linha_unica") else f"VIG-{ln.get('regime')}"
+
+
+def _item_para_linha(ln):
+	"""Get or create the line's Item (see codigo_item)."""
+	if ln.get("linha_unica"):
+		return _criar_item(ITEM_POSTO, "Vigilância por Posto",
+			"Serviço de vigilância — total mensal do posto (composição na descrição da linha).")
+	return _item_para_regime(ln.get("regime"))
+
+
 def _item_para_regime(regime):
+	return _criar_item(f"VIG-{regime}", f"Vigilância {regime}",
+		f"Serviço de vigilância — regime {regime} (por vigilante/mês).")
+
+
+def _criar_item(code, nome, descricao):
 	"""
-	Get or create the non-stock service Item for a regime (e.g. 'VIG-H24').
+	Get or create a non-stock service Item (e.g. 'VIG-H24', 'VIG-POSTO').
 	insert(set_name=code) forces the item code even when Stock Settings names Items
 	by naming series — otherwise the item would be saved as e.g. STO-ITEM-0001, the
 	invoice would point at a non-existent VIG-<regime> and every run would add a
 	duplicate. _verificar guarantees the group/UOM exist before we get here.
 	"""
-	code = f"VIG-{regime}"
 	if frappe.db.exists("Item", code):
 		return code
 
 	item = frappe.get_doc({
 		"doctype": "Item",
 		"item_code": code,
-		"item_name": f"Vigilância {regime}",
+		"item_name": nome,
 		"item_group": ITEM_GROUP_FATURACAO,
 		"stock_uom": UOM_FATURACAO,
 		"is_stock_item": 0,
 		"is_sales_item": 1,
 		"is_purchase_item": 0,
 		"include_item_in_manufacturing": 0,
-		"description": f"Serviço de vigilância — regime {regime} (por vigilante/mês).",
+		"description": descricao,
 	})
 	item.flags.ignore_permissions = True
 	item.insert(set_name=code)
