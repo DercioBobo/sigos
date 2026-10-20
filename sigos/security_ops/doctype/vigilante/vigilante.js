@@ -26,6 +26,7 @@ frappe.ui.form.on("Vigilante", {
 		_toggle_subsidios_comb(frm);
 		_abandono_de_posto(frm);
 		_doente(frm);
+		_suspenso(frm);
 
 		// Ver Escala — only for active guards already assigned to a posto
 		if (!frm.is_new() && frm.doc.status === "Activo" && frm.doc.posto_de_vigilancia) {
@@ -267,7 +268,11 @@ function _abandono_de_posto(frm) {
 		}
 		if (pode_ops) {
 			frm.add_custom_button(__("Registar Regresso"), () => _registar_regresso(frm), __("Acções"));
-			frm.add_custom_button(__("Demitir"), () => abrir("DEM"), __("Acções"));
+		}
+		// Dismissal goes through the Presunção → Jurista → Processo Disciplinar; only
+		// managers keep the manual DEM (admin escape hatch).
+		if (["System Manager", "SIGOS Manager"].some((r) => frappe.user.has_role(r))) {
+			frm.add_custom_button(__("Demitir (manual)"), () => abrir("DEM"), __("Acções"));
 		}
 		return;
 	}
@@ -397,6 +402,72 @@ function _doente(frm) {
 	}, __("Acções"));
 }
 
+// ─── Suspensão Preventiva (sigos/suspensao.py) ────────────────────────────────
+// Started from a submitted Participação; here: headline + Ver Participação +
+// Registar Regresso when the process ends without dismissal.
+function _suspenso(frm) {
+	if (frm.is_new() || frm.doc.status !== "Suspenso Preventivamente") return;
+	const part = frm.doc.participacao_suspensao;
+	frm.dashboard.set_headline_alert(
+		__("<b>Suspenso preventivamente</b>{0} — fora do posto e da escala até ao fim do processo disciplinar.",
+			[part ? ` (<a href="/app/participacao/${encodeURIComponent(part)}">${frappe.utils.escape_html(part)}</a>)` : ""]),
+		"red",
+	);
+	if (part) {
+		frm.add_custom_button(__("Ver Participação"), () => frappe.set_route("Form", "Participacao", part), __("Acções"));
+	}
+	const pode = ["Aprovador Operações", "Operações SIGOS", "Jurista", "SIGOS Manager", "System Manager"]
+		.some((r) => frappe.user.has_role(r));
+	if (!pode || !part) return;
+	frm.add_custom_button(__("Registar Regresso"), () => {
+		frappe.db.get_value("Participacao", part, ["suspensao_posto", "suspensao_desde", "suspensao_remuneracao"])
+			.then((r) => {
+				const p = r.message || {};
+				const destinos = [];
+				if (p.suspensao_posto) {
+					destinos.push({ value: "Posto Anterior",
+						label: __("Voltar ao posto anterior ({0}) — só se ainda houver vaga", [p.suspensao_posto]) });
+				}
+				destinos.push(
+					{ value: "Reserva", label: __("Ficar em Reserva") },
+					{ value: "Novo Posto", label: __("Atribuir um novo posto (abre a Rotatividade APR)") },
+				);
+				const congelado = p.suspensao_remuneracao === "Salário Congelado";
+				const d = new frappe.ui.Dialog({
+					title: __("Fim da Suspensão Preventiva"),
+					fields: [
+						{ fieldtype: "HTML", options: `<p class="text-muted" style="margin-bottom:8px">${__(
+							"O processo terminou sem demissão. (Uma demissão é registada pelo Processo Disciplinar e fecha a suspensão automaticamente.)")}</p>` },
+						{ fieldname: "destino", fieldtype: "Select", label: __("Destino"), reqd: 1,
+							options: destinos, default: destinos[0].value },
+						{ fieldname: "data_regresso", fieldtype: "Date", label: __("Data de Regresso"), reqd: 1,
+							default: frappe.datetime.get_today() },
+						{ fieldname: "pagar_periodo", fieldtype: "Check", label: __("Pagar o período suspenso (salário estava congelado)"),
+							default: 1, hidden: congelado ? 0 : 1 },
+						{ fieldname: "observacoes", fieldtype: "Small Text", label: __("Observações") },
+					],
+					primary_action_label: __("Confirmar"),
+					primary_action(v) {
+						if (v.data_regresso > frappe.datetime.get_today()) { frappe.msgprint(__("A data não pode ser no futuro.")); return; }
+						d.hide();
+						frm.call("registar_regresso_suspensao", {
+							destino: v.destino, data_regresso: v.data_regresso,
+							pagar_periodo: v.pagar_periodo ? 1 : 0, observacoes: v.observacoes || null,
+						}).then(() => {
+							if (v.destino === "Novo Posto") {
+								frappe.route_options = { vigilante: frm.doc.name, abreviatura_op: "APR" };
+								frappe.new_doc("Rotatividade");
+							} else {
+								frm.reload_doc();
+							}
+						});
+					},
+				});
+				d.show();
+			});
+	}, __("Acções"));
+}
+
 // Congelar Salário (RH): only for guards in Abandono de Posto; frozen guards are
 // left out of Payroll Entries until the freeze is lifted (by hand here, or
 // automatically on Registar Regresso / Demissão).
@@ -423,7 +494,7 @@ function _salario_congelado(frm, fmt) {
 		}
 		return;
 	}
-	if (pode_rh && ["Abandono de Posto", "Doente"].includes(frm.doc.status)) {
+	if (pode_rh && ["Abandono de Posto", "Doente", "Suspenso Preventivamente"].includes(frm.doc.status)) {
 		frm.add_custom_button(__("Congelar Salário"), () => {
 			frappe.prompt(
 				[
@@ -587,6 +658,7 @@ const _DASH_REQ = {
 	"Reserva":          ["categoria", "delegacao", "mecanografico", "data_admissao"],
 	"Abandono de Posto": ["categoria", "delegacao", "mecanografico", "data_admissao"],
 	"Doente": ["categoria", "delegacao", "mecanografico", "data_admissao"],
+	"Suspenso Preventivamente": ["categoria", "delegacao", "mecanografico", "data_admissao"],
 };
 const _DASH_STATUS_CLS = {
 	"Activo": "vigd-st-on", "Reserva": "vigd-st-res",
@@ -594,6 +666,7 @@ const _DASH_STATUS_CLS = {
 	"Inactivo": "vigd-st-off", "Demitido": "vigd-st-dem",
 	"Abandono de Posto": "vigd-st-abd",
 	"Doente": "vigd-st-doe",
+	"Suspenso Preventivamente": "vigd-st-sus",
 };
 const _DASH_PER_CLS = { "Manhã": "cell-manha", "Noite": "cell-noite", "Tarde": "cell-tarde" };
 
@@ -618,6 +691,8 @@ function _render_mini_dash(frm) {
 	let postoOpts = { req: req.has("posto_de_vigilancia") };
 	if (frm.doc.status === "Reserva" && !frm.doc.posto_de_vigilancia) {
 		postoOpts = { html: `<span class="vigd-dim">${__("Reserva — sem posto")}</span>` };
+	} else if (frm.doc.status === "Suspenso Preventivamente") {
+		postoOpts = { html: `<span class="vigd-dim">${__("Suspenso — sem posto (aguarda processo)")}</span>` };
 	} else if (frm.doc.status === "Doente") {
 		postoOpts = { html: `<span class="vigd-dim">${__("Doente — sem posto (Baixa Médica)")}</span>` };
 	} else if (frm.doc.status === "Abandono de Posto" && !frm.doc.posto_de_vigilancia) {
@@ -698,6 +773,7 @@ function _inject_dash_css() {
 .vigd-st-dem { background: #f8d7da; color: #842029; }
 .vigd-st-abd { background: #ffe5d0; color: #9a3412; }
 .vigd-st-doe { background: #e0ecff; color: #1e40af; }
+.vigd-st-sus { background: #f3e8ff; color: #6b21a8; }
 .vigd-cobertura-badge { display: inline-block; margin-left: 6px; padding: 2px 10px; border-radius: 999px;
   font-size: .82em; font-weight: 600; background: #fff3cd; color: #856404; }
 .vigd-chip { display: inline-block; padding: 2px 10px; border-radius: 999px; color: #fff; font-size: .82em; font-weight: 700; }

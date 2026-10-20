@@ -36,6 +36,7 @@
   "col_infracao",
   "tipo_de_infracao",
   "ocorrencia_referente",
+  "processo_disciplinar",
   "sec_relatorio",
   "posto",
   "posto_nome",
@@ -44,7 +45,21 @@
   "sec_testemunhas",
   "tabela_testemunhas",
   "testemunhas",
-  "registado_por"
+  "registado_por",
+  "sec_suspensao",
+  "suspensao_desde",
+  "suspensao_ate",
+  "suspensao_remuneracao",
+  "suspensao_por",
+  "col_suspensao",
+  "suspensao_posto",
+  "suspensao_regime",
+  "suspensao_turno",
+  "suspensao_tipo_vigilante",
+  "suspensao_estado_anterior",
+  "suspensao_vaga",
+  "suspensao_destino",
+  "suspensao_motivo"
  ],
  "fields": [
   {
@@ -223,6 +238,18 @@
    "read_only": 1
   },
   {
+   "fieldname": "processo_disciplinar",
+   "fieldtype": "Link",
+   "options": "Processo Disciplinar",
+   "label": "Processo Disciplinar",
+   "read_only": 1,
+   "no_copy": 1,
+   "allow_on_submit": 1,
+   "in_standard_filter": 1,
+   "search_index": 1,
+   "description": "Aberto pelo Jurista (ou automaticamente pela acumulação). Vazio numa participação submetida = ainda sem processo."
+  },
+  {
    "fieldname": "sec_relatorio",
    "fieldtype": "Section Break",
    "label": "Relatório"
@@ -280,10 +307,123 @@
    "options": "User",
    "read_only": 1,
    "no_copy": 1
+  },
+  {
+   "fieldname": "sec_suspensao",
+   "fieldtype": "Section Break",
+   "label": "Suspensão Preventiva",
+   "depends_on": "eval:doc.suspensao_desde"
+  },
+  {
+   "fieldname": "suspensao_desde",
+   "fieldtype": "Date",
+   "label": "Suspenso Desde",
+   "read_only": 1,
+   "allow_on_submit": 1,
+   "no_copy": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "suspensao_ate",
+   "fieldtype": "Date",
+   "label": "Até (véspera do regresso)",
+   "read_only": 1,
+   "allow_on_submit": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "suspensao_remuneracao",
+   "fieldtype": "Select",
+   "label": "Remuneração Durante a Suspensão",
+   "read_only": 1,
+   "allow_on_submit": 1,
+   "no_copy": 1,
+   "options": "\nPago Normalmente\nSalário Congelado\nNão Pago"
+  },
+  {
+   "fieldname": "suspensao_por",
+   "fieldtype": "Link",
+   "label": "Suspenso Por",
+   "read_only": 1,
+   "allow_on_submit": 1,
+   "no_copy": 1,
+   "options": "User"
+  },
+  {
+   "fieldname": "col_suspensao",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "suspensao_posto",
+   "fieldtype": "Link",
+   "label": "Posto Anterior",
+   "read_only": 1,
+   "allow_on_submit": 1,
+   "no_copy": 1,
+   "options": "Posto De Vigilancia"
+  },
+  {
+   "fieldname": "suspensao_regime",
+   "fieldtype": "Link",
+   "label": "Regime Anterior",
+   "read_only": 1,
+   "allow_on_submit": 1,
+   "no_copy": 1,
+   "options": "Regime"
+  },
+  {
+   "fieldname": "suspensao_turno",
+   "fieldtype": "Link",
+   "label": "Turno Anterior",
+   "read_only": 1,
+   "allow_on_submit": 1,
+   "no_copy": 1,
+   "options": "Turno"
+  },
+  {
+   "fieldname": "suspensao_tipo_vigilante",
+   "fieldtype": "Data",
+   "label": "Tipo de Vigilante Anterior",
+   "read_only": 1,
+   "allow_on_submit": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "suspensao_estado_anterior",
+   "fieldtype": "Data",
+   "label": "Estado Anterior",
+   "read_only": 1,
+   "allow_on_submit": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "suspensao_vaga",
+   "fieldtype": "Link",
+   "label": "Vaga Aberta",
+   "read_only": 1,
+   "allow_on_submit": 1,
+   "no_copy": 1,
+   "options": "Vaga De Posto"
+  },
+  {
+   "fieldname": "suspensao_destino",
+   "fieldtype": "Data",
+   "label": "Destino no Fim",
+   "read_only": 1,
+   "allow_on_submit": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "suspensao_motivo",
+   "fieldtype": "Small Text",
+   "label": "Motivo / Notas da Suspensão",
+   "read_only": 1,
+   "allow_on_submit": 1,
+   "no_copy": 1
   }
  ],
  "links": [],
- "modified": "2026-10-21 16:00:00.000000",
+ "modified": "2026-10-22 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Disciplinar",
  "name": "Participacao",
@@ -359,6 +499,21 @@
    "write": 0,
    "submit": 0,
    "cancel": 0
+  },
+  {
+   "role": "Jurista",
+   "permlevel": 0,
+   "read": 1,
+   "write": 0,
+   "create": 0,
+   "submit": 0,
+   "cancel": 0,
+   "delete": 0,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 0
   }
  ],
  "sort_field": "modified",

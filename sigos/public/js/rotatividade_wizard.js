@@ -211,7 +211,9 @@ sigos.build_rotatividade_wizard = function (opts) {
 			order_by: "abreviatura", limit_page_length: 0,
 		},
 		callback: (r) => {
-			S.operacoes = r.message || [];
+			// Dismissal = Processo Disciplinar outcome; only managers keep a manual DEM.
+			S.podeDemitir = ["System Manager", "SIGOS Manager"].some((x) => frappe.user.has_role(x));
+			S.operacoes = (r.message || []).filter((o) => S.podeDemitir || !o.demite);
 			// Pre-selected operação (e.g. the Vigilante "Demitir" / "Novo Posto" buttons)
 			const pre = (opts.prefill || {}).abreviatura_op;
 			const op = pre && S.operacoes.find((o) => o.name === pre);
@@ -427,7 +429,9 @@ sigos.build_rotatividade_wizard = function (opts) {
 			() => ({ filters: { delegacao: S.vig.delegacao, estado: "Activo" } }));
 		if (S.flags.muda_regime) _mountLink("novo_regime", "Regime", null);
 
-		_mountSelect("motivo", "\nTransferência\nReserva\nDemissão\nDisciplinar\nOutro", () => {
+		_mountSelect("motivo", S.podeDemitir
+			? "\nTransferência\nReserva\nDemissão\nDisciplinar\nOutro"
+			: "\nTransferência\nReserva\nDisciplinar\nOutro", () => {
 			const demite = S.flags.demite || S.motivo === "Demissão";
 			$body().find("#rotw-demfields").toggle(!!demite);
 		});
@@ -497,7 +501,7 @@ sigos.build_rotatividade_wizard = function (opts) {
 		// A guard in Abandono de Posto (Presunção open) or Doente can be dismissed too.
 		const status = soSub ? "Activo"
 			: S.flags.de_reserva ? "Reserva"
-			: S.flags.demite ? ["Activo", "Reserva", "Abandono de Posto", "Doente"]
+			: S.flags.demite ? ["Activo", "Reserva", "Abandono de Posto", "Doente", "Suspenso Preventivamente"]
 			: "Activo";
 		frappe.call({
 			method: "sigos.api.search_vigilantes_rich",

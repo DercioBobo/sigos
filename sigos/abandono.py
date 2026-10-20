@@ -643,7 +643,8 @@ def fechar_presuncao(vigilante, estado, nota=None, fim=None):
 	if doc.estado == PRESUNCAO_ABERTA:
 		sincronizar_presuncao(nome)
 		doc.reload()
-	if doc.estado == PRESUNCAO_EM_PROCESSO:
+	if doc.estado == PRESUNCAO_EM_PROCESSO and estado != PRESUNCAO_CONCLUIDA:
+		# Back while the process runs — it carries on; just note it.
 		doc.add_comment("Info", _("Vigilante saiu de Abandono de Posto ({0}).").format(estado))
 		return nome
 	doc.estado = estado
@@ -702,7 +703,8 @@ def periodo_sem_registo(vigilante, data):
 	):
 		if not b.data_regresso or getdate(b.data_regresso) > data:
 			return _("Doente (Baixa Médica {0})").format(b.name)
-	return None
+	from sigos.suspensao import periodo_suspenso
+	return periodo_suspenso(vigilante, data)
 
 
 @frappe.whitelist()

@@ -3,18 +3,45 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import date_diff, today, getdate
 
+# A dismissal is the outcome of a disciplinary process (Participação → Jurista →
+# Processo Disciplinar → decisão Demissão), not an operational move: only these
+# roles may still START a DEM / "Demissão" Rotatividade (admin escape hatch).
+PAPEIS_DEMISSAO_MANUAL = ("System Manager", "SIGOS Manager")
+
+
+def pode_demitir_manualmente(user=None):
+	return bool(set(frappe.get_roles(user)) & set(PAPEIS_DEMISSAO_MANUAL))
+
 
 class Rotatividade(Document):
 
 	def validate(self):
+		self._validar_demissao_manual()
 		self._validar_regra_3meses()
 		self._validar_substituto_categoria()
 		self._validar_transferencia_contrato()
 
 	def before_submit(self):
+		self._validar_demissao_manual()
 		self._validar_regra_3meses()
 		self._validar_substituto_categoria()
 		self._validar_transferencia_contrato()
+
+	def _validar_demissao_manual(self):
+		"""CCO/Operações can't dismiss through a Rotatividade. Checked against the
+		CREATOR (owner), not whoever approves it in a workflow — so a manager's DEM
+		can still be approved by Operações, but Operações can't start one."""
+		op = self._get_operacao()
+		if not ((op and op.demite) or self.motivo == "Demissão"):
+			return
+		if pode_demitir_manualmente(self.owner or frappe.session.user):
+			return
+		frappe.throw(
+			_("A demissão não se faz por Rotatividade: é a decisão de um <b>Processo "
+			  "Disciplinar</b>. Registe uma <b>Participação</b> (ou, em abandono, a Presunção) "
+			  "— o Jurista abre o processo e decide."),
+			title=_("Demissão Só Por Processo Disciplinar"),
+		)
 
 	def on_submit(self):
 		if (self.get("workflow_state") or "Aprovado") != "Aprovado":

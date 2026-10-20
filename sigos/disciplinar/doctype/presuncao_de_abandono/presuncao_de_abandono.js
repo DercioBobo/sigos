@@ -23,6 +23,10 @@ frappe.ui.form.on("Presuncao De Abandono", {
 		const chamar = (metodo, args) => frm.call(metodo, args || {}).then(() => frm.reload_doc());
 
 		frm.add_custom_button(__("Ver Vigilante"), () => frappe.set_route("Form", "Vigilante", frm.doc.vigilante));
+		if (frm.doc.processo_disciplinar) {
+			frm.add_custom_button(__("Ver Processo Disciplinar"),
+				() => frappe.set_route("Form", "Processo Disciplinar", frm.doc.processo_disciplinar));
+		}
 		frm.add_custom_button(__("Imprimir Presunção"), () => frm.print_doc());
 		if (frm.doc.estado === "Aberta") {
 			frm.add_custom_button(__("Actualizar Faltas"), () => chamar("actualizar_faltas"));
@@ -40,9 +44,17 @@ frappe.ui.form.on("Presuncao De Abandono", {
 		}
 		if (["Aberta", "Em Análise"].includes(frm.doc.estado)) {
 			frm.add_custom_button(__("Encaminhar para Processo"), () => frappe.prompt(
-				[{ fieldname: "processo_disciplinar", fieldtype: "Link", options: "Processo Disciplinar",
-					label: __("Processo Disciplinar (opcional)") }],
-				(v) => chamar("encaminhar_para_processo", { processo_disciplinar: v.processo_disciplinar || null }),
+				[
+					{ fieldtype: "HTML", options: `<p class="text-muted">${__("Por defeito é aberto um <b>Processo Disciplinar</b> novo a partir desta Presunção. Escolha um existente só se o processo já foi aberto.")}</p>` },
+					{ fieldname: "processo_disciplinar", fieldtype: "Link", options: "Processo Disciplinar",
+						label: __("Processo Disciplinar existente (opcional)") },
+				],
+				(v) => frm.call("encaminhar_para_processo", { processo_disciplinar: v.processo_disciplinar || null })
+					.then((r) => {
+						const pd = r.message && r.message.processo_disciplinar;
+						if (pd) frappe.set_route("Form", "Processo Disciplinar", pd);
+						else frm.reload_doc();
+					}),
 				__("Encaminhar para Processo"), __("Encaminhar"),
 			), __("Jurista"));
 		}

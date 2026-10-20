@@ -10,9 +10,24 @@ class ProcessoDisciplinar(Document):
 		# known) — the posto needs covering immediately, not only once the
 		# process is eventually submitted/approved.
 		self._criar_cobertura_se_necessario()
+		self._ligar_participacao(self.name)
 
 	def on_cancel(self):
 		self._cancelar_cobertura_se_existir()
+		self._ligar_participacao(None)
+
+	def on_trash(self):
+		self._ligar_participacao(None)
+
+	def _ligar_participacao(self, valor):
+		"""Participação.processo_disciplinar mirrors the live (non-cancelled) process
+		opened from it — what the Jurista filters on ("Sem Processo")."""
+		if not self.participacao_referente:
+			return
+		atual = frappe.db.get_value("Participacao", self.participacao_referente, "processo_disciplinar")
+		if valor or atual == self.name:
+			frappe.db.set_value("Participacao", self.participacao_referente, "processo_disciplinar", valor,
+				update_modified=False)
 
 	def on_update(self):
 		# docstatus == 1 (not just workflow_state) is the real gate: on_update fires

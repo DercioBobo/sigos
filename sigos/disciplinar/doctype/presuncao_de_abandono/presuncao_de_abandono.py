@@ -76,13 +76,41 @@ class PresuncaoDeAbandono(Document):
 
 	@frappe.whitelist()
 	def encaminhar_para_processo(self, processo_disciplinar=None):
-		"""Forwarded to a Processo Disciplinar (the process itself is opened by the
-		Jurista — automation comes later)."""
-		return self._mudar_estado(
+		"""Forward to a Processo Disciplinar — an existing one, or (default) a new
+		draft opened here from the Presunção (motivo Abandono de Posto, the faltas as
+		detalhes). The Jurista decides there; a Demissão decision dismisses the guard
+		and concludes this Presunção. Returns {estado, processo_disciplinar}."""
+		if not processo_disciplinar and not self.processo_disciplinar:
+			processo_disciplinar = self._abrir_processo()
+		self._mudar_estado(
 			PRESUNCAO_EM_PROCESSO, (PRESUNCAO_ABERTA, PRESUNCAO_EM_ANALISE),
 			processo_disciplinar=processo_disciplinar or self.processo_disciplinar,
 			jurista=self.jurista or frappe.session.user,
 		)
+		return {"estado": self.estado, "processo_disciplinar": self.processo_disciplinar}
+
+	def _abrir_processo(self):
+		frappe.only_for(PAPEIS_JURISTA)
+		frappe.has_permission("Processo Disciplinar", "create", throw=True)
+		faltas = "".join(
+			f"<li>{frappe.utils.formatdate(f.data)} — {f.turno or ''} ({f.n_de_faltas or 0})</li>"
+			for f in self.faltas
+		)
+		pd = frappe.get_doc({
+			"doctype": "Processo Disciplinar",
+			"data": today(),
+			"delegacao": self.delegacao,
+			"vigilante": self.vigilante,
+			"gravidade": "Alta",
+			"motivo": _("Abandono de Posto"),
+			"detalhes": _("<p>Presunção de Abandono <b>{0}</b>: ausente desde {1} — {2} dia(s) com falta, "
+				"{3} falta(s).</p><ul>{4}</ul>").format(
+				self.name, frappe.utils.formatdate(self.primeira_falta), self.total_dias or 0,
+				self.total_faltas or 0, faltas),
+			"automatico": _("Presunção de Abandono {0}").format(self.name),
+		})
+		pd.insert(ignore_permissions=True)
+		return pd.name
 
 	@frappe.whitelist()
 	def arquivar(self, nota=None):

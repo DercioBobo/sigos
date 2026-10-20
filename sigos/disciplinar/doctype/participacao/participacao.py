@@ -104,9 +104,55 @@ class Participacao(Document):
 	def on_submit(self):
 		self._registar_timeline(_("registada"))
 		self._verificar_acumulacao_pd()
+		self._notificar_jurista()
+
+	def _notificar_jurista(self):
+		"""Bell to every Jurista: a submitted Participação is waiting for them to open
+		(or follow) the Processo Disciplinar. Never blocks the submission."""
+		try:
+			users = set(frappe.get_all(
+				"Has Role", filters={"role": "Jurista", "parenttype": "User"}, pluck="parent",
+			))
+			activos = set(frappe.get_all("User", filters={"enabled": 1, "name": ["in", list(users) or [""]]},
+				pluck="name"))
+			pd = self.processo_disciplinar or frappe.db.get_value(
+				"Processo Disciplinar", {"participacao_referente": self.name, "docstatus": ["<", 2]}, "name")
+			infracoes = ", ".join(r.tipo_de_infracao for r in self.infracoes or []) or self.tipo_de_infracao or ""
+			for user in activos - {"Administrator", "Guest"}:
+				frappe.get_doc({
+					"doctype": "Notification Log",
+					"subject": _("Participação {0}: {1} — {2}").format(
+						self.name, self.nome_do_vigilante or self.vigilante, infracoes),
+					"email_content": (
+						_("Processo Disciplinar <b>{0}</b> já aberto automaticamente.").format(pd) if pd
+						else _("Participação submetida ({0}, gravidade {1}). Abra-a para criar o "
+							   "<b>Processo Disciplinar</b>.").format(infracoes, self.gravidade or "-")
+					),
+					"for_user": user,
+					"type": "Alert",
+					"document_type": "Participacao",
+					"document_name": self.name,
+				}).insert(ignore_permissions=True)
+		except Exception as e:
+			frappe.log_error(f"Participacao {self.name}: erro ao notificar Jurista: {e}", "SIGOS Participacao")
+
+	def before_cancel(self):
+		if self.suspensao_desde and not self.suspensao_ate:
+			frappe.throw(
+				_("O vigilante está <b>suspenso preventivamente</b> por esta participação — registe o "
+				  "regresso (ou a demissão) antes de a cancelar."),
+				title=_("Suspensão em Curso"),
+			)
 
 	def on_cancel(self):
 		self._registar_timeline(_("cancelada"))
+
+	@frappe.whitelist()
+	def suspender_preventivamente(self, remuneracao, data_inicio=None, motivo=None):
+		"""CCO takes the guard off the posto while the Jurista works the process
+		(sigos.suspensao)."""
+		from sigos.suspensao import suspender
+		return suspender(self, remuneracao, data_inicio, motivo)
 
 	# ─── Disciplinary process ────────────────────────────────────────────────────
 
@@ -125,7 +171,7 @@ class Participacao(Document):
 			frappe.throw(_("Submeta a participação antes de abrir um Processo Disciplinar."))
 
 		existente = frappe.db.exists(
-			"Processo Disciplinar", {"participacao_referente": self.name}
+			"Processo Disciplinar", {"participacao_referente": self.name, "docstatus": ["<", 2]}
 		)
 		if existente:
 			frappe.msgprint(
@@ -156,7 +202,7 @@ class Participacao(Document):
 			"participacao_referente": self.name,
 			"automatico": razao,
 		})
-		processo.insert(ignore_permissions=True)
+		processo.insert(ignore_permissions=True)  # links back in ProcessoDisciplinar.after_insert
 		return processo.name
 
 	def _verificar_acumulacao_pd(self):
@@ -174,7 +220,7 @@ class Participacao(Document):
 
 		# Skip if a process already traces back to this very participação (manual button
 		# or a prior run) so we never double-open for the same record.
-		if frappe.db.exists("Processo Disciplinar", {"participacao_referente": self.name}):
+		if frappe.db.exists("Processo Disciplinar", {"participacao_referente": self.name, "docstatus": ["<", 2]}):
 			return
 
 		# Reset point: opening any disciplinary process wipes the warning slate, so only

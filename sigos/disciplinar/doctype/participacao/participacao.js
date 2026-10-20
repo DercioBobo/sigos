@@ -32,6 +32,7 @@ frappe.ui.form.on("Participacao", {
 		_pt_esconder_nativos(frm);
 		_pt_render(frm);
 		_botao_processo(frm);
+		_pt_suspensao(frm);
 		if (!frm.is_new()) {
 			frm.add_custom_button(__("Imprimir Participação"), () => frm.print_doc());
 		}
@@ -420,28 +421,84 @@ function _pt_testemunhas(frm, so_se_mudou) {
 	});
 }
 
+// ─── Suspensão Preventiva (sigos/suspensao.py) ────────────────────────────────
+// On a submitted participação CCO can take the guard off the posto right away
+// while the Jurista works the process; pay is chosen per case.
+const _PT_PAPEIS_SUSP = ["Aprovador Operações", "Operações SIGOS", "Jurista", "SIGOS Manager", "System Manager"];
+
+function _pt_suspensao(frm) {
+	if (frm.doc.docstatus !== 1) return;
+	const fmt = (d) => frappe.datetime.str_to_user(d);
+	if (frm.doc.suspensao_desde) {
+		const ativa = !frm.doc.suspensao_ate;
+		frm.dashboard.add_comment(ativa
+			? __("<b>Suspenso preventivamente</b> desde {0} — remuneração: <b>{1}</b>. Fora do posto até ao fim do processo.",
+				[fmt(frm.doc.suspensao_desde), frappe.utils.escape_html(frm.doc.suspensao_remuneracao || "")])
+			: __("Suspensão preventiva de {0} a {1} ({2}) — {3}.",
+				[fmt(frm.doc.suspensao_desde), fmt(frm.doc.suspensao_ate),
+				 frappe.utils.escape_html(frm.doc.suspensao_remuneracao || ""),
+				 frappe.utils.escape_html(frm.doc.suspensao_destino || "")]),
+			ativa ? "red" : "blue", true);
+		return;
+	}
+	if (!_PT_PAPEIS_SUSP.some((r) => frappe.user.has_role(r))) return;
+	frappe.db.get_value("Vigilante", frm.doc.vigilante, "status").then((r) => {
+		const st = r.message && r.message.status;
+		if (!["Activo", "Reserva"].includes(st)) return;
+		frm.add_custom_button(__("Suspender Preventivamente"), () => {
+			const d = new frappe.ui.Dialog({
+				title: __("Suspensão Preventiva"),
+				fields: [
+					{ fieldtype: "HTML", options: `<p class="text-muted" style="margin-bottom:8px">${__(
+						"O vigilante sai já do posto e da escala (o turno fica como vaga) enquanto o Jurista conduz o Processo Disciplinar. Não se registam faltas durante a suspensão. Termina com a demissão (decisão do processo) ou com <b>Registar Regresso</b> no Vigilante.")}</p>` },
+					{ fieldname: "remuneracao", fieldtype: "Select", label: __("Remuneração durante a suspensão"), reqd: 1,
+						options: ["", "Pago Normalmente", "Salário Congelado", "Não Pago"].join("\n"),
+						description: __("Pago Normalmente: sem alteração. Salário Congelado: sem folha até ao fim — no regresso decide-se se o período é pago. Não Pago: os dias são descontados.") },
+					{ fieldname: "data_inicio", fieldtype: "Date", label: __("Suspenso desde"), reqd: 1,
+						default: frappe.datetime.get_today() },
+					{ fieldname: "motivo", fieldtype: "Small Text", label: __("Motivo / Notas") },
+				],
+				primary_action_label: __("Suspender"),
+				primary_action(v) {
+					if (v.data_inicio > frappe.datetime.get_today()) { frappe.msgprint(__("A data não pode ser no futuro.")); return; }
+					d.hide();
+					frm.call("suspender_preventivamente", {
+						remuneracao: v.remuneracao, data_inicio: v.data_inicio, motivo: v.motivo || null,
+					}).then(() => frm.reload_doc());
+				},
+			});
+			d.show();
+		}, __("Acções"));
+	});
+}
+
 // ─── Processo Disciplinar (unchanged behaviour) ───────────────────────────────
 
-// On a submitted participação, offer to open (or jump to) the Processo Disciplinar.
+// On a submitted participação: "Ver Processo Disciplinar" for anyone who can read it,
+// "Abrir Processo Disciplinar" only for whoever can create one (the Jurista, RH,
+// managers) — CCO files the participação, the Jurista takes it from there.
 function _botao_processo(frm) {
 	if (frm.doc.docstatus !== 1) return;
+	const abrir_pd = (nome) => frappe.set_route("Form", "Processo Disciplinar", nome);
 
-	frappe.db.get_value(
-		"Processo Disciplinar", { participacao_referente: frm.doc.name }, "name"
-	).then((r) => {
-		const existente = r.message && r.message.name;
-		if (existente) {
-			frm.add_custom_button(__("Ver Processo Disciplinar"), () => {
-				frappe.set_route("Form", "Processo Disciplinar", existente);
-			});
-		} else {
-			frm.add_custom_button(__("Abrir Processo Disciplinar"), () => {
-				frm.call("criar_processo_disciplinar").then((res) => {
-					if (res.message) frappe.set_route("Form", "Processo Disciplinar", res.message);
-				});
-			}).addClass("btn-primary");
-		}
-	});
+	if (frm.doc.processo_disciplinar) {
+		frm.add_custom_button(__("Ver Processo Disciplinar"), () => abrir_pd(frm.doc.processo_disciplinar));
+		return;
+	}
+	if (!frappe.model.can_create("Processo Disciplinar")) {
+		frm.dashboard.set_headline_alert(__("Submetida — aguarda o <b>Jurista</b> para abrir o Processo Disciplinar."), "blue");
+		return;
+	}
+	frm.dashboard.set_headline_alert(__("Ainda sem Processo Disciplinar."), "orange");
+	frm.add_custom_button(__("Abrir Processo Disciplinar"), () => {
+		frappe.confirm(
+			__("Abrir um Processo Disciplinar para <b>{0}</b> a partir desta participação?",
+				[frappe.utils.escape_html(frm.doc.nome_do_vigilante || frm.doc.vigilante)]),
+			() => frm.call("criar_processo_disciplinar").then((res) => {
+				if (res.message) abrir_pd(res.message);
+			}),
+		);
+	}).addClass("btn-primary");
 }
 
 // ─── Styles (ASCII-only, self-injected) ───────────────────────────────────────

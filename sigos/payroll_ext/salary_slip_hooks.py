@@ -216,7 +216,7 @@ def _vigilante_em_reserva(doc):
 	if not doc.custom_vigilante:
 		return False
 	estado = frappe.db.get_value("Vigilante", doc.custom_vigilante, "status")
-	return estado in ("Reserva", "Abandono de Posto", "Doente")
+	return estado in ("Reserva", "Abandono de Posto", "Doente", "Suspenso Preventivamente")
 
 
 def _componentes_aplicaveis(project, vigilante):
@@ -949,8 +949,10 @@ def _dias_fora_emprego(doc):
 		from sigos.abandono import dias_abandono
 		from sigos.doenca import dias_inss
 		# Union — a day is unpaid once, whatever the reason.
+		from sigos.suspensao import dias_nao_pagos
 		fora = len(dias_inss(doc.custom_vigilante, emp_start, emp_end)
-			| dias_abandono(doc.custom_vigilante, emp_start, emp_end))
+			| dias_abandono(doc.custom_vigilante, emp_start, emp_end)
+			| dias_nao_pagos(doc.custom_vigilante, emp_start, emp_end))
 	return max(0, total - empregado + fora)
 
 

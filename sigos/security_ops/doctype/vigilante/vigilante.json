@@ -16,6 +16,7 @@
   "status",
   "cobertura_de_posto_activa",
   "baixa_medica",
+  "participacao_suspensao",
   "presuncao_abandono",
   "abandono_inicio_ausencia",
   "data_inicio_abandono",
@@ -230,7 +231,7 @@
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Estado",
-   "options": "Pre-Adimissão RH\nPre-Adimissão\nActivo\nReserva\nAbandono de Posto\nDoente\nInactivo\nDemitido",
+   "options": "Pre-Adimissão RH\nPre-Adimissão\nActivo\nReserva\nAbandono de Posto\nDoente\nSuspenso Preventivamente\nInactivo\nDemitido",
    "default": "Pre-Adimissão RH",
    "reqd": 1,
    "read_only": 1,
@@ -257,6 +258,15 @@
    "no_copy": 1,
    "depends_on": "eval:doc.status=='Doente' && doc.baixa_medica",
    "description": "Baixa Médica em curso (estado Doente)."
+  },
+  {
+   "fieldname": "participacao_suspensao",
+   "fieldtype": "Link",
+   "options": "Participacao",
+   "label": "Participação (Suspensão Preventiva)",
+   "read_only": 1,
+   "no_copy": 1,
+   "depends_on": "eval:doc.status=='Suspenso Preventivamente' && doc.participacao_suspensao"
   },
   {
    "fieldname": "presuncao_abandono",
@@ -675,7 +685,7 @@
    "link_fieldname": "vigilante"
   }
  ],
- "modified": "2026-10-21 12:00:00.000000",
+ "modified": "2026-10-22 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Security Ops",
  "name": "Vigilante",
@@ -801,6 +811,21 @@
    "permlevel": 2,
    "read": 1,
    "write": 0
+  },
+  {
+   "role": "Jurista",
+   "permlevel": 0,
+   "read": 1,
+   "write": 0,
+   "create": 0,
+   "submit": 0,
+   "cancel": 0,
+   "delete": 0,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 0
   }
  ],
  "sort_field": "modified",

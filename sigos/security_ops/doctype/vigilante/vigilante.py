@@ -4,7 +4,8 @@ from frappe.model.document import Document
 from frappe.utils import add_days, cint, getdate, today
 
 # Statuses that require an active Employee record
-_REQUER_EMPLOYEE = frozenset({"Pre-Adimissão", "Activo", "Reserva", "Abandono de Posto", "Doente", "Inactivo", "Demitido"})
+_REQUER_EMPLOYEE = frozenset({"Pre-Adimissão", "Activo", "Reserva", "Abandono de Posto", "Doente",
+	"Suspenso Preventivamente", "Inactivo", "Demitido"})
 
 # Canonical Vigilante → Employee status map (single source of truth, shared with sync.py)
 # "Reserva" = benched/available (posto closed) — still employed, so Employee stays Active.
@@ -19,6 +20,9 @@ VIGILANTE_TO_EMP_STATUS = {
 	# "Doente" = on sick leave (Baixa Médica, sigos.doenca) — off posto + escala, still
 	# employed (paid by INSS, left out of the company payroll meanwhile).
 	"Doente":           "Active",
+	# "Suspenso Preventivamente" = taken off the posto by CCO from a Participação while
+	# the Jurista works the process (sigos.suspensao) — still employed.
+	"Suspenso Preventivamente": "Active",
 	"Inactivo":         "Suspended",
 	"Demitido":         "Left",
 }
@@ -47,6 +51,8 @@ CAMPOS_OPERACIONAIS_RESERVA = (
 _ESTADOS_SALARIO_CONGELADO = {
 	"Abandono de Posto": "Abandono de Posto",
 	"Doente": "Doente (Baixa Médica — pago pelo INSS)",
+	# only when that case's remuneração is "Salário Congelado" (see _congela_neste_estado)
+	"Suspenso Preventivamente": "Suspensão Preventiva",
 }
 
 
@@ -85,6 +91,7 @@ class Vigilante(Document):
 		self._registar_congelamento_auto()
 		self._fechar_presuncao_se_saiu()
 		self._fechar_baixa_se_saiu()
+		self._fechar_suspensao_se_saiu()
 		self._atualizar_ocupacao_postos()
 		self._migrar_escala_se_mudou()
 		self._seed_salario_base()
@@ -603,7 +610,7 @@ class Vigilante(Document):
 		antes = before.status if before else None
 		if antes == self.status:
 			return
-		if self.status in _ESTADOS_SALARIO_CONGELADO:
+		if self.status in _ESTADOS_SALARIO_CONGELADO and self._congela_neste_estado():
 			if not self.salario_congelado:
 				self.salario_congelado = 1
 				self.salario_congelado_desde = (
@@ -618,6 +625,20 @@ class Vigilante(Document):
 		elif antes in _ESTADOS_SALARIO_CONGELADO and self.salario_congelado:
 			self._descongelar_campos()
 			self.flags.salario_descongelado = _ESTADOS_SALARIO_CONGELADO[antes]
+
+	def _congela_neste_estado(self):
+		if self.status != "Suspenso Preventivamente":
+			return True
+		from sigos.suspensao import REM_CONGELADO, remuneracao
+		return remuneracao(self) == REM_CONGELADO
+
+	def _fechar_suspensao_se_saiu(self):
+		"""Left Suspenso Preventivamente another way (e.g. Demissão decided by the
+		Processo Disciplinar): close the episode on the Participação."""
+		before = self.get_doc_before_save()
+		if before and before.status == "Suspenso Preventivamente" and self.status != "Suspenso Preventivamente":
+			from sigos.suspensao import ao_sair
+			ao_sair(self)
 
 	def _fechar_presuncao_se_saiu(self):
 		"""Left Abandono (return / dismissal): close the open Presunção — Concluída
@@ -963,6 +984,12 @@ class Vigilante(Document):
 		return registar_regresso(self, destino, data_regresso, atestado, observacoes)
 
 	@frappe.whitelist()
+	def registar_regresso_suspensao(self, destino="Reserva", data_regresso=None, pagar_periodo=1, observacoes=None):
+		"""End of a preventive suspension without dismissal (sigos.suspensao)."""
+		from sigos.suspensao import registar_regresso
+		return registar_regresso(self, destino, data_regresso, pagar_periodo, observacoes)
+
+	@frappe.whitelist()
 	def congelar_salario(self, motivo=None):
 		"""RH: freeze a guard in Abandono de Posto out of payroll until the process
 		ends. Written with db.set_value (no full save — nothing else changes, and a
@@ -972,7 +999,8 @@ class Vigilante(Document):
 
 		frappe.only_for(PAPEIS_CONGELAR)
 		if self.status not in _ESTADOS_SALARIO_CONGELADO:
-			frappe.throw(_("Só é possível congelar o salário de um vigilante em <b>Abandono de Posto</b> ou <b>Doente</b>."))
+			frappe.throw(_("Só é possível congelar o salário de um vigilante em <b>Abandono de Posto</b>, "
+				"<b>Doente</b> ou <b>Suspenso Preventivamente</b>."))
 		if self.salario_congelado:
 			frappe.throw(_("O salário já está congelado."), title=_("Sem alteração"))
 		motivo = (motivo or "").strip()
