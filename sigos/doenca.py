@@ -38,9 +38,8 @@ _PODEM_ADOECER = ("Activo", "Reserva")
 def dias_pagos_empresa():
 	"""N: a sickness of up to N days is paid by the company. An explicit 0 is
 	respected; never set = 3."""
-	v = frappe.db.get_value(
-		"Singles", {"doctype": "SIGOS Settings", "field": "doenca_dias_pagos_empresa"}, "value"
-	)
+	from sigos.utils import valor_settings_bruto
+	v = valor_settings_bruto("doenca_dias_pagos_empresa")
 	return 3 if v in (None, "") else cint(v)
 
 

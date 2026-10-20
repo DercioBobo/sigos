@@ -6,8 +6,8 @@ from frappe.model.document import Document
 def limite_repreensoes():
 	"""Repreensões (since the guard's last Processo Disciplinar) at which the Jurista is
 	asked whether to open a process. The Jurista decides — nothing opens on its own."""
-	v = frappe.db.get_value(
-		"Singles", {"doctype": "SIGOS Settings", "field": "repreensoes_para_processo"}, "value")
+	from sigos.utils import valor_settings_bruto
+	v = valor_settings_bruto("repreensoes_para_processo")
 	return 3 if v in (None, "", "0", 0) else int(v)
 
 

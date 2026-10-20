@@ -18,7 +18,8 @@ PAPEIS_FORCAR_PRAZO = ("System Manager", "SIGOS Manager")
 
 
 def _setting(campo, padrao):
-	v = frappe.db.get_value("Singles", {"doctype": "SIGOS Settings", "field": campo}, "value")
+	from sigos.utils import valor_settings_bruto
+	v = valor_settings_bruto(campo)
 	return padrao if v in (None, "", "0", 0) else cint(v)
 
 

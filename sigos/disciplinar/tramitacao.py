@@ -49,7 +49,8 @@ PAPEIS_TRAMITACAO = ("System Manager", "SIGOS Manager", "Jurista", "Aprovador RH
 
 
 def _setting(campo, padrao):
-	v = frappe.db.get_value("Singles", {"doctype": "SIGOS Settings", "field": campo}, "value")
+	from sigos.utils import valor_settings_bruto
+	v = valor_settings_bruto(campo)
 	return padrao if v in (None, "", "0", 0) else cint(v)
 
 

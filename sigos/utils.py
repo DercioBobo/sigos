@@ -6,6 +6,18 @@ import frappe
 from frappe.utils import getdate, add_months, add_days, get_last_day
 
 
+def valor_settings_bruto(campo):
+	"""Raw stored value of a SIGOS Settings field, or None when it was never saved —
+	so a caller can tell "not set" (use its default) from an explicit 0, which
+	frappe.db.get_single_value can't. Plain SQL on purpose: tabSingles has no
+	`modified` column, and frappe.db.get_value("Singles", ...) orders by it."""
+	r = frappe.db.sql(
+		"SELECT value FROM `tabSingles` WHERE doctype = 'SIGOS Settings' AND field = %s LIMIT 1",
+		(campo,),
+	)
+	return r[0][0] if r else None
+
+
 # ─── Payroll period (dia de corte) ─────────────────────────────────────────────
 
 def resolver_periodo_folha(mes_num: int, ano: int) -> tuple:
