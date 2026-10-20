@@ -10,5 +10,8 @@ def execute():
 	if frappe.db.exists("Rotatividade", {"abreviatura_op": "ABP"}):
 		frappe.db.set_value("Operacao De Rotatividade", "ABP", "activo", 0)
 	else:
+		# Seeded as bloqueada (system operation), which on_trash refuses to delete —
+		# release it first: it's ours to remove.
+		frappe.db.set_value("Operacao De Rotatividade", "ABP", "bloqueada", 0)
 		frappe.delete_doc("Operacao De Rotatividade", "ABP", ignore_permissions=True, force=True)
 	frappe.db.commit()
