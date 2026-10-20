@@ -8,7 +8,8 @@ const _PT_GRAV = ["Baixa", "Média", "Alta"];
 
 frappe.ui.form.on("Participacao", {
 	setup(frm) {
-		frm.set_query("tipo_de_infracao", "infracoes", () => ({ filters: { ativo: 1 } }));
+		// Table MultiSelect: the query goes on the field itself (it has no grid).
+		frm.set_query("infracoes", () => ({ filters: { ativo: 1 } }));
 		const sem_demitidos = () => ({ filters: { status: ["!=", "Demitido"] } });
 		frm.set_query("vigilante", sem_demitidos);
 		frm.set_query("participante", sem_demitidos);
@@ -200,7 +201,7 @@ function _pt_ctrl(frm, $parent, df, depois, transformar) {
 		parent: $parent,
 		render_input: true,
 	});
-	if (df.get_query && ctrl.set_query) ctrl.get_query = df.get_query;
+	if (df.get_query) ctrl.get_query = df.get_query;
 	ctrl.set_value(frm.doc[df.fieldname] || "");
 	frm._pt_ctrl[df.fieldname] = ctrl;
 	return ctrl;
@@ -211,7 +212,7 @@ function _pt_carregar_tipos(frm) {
 	return frappe.db.get_list("Tipo De Infracao", {
 		filters: { ativo: 1 },
 		fields: ["name", "gravidade_sugerida", "ordem", "pede_descricao"],
-		limit: 0,
+		limit_page_length: 0,
 	}).then((tipos) => {
 		// Paper order (ordem 1..n), then any type without an order, alphabetically.
 		frm._pt_tipos = (tipos || []).sort((a, b) => {

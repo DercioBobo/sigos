@@ -23,6 +23,7 @@ frappe.ui.form.on("Presuncao De Abandono", {
 		const chamar = (metodo, args) => frm.call(metodo, args || {}).then(() => frm.reload_doc());
 
 		frm.add_custom_button(__("Ver Vigilante"), () => frappe.set_route("Form", "Vigilante", frm.doc.vigilante));
+		frm.add_custom_button(__("Imprimir Presunção"), () => frm.print_doc());
 		if (frm.doc.estado === "Aberta") {
 			frm.add_custom_button(__("Actualizar Faltas"), () => chamar("actualizar_faltas"));
 		}

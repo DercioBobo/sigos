@@ -123,7 +123,11 @@
   "sec_ss_impressos",
   "local_documentos",
   "col_ss_impressos",
-  "codigo_formulario_participacao"
+  "codigo_formulario_participacao",
+  "codigo_formulario_presuncao",
+  "presuncao_assinatura",
+  "presuncao_base_legal",
+  "contactos_documentos"
  ],
  "fields": [
   {
@@ -824,6 +828,30 @@
    "description": "Impresso no rodapé da Participação (ex.: XSS_OP.FR.006 / REV.00.05.11.2021). Uma linha por linha impressa."
   },
   {
+   "fieldname": "codigo_formulario_presuncao",
+   "fieldtype": "Small Text",
+   "label": "Código do Formulário — Presunção de Abandono",
+   "description": "Rodapé da Presunção: 1.ª linha à esquerda (ex.: XSS_RH.FR.031), restantes à direita (ex.: Rev. 00 de 24.03.2022)."
+  },
+  {
+   "fieldname": "presuncao_assinatura",
+   "fieldtype": "Data",
+   "label": "Assinatura — Presunção de Abandono",
+   "description": "Por baixo da linha de assinatura. Vazio = \"Dep. Operativo\"."
+  },
+  {
+   "fieldname": "presuncao_base_legal",
+   "fieldtype": "Small Text",
+   "label": "Base Legal — Presunção de Abandono",
+   "description": "Completa \"Nos termos do …, tal situação configura presunção de abandono\". Vazio = \"n.º 3 do artigo 115 da Lei n.º 13/2023, de 25 de agosto\"."
+  },
+  {
+   "fieldname": "contactos_documentos",
+   "fieldtype": "Small Text",
+   "label": "Contactos (Barra do Rodapé)",
+   "description": "Barra escura no rodapé das cartas (ex.: Presunção). Um item por linha: telefones, morada, site, e-mail."
+  },
+  {
    "fieldname": "tab_ss_fat",
    "fieldtype": "Tab Break",
    "label": "Faturação"
@@ -886,7 +914,7 @@
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-10-21 16:00:00.000000",
+ "modified": "2026-10-21 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "SIGOS Setup",
  "name": "SIGOS Settings",
