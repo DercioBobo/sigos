@@ -9,6 +9,8 @@
  "engine": "InnoDB",
  "field_order": [
   "tab_pd_colab",
+  "sec_cabecalho_pd",
+  "cabecalho_processo",
   "naming_series",
   "sec_colaborador",
   "vigilante",
@@ -79,6 +81,7 @@
   "parecer_sindicato",
   "tab_pd_dec",
   "sec_decisao",
+  "seletor_decisao",
   "decisao",
   "justificacao_caducidade",
   "suspensao_dias",
@@ -110,12 +113,23 @@
    "label": "Série",
    "options": "PD-.YY.-.##",
    "reqd": 1,
-   "set_only_once": 1
+   "set_only_once": 1,
+   "default": "PD-.YY.-.##",
+   "hidden": 1
   },
   {
    "fieldname": "tab_pd_colab",
    "fieldtype": "Tab Break",
    "label": "Colaborador e Processo"
+  },
+  {
+   "fieldname": "sec_cabecalho_pd",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "cabecalho_processo",
+   "fieldtype": "HTML",
+   "label": "Cabeçalho do Processo"
   },
   {
    "fieldname": "data",
@@ -533,6 +547,12 @@
    "permlevel": 1
   },
   {
+   "fieldname": "seletor_decisao",
+   "fieldtype": "HTML",
+   "label": "Sanções",
+   "permlevel": 1
+  },
+  {
    "fieldname": "decisao",
    "fieldtype": "Select",
    "label": "Decisão",
@@ -719,7 +739,7 @@
  ],
  "is_submittable": 1,
  "links": [],
- "modified": "2026-10-23 10:00:00.000000",
+ "modified": "2026-10-23 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Disciplinar",
  "name": "Processo Disciplinar",
