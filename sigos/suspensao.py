@@ -99,6 +99,8 @@ def suspender(part, remuneracao, data_inicio=None, motivo=None):
 	).format(frappe.format_value(inicio, {"fieldtype": "Date"}), part.name,
 		_(" <b>{0}</b>").format(posto) if posto else "", remuneracao), part)
 	_notificar_jurista(part, vig, inicio, remuneracao)
+	from sigos.notificacoes import sinal
+	sinal("Participacao", part.name, "sigos_suspensao_preventiva")
 	return part.name
 
 
@@ -161,6 +163,8 @@ def registar_regresso(vig, destino="Reserva", data_regresso=None, pagar_periodo=
 	if part.suspensao_remuneracao == REM_CONGELADO and not cint(pagar_periodo):
 		part.db_set("suspensao_remuneracao", REM_NAO_PAGO)
 	fechar(part, regresso, destino, observacoes)
+	from sigos.notificacoes import sinal
+	sinal("Participacao", part.name, "sigos_suspensao_terminada")
 
 	from sigos.timeline import registar
 	registar(vig.name, _("<b>Fim da suspensão preventiva</b> (Participação {0}) — {1}. Remuneração do período: {2}.").format(

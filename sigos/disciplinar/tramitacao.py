@@ -315,6 +315,9 @@ def actualizar_processos():
 					pd.db_set(campo, pd.get(campo), update_modified=False)
 				if pd.fase in (FASE_SINDICATO, FASE_CADUCADO) and antes != pd.fase:
 					_notificar(pd)
+					from sigos.notificacoes import sinal
+					sinal("Processo Disciplinar", pd.name,
+						"sigos_pd_sindicato" if pd.fase == FASE_SINDICATO else "sigos_pd_caducado")
 			frappe.db.commit()
 		except Exception as ex:
 			frappe.db.rollback()

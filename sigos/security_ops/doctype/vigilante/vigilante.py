@@ -664,15 +664,16 @@ class Vigilante(Document):
 		if not (self.flags.salario_congelado_auto or self.flags.salario_descongelado):
 			return
 		from sigos.timeline import registar
-		if self.flags.salario_congelado_auto:
-			registar(self.name, _("<b>Salário congelado</b> automaticamente — {0}.").format(
-				self.flags.salario_congelado_auto), self)
-		if self.flags.salario_descongelado:
-			from sigos.abandono import aviso_descongelado
-			registar(self.name, _("<b>Salário descongelado</b> — fim de {0}.").format(
-				self.flags.salario_descongelado), self)
-			frappe.msgprint(aviso_descongelado(self.name), title=_("Salário Descongelado"), indicator="blue")
+		congelou, descongelou = self.flags.salario_congelado_auto, self.flags.salario_descongelado
 		self.flags.salario_congelado_auto = self.flags.salario_descongelado = False
+		if congelou:
+			registar(self.name, _("<b>Salário congelado</b> automaticamente — {0}.").format(congelou), self)
+			self.run_method("sigos_salario_congelado")  # Notification signal (sigos.notificacoes)
+		if descongelou:
+			from sigos.abandono import aviso_descongelado
+			registar(self.name, _("<b>Salário descongelado</b> — fim de {0}.").format(descongelou), self)
+			frappe.msgprint(aviso_descongelado(self.name), title=_("Salário Descongelado"), indicator="blue")
+			self.run_method("sigos_salario_descongelado")
 
 	def _descongelar_campos(self):
 		self.salario_congelado = 0
@@ -1014,6 +1015,8 @@ class Vigilante(Document):
 		})
 		from sigos.timeline import registar
 		registar(self.name, _("<b>Salário congelado</b> — {0}").format(motivo), self)
+		from sigos.notificacoes import sinal
+		sinal("Vigilante", self.name, "sigos_salario_congelado")
 		return True
 
 	@frappe.whitelist()
@@ -1035,6 +1038,8 @@ class Vigilante(Document):
 		if (motivo or "").strip():
 			texto += _(" — {0}").format(motivo.strip())
 		registar(self.name, texto, self)
+		from sigos.notificacoes import sinal
+		sinal("Vigilante", self.name, "sigos_salario_descongelado")
 		return aviso_descongelado(self.name)
 
 	@frappe.whitelist()

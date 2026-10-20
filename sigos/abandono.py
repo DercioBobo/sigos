@@ -381,6 +381,8 @@ def _processar(v, modo, limite, ontem):
 		registar(v.name, _(
 			"<b>Possível Abandono de Posto</b> — {0} desde {1}."
 		).format(_descrever(info), frappe.format_value(info["inicio"], {"fieldtype": "Date"})))
+		from sigos.notificacoes import sinal
+		sinal("Vigilante", v.name, "sigos_limite_faltas_atingido")
 
 	if modo == "Automático":
 		# Keep the alert even if the Presunção below fails (retried tomorrow,
