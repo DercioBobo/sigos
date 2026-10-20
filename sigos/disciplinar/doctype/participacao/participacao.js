@@ -500,8 +500,11 @@ function _pt_css() {
 .pt-test { display: grid; grid-template-columns: 22px 1.6fr 1fr 1fr 2fr 28px; gap: 6px; align-items: center; margin-bottom: 6px; }
 .pt-ro .pt-test { grid-template-columns: 22px 1.6fr 1fr 1fr 2fr; }
 .pt-test-i { font-size: 11px; color: var(--pt-ink2); text-align: center; font-variant-numeric: tabular-nums; }
-.pt-test .frappe-control { margin: 0; }
-.pt-test .control-label, .pt-test .help-box { display: none; }
+.pt-test .frappe-control, .pt-test .form-group, .pt-test .control-input-wrapper,
+.pt-test .control-input, .pt-test .link-field { margin: 0 !important; padding: 0; }
+.pt-test .control-label, .pt-test .help-box, .pt-test .control-value { display: none; }
+.pt-test .form-control { height: 30px; min-height: 30px; padding: 4px 8px; font-size: 13px; line-height: 20px; }
+.pt-ro .pt-test .control-value { display: block; height: 30px; line-height: 30px; padding: 0 8px; margin: 0; }
 .pt-add { margin-top: 2px; }
 .pt-legado { white-space: pre-wrap; font-size: 12.5px; padding: 6px 8px; background: #fff; border: 1px dashed var(--pt-line); border-radius: 8px; }
 .pt-foot { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;
