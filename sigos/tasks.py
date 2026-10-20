@@ -9,6 +9,30 @@ def daily():
 	_verificar_postos_temporarios()
 	_acumular_ferias()
 	_fechar_coberturas_expiradas()
+	_verificar_abandonos()
+	_registar_ausencias_abandono()
+
+
+def _registar_ausencias_abandono():
+	"""One "Ausência em Abandono" row per calendar day for guards in Abandono de
+	Posto — runs whatever abandono_modo says (guards can be marked by hand)."""
+	from sigos.abandono import registar_ausencias_abandono
+	try:
+		registar_ausencias_abandono()
+	except Exception as ex:
+		frappe.db.rollback()
+		frappe.log_error(f"Erro ao registar ausências em abandono: {ex}", "SIGOS Abandono de Posto")
+
+
+def _verificar_abandonos():
+	"""Abandono de Posto detection (alert / auto-mark per SIGOS Settings.abandono_modo).
+	Runs after _rolar_escalas so it reads the freshly reconciled escala."""
+	from sigos.abandono import verificar_abandonos
+	try:
+		verificar_abandonos()
+	except Exception as ex:
+		frappe.db.rollback()
+		frappe.log_error(f"Erro na verificação de abandono de posto: {ex}", "SIGOS Abandono de Posto")
 
 
 def _fechar_coberturas_expiradas():

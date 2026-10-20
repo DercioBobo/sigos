@@ -28,3 +28,4 @@ sigos.patches.add_payroll_entry_customer_group_filter
 sigos.patches.divisor_folha_30_dias
 sigos.patches.separar_faturacao_do_contrato
 sigos.patches.sigos_stamp_fatura_no_copy
+sigos.patches.seed_abandono_de_posto

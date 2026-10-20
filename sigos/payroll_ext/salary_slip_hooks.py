@@ -190,13 +190,14 @@ def _resolve_projecto(doc):
 
 
 def _vigilante_em_reserva(doc):
-	"""True when the guard behind this slip is currently benched (Reserva) —
-	subsídios (arma/categoria/chefia/canino/projecto) don't apply to a guard
-	with no active posto/projecto, even though base salary and faltas are
-	unaffected by Reserva (see vigilante.limpar_campos_operacionais)."""
+	"""True when the guard behind this slip is currently benched (Reserva) or in
+	Abandono de Posto — subsídios (arma/categoria/chefia/canino/projecto) don't
+	apply to a guard with no active posto/projecto, even though base salary and
+	faltas are unaffected by Reserva (see vigilante.limpar_campos_operacionais)."""
 	if not doc.custom_vigilante:
 		return False
-	return frappe.db.get_value("Vigilante", doc.custom_vigilante, "status") == "Reserva"
+	estado = frappe.db.get_value("Vigilante", doc.custom_vigilante, "status")
+	return estado in ("Reserva", "Abandono de Posto")
 
 
 def _componentes_aplicaveis(project, vigilante):
@@ -727,6 +728,12 @@ def _add_faltas_deduction(doc):
 		dias = doc.custom_dias_de_trabalho or 0
 		amount = (base / dias) * faltas_nao if dias > 0 else 0
 
+	# Never more than the base: a guard absent a whole 31-day month (e.g. Abandono
+	# de Posto in "Faltas" mode, 1 falta per calendar day) would otherwise owe
+	# base/30 × 31.
+	base_max = _get_salario_base(doc)
+	if base_max > 0:
+		amount = min(amount, base_max)
 	amount = round(amount, 2)
 
 	# Update existing row or append
@@ -900,9 +907,11 @@ def _add_horas_extras(doc):
 # ─── Proporcional por admissão/demissão a meio do mês ───────────────────────────
 
 def _dias_fora_emprego(doc):
-	"""Calendar days within the slip period that fall OUTSIDE the employment window
-	[date_of_joining, relieving_date] — i.e. days not yet joined or already left.
-	0 for a normal full-month employee."""
+	"""Calendar days within the slip period that are NOT paid: outside the
+	employment window [date_of_joining, relieving_date] — not yet joined or already
+	left — plus, inside it, the guard's Abandono de Posto window
+	[Vigilante.data_inicio_abandono, data_fim_abandono or open-ended]. 0 for a
+	normal full-month employee."""
 	if not (doc.employee and doc.start_date and doc.end_date):
 		return 0
 	emp = frappe.db.get_value(
@@ -915,7 +924,32 @@ def _dias_fora_emprego(doc):
 	emp_start = max(start, getdate(emp.date_of_joining)) if emp.date_of_joining else start
 	emp_end = min(end, getdate(emp.relieving_date)) if emp.relieving_date else end
 	empregado = (date_diff(emp_end, emp_start) + 1) if emp_start <= emp_end else 0
-	return max(0, total - empregado)
+	return max(0, total - empregado + _dias_abandono(doc, emp_start, emp_end))
+
+
+def _dias_abandono(doc, de, ate):
+	"""Days of [de, ate] (already clipped to the period + employment window) inside
+	the guard's Abandono de Posto window, minus days pardoned by a submitted
+	Justificacao De Faltas. Only in the two SIGOS Settings.abandono_desconto "Dias
+	não remunerados" modes — in "Faltas" the daily "Ausência em Abandono" rows are
+	deducted as faltas instead (never both); "Nenhum" deducts nothing. Only the latest episode is stored on
+	the Vigilante; faltas recorded before data_inicio_abandono are deducted as
+	usual, so the two never overlap."""
+	from sigos.abandono import abandono_dias_nao_remunerados, dias_justificados
+
+	if not doc.get("custom_vigilante") or de > ate or not abandono_dias_nao_remunerados():
+		return 0
+	ab = frappe.db.get_value(
+		"Vigilante", doc.custom_vigilante, ["data_inicio_abandono", "data_fim_abandono"], as_dict=True
+	)
+	if not (ab and ab.data_inicio_abandono):
+		return 0
+	ini = max(de, getdate(ab.data_inicio_abandono))
+	fim = min(ate, getdate(ab.data_fim_abandono)) if ab.data_fim_abandono else ate
+	if ini > fim:
+		return 0
+	perdoados = len(dias_justificados(doc.custom_vigilante, ini, fim))
+	return max(0, date_diff(fim, ini) + 1 - perdoados)
 
 
 def _get_componente_proporcional():
@@ -939,7 +973,7 @@ def _get_componente_proporcional():
 
 def _add_proporcional_admissao_demissao(doc):
 	"""Deduct the base portion for days the employee was NOT in service this period
-	(joined or left mid-month): base × dias_fora / total_dias. Uses the exact calendar
+	(joined or left mid-month, or in Abandono de Posto): base × dias_fora / total_dias. Uses the exact calendar
 	fraction (independent of the faltas divisor) and is disjoint from faltas — no
 	Ausencias exist outside the employment window. No-op for full-month employees."""
 	if not (doc.employee and doc.start_date and doc.end_date):

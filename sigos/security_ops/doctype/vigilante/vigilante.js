@@ -24,6 +24,7 @@ frappe.ui.form.on("Vigilante", {
 		_toggle_posicao(frm);
 		_toggle_supervisor(frm);
 		_toggle_subsidios_comb(frm);
+		_abandono_de_posto(frm);
 
 		// Ver Escala — only for active guards already assigned to a posto
 		if (!frm.is_new() && frm.doc.status === "Activo" && frm.doc.posto_de_vigilancia) {
@@ -230,6 +231,131 @@ function _toggle_subsidios_comb(frm) {
 	}
 }
 
+// ─── Abandono de Posto (sigos/abandono.py) ─────────────────────────────────────
+// Detected (daily job flagged a streak, guard still Activo/Reserva): red headline
+// with the live streak + "Marcar Abandono de Posto", which opens the Rotatividade
+// wizard on the ABP operação so Ops pick the substituto there.
+// Already in Abandono: headline with the start date + Registar Regresso
+// (Reserva or a new posto, optionally justified) / Demitir (DEM wizard).
+function _abandono_de_posto(frm) {
+	if (frm.is_new()) return;
+	const pode_ops = frappe.user.has_role("Aprovador Operações")
+		|| frappe.user.has_role("Operações SIGOS")
+		|| frappe.user.has_role("SIGOS Manager")
+		|| frappe.user.has_role("System Manager");
+	const fmt = (d) => frappe.datetime.str_to_user(d);
+	const abrir = (op) => {
+		frappe.route_options = { vigilante: frm.doc.name, abreviatura_op: op };
+		frappe.new_doc("Rotatividade");
+	};
+
+	if (frm.doc.status === "Abandono de Posto") {
+		const pintar_abd = (efeito) => frm.dashboard.set_headline_alert(
+			__("Em <b>Abandono de Posto</b> desde {0}{1}, até ao regresso ou demissão.",
+				[fmt(frm.doc.data_inicio_abandono), efeito ? ` — ${efeito}` : ""]),
+			"red",
+		);
+		pintar_abd("");
+		frappe.xcall("sigos.abandono.resumo_desconto").then((t) => pintar_abd(t));
+		if (pode_ops) {
+			frm.add_custom_button(__("Registar Regresso"), () => _registar_regresso(frm), __("Acções"));
+			frm.add_custom_button(__("Demitir"), () => abrir("DEM"), __("Acções"));
+		}
+		return;
+	}
+
+	if (!frm.doc.abandono_detectado_em || !["Activo", "Reserva"].includes(frm.doc.status)) return;
+
+	const pintar = (dias, limite) => frm.dashboard.set_headline_alert(
+		__("Possível <b>Abandono de Posto</b>: {0} dias seguidos de ausência desde {1} (limite: {2}).",
+			[dias, fmt(frm.doc.abandono_primeira_falta), limite]),
+		"red",
+	);
+	pintar("≥", "…");
+	frappe.xcall("sigos.abandono.sequencia_vigilante", { vigilante: frm.doc.name })
+		.then((r) => { if (r && r.dias) pintar(r.dias, r.limite); });
+
+	if (pode_ops) {
+		frm.add_custom_button(__("Marcar Abandono de Posto"), () => abrir("ABP"), __("Acções"));
+	}
+}
+
+// The guard came back. Never straight back to the old posto: they land in Reserva,
+// and "Novo Posto" then opens the APR wizard to pick one. A justification files a
+// Justificacao De Faltas over the episode (pardons the days in payroll).
+function _registar_regresso(frm) {
+	const desde = frm.doc.abandono_inicio_ausencia || frm.doc.abandono_primeira_falta
+		|| frm.doc.data_inicio_abandono;
+	const ontem = frappe.datetime.add_days(frappe.datetime.get_today(), -1);
+	const d = new frappe.ui.Dialog({
+		title: __("Registar Regresso"),
+		fields: [
+			{ fieldtype: "HTML", options: `<p class="text-muted" style="margin-bottom:8px">${
+				__("O vigilante volta a ser remunerado a partir de hoje. Não regressa automaticamente ao posto anterior.")}</p>` },
+			{ fieldname: "destino", fieldtype: "Select", label: __("Destino"), reqd: 1,
+				options: [
+					{ value: "Reserva", label: __("Ficar em Reserva") },
+					{ value: "Novo Posto", label: __("Atribuir um novo posto (abre a Rotatividade APR)") },
+				],
+				default: "Reserva" },
+			{ fieldtype: "Section Break" },
+			{ fieldname: "justificado", fieldtype: "Check",
+				label: __("Apresentou justificação (perdoar os dias de ausência)") },
+			{ fieldname: "justificar_desde", fieldtype: "Date", label: __("Justificar desde"),
+				default: desde, depends_on: "eval:doc.justificado",
+				description: __("Por defeito, a primeira falta da sequência.") },
+			{ fieldname: "justificar_ate", fieldtype: "Date", label: __("Justificar até"),
+				default: ontem, depends_on: "eval:doc.justificado",
+				description: __("Por defeito, ontem. Os dias fora deste período continuam descontados. Para vários períodos separados, crie Justificações de Faltas adicionais (sem prazo dentro do abandono).") },
+			{ fieldname: "justificativo", fieldtype: "Attach", label: __("Justificativo"),
+				depends_on: "eval:doc.justificado" },
+			{ fieldname: "observacoes", fieldtype: "Small Text", label: __("Observações da Justificação"),
+				depends_on: "eval:doc.justificado" },
+			{ fieldtype: "Section Break" },
+			{ fieldname: "motivo", fieldtype: "Small Text", label: __("Motivo / Notas (opcional)") },
+		],
+		primary_action_label: __("Confirmar Regresso"),
+		primary_action(vals) {
+			if (vals.justificado && vals.justificar_desde && vals.justificar_ate
+				&& vals.justificar_desde > vals.justificar_ate) {
+				frappe.msgprint(__("<b>Justificar desde</b> tem de ser anterior a <b>Justificar até</b>."));
+				return;
+			}
+			if (vals.justificado && vals.justificar_ate && vals.justificar_ate > ontem) {
+				frappe.msgprint(__("<b>Justificar até</b> não pode passar de ontem — o vigilante regressa hoje."));
+				return;
+			}
+			d.hide();
+			frm.call("registar_regresso", {
+				motivo: (vals.motivo || "").trim() || null,
+				justificado: vals.justificado ? 1 : 0,
+				justificar_desde: vals.justificado ? vals.justificar_desde : null,
+				justificar_ate: vals.justificado ? vals.justificar_ate : null,
+				justificativo: vals.justificado ? vals.justificativo : null,
+				observacoes: vals.justificado ? vals.observacoes : null,
+				destino: vals.destino,
+			}).then((r) => {
+				const j = r.message && r.message.justificacao;
+				if (j) {
+					frappe.show_alert({
+						message: j.submetida
+							? __("Justificação {0} registada — dias perdoados.", [j.name])
+							: __("Justificação {0} criada — pendente de aprovação do RH.", [j.name]),
+						indicator: j.submetida ? "green" : "orange",
+					}, 8);
+				}
+				if (vals.destino === "Novo Posto") {
+					frappe.route_options = { vigilante: frm.doc.name, abreviatura_op: "APR" };
+					frappe.new_doc("Rotatividade");
+				} else {
+					frm.reload_doc();
+				}
+			});
+		},
+	});
+	d.show();
+}
+
 // ─── Operational state change (Reserva / Inactivo) ────────────────────────────
 // Single dialog: shows the consequence + an optional reason, then calls the
 // whitelisted controller method which releases the posto and saves.
@@ -284,11 +410,13 @@ const _DASH_REQ = {
 	"Pre-Adimissão":    ["posto_de_vigilancia", "regime_do_vigilante", "categoria", "delegacao", "mecanografico", "data_admissao"],
 	"Pre-Adimissão RH": ["delegacao", "categoria", "data_admissao"],
 	"Reserva":          ["categoria", "delegacao", "mecanografico", "data_admissao"],
+	"Abandono de Posto": ["categoria", "delegacao", "mecanografico", "data_admissao"],
 };
 const _DASH_STATUS_CLS = {
 	"Activo": "vigd-st-on", "Reserva": "vigd-st-res",
 	"Pre-Adimissão": "vigd-st-pre", "Pre-Adimissão RH": "vigd-st-pre",
 	"Inactivo": "vigd-st-off", "Demitido": "vigd-st-dem",
+	"Abandono de Posto": "vigd-st-abd",
 };
 const _DASH_PER_CLS = { "Manhã": "cell-manha", "Noite": "cell-noite", "Tarde": "cell-tarde" };
 
@@ -313,6 +441,8 @@ function _render_mini_dash(frm) {
 	let postoOpts = { req: req.has("posto_de_vigilancia") };
 	if (frm.doc.status === "Reserva" && !frm.doc.posto_de_vigilancia) {
 		postoOpts = { html: `<span class="vigd-dim">${__("Reserva — sem posto")}</span>` };
+	} else if (frm.doc.status === "Abandono de Posto") {
+		postoOpts = { html: `<span class="vigd-dim">${__("Abandono — sem posto")}</span>` };
 	}
 
 	const cobridorBadge = frm.doc.cobertura_de_posto_activa
@@ -387,6 +517,7 @@ function _inject_dash_css() {
 .vigd-st-pre { background: #fff3cd; color: #856404; }
 .vigd-st-off { background: #e2e3e5; color: #41464b; }
 .vigd-st-dem { background: #f8d7da; color: #842029; }
+.vigd-st-abd { background: #ffe5d0; color: #9a3412; }
 .vigd-cobertura-badge { display: inline-block; margin-left: 6px; padding: 2px 10px; border-radius: 999px;
   font-size: .82em; font-weight: 600; background: #fff3cd; color: #856404; }
 .vigd-chip { display: inline-block; padding: 2px 10px; border-radius: 999px; color: #fff; font-size: .82em; font-weight: 700; }

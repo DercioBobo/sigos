@@ -2279,6 +2279,7 @@ def resumo_aplicado_rotatividade(name):
 
 	demite = bool(op and op.demite) or doc.motivo == "Demissão"
 	reserva = bool(op and op.get("enviar_reserva")) and not demite
+	abandono = bool(op and op.get("marca_abandono")) and not demite
 	out["demite"] = demite
 
 	def _nome_posto(p):
@@ -2298,8 +2299,8 @@ def resumo_aplicado_rotatividade(name):
 		out["mudancas"].append({"campo": "Regime", "de": cur_regime, "para": new_regime})
 	if demite:
 		out["mudancas"].append({"campo": "Estado", "de": "Activo", "para": "Demitido"})
-	elif reserva:
-		out["mudancas"].append({"campo": "Estado", "de": "Activo", "para": "Reserva"})
+	elif reserva or abandono:
+		out["mudancas"].append({"campo": "Estado", "de": "Activo", "para": "Reserva" if reserva else "Abandono de Posto"})
 		if cur_posto:
 			out["mudancas"].append({"campo": "Posto", "de": _nome_posto(cur_posto), "para": "— (saiu do posto)"})
 
@@ -2350,6 +2351,7 @@ def preview_rotatividade(vigilante, abreviatura_op=None, novo_posto=None, novo_r
 
 	demite = bool(op and op.demite) or motivo == "Demissão"
 	reserva = bool(op and op.get("enviar_reserva")) and not demite
+	abandono = bool(op and op.get("marca_abandono")) and not demite
 	out["demite"] = demite
 
 	def _nome_posto(p):
@@ -2374,15 +2376,22 @@ def preview_rotatividade(vigilante, abreviatura_op=None, novo_posto=None, novo_r
 		out["mudancas"].append({"campo": "Regime", "de": cur_regime, "para": new_regime})
 	if demite:
 		out["mudancas"].append({"campo": "Estado", "de": vig.status, "para": "Demitido"})
-	elif reserva:
-		out["mudancas"].append({"campo": "Estado", "de": vig.status, "para": "Reserva"})
+	elif reserva or abandono:
+		out["mudancas"].append({"campo": "Estado", "de": vig.status, "para": "Reserva" if reserva else "Abandono de Posto"})
 		if cur_posto:
 			out["mudancas"].append({"campo": "Posto", "de": _nome_posto(cur_posto), "para": "— (sai do posto)"})
+	if abandono:
+		out["avisos"].append(
+			"A partir de {0} (inclusive), até ao regresso ou demissão: {1}. "
+			"Será criada uma Participação (rascunho) por Abandono de Posto.".format(
+				frappe.format_value(data or frappe.utils.today(), {"fieldtype": "Date"}),
+				__import__("sigos.abandono", fromlist=["descricao_desconto"]).descricao_desconto())
+		)
 
 	# ── Escala migration ──
 	old_pair = (cur_posto, cur_regime)
-	# demissão and reserva both pull the guard out of any escala (no destination)
-	dest_posto, dest_regime = (None, None) if (demite or reserva) else (new_posto, new_regime)
+	# demissão, reserva and abandono all pull the guard out of any escala (no destination)
+	dest_posto, dest_regime = (None, None) if (demite or reserva or abandono) else (new_posto, new_regime)
 	if old_pair != (dest_posto, dest_regime):
 		sai = _escala_do_par(cur_posto, cur_regime)
 		if sai and not frappe.db.exists("Tab Vigilante Do Posto", {"parent": sai, "vigilante": vigilante}):
@@ -2398,7 +2407,7 @@ def preview_rotatividade(vigilante, abreviatura_op=None, novo_posto=None, novo_r
 	def _d(p, n):
 		if p:
 			deltas[p] = deltas.get(p, 0) + n
-	if demite or new_posto != cur_posto:
+	if demite or abandono or new_posto != cur_posto:
 		_d(cur_posto, -1)
 	if not demite and new_posto != cur_posto:
 		_d(new_posto, +1)

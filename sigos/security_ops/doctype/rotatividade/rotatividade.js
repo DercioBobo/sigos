@@ -125,7 +125,10 @@ function _wizard_mode(frm) {
 
 	sigos.build_rotatividade_wizard({
 		$mount: $inner,
-		prefill: frm.doc.vigilante ? { vigilante: frm.doc.vigilante } : {},
+		prefill: Object.assign(
+			frm.doc.vigilante ? { vigilante: frm.doc.vigilante } : {},
+			frm.doc.abreviatura_op ? { abreviatura_op: frm.doc.abreviatura_op } : {},
+		),
 		cancelLabel: __("Recomeçar"),
 		onCancel: () => { frm._rotw_mounted = false; _wizard_mode(frm); },   // reset fresh
 		onConfirm: (docData) => {

@@ -41,7 +41,8 @@ class JustificacaoDeFaltas(Document):
 
 		# Nothing to justify → nothing to save. Only once the guard + window are known
 		# (before that the form is still being filled and required-field checks apply).
-		if self.vigilante and self.dia_de_inicio and self.dia_de_fim and real <= 0:
+		if (self.vigilante and self.dia_de_inicio and self.dia_de_fim and real <= 0
+				and not self._cobre_abandono()):
 			frappe.throw(
 				_("O vigilante {0} não tem faltas entre {1} e {2}. "
 				  "Não é possível registar uma Justificação de Faltas sem faltas.").format(
@@ -52,9 +53,33 @@ class JustificacaoDeFaltas(Document):
 				title=_("Sem Faltas a Justificar"),
 			)
 
+	def _cobre_abandono(self):
+		"""The window lies within the guard's (latest) Abandono de Posto episode —
+		from the first day of the absence streak (abandono_inicio_ausencia) to the
+		return/dismissal. Such a justification:
+		  - may have 0 faltas: in the "Dias não remunerados" modes those days are
+		    0-falta rows but still unpaid, and this is what pardons them
+		    (salary_slip_hooks._dias_abandono);
+		  - is not bound by the prazo: the guard was absent, so the proof normally
+		    only arrives with the return, often weeks after the justified days."""
+		if not (self.vigilante and self.dia_de_inicio and self.dia_de_fim):
+			return False
+		ab = frappe.db.get_value(
+			"Vigilante", self.vigilante,
+			["abandono_inicio_ausencia", "data_inicio_abandono", "data_fim_abandono"], as_dict=True,
+		)
+		inicio_ep = ab and (ab.abandono_inicio_ausencia or ab.data_inicio_abandono)
+		if not inicio_ep:
+			return False
+		fim_ep = getdate(ab.data_fim_abandono) if ab.data_fim_abandono else getdate(self.dia_de_fim)
+		return (getdate(self.dia_de_inicio) >= getdate(inicio_ep)
+			and getdate(self.dia_de_fim) <= fim_ep)
+
 	def _validar_prazo(self):
 		if not self.dia_de_fim or not self.data_do_justificativo:
 			return
+		if self._cobre_abandono():
+			return  # Abandono de Posto episode — proof arrives with the return
 
 		# Single source of truth for the deadline (the form no longer duplicates it).
 		# An unset/0 value falls back to the 3-day default.

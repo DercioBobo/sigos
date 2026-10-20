@@ -35,7 +35,7 @@
   "module": "SIGOS Setup",
   "fieldname": "custom_estado_operacional",
   "fieldtype": "Select",
-  "options": "Pre-Adimissão RH\nPre-Adimissão\nActivo\nReserva\nInactivo\nDemitido",
+  "options": "Pre-Adimissão RH\nPre-Adimissão\nActivo\nReserva\nAbandono de Posto\nInactivo\nDemitido",
   "label": "Estado Operacional (SIGOS)",
   "read_only": 1,
   "insert_after": "custom_vigilante"

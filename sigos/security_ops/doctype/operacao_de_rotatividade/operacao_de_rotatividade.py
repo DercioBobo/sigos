@@ -15,18 +15,20 @@ class OperacaoDeRotatividade(Document):
 		regime/reserve modifiers only make sense with the right outcome.
 		"""
 		# ── One primary outcome ──
-		primary = sum(1 for x in (self.muda_posto, self.enviar_reserva, self.demite) if x)
+		primary = sum(1 for x in (self.muda_posto, self.enviar_reserva, self.demite, self.marca_abandono) if x)
 		if primary > 1:
 			frappe.throw(
 				_("Escolha apenas <b>uma</b> acção principal: <b>Muda Posto</b>, "
-				  "<b>Enviar para Reserva</b> ou <b>Cria Demissão</b> — um vigilante não "
-				  "pode ser movido, reservado e demitido ao mesmo tempo."),
+				  "<b>Enviar para Reserva</b>, <b>Marcar Abandono de Posto</b> ou <b>Cria "
+				  "Demissão</b> — um vigilante não pode ser movido, reservado e demitido ao "
+				  "mesmo tempo."),
 				title=_("Acções em Conflito"),
 			)
 		if primary == 0 and not self.de_reserva:
 			frappe.throw(
 				_("Seleccione pelo menos uma acção principal: <b>Muda Posto</b>, "
-				  "<b>Enviar para Reserva</b>, <b>Cria Demissão</b> ou <b>Origem: Reserva</b>."),
+				  "<b>Enviar para Reserva</b>, <b>Marcar Abandono de Posto</b>, <b>Cria "
+				  "Demissão</b> ou <b>Origem: Reserva</b>."),
 				title=_("Operação Sem Efeito"),
 			)
 
@@ -43,18 +45,21 @@ class OperacaoDeRotatividade(Document):
 			if not self.muda_posto:
 				frappe.throw(_("<b>Origem: Reserva</b> exige <b>Muda Posto</b> — o vigilante "
 					"da reserva recebe um posto."), title=_("Reserva Sem Posto"))
-			if self.demite or self.enviar_reserva:
-				frappe.throw(_("<b>Origem: Reserva</b> não pode coexistir com Demissão nem "
-					"Enviar para Reserva."), title=_("Acções em Conflito"))
+			if self.demite or self.enviar_reserva or self.marca_abandono:
+				frappe.throw(_("<b>Origem: Reserva</b> não pode coexistir com Demissão, "
+					"Enviar para Reserva nem Abandono de Posto."), title=_("Acções em Conflito"))
 			if self.requer_substituto:
 				frappe.throw(_("<b>Origem: Reserva</b> não usa substituto — o vigilante vem da "
 					"reserva e não liberta nenhum posto."), title=_("Substituto Sem Vaga"))
 
 		# ── Requer Substituto needs a vacated posto ──
-		if self.requer_substituto and not (self.muda_posto or self.enviar_reserva or self.demite):
+		if self.requer_substituto and not (
+			self.muda_posto or self.enviar_reserva or self.demite or self.marca_abandono
+		):
 			frappe.throw(
 				_("<b>Requer Substituto</b> exige uma acção que liberte o posto "
-				  "(<b>Muda Posto</b>, <b>Enviar para Reserva</b> ou <b>Cria Demissão</b>)."),
+				  "(<b>Muda Posto</b>, <b>Enviar para Reserva</b>, <b>Marcar Abandono de "
+				  "Posto</b> ou <b>Cria Demissão</b>)."),
 				title=_("Substituto Sem Vaga"),
 			)
 

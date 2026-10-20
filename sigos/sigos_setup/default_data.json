@@ -259,6 +259,23 @@
   "requer_substituto": 0,
   "descricao": "Selecciona um vigilante em Reserva e atribui-lhe um posto e regime. O vigilante volta a Activo."
  },
+ {
+  "doctype": "Operacao De Rotatividade",
+  "abreviatura": "ABP",
+  "operacao": "Abandono de Posto",
+  "activo": 1,
+  "bloqueada": 1,
+  "muda_posto": 0,
+  "muda_regime": 0,
+  "demite": 0,
+  "enviar_reserva": 0,
+  "marca_abandono": 1,
+  "de_reserva": 0,
+  "requer_substituto": 1,
+  "descricao": "Vigilante com ausências seguidas acima do limite: sai do posto e da escala, fica em Abandono de Posto (empregado, sem remuneração). Um substituto pode assumir o posto. Cria uma Participação automaticamente."
+ },
+ { "doctype": "Tipo De Infracao", "nome": "Abandono de Posto", "gravidade_sugerida": "Alta", "ativo": 1,
+   "descricao": "Ausência seguida acima do limite definido em SIGOS Settings (Abandono de Posto)." },
  { "doctype": "Tipo De Justificacao", "justificacao": "Nojo", "activo": 1 },
  { "doctype": "Tipo De Justificacao", "justificacao": "Doença", "activo": 1 },
  { "doctype": "Tipo De Justificacao", "justificacao": "Formação", "activo": 1 },

@@ -1,18 +1,21 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import getdate, today
+from frappe.utils import add_days, cint, getdate, today
 
 # Statuses that require an active Employee record
-_REQUER_EMPLOYEE = frozenset({"Pre-Adimissão", "Activo", "Reserva", "Inactivo", "Demitido"})
+_REQUER_EMPLOYEE = frozenset({"Pre-Adimissão", "Activo", "Reserva", "Abandono de Posto", "Inactivo", "Demitido"})
 
 # Canonical Vigilante → Employee status map (single source of truth, shared with sync.py)
 # "Reserva" = benched/available (posto closed) — still employed, so Employee stays Active.
+# "Abandono de Posto" = off posto after N days absent (sigos.abandono) — still employed
+# until a disciplinary decision, so also Active; the unpaid days are handled in payroll.
 VIGILANTE_TO_EMP_STATUS = {
 	"Pre-Adimissão RH": "Active",
 	"Pre-Adimissão":    "Active",
 	"Activo":            "Active",
 	"Reserva":          "Active",
+	"Abandono de Posto": "Active",
 	"Inactivo":         "Suspended",
 	"Demitido":         "Left",
 }
@@ -57,6 +60,7 @@ class Vigilante(Document):
 		self._criar_employee_se_necessario()    # must run before the link check
 		self._auto_activar_com_posto()
 		self._validar_status_com_posto()
+		self._carimbar_abandono()
 		self._validar_capacidade_posto()
 		self._validar_link_employee()
 		self._guardar_mudanca_regime()
@@ -532,6 +536,48 @@ class Vigilante(Document):
 				title=_("Regime Obrigatório"),
 			)
 
+	def _carimbar_abandono(self):
+		"""
+		Entering Abandono de Posto (normally via an ABP Rotatividade, which sets the
+		date itself) opens a fresh unpaid window: data_inicio_abandono defaults to
+		today when missing or left over from a previous episode, and the previous
+		episode's data_fim_abandono is cleared. Leaving the status by any path
+		(registar_regresso sets its own end; a DEM Rotatividade doesn't) closes the
+		window at yesterday, so a later readmission is never left unpaid.
+		"""
+		before = self.get_doc_before_save()
+		if self.status != "Abandono de Posto":
+			if (
+				before and before.status == "Abandono de Posto"
+				and self.data_inicio_abandono and not self.data_fim_abandono
+			):
+				self.data_fim_abandono = max(
+					getdate(add_days(today(), -1)),
+					getdate(add_days(self.data_inicio_abandono, -1)),
+				)
+			return
+		if before and before.status == "Abandono de Posto":
+			return
+		if not self.data_inicio_abandono or (
+			before and before.data_inicio_abandono == self.data_inicio_abandono
+		):
+			self.data_inicio_abandono = today()
+		self.data_fim_abandono = None
+		# Where the absence really began (the streak before the marking) — bounds
+		# the deadline-free justification window (JustificacaoDeFaltas._cobre_abandono)
+		# and is the Regresso dialog's default "Justificar desde".
+		self.abandono_inicio_ausencia = self.abandono_primeira_falta
+		if not self.abandono_inicio_ausencia and not self.is_new():
+			from sigos.abandono import calcular_sequencia_ausencia
+			seq = calcular_sequencia_ausencia(
+				self.name, ate=add_days(self.data_inicio_abandono, -1)
+			)
+			self.abandono_inicio_ausencia = seq["inicio"]
+		if not self.abandono_inicio_ausencia or (
+			getdate(self.abandono_inicio_ausencia) > getdate(self.data_inicio_abandono)
+		):
+			self.abandono_inicio_ausencia = self.data_inicio_abandono
+
 	def _validar_capacidade_posto(self):
 		"""Prevent assigning more vigilantes than the posto's maximum."""
 		if self.flags.get("via_cobridor"):
@@ -713,6 +759,82 @@ class Vigilante(Document):
 	def colocar_em_reserva(self, motivo=None):
 		"""Bench the guard: release posto + contract, keep them employed (Reserva)."""
 		return self._mudar_estado_operacional("Reserva", motivo)
+
+	@frappe.whitelist()
+	def registar_regresso(self, motivo=None, justificado=0, justificar_desde=None,
+			justificativo=None, observacoes=None, destino="Reserva", justificar_ate=None):
+		"""
+		A guard in Abandono de Posto came back: close the window (yesterday is its
+		last day — paid again from today) and bench them in Reserva. They never go
+		back to their old posto automatically: destino "Novo Posto" only tells the
+		form to open the APR wizard next, where Ops choose the posto like for any
+		reserve. Dismissal instead goes through a DEM Rotatividade.
+
+		`justificado`: the guard brought a justification — file a Justificacao De
+		Faltas over [`justificar_desde`, `justificar_ate`] (defaults: the streak's
+		first falta .. yesterday), pardoning those days in any abandono_desconto
+		mode. A partial justification (10 of 17 days) just narrows the range; the
+		rest stays deducted.
+		"""
+		from sigos.abandono import justificar_abandono, registar_ausencias_abandono
+
+		if self.status != "Abandono de Posto":
+			frappe.throw(
+				_("O vigilante não está em <b>Abandono de Posto</b>."), title=_("Sem alteração")
+			)
+		justificado = cint(justificado)
+		if justificado and not justificativo and frappe.db.get_single_value(
+			"SIGOS Settings", "justificativo_faltas_obrigatorio"
+		) not in (0, "0"):
+			frappe.throw(_("Anexe o <b>Justificativo</b> para justificar o abandono."))
+
+		ontem = getdate(add_days(today(), -1))
+		inicio = getdate(self.data_inicio_abandono) if self.data_inicio_abandono else ontem
+		primeira_falta = (
+			self.abandono_inicio_ausencia or self.abandono_primeira_falta or self.data_inicio_abandono
+		)
+		# Returning the same day it was marked means no unpaid day at all — keep
+		# fim >= inicio-1 so payroll's window is simply empty.
+		self.data_fim_abandono = max(ontem, getdate(add_days(inicio, -1)))
+		self.abandono_detectado_em = None
+		self.abandono_primeira_falta = None
+		self._mudar_estado_operacional("Reserva", motivo)
+
+		# File the days still missing up to yesterday now (the daily job would
+		# catch up tonight anyway) so the record — and a justification — is whole.
+		registar_ausencias_abandono([self.name], em_lote=False)
+
+		just = None
+		if justificado:
+			de = getdate(justificar_desde or primeira_falta or inicio)
+			ate = getdate(justificar_ate) if justificar_ate else getdate(self.data_fim_abandono)
+			if ate > getdate(self.data_fim_abandono):
+				ate = getdate(self.data_fim_abandono)  # can't justify today onwards — they're back
+			if de > ate:
+				frappe.throw(
+					_("Período de justificação inválido: <b>{0}</b> a <b>{1}</b>.").format(
+						frappe.format_value(de, {"fieldtype": "Date"}),
+						frappe.format_value(ate, {"fieldtype": "Date"})),
+					title=_("Justificação"),
+				)
+			just = justificar_abandono(self.name, de, ate, justificativo, observacoes)
+
+		from sigos.timeline import registar
+		texto = _("<b>Regressou</b> do Abandono de Posto ({0} a {1}) — fica em <b>Reserva</b>.").format(
+			frappe.format_value(self.data_inicio_abandono, {"fieldtype": "Date"}),
+			frappe.format_value(self.data_fim_abandono, {"fieldtype": "Date"}),
+		)
+		if just:
+			texto += _(" Justificado de {0} a {1} ({2}{3}).").format(
+				frappe.format_value(de, {"fieldtype": "Date"}),
+				frappe.format_value(ate, {"fieldtype": "Date"}),
+				just["name"], "" if just["submetida"] else _(", pendente de aprovação"))
+		if destino == "Novo Posto":
+			texto += _(" A destacar para um novo posto.")
+		if motivo:
+			texto += _(" — motivo: {0}").format(motivo)
+		registar(self.name, texto, self)
+		return {"status": self.status, "justificacao": just}
 
 	@frappe.whitelist()
 	def inactivar(self, motivo=None):

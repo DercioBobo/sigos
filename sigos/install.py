@@ -11,6 +11,7 @@ def after_install():
 	_clean_project_fields()
 	_clean_payroll_entry_fields()
 	_add_situacao_options()
+	_sync_estado_operacional_options()
 	_seccionar_contrato()
 	_seccionar_cliente()
 	_set_employee_naming()
@@ -31,6 +32,7 @@ def after_migrate():
 	_clean_project_fields()
 	_clean_payroll_entry_fields()
 	_add_situacao_options()
+	_sync_estado_operacional_options()
 	_seccionar_contrato()
 	_seccionar_cliente()
 	_set_employee_naming()
@@ -54,6 +56,7 @@ def _seed_settings_defaults():
 		"leave_type_ferias": ("Leave Type", "Ferias"),
 		"aprovador_rh": ("Role", "Aprovador RH"),
 		"aprovador_operacoes": ("Role", "Aprovador Operações"),
+		"abandono_tipo_infracao": ("Tipo De Infracao", "Abandono de Posto"),
 	}
 	try:
 		settings = frappe.get_single("SIGOS Settings")
@@ -312,6 +315,27 @@ def _add_situacao_options():
 		frappe.log_error(f"SIGOS: add situacao options failed: {e}", "SIGOS Install")
 
 
+def _sync_estado_operacional_options():
+	"""
+	Keep Employee.custom_estado_operacional's options equal to Vigilante.status's.
+	It mirrors that status (sync.py), so a status added later (e.g. "Abandono de
+	Posto") would otherwise fail Select validation on every Employee save —
+	_load_custom_fields never updates a Custom Field that already exists.
+	Idempotent (no-op once they match).
+	"""
+	try:
+		fieldname = {"dt": "Employee", "fieldname": "custom_estado_operacional"}
+		if not frappe.db.exists("Custom Field", fieldname):
+			return
+		alvo = frappe.get_meta("Vigilante").get_field("status").options
+		if not alvo or frappe.db.get_value("Custom Field", fieldname, "options") == alvo:
+			return
+		frappe.db.set_value("Custom Field", fieldname, "options", alvo)
+		frappe.clear_cache(doctype="Employee")
+	except Exception as e:
+		frappe.log_error(f"SIGOS: sync estado operacional options failed: {e}", "SIGOS Install")
+
+
 def _load_custom_fields():
 	path = os.path.join(os.path.dirname(__file__), "sigos_setup", "custom_fields.json")
 	with open(path, encoding="utf-8") as f:
@@ -346,6 +370,7 @@ def _load_default_data():
 			"Regime":                  "nome",
 			"Operacao De Rotatividade": "abreviatura",
 			"Tipo De Justificacao":    "justificacao",
+			"Tipo De Infracao":        "nome",
 			"Leave Type":              "leave_type_name",
 		}.get(doctype)
 

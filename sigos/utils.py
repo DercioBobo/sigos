@@ -156,11 +156,19 @@ def calcular_faltas_detalhado(vigilante: str, start_date, end_date) -> list:
 		return []
 
 	absence_dates = {getdate(a.data) for a in absences}
+	from sigos.abandono import TIPO_AUSENCIA_EM_ABANDONO, abandono_conta_faltas
+	peso_abandono = 1 if abandono_conta_faltas() else 0
 	rows = []
 	cumul = 0
 	for a in absences:
 		d = getdate(a.data)
-		if a.regime and a.turno:
+		if a.tipo_de_ausencia == TIPO_AUSENCIA_EM_ABANDONO:
+			# Generated daily while the guard is in the Abandono de Posto estado:
+			# 1 falta per calendar day, or 0 when SIGOS Settings.abandono_desconto
+			# charges those days as unpaid (salary_slip_hooks._dias_abandono)
+			# instead — resolved HERE, at read time, so the two never both apply.
+			efetivo = peso_abandono
+		elif a.regime and a.turno:
 			# Real regime/turno context — Normal rows always have it; Falta de
 			# Reserva rows do too when the guard has a real Reserva-escala
 			# assignment for that day (metodo_faltas_reserva == "Peso do Turno").
