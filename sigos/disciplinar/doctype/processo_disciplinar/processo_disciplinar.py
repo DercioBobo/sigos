@@ -8,6 +8,39 @@ class ProcessoDisciplinar(Document):
 	def validate(self):
 		self._preencher_da_origem()
 		self._validar_prazo()
+		if self.docstatus == 0:
+			from sigos.disciplinar.tramitacao import actualizar_estado
+			actualizar_estado(self)
+
+	def before_submit(self):
+		from sigos.disciplinar.tramitacao import D_MULTA, validar_decisao
+
+		validar_decisao(self)
+		if self.decisao == D_MULTA:
+			# Outras Deduções (on_update) take the multa as the amount to deduct
+			self.valor_a_pagar = self.multa_valor
+			self.meses_a_pagar = self.meses_a_pagar or 1
+		self.fase = "Concluído"
+
+	# ─── Tramitação (sigos.disciplinar.tramitacao) ──────────────────────────────
+
+	@frappe.whitelist()
+	def registar_defesa(self, texto=None, anexo=None, data=None):
+		from sigos.disciplinar.tramitacao import registar_defesa
+		registar_defesa(self, texto, anexo, data)
+		return self.fase
+
+	@frappe.whitelist()
+	def pedir_diligencias(self, descricao=None, data=None):
+		from sigos.disciplinar.tramitacao import pedir_diligencias
+		pedir_diligencias(self, descricao, data)
+		return self.fase
+
+	@frappe.whitelist()
+	def concluir_diligencias(self, resultado=None, data=None):
+		from sigos.disciplinar.tramitacao import concluir_diligencias
+		concluir_diligencias(self, resultado, data)
+		return self.fase
 
 	def _validar_prazo(self):
 		"""A process from a Participação (directly or through a Repreensão) must be
@@ -104,17 +137,26 @@ class ProcessoDisciplinar(Document):
 		if (self.get("workflow_state") or "Aprovado") != "Aprovado":
 			return
 
-		if self.decisao == "Dedução":
+		if self.decisao in ("Multa", "Dedução"):  # "Dedução" = pre-2026-10 records
 			self._criar_deducao()
 
 	def on_submit(self):
 		decisao = (self.decisao or "").strip()
 
-		if decisao == "Retenção De Salário":
+		if decisao == "Retenção De Salário":  # pre-2026-10 records only
 			self._aplicar_retencao_salario()
 
-		elif decisao == "Demissão":
+		elif decisao in ("Despedimento", "Demissão"):
 			self._criar_demissao()
+
+		elif decisao == "Despromoção":
+			if (self.get("workflow_state") or "Aprovado") == "Aprovado":
+				from sigos.disciplinar.tramitacao import aplicar_despromocao
+				aplicar_despromocao(self)  # today, or by the daily job on the start day
+
+		from sigos.timeline import registar
+		registar(self.vigilante, _("Processo Disciplinar <b>{0}</b> decidido: <b>{1}</b>").format(
+			self.name, decisao or "-"), self)
 
 	# ─── Private helpers ──────────────────────────────────────────────────────
 

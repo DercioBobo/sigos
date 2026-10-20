@@ -51,9 +51,48 @@
   "motivo",
   "col_pd_2",
   "detalhes",
+  "tab_pd_tram",
+  "sec_tram",
+  "painel_tramitacao",
+  "sec_prazos",
+  "fase",
+  "col_tram_1",
+  "prazo_defesa",
+  "col_tram_2",
+  "prazo_decisao",
+  "sec_defesa",
+  "defesa_apresentada",
+  "data_defesa",
+  "col_def",
+  "defesa",
+  "defesa_anexo",
+  "sec_dilig",
+  "data_pedido_diligencias",
+  "prazo_diligencias",
+  "diligencias_concluidas_em",
+  "col_dil",
+  "diligencias_pedidas",
+  "diligencias_resultado",
+  "sec_sind",
+  "sindicato_desde",
+  "col_sind",
+  "parecer_sindicato",
   "tab_pd_dec",
   "sec_decisao",
   "decisao",
+  "justificacao_caducidade",
+  "suspensao_dias",
+  "suspensao_inicio",
+  "suspensao_fim",
+  "multa_dias",
+  "multa_valor",
+  "despromocao_categoria",
+  "despromocao_meses",
+  "despromocao_inicio",
+  "despromocao_fim",
+  "categoria_anterior",
+  "despromocao_aplicada",
+  "despromocao_revertida",
   "col_pd_4",
   "valor_a_pagar",
   "meses_a_pagar",
@@ -326,6 +365,162 @@
    "label": "Detalhes"
   },
   {
+   "fieldname": "tab_pd_tram",
+   "fieldtype": "Tab Break",
+   "label": "Tramitação"
+  },
+  {
+   "fieldname": "sec_tram",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "painel_tramitacao",
+   "fieldtype": "HTML",
+   "label": "Tramitação"
+  },
+  {
+   "fieldname": "sec_prazos",
+   "fieldtype": "Section Break",
+   "label": "Prazos"
+  },
+  {
+   "fieldname": "fase",
+   "fieldtype": "Select",
+   "label": "Fase",
+   "read_only": 1,
+   "no_copy": 1,
+   "options": "\nDefesa\nDiligências\nSindicato\nDecisão\nConcluído\nCaducado",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "default": "Defesa"
+  },
+  {
+   "fieldname": "col_tram_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "prazo_defesa",
+   "fieldtype": "Date",
+   "label": "Prazo de Defesa",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "col_tram_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "prazo_decisao",
+   "fieldtype": "Date",
+   "label": "Prazo da Decisão Final",
+   "read_only": 1,
+   "no_copy": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "sec_defesa",
+   "fieldtype": "Section Break",
+   "label": "Defesa do Vigilante"
+  },
+  {
+   "fieldname": "defesa_apresentada",
+   "fieldtype": "Check",
+   "label": "Defesa Apresentada",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "data_defesa",
+   "fieldtype": "Date",
+   "label": "Data da Defesa",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "col_def",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "defesa",
+   "fieldtype": "Text",
+   "label": "Defesa",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "defesa_anexo",
+   "fieldtype": "Attach",
+   "label": "Documento da Defesa",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "sec_dilig",
+   "fieldtype": "Section Break",
+   "label": "Diligências / Investigação"
+  },
+  {
+   "fieldname": "data_pedido_diligencias",
+   "fieldtype": "Date",
+   "label": "Pedidas Em",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "prazo_diligencias",
+   "fieldtype": "Date",
+   "label": "Prazo das Diligências",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "diligencias_concluidas_em",
+   "fieldtype": "Date",
+   "label": "Concluídas Em",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "col_dil",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "diligencias_pedidas",
+   "fieldtype": "Text",
+   "label": "Diligências Pedidas",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "diligencias_resultado",
+   "fieldtype": "Text",
+   "label": "Resultado das Diligências",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "sec_sind",
+   "fieldtype": "Section Break",
+   "label": "Sindicato",
+   "depends_on": "eval:doc.sindicato_desde"
+  },
+  {
+   "fieldname": "sindicato_desde",
+   "fieldtype": "Date",
+   "label": "Com o Sindicato Desde",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "col_sind",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "parecer_sindicato",
+   "fieldtype": "Text",
+   "label": "Parecer do Sindicato"
+  },
+  {
    "fieldname": "tab_pd_dec",
    "fieldtype": "Tab Break",
    "label": "Decisão",
@@ -341,8 +536,121 @@
    "fieldname": "decisao",
    "fieldtype": "Select",
    "label": "Decisão",
-   "options": "\nAdvertência\nDedução\nRetenção De Salário\nDemissão",
+   "options": "\nRepreensão\nSuspensão do Trabalho\nMulta\nDespromoção\nTermo de Responsabilidade\nDespedimento\nArquivamento",
    "in_list_view": 1,
+   "permlevel": 1,
+   "description": "Sanção final. Suspensão: dias sem remuneração (máx. 10). Multa: dias de salário (máx. 20). Despromoção: categoria imediatamente inferior (máx. 12 meses). Despedimento: cria a Demissão."
+  },
+  {
+   "fieldname": "justificacao_caducidade",
+   "fieldtype": "Small Text",
+   "label": "Justificação (Caducidade)",
+   "read_only": 0,
+   "no_copy": 1,
+   "depends_on": "eval:doc.fase==='Caducado'",
+   "description": "Processo caducado: só um gestor (SIGOS Manager) pode decidir, com esta justificação.",
+   "permlevel": 1
+  },
+  {
+   "fieldname": "suspensao_dias",
+   "fieldtype": "Int",
+   "label": "Dias de Suspensão (máx. 10)",
+   "depends_on": "eval:doc.decisao==='Suspensão do Trabalho'",
+   "permlevel": 1
+  },
+  {
+   "fieldname": "suspensao_inicio",
+   "fieldtype": "Date",
+   "label": "Início da Suspensão",
+   "depends_on": "eval:doc.decisao==='Suspensão do Trabalho'",
+   "permlevel": 1
+  },
+  {
+   "fieldname": "suspensao_fim",
+   "fieldtype": "Date",
+   "label": "Fim da Suspensão",
+   "read_only": 1,
+   "no_copy": 1,
+   "depends_on": "eval:doc.decisao==='Suspensão do Trabalho'",
+   "permlevel": 1
+  },
+  {
+   "fieldname": "multa_dias",
+   "fieldtype": "Int",
+   "label": "Dias de Salário (máx. 20)",
+   "depends_on": "eval:doc.decisao==='Multa'",
+   "permlevel": 1
+  },
+  {
+   "fieldname": "multa_valor",
+   "fieldtype": "Currency",
+   "label": "Valor da Multa",
+   "read_only": 1,
+   "no_copy": 1,
+   "depends_on": "eval:doc.decisao==='Multa'",
+   "description": "Salário base / 30 × dias.",
+   "permlevel": 1
+  },
+  {
+   "fieldname": "despromocao_categoria",
+   "fieldtype": "Link",
+   "options": "Categoria Vigilante",
+   "label": "Categoria (Despromoção)",
+   "depends_on": "eval:doc.decisao==='Despromoção'",
+   "description": "A categoria imediatamente inferior (definida na Categoria actual).",
+   "permlevel": 1
+  },
+  {
+   "fieldname": "despromocao_meses",
+   "fieldtype": "Int",
+   "label": "Duração (meses, máx. 12)",
+   "depends_on": "eval:doc.decisao==='Despromoção'",
+   "permlevel": 1
+  },
+  {
+   "fieldname": "despromocao_inicio",
+   "fieldtype": "Date",
+   "label": "Início da Despromoção",
+   "depends_on": "eval:doc.decisao==='Despromoção'",
+   "permlevel": 1
+  },
+  {
+   "fieldname": "despromocao_fim",
+   "fieldtype": "Date",
+   "label": "Fim da Despromoção",
+   "read_only": 1,
+   "no_copy": 1,
+   "depends_on": "eval:doc.decisao==='Despromoção'",
+   "permlevel": 1
+  },
+  {
+   "fieldname": "categoria_anterior",
+   "fieldtype": "Link",
+   "label": "Categoria Anterior",
+   "read_only": 1,
+   "no_copy": 1,
+   "options": "Categoria Vigilante",
+   "depends_on": "eval:doc.decisao==='Despromoção'",
+   "permlevel": 1
+  },
+  {
+   "fieldname": "despromocao_aplicada",
+   "fieldtype": "Check",
+   "label": "Despromoção Aplicada",
+   "read_only": 1,
+   "no_copy": 1,
+   "allow_on_submit": 1,
+   "depends_on": "eval:doc.decisao==='Despromoção'",
+   "permlevel": 1
+  },
+  {
+   "fieldname": "despromocao_revertida",
+   "fieldtype": "Check",
+   "label": "Categoria Reposta",
+   "read_only": 1,
+   "no_copy": 1,
+   "allow_on_submit": 1,
+   "depends_on": "eval:doc.decisao==='Despromoção'",
    "permlevel": 1
   },
   {
@@ -353,37 +661,39 @@
   {
    "fieldname": "valor_a_pagar",
    "fieldtype": "Currency",
-   "label": "Valor a Pagar",
-   "depends_on": "eval:doc.decisao===\"Dedução\"",
-   "permlevel": 1
+   "label": "Valor da Multa (a descontar)",
+   "depends_on": "eval:doc.decisao==='Multa'",
+   "permlevel": 1,
+   "read_only": 1
   },
   {
    "fieldname": "meses_a_pagar",
    "fieldtype": "Int",
    "label": "Meses a Pagar",
-   "depends_on": "eval:doc.decisao===\"Dedução\"",
-   "permlevel": 1
+   "depends_on": "eval:doc.decisao==='Multa'",
+   "permlevel": 1,
+   "description": "Em quantos meses descontar a multa (por defeito 1)."
   },
   {
    "fieldname": "mes_referencia",
    "fieldtype": "Select",
    "label": "Mês de Referência",
    "options": "\nJaneiro\nFevereiro\nMarço\nAbril\nMaio\nJunho\nJulho\nAgosto\nSetembro\nOutubro\nNovembro\nDezembro",
-   "depends_on": "eval:doc.decisao===\"Dedução\"",
+   "depends_on": "eval:doc.decisao==='Multa'",
    "permlevel": 1
   },
   {
    "fieldname": "data_de_inicio",
    "fieldtype": "Date",
-   "label": "Data de Início",
-   "depends_on": "eval:doc.decisao===\"Dedução\"",
+   "label": "Início do Desconto",
+   "depends_on": "eval:doc.decisao==='Multa'",
    "permlevel": 1
   },
   {
    "fieldname": "descricao",
    "fieldtype": "Small Text",
    "label": "Descrição",
-   "depends_on": "eval:doc.decisao===\"Dedução\"",
+   "depends_on": "eval:doc.decisao==='Multa'",
    "permlevel": 1
   },
   {
@@ -391,7 +701,7 @@
    "fieldtype": "Select",
    "label": "Uniforme",
    "options": "\nEntregue\nNão Entregue",
-   "depends_on": "eval:doc.decisao===\"Demissão\"",
+   "depends_on": "eval:doc.decisao==='Despedimento'",
    "permlevel": 1
   },
   {
@@ -403,12 +713,13 @@
    "fieldname": "termo_de_responsabilidade",
    "fieldtype": "Attach",
    "label": "Termo de Responsabilidade",
-   "permlevel": 1
+   "permlevel": 1,
+   "depends_on": "eval:doc.decisao==='Termo de Responsabilidade'"
   }
  ],
  "is_submittable": 1,
  "links": [],
- "modified": "2026-10-22 18:00:00.000000",
+ "modified": "2026-10-23 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Disciplinar",
  "name": "Processo Disciplinar",

@@ -704,7 +704,8 @@ def periodo_sem_registo(vigilante, data):
 		if not b.data_regresso or getdate(b.data_regresso) > data:
 			return _("Doente (Baixa Médica {0})").format(b.name)
 	from sigos.suspensao import periodo_suspenso
-	return periodo_suspenso(vigilante, data)
+	from sigos.disciplinar.tramitacao import periodo_suspensao_trabalho
+	return periodo_suspenso(vigilante, data) or periodo_suspensao_trabalho(vigilante, data)
 
 
 @frappe.whitelist()

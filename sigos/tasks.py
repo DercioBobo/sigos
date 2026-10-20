@@ -10,6 +10,17 @@ def daily():
 	_acumular_ferias()
 	_fechar_coberturas_expiradas()
 	_verificar_abandonos()
+	_processos_disciplinares()
+
+
+def _processos_disciplinares():
+	"""Processo Disciplinar: phase/expiry (Sindicato, Caducado) + despromoção start/end."""
+	from sigos.disciplinar.tramitacao import actualizar_processos
+	try:
+		actualizar_processos()
+	except Exception as ex:
+		frappe.db.rollback()
+		frappe.log_error(f"Erro na tramitação dos processos disciplinares: {ex}", "SIGOS Processo Disciplinar")
 
 
 def _verificar_abandonos():

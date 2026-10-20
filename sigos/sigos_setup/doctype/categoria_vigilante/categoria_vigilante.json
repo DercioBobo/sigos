@@ -12,6 +12,7 @@
   "descricao",
   "col_break_1",
   "bloqueada",
+  "categoria_inferior",
   "sec_salario_base",
   "salario_base",
   "sec_subsidio",
@@ -44,6 +45,13 @@
    "default": "0",
    "in_list_view": 1,
    "description": "Categorias bloqueadas não podem ser eliminadas"
+  },
+  {
+   "fieldname": "categoria_inferior",
+   "fieldtype": "Link",
+   "options": "Categoria Vigilante",
+   "label": "Categoria Imediatamente Inferior",
+   "description": "Usada na sanção de Despromoção do Processo Disciplinar."
   },
   {
    "fieldname": "sec_salario_base",
@@ -79,7 +87,7 @@
   }
  ],
  "links": [],
- "modified": "2026-06-02 00:00:00.000000",
+ "modified": "2026-10-23 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "SIGOS Setup",
  "name": "Categoria Vigilante",

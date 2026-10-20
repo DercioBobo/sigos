@@ -43,6 +43,9 @@
   "repreensoes_para_processo",
   "prazo_participacao_dias",
   "prazo_processo_dias",
+  "pd_prazo_defesa_dias",
+  "pd_prazo_diligencias_dias",
+  "pd_prazo_decisao_dias",
   "sec_ss_rh360",
   "painel_rh_360_activo",
   "tab_ss_pay",
@@ -377,6 +380,27 @@
    "label": "Prazo para Abrir o Processo Disciplinar (dias)",
    "default": "15",
    "description": "Dias de calendário após a Data de Conhecimento da Infracção para abrir o Processo Disciplinar. Não se aplica à Presunção de Abandono."
+  },
+  {
+   "fieldname": "pd_prazo_defesa_dias",
+   "fieldtype": "Int",
+   "label": "Prazo de Defesa (dias)",
+   "default": "15",
+   "description": "Dias de calendário, a partir da abertura do Processo Disciplinar, para o vigilante apresentar a defesa."
+  },
+  {
+   "fieldname": "pd_prazo_diligencias_dias",
+   "fieldtype": "Int",
+   "label": "Prazo das Diligências (dias)",
+   "default": "5",
+   "description": "Duração máxima das diligências/investigação pedidas na defesa; ultrapassado, o processo passa para o Sindicato."
+  },
+  {
+   "fieldname": "pd_prazo_decisao_dias",
+   "fieldtype": "Int",
+   "label": "Prazo da Decisão Final (dias)",
+   "default": "30",
+   "description": "Dias a partir da abertura para a decisão final; depois o processo caduca (só um gestor decide, com justificação)."
   },
   {
    "fieldname": "sec_ss_rh360",
@@ -938,7 +962,7 @@
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-10-22 18:00:00.000000",
+ "modified": "2026-10-23 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "SIGOS Setup",
  "name": "SIGOS Settings",

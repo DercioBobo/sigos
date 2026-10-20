@@ -950,9 +950,11 @@ def _dias_fora_emprego(doc):
 		from sigos.doenca import dias_inss
 		# Union — a day is unpaid once, whatever the reason.
 		from sigos.suspensao import dias_nao_pagos
+		from sigos.disciplinar.tramitacao import dias_suspensao_trabalho
 		fora = len(dias_inss(doc.custom_vigilante, emp_start, emp_end)
 			| dias_abandono(doc.custom_vigilante, emp_start, emp_end)
-			| dias_nao_pagos(doc.custom_vigilante, emp_start, emp_end))
+			| dias_nao_pagos(doc.custom_vigilante, emp_start, emp_end)
+			| dias_suspensao_trabalho(doc.custom_vigilante, emp_start, emp_end))
 	return max(0, total - empregado + fora)
 
 
