@@ -153,9 +153,9 @@ function _tramitacao(frm) {
 			chip: d.docstatus === 1 ? "" : chip(d.prazo_decisao), done: d.docstatus === 1 },
 	];
 	const alerta = fase === "Caducado"
-		? `<div class="pdt-alert exp">${__("<b>Processo caducado</b> — a decisão final tinha de ser tomada até {0}. Só um gestor pode decidir, com justificação.", [dt(d.prazo_decisao)])}</div>`
+		? `<div class="pdt-alert exp">${__("<b>Caducado</b> desde {0}. Só um gestor pode decidir, com justificação.", [dt(d.prazo_decisao)])}</div>`
 		: fase === "Sindicato"
-			? `<div class="pdt-alert sind">${__("<b>Com o Sindicato</b> desde {0} — as diligências ultrapassaram o prazo. Registe o parecer do Sindicato e a decisão.", [dt(d.sindicato_desde)])}</div>`
+			? `<div class="pdt-alert sind">${__("<b>Com o Sindicato</b> desde {0}. Registe o parecer e a decisão.", [dt(d.sindicato_desde)])}</div>`
 			: (passos[1].perdeu && d.docstatus === 0
 				? `<div class="pdt-alert">${__("O prazo de defesa terminou a {0} sem defesa — o vigilante perdeu o direito de a apresentar.", [dt(d.prazo_defesa)])}</div>` : "");
 
@@ -184,7 +184,7 @@ function _tramitacao(frm) {
 	}
 	if (!d.data_pedido_diligencias && em_defesa) {
 		frm.add_custom_button(__("Pedido de Diligências"), () => frappe.prompt([
-			{ fieldtype: "HTML", options: `<p class="text-muted">${__("O vigilante pede diligências/investigação durante o prazo de defesa. Duram até ao prazo definido (5 dias por defeito); ultrapassado, o processo passa para o Sindicato.")}</p>` },
+			{ fieldtype: "HTML", options: `<p class="text-muted">${__("Ultrapassado o prazo das diligências, o processo passa para o Sindicato.")}</p>` },
 			{ fieldname: "data", fieldtype: "Date", label: __("Data do Pedido"), reqd: 1, default: hoje },
 			{ fieldname: "descricao", fieldtype: "Text", label: __("Diligências pedidas"), reqd: 1 },
 		], (v) => frm.call("pedir_diligencias", v).then(() => frm.reload_doc()),

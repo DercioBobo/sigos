@@ -107,7 +107,7 @@
    "fieldname": "data_conhecimento_infracao",
    "fieldtype": "Date",
    "label": "Data de Conhecimento da Infracção",
-   "description": "Dia em que se tomou conhecimento da infracção. Conta o prazo para criar esta participação e para abrir o Processo Disciplinar (SIGOS Settings).",
+   "description": "Conta os prazos da participação e do processo.",
    "reqd": 1
   },
   {
@@ -123,7 +123,7 @@
    "fieldtype": "Small Text",
    "label": "Justificação (Fora de Prazo)",
    "no_copy": 1,
-   "description": "Só um gestor (SIGOS Manager) pode avançar fora de prazo — fica registado aqui."
+   "description": "Obrigatória para avançar fora de prazo (só gestores)."
   },
   {
    "fieldname": "col_break_1",
@@ -147,8 +147,7 @@
    "default": "Média",
    "reqd": 1,
    "in_list_view": 1,
-   "in_standard_filter": 1,
-   "description": "Sugerida pela infracção mais grave marcada; pode ser alterada."
+   "in_standard_filter": 1
   },
   {
    "fieldname": "sec_participante",
@@ -160,7 +159,7 @@
    "fieldtype": "Link",
    "options": "Vigilante",
    "label": "Participante (Vigilante)",
-   "description": "Quem participa (ex.: o supervisor). Opcional — preenche número, categoria e nome; para quem não é vigilante, escreva-os directamente."
+   "description": "Opcional — preenche número, categoria e nome."
   },
   {
    "fieldname": "participante_numero",
@@ -233,13 +232,13 @@
    "fieldtype": "Table MultiSelect",
    "options": "Participacao Infracao",
    "label": "Infracções",
-   "description": "Uma ou mais (obrigatório para submeter)."
+   "description": "Uma ou mais."
   },
   {
    "fieldname": "outras_descricao",
    "fieldtype": "Data",
    "label": "Outras — Descrição",
-   "description": "Obrigatória quando é marcada uma infracção que pede descrição (ex.: Outras)."
+   "description": "Obrigatória para infracções como 'Outras'."
   },
   {
    "fieldname": "col_infracao",
@@ -254,7 +253,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "read_only": 1,
-   "description": "A primeira infracção marcada (usada em listas, relatórios e no Processo Disciplinar)."
+   "description": "Primeira infracção marcada."
   },
   {
    "fieldname": "ocorrencia_referente",
@@ -272,8 +271,7 @@
    "no_copy": 1,
    "allow_on_submit": 1,
    "in_standard_filter": 1,
-   "search_index": 1,
-   "description": "Aberto pelo Jurista (ou automaticamente pela acumulação). Vazio numa participação submetida = ainda sem processo."
+   "search_index": 1
   },
   {
    "fieldname": "repreensao",
@@ -283,8 +281,7 @@
    "read_only": 1,
    "no_copy": 1,
    "allow_on_submit": 1,
-   "in_standard_filter": 1,
-   "description": "Desfecho leve dado pelo Jurista (só registo)."
+   "in_standard_filter": 1
   },
   {
    "fieldname": "sec_relatorio",
@@ -460,7 +457,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-22 18:00:00.000000",
+ "modified": "2026-10-23 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "Disciplinar",
  "name": "Participacao",

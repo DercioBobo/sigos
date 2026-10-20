@@ -146,21 +146,21 @@
    "fieldtype": "Int",
    "label": "Dias Mínimos para Rotatividade",
    "default": "90",
-   "description": "Número mínimo de dias no posto antes de uma rotatividade (regra dos 3 meses)"
+   "description": "Dias mínimos no posto antes de nova rotatividade."
   },
   {
    "fieldname": "prazo_justificacao_faltas",
    "fieldtype": "Int",
    "label": "Prazo Justificação de Faltas (dias)",
    "default": "3",
-   "description": "Número máximo de dias após a falta para apresentar justificativo"
+   "description": "Dias após a falta para justificar."
   },
   {
    "fieldname": "meses_horizonte_escala",
    "fieldtype": "Int",
    "label": "Meses de Horizonte da Escala",
    "default": "2",
-   "description": "Quantos meses à frente a escala é gerada automaticamente (janela futura)"
+   "description": "Meses de escala gerados para a frente."
   },
   {
    "fieldname": "col_ss_op1",
@@ -171,7 +171,7 @@
    "fieldtype": "Int",
    "label": "Meses Passados a Manter",
    "default": "1",
-   "description": "Quantos meses de escala passada são mantidos antes de serem removidos automaticamente"
+   "description": "Meses de escala passada mantidos."
   },
   {
    "fieldname": "hora_limite_manha",
@@ -192,13 +192,13 @@
    "fieldtype": "Check",
    "label": "Justificativo de Faltas Obrigatório",
    "default": "1",
-   "description": "Quando activo, é obrigatório anexar o documento justificativo em cada Justificação de Faltas. Desactive para permitir submeter sem anexo (ex.: justificativo entregue em papel)."
+   "description": "Exige anexo em cada Justificação de Faltas."
   },
   {
    "fieldname": "sec_ss_abandono",
    "fieldtype": "Section Break",
    "label": "Abandono de Posto",
-   "description": "Detecção diária de vigilantes com ausências seguidas, medidas em dias de calendário ou em nº de faltas (ver critério). Um dia trabalhado ou uma falta justificada quebra a sequência; licenças aprovadas não quebram nem contam."
+   "description": "Detecção diária de ausências seguidas."
   },
   {
    "fieldname": "abandono_modo",
@@ -206,7 +206,7 @@
    "label": "Modo de Abandono de Posto",
    "options": "Desactivado\nApenas Alerta\nAutomático",
    "default": "Automático",
-   "description": "Automático (recomendado): ao atingir o limite abre a Presunção de Abandono durante a noite. Apenas Alerta: notifica (sino) e mostra o botão Criar Presunção de Abandono no Vigilante. Com a Presunção aberta o vigilante sai do posto e da escala (o turno fica como vaga), o salário é congelado (a empresa deixa de pagar até ao regresso) e não se registam mais faltas. Desactivado: sem detecção."
+   "description": "Automático: abre a Presunção. Apenas Alerta: só notifica."
   },
   {
    "fieldname": "abandono_criterio",
@@ -215,7 +215,7 @@
    "options": "Dias de Calendário\nNº de Faltas",
    "default": "Dias de Calendário",
    "depends_on": "eval:doc.abandono_modo!='Desactivado'",
-   "description": "Dias de Calendário: cada dia conta 1, folgas incluídas (ex.: 1ª Manhã + 2ª Manhã = 2). Nº de Faltas: soma das faltas com o peso do turno, como na folha de salário (ex.: 1ª Manhã = 3 + 2ª Manhã = 1 = 4). A sequência é a mesma nos dois casos — só muda a forma de a medir."
+   "description": "Dias: cada dia conta 1. Faltas: soma com o peso do turno."
   },
   {
    "fieldname": "abandono_dias_limite",
@@ -223,7 +223,7 @@
    "label": "Limite (Dias ou Faltas)",
    "default": "15",
    "depends_on": "eval:doc.abandono_modo!='Desactivado'",
-   "description": "A partir deste valor (em dias de calendário ou em nº de faltas, conforme o critério acima) o vigilante é considerado em Abandono de Posto."
+   "description": "Em dias ou faltas, conforme o critério."
   },
   {
    "fieldname": "col_ss_abandono",
@@ -232,15 +232,14 @@
   {
    "fieldname": "sec_ss_doenca",
    "fieldtype": "Section Break",
-   "label": "Doença (Baixa Médica)",
-   "description": "Regra de pagamento dos dias de doença — vigilantes marcados Doente e faltas justificadas por doença (atestado médico)."
+   "label": "Doença (Baixa Médica)"
   },
   {
    "fieldname": "doenca_dias_pagos_empresa",
    "fieldtype": "Int",
    "label": "Dias de Doença Pagos pela Empresa",
    "default": "3",
-   "description": "Uma doença até este número de dias é paga pela empresa (nada é descontado). Acima disso, TODOS os dias são pagos pelo INSS e descontados do salário (ex.: 3 → 1 a 3 dias pagos pela empresa; 4 ou mais, nenhum)."
+   "description": "Até este nº de dias paga a empresa; acima, o INSS paga todos."
   },
   {
    "fieldname": "tab_ss_rh",
@@ -252,7 +251,7 @@
    "fieldtype": "Percent",
    "label": "Percentagem Máxima de Empréstimo",
    "default": "100",
-   "description": "Percentagem máxima do salário base que pode ser emprestada (valor total do empréstimo)"
+   "description": "Do salário base (valor total do empréstimo)."
   },
   {
    "fieldname": "meses_maximos_emprestimo",
@@ -265,14 +264,14 @@
    "fieldtype": "Percent",
    "label": "Percentagem Máxima da Prestação Mensal",
    "default": "30",
-   "description": "Percentagem máxima do salário líquido que a prestação mensal do empréstimo pode consumir. Usa o net_pay da última Salary Slip submetida; sem histórico de folha, usa o salário base como estimativa."
+   "description": "Do salário líquido da última folha."
   },
   {
    "fieldname": "percentagem_maxima_deducao_mensal",
    "fieldtype": "Percent",
    "label": "Percentagem Máxima da Dedução Mensal",
    "default": "30",
-   "description": "Percentagem máxima do salário líquido que o valor mensal de uma Outras Deduções pode consumir. Mesmo princípio da prestação mensal do empréstimo, mas com o seu próprio limite — sempre bloqueante, sem excepção."
+   "description": "Do salário líquido, por Outras Deduções. Bloqueante."
   },
   {
    "fieldname": "col_ss_rh1",
@@ -294,21 +293,21 @@
    "fieldname": "sec_ss_ferias",
    "fieldtype": "Section Break",
    "label": "Férias (Acumulação Automática)",
-   "description": "Acumulação progressiva de férias por antiguidade (Lei do Trabalho). Acumula 1 dia/mês no 1º ano e 2,5 dias/mês a partir de 1 ano, no dia de admissão de cada colaborador. Uma única Leave Allocation rolante por colaborador reflecte sempre o saldo real."
+   "description": "1 dia/mês no 1.º ano; 2,5 dias/mês depois."
   },
   {
    "fieldname": "ferias_activo",
    "fieldtype": "Check",
    "label": "Activar Acumulação Automática de Férias",
    "default": "0",
-   "description": "Quando activo, a tarefa diária acumula férias a cada colaborador activo no dia da sua admissão. Desactive para gerir as Leave Allocations manualmente."
+   "description": "Acumula férias no dia de admissão de cada colaborador."
   },
   {
    "fieldname": "leave_type_ferias",
    "fieldtype": "Link",
    "label": "Tipo de Licença — Férias",
    "options": "Leave Type",
-   "description": "Leave Type usado para as férias. Padrão: \"Ferias\" — atribuído automaticamente após a instalação (sigos.install), quando o Leave Type já existe."
+   "description": "Padrão: Ferias."
   },
   {
    "fieldname": "col_ss_ferias",
@@ -319,20 +318,19 @@
    "fieldtype": "Int",
    "label": "Máximo Acumulável de Férias (dias)",
    "default": "60",
-   "description": "Tecto do saldo de férias. A partir de 2 anos de antiguidade, no aniversário de admissão o excedente acima deste valor expira. Padrão: 60 (2 anos)."
+   "description": "Tecto do saldo; o excedente expira no aniversário."
   },
   {
    "fieldname": "sec_ss_disc",
    "fieldtype": "Section Break",
-   "label": "Escalação Automática PD",
-   "description": "Acumulação de Participações (por gravidade) que dispara um Processo Disciplinar automático. A contagem reinicia sempre que um PD é aberto para o vigilante."
+   "label": "Escalação Automática PD"
   },
   {
    "fieldname": "acumulacao_pd_activa",
    "fieldtype": "Check",
    "label": "Activar Escalação Automática para Processo Disciplinar",
    "default": "0",
-   "description": "Quando activo, ao submeter uma Participação o sistema conta as participações do vigilante (desde o último PD) por gravidade e abre um Processo Disciplinar automático ao atingir os limites abaixo. Desactive para criar PDs apenas manualmente."
+   "description": "Abre um processo automaticamente ao atingir os limites abaixo."
   },
   {
    "fieldname": "reprimendas_baixa_pd",
@@ -340,7 +338,7 @@
    "label": "Participações Baixa → Processo Disciplinar",
    "default": "3",
    "depends_on": "acumulacao_pd_activa",
-   "description": "Número de participações de gravidade Baixa que dispara um Processo Disciplinar automático"
+   "description": "Participações Baixa que abrem um processo."
   },
   {
    "fieldname": "reprimendas_media_pd",
@@ -365,42 +363,42 @@
    "fieldtype": "Int",
    "label": "Repreensões até Propor Processo",
    "default": "3",
-   "description": "Ao registar a N.ª repreensão de um vigilante (desde o último Processo Disciplinar), o Jurista é questionado se quer abrir um processo. Nunca abre sozinho."
+   "description": "Na N.ª repreensão o Jurista é questionado."
   },
   {
    "fieldname": "prazo_participacao_dias",
    "fieldtype": "Int",
    "label": "Prazo para Criar a Participação (dias)",
    "default": "10",
-   "description": "Dias de calendário após a Data de Conhecimento da Infracção. Depois disso a Participação é recusada (um gestor pode avançar com justificação)."
+   "description": "Dias após a Data de Conhecimento."
   },
   {
    "fieldname": "prazo_processo_dias",
    "fieldtype": "Int",
    "label": "Prazo para Abrir o Processo Disciplinar (dias)",
    "default": "15",
-   "description": "Dias de calendário após a Data de Conhecimento da Infracção para abrir o Processo Disciplinar. Não se aplica à Presunção de Abandono."
+   "description": "Dias após a Data de Conhecimento."
   },
   {
    "fieldname": "pd_prazo_defesa_dias",
    "fieldtype": "Int",
    "label": "Prazo de Defesa (dias)",
    "default": "15",
-   "description": "Dias de calendário, a partir da abertura do Processo Disciplinar, para o vigilante apresentar a defesa."
+   "description": "Dias após a abertura do processo."
   },
   {
    "fieldname": "pd_prazo_diligencias_dias",
    "fieldtype": "Int",
    "label": "Prazo das Diligências (dias)",
    "default": "5",
-   "description": "Duração máxima das diligências/investigação pedidas na defesa; ultrapassado, o processo passa para o Sindicato."
+   "description": "Ultrapassado, o processo passa para o Sindicato."
   },
   {
    "fieldname": "pd_prazo_decisao_dias",
    "fieldtype": "Int",
    "label": "Prazo da Decisão Final (dias)",
    "default": "30",
-   "description": "Dias a partir da abertura para a decisão final; depois o processo caduca (só um gestor decide, com justificação)."
+   "description": "Dias após a abertura; depois o processo caduca."
   },
   {
    "fieldname": "sec_ss_rh360",
@@ -412,7 +410,7 @@
    "fieldtype": "Check",
    "label": "Painel RH 360 no Employee",
    "default": "1",
-   "description": "Mostra um painel no formulário do Employee com faltas, saldo de férias e salário/deduções/empréstimos do colaborador, com atalhos para criar Outras Deduções, Empréstimo, Outras Remunerações, Reclamação de Salário e para Definir Salário — tudo sem sair do Employee. Activo por omissão em todos os clientes; desligue apenas se preferir usar só o Diretório de Colaboradores."
+   "description": "Painel no Employee com faltas, férias, salário e atalhos."
   },
   {
    "fieldname": "tab_ss_pay",
@@ -429,7 +427,7 @@
    "fieldtype": "Int",
    "label": "Dia de Corte",
    "default": "1",
-   "description": "Dia do mês em que o período de folha começa. 1 = mês civil (1º ao último dia do mês — comportamento actual). Ex.: 25 → período de 25 do mês anterior a 24 do mês actual, arquivado no mês em que termina (ex.: 25 Jun–24 Jul = Julho)."
+   "description": "1 = mês civil. Ex.: 25 → de 25 a 24 do mês seguinte."
   },
   {
    "fieldname": "sec_ss_falt",
@@ -442,7 +440,7 @@
    "label": "Método de Cálculo de Faltas",
    "options": "Proporcional ao Salário\nValor Fixo por Falta",
    "default": "Proporcional ao Salário",
-   "description": "Proporcional: (Salário Base ÷ Dias de Trabalho) × Faltas Não Justificadas. Valor Fixo: Faltas Não Justificadas × Valor por Falta."
+   "description": "Proporcional: base ÷ dias × faltas. Fixo: faltas × valor."
   },
   {
    "fieldname": "col_ss_pay1",
@@ -453,14 +451,14 @@
    "fieldtype": "Currency",
    "label": "Valor Fixo por Falta",
    "depends_on": "eval: doc.metodo_calculo_faltas == 'Valor Fixo por Falta'",
-   "description": "Valor deduzido por cada falta não justificada (apenas para o método Valor Fixo). Usado para faltas Normais, e também para todas as faltas quando a distinção Normal/Vermelha (Personalização de Cliente) está desactivada."
+   "description": "Por falta não justificada (Valor Fixo)."
   },
   {
    "fieldname": "valor_fixo_por_falta_vermelha",
    "fieldtype": "Currency",
    "label": "Valor Fixo por Falta Vermelha",
    "depends_on": "eval: doc.metodo_calculo_faltas == 'Valor Fixo por Falta' && doc.faltas_normal_vermelha_activo",
-   "description": "Valor deduzido por cada falta VERMELHA não justificada — só se aplica com o método Valor Fixo e a distinção Normal/Vermelha activa (Personalização de Cliente). Em branco usa o mesmo valor da Falta Normal."
+   "description": "Por falta vermelha. Vazio = valor normal."
   },
   {
    "fieldname": "base_dias_de_trabalho",
@@ -468,21 +466,21 @@
    "label": "Base de Dias de Trabalho",
    "options": "30 Dias (Mês Comercial)\nDias do Mês\nDias Úteis (HRMS)",
    "default": "30 Dias (Mês Comercial)",
-   "description": "Divisor do valor diário (faltas, dobras, meias dobras, horas extras). 30 Dias: sempre Salário Base / 30, igual em todos os meses. Dias do Mês: total de dias do período (28-31). Dias Úteis: usa o total_working_days do HRMS."
+   "description": "Divisor do valor diário (faltas, dobras, horas extras)."
   },
   {
    "fieldname": "n_faltas_abandono_posto",
    "fieldtype": "Int",
    "label": "Nº de Faltas por Abandono de Posto",
    "default": "1",
-   "description": "Número de faltas debitado automaticamente quando um vigilante é registado como Abandono de Posto — valor fixo, não passa pelo cálculo de peso de regime/turno usado nas faltas normais."
+   "description": "Faltas por registo de abandono a meio do turno."
   },
   {
    "fieldname": "n_faltas_reserva",
    "fieldtype": "Int",
    "label": "Nº de Faltas por Falta de Reserva",
    "default": "1",
-   "description": "Usado quando o Método de Faltas em Reserva abaixo é \"Valor Fixo\" — número de faltas debitado automaticamente quando um vigilante em Reserva falta, independentemente do dia."
+   "description": "Faltas por falta em Reserva (Valor Fixo)."
   },
   {
    "fieldname": "metodo_faltas_reserva",
@@ -490,7 +488,7 @@
    "label": "Método de Faltas em Reserva",
    "options": "Valor Fixo\nPeso do Turno",
    "default": "Valor Fixo",
-   "description": "Valor Fixo: usa sempre o Nº de Faltas acima. Peso do Turno: quando o vigilante em Reserva tem uma escala real atribuída (Escala Do Vigilante do tipo \"Reserva\", pela delegação), usa o peso do turno desse dia — mesma lógica de peso das faltas normais, incluindo a dedução de faltas consecutivas. Sem escala correspondente, cai sempre no Valor Fixo acima."
+   "description": "Peso do Turno usa a escala de Reserva; sem escala, Valor Fixo."
   },
   {
    "fieldname": "sec_ss_arma",
@@ -517,7 +515,7 @@
    "fieldtype": "Check",
    "label": "Activar Pagamento de Dobras",
    "default": "0",
-   "description": "Quando activo, o vigilante que cobre turnos de ausentes (Dobra de Turno ou Meia Dobra na Tabela de Ausências) recebe um pagamento extra na Salary Slip. Substitutos não são pagos. Adiantamentos só são pagos se a opção abaixo estiver activa."
+   "description": "Paga dobras e meias dobras na folha."
   },
   {
    "fieldname": "pagar_adiantamento_como_dobra",
@@ -525,7 +523,7 @@
    "label": "Pagar Adiantamento de Turno como Dobra",
    "default": "0",
    "depends_on": "eval:doc.dobras_activo",
-   "description": "Quando activo, cada Adiantamento de Turno é contado e pago como uma Dobra (Salary Slip e relatório Cumulativo de Coberturas). Desactivado por defeito: adiantamentos não são pagos."
+   "description": "Paga cada adiantamento como dobra."
   },
   {
    "fieldname": "metodo_calculo_dobra",
@@ -533,7 +531,7 @@
    "label": "Método de Cálculo de Dobra",
    "options": "Proporcional ao Salário\nValor Fixo por Dobra",
    "default": "Proporcional ao Salário",
-   "description": "Proporcional: (Salário Base ÷ Dias de Trabalho) × Nº de Dobras. Valor Fixo: Nº de Dobras × Valor por Dobra."
+   "description": "Proporcional: base ÷ dias × dobras. Fixo: dobras × valor."
   },
   {
    "fieldname": "col_ss_dobra",
@@ -544,14 +542,14 @@
    "fieldtype": "Currency",
    "label": "Valor Fixo por Dobra",
    "depends_on": "eval: doc.metodo_calculo_dobra == 'Valor Fixo por Dobra'",
-   "description": "Valor pago por cada turno coberto (apenas para o método Valor Fixo)."
+   "description": "Por turno coberto (Valor Fixo)."
   },
   {
    "fieldname": "valor_fixo_por_meia_dobra",
    "fieldtype": "Currency",
    "label": "Valor Fixo por Meia Dobra",
    "depends_on": "eval: doc.metodo_calculo_dobra == 'Valor Fixo por Dobra'",
-   "description": "Valor pago por cada MEIA dobra (turno de meio-dia coberto), apenas para o método Valor Fixo. No método Proporcional, a meia dobra usa metade do valor de uma dobra inteira automaticamente."
+   "description": "Por meia dobra (Valor Fixo). No Proporcional é metade."
   },
   {
    "fieldname": "sec_ss_horas_extras",
@@ -563,7 +561,7 @@
    "fieldtype": "Check",
    "label": "Activar Pagamento de Horas Extras",
    "default": "0",
-   "description": "Quando activo, o vigilante de folga chamado para cobrir uma ausência (Horas Extras na Tabela de Ausências) recebe um pagamento extra na Salary Slip."
+   "description": "Paga horas extras na folha."
   },
   {
    "fieldname": "metodo_calculo_horas_extras",
@@ -571,7 +569,7 @@
    "label": "Método de Cálculo de Horas Extras",
    "options": "Proporcional ao Salário\nValor Fixo por Horas Extras",
    "default": "Proporcional ao Salário",
-   "description": "Proporcional: (Salário Base ÷ Dias de Trabalho) × Nº de Horas Extras. Valor Fixo: Nº de Horas Extras × Valor por Horas Extras."
+   "description": "Proporcional: base ÷ dias × horas. Fixo: horas × valor."
   },
   {
    "fieldname": "col_ss_horas_extras",
@@ -582,13 +580,12 @@
    "fieldtype": "Currency",
    "label": "Valor Fixo por Horas Extras",
    "depends_on": "eval: doc.metodo_calculo_horas_extras == 'Valor Fixo por Horas Extras'",
-   "description": "Valor pago por cada turno de horas extras coberto (apenas para o método Valor Fixo)."
+   "description": "Por turno de horas extras (Valor Fixo)."
   },
   {
    "fieldname": "sec_ss_comp",
    "fieldtype": "Section Break",
-   "label": "Outros Componentes Salariais",
-   "description": "Componentes sem secção própria — os restantes (Faltas, Subsídio de Arma, Dobra/Meia Dobra) já têm o componente ao lado do respectivo método/valor, acima."
+   "label": "Outros Componentes Salariais"
   },
   {
    "fieldname": "componente_faltas",
@@ -608,28 +605,28 @@
    "fieldtype": "Link",
    "label": "Salary Component — Empréstimo",
    "options": "Salary Component",
-   "description": "Dedução usada para a prestação mensal de Empréstimo. Padrão: \"Emprestimo\""
+   "description": "Padrão: Emprestimo."
   },
   {
    "fieldname": "componente_dobra",
    "fieldtype": "Link",
    "label": "Salary Component — Dobra/Adiantamento",
    "options": "Salary Component",
-   "description": "Provento (tipo Earning) pago pela cobertura de turnos. Padrão: \"Dobra\""
+   "description": "Padrão: Dobra."
   },
   {
    "fieldname": "componente_meia_dobra",
    "fieldtype": "Link",
    "label": "Salary Component — Meia Dobra",
    "options": "Salary Component",
-   "description": "Provento (tipo Earning) pago pela cobertura de MEIO turno — linha própria, separada da Dobra inteira. Padrão: \"Meia Dobra\""
+   "description": "Padrão: Meia Dobra."
   },
   {
    "fieldname": "componente_horas_extras",
    "fieldtype": "Link",
    "label": "Salary Component — Horas Extras",
    "options": "Salary Component",
-   "description": "Provento (tipo Earning) pago por chamar um vigilante de folga para cobrir uma ausência. Padrão: \"Horas Extras\""
+   "description": "Padrão: Horas Extras."
   },
   {
    "fieldname": "col_ss_pay2",
@@ -646,28 +643,28 @@
    "fieldtype": "Link",
    "label": "Salary Component — Deduções Diversas",
    "options": "Salary Component",
-   "description": "Componente de dedução genérico. Usado pela migração de registos antigos. Padrão: \"Deducoes diversas\""
+   "description": "Padrão: Deducoes diversas."
   },
   {
    "fieldname": "componente_uniforme",
    "fieldtype": "Link",
    "label": "Salary Component — Uniforme",
    "options": "Salary Component",
-   "description": "Componente de Uniforme. Em Outras Deduções, seleccionar este componente preenche os valores padrão. Padrão: \"Uniforme\""
+   "description": "Preenche os valores padrão em Outras Deduções."
   },
   {
    "fieldname": "componente_processo_disciplinar",
    "fieldtype": "Link",
    "label": "Salary Component — Processo Disciplinar",
    "options": "Salary Component",
-   "description": "Componente usado na dedução criada automaticamente por um Processo Disciplinar. Padrão: \"Processo Disciplinar\""
+   "description": "Usado na multa do Processo Disciplinar."
   },
   {
    "fieldname": "componente_proporcional",
    "fieldtype": "Link",
    "label": "Salary Component — Proporcional (Admissão/Demissão)",
    "options": "Salary Component",
-   "description": "Componente de dedução usado para o desconto proporcional dos dias fora do vínculo (admissão ou demissão a meio do mês). Criado automaticamente se não existir. Padrão: \"Proporcional\""
+   "description": "Desconto dos dias fora do vínculo. Criado se não existir."
   },
   {
    "fieldname": "sec_ss_base",
@@ -679,33 +676,33 @@
    "fieldtype": "Link",
    "label": "Estrutura Salarial Padrão",
    "options": "Salary Structure",
-   "description": "Estrutura usada ao criar Salary Structure Assignments automaticamente (atribuição do salário base por contrato/regime)."
+   "description": "Usada nas atribuições de salário automáticas."
   },
   {
    "fieldname": "salario_minimo_padrao",
    "fieldtype": "Currency",
    "label": "Salário Mínimo Padrão",
-   "description": "Piso do salário base. Usado quando o contrato/regime não define um valor, e como mínimo quando o valor resolvido é inferior. Deixe vazio para não aplicar piso."
+   "description": "Piso do salário base. Vazio = sem piso."
   },
   {
    "fieldname": "salario_base_padrao_reserva",
    "fieldtype": "Currency",
    "label": "Salário Base Padrão para Reserva",
-   "description": "Usado como salário base quando um vigilante é criado (ou activado) directamente em Reserva, sem qualquer salário anterior (nunca teve uma Salary Structure Assignment submetida) — evita cair na Categoria/Salário Mínimo por omissão para quem nunca teve posto. Não se aplica a quem já tinha salário antes de ir para Reserva (esse é retido, ver Manter Salário Base). Também disponível a qualquer momento, para qualquer vigilante em Reserva, pelo botão \"Repor Salário Padrão de Reserva\" no Vigilante. Deixe vazio para desactivar."
+   "description": "Para quem entra em Reserva sem salário anterior."
   },
   {
    "fieldname": "reter_salario_base_em_rotatividade",
    "fieldtype": "Check",
    "label": "Manter Salário Base em Rotatividade/Reserva",
    "default": "1",
-   "description": "Quando activo, uma mudança entre dois vínculos reais (posto, regime, ou entrada/saída de Reserva) nunca REDUZ automaticamente o salário BASE de um vigilante: mantém-se sempre, no mínimo, o que já recebe. Pode SUBIR — se o novo posto/regime paga mais do que o vigilante já recebe, aplica-se o valor mais alto. Isto vale mesmo através de uma passagem por Reserva (o topo anterior ao entrar em Reserva continua a ser o piso ao sair, mesmo para um posto novo). O salário só desce por acção deliberada (\"Definir Salário\", Ajuste de Salários, ou aplicação em massa por contrato). Aplica-se apenas ao salário base; subsídios não são afectados. Nunca sobrepõe um valor manual definido por RH em \"Definir Salário\"."
+   "description": "Mudanças de posto ou regime nunca reduzem o salário base."
   },
   {
    "fieldname": "payroll_payable_account",
    "fieldtype": "Link",
    "label": "Conta a Pagar de Salários (Payroll Payable)",
    "options": "Account",
-   "description": "Conta usada nos Salary Structure Assignments criados automaticamente. Deixe vazio para usar a conta padrão da empresa."
+   "description": "Vazio = conta padrão da empresa."
   },
   {
    "fieldname": "tab_ss_sis",
@@ -727,14 +724,14 @@
    "fieldtype": "Link",
    "label": "Role — Aprovador RH",
    "options": "Role",
-   "description": "Padrão: \"Aprovador RH\" — atribuído automaticamente após a instalação (sigos.install), quando a Role já existe."
+   "description": "Padrão: Aprovador RH."
   },
   {
    "fieldname": "aprovador_operacoes",
    "fieldtype": "Link",
    "label": "Role — Aprovador Operações",
    "options": "Role",
-   "description": "Padrão: \"Aprovador Operações\" — atribuído automaticamente após a instalação (sigos.install), quando a Role já existe."
+   "description": "Padrão: Aprovador Operações."
   },
   {
    "fieldname": "tab_ss_custom",
@@ -746,7 +743,7 @@
    "fieldtype": "Check",
    "label": "Activar Personalização de Cliente",
    "default": "0",
-   "description": "Por omissão o SIGOS usa o comportamento padrão em todo o lado. Active esta opção só para mostrar a secção abaixo onde pode configurar regras específicas deste cliente — cada regra tem o seu próprio valor por omissão (igual ao SIGOS padrão), por isso desligar esta opção não desactiva nada por si só, só esconde a secção."
+   "description": "Mostra as regras específicas deste cliente."
   },
   {
    "fieldname": "sec_ss_custom",
@@ -759,28 +756,28 @@
    "fieldtype": "Check",
    "label": "Faltas: Distinguir Normal vs Vermelha",
    "default": "0",
-   "description": "Quando activo: (1) o Subtipo de Falta (Normal/Vermelha) torna-se obrigatório em cada linha de Falta nas Ausências; (2) Faltas Vermelhas não justificadas também abatem o saldo de férias, além do desconto salarial normal."
+   "description": "Subtipo obrigatório; faltas vermelhas também abatem férias."
   },
   {
    "fieldname": "posicao_no_posto_activo",
    "fieldtype": "Check",
    "label": "Vigilante: Campo Posição",
    "default": "0",
-   "description": "Quando activo, mostra o campo Posição (texto livre) no Vigilante, na secção Alocação — a função/posição do vigilante dentro do posto (ex: Chefe de Equipa, Motorista). Campo opcional, sem lista fixa de valores."
+   "description": "Mostra o campo Posição no Vigilante."
   },
   {
    "fieldname": "supervisor_activo",
    "fieldtype": "Check",
    "label": "Vigilante: Campo Supervisor",
    "default": "0",
-   "description": "Quando activo, mostra o campo Supervisor (texto livre) no Vigilante, na secção Alocação — o nome do supervisor responsável por este vigilante. Campo opcional, sem lista fixa de valores. Também aparece no perfil do vigilante em Vigilantes de Hoje."
+   "description": "Mostra o campo Supervisor no Vigilante."
   },
   {
    "fieldname": "subsidios_categoria_funcao_activo",
    "fieldtype": "Check",
    "label": "Subsídios por Categoria e Função (Combináveis)",
    "default": "0",
-   "description": "Quando activo, a Salary Slip soma automaticamente: (1) o subsídio configurado na Categoria do vigilante (Categoria Vigilante — quando definido); (2) os subsídios de Chefia de Turno, Chefia de Posto e Canino — três campos independentes no Vigilante que podem estar todos activos ao mesmo tempo, cada um com o seu próprio componente/valor abaixo. Um vigilante pode acumular vários destes numa única folha."
+   "description": "Soma subsídios de categoria, chefias e canino na folha."
   },
   {
    "fieldname": "componente_subsidio_chefia_turno",
@@ -830,40 +827,40 @@
    "fieldtype": "Check",
    "label": "Escala: Turno da Equipa",
    "default": "0",
-   "description": "Quando activo, mostra a coluna Turno da Equipa (Link) na tabela de vigilantes do posto e na escala gerada, dentro de Escala do Vigilante. É apenas um agrupamento/etiqueta (ex: Equipa A, B, C) — não altera a rotação, que continua definida pelo Turno Inicial de cada vigilante."
+   "description": "Mostra a coluna Turno da Equipa na escala (só etiqueta)."
   },
   {
    "fieldname": "admissao_automatica_activo",
    "fieldtype": "Check",
    "label": "Vigilante: Admissão Automática (sem RH)",
    "default": "0",
-   "description": "Quando activo, um novo Vigilante salta o passo \"Admitir (RH)\" — a Data de Admissão é preenchida automaticamente com hoje e o Funcionário é criado logo na criação, tal como já acontecia depois de admitido. A Operações passa directamente para \"Ativar\"/\"Ativar em Reserva\", sem intervenção do RH. Os campos exclusivos do RH (dados bancários, INSS, salário base, empresa) continuam bloqueados a Aprovador RH exactamente como antes — só o botão de admissão deixa de ser necessário. Requer Empresa Padrão definida no separador Sistema."
+   "description": "Novo vigilante salta o passo Admitir (RH)."
   },
   {
    "fieldname": "posto_interno_por_omissao",
    "fieldtype": "Check",
    "label": "Postos: Interno por Omissão",
    "default": "0",
-   "description": "Quando activo, novos Postos de Vigilância nascem já marcados como \"Posto Interno\" (sem Contrato/Cliente) — para clientes que operam só com efectivo próprio, sem facturar a terceiros. Pode sempre ser desmarcado posto a posto."
+   "description": "Novos postos nascem como Posto Interno."
   },
   {
    "fieldname": "nao_herdar_salario_por_omissao",
    "fieldtype": "Check",
    "label": "Salário: Não Herdar do Contrato por Omissão",
    "default": "0",
-   "description": "Quando activo, o diálogo \"Definir Salário Base\" abre sempre com a opção \"Herdar salário do contrato\" DESMARCADA por omissão (mesmo quando o vigilante ainda não tem override manual) — para clientes que preferem definir o salário caso a caso em vez de herdar do contrato/regime/categoria."
+   "description": "Definir Salário abre sem herdar do contrato."
   },
   {
    "fieldname": "sec_ss_impressos",
    "fieldtype": "Section Break",
    "label": "Documentos Impressos",
-   "description": "Cabeçalho e rodapé dos impressos (ex.: Participação). O logótipo é o da Empresa Padrão (Company → Logo)."
+   "description": "O logótipo é o da Empresa Padrão."
   },
   {
    "fieldname": "local_documentos",
    "fieldtype": "Data",
    "label": "Local nos Documentos",
-   "description": "Cidade do fecho \"<Local>, aos .. de .. de ..\". Vazio = nome da Delegação do documento."
+   "description": "Vazio = nome da delegação."
   },
   {
    "fieldname": "col_ss_impressos",
@@ -873,13 +870,13 @@
    "fieldname": "codigo_formulario_participacao",
    "fieldtype": "Small Text",
    "label": "Código do Formulário — Participação",
-   "description": "Impresso no rodapé da Participação (ex.: XSS_OP.FR.006 / REV.00.05.11.2021). Uma linha por linha impressa."
+   "description": "Uma linha por linha impressa."
   },
   {
    "fieldname": "codigo_formulario_presuncao",
    "fieldtype": "Small Text",
    "label": "Código do Formulário — Presunção de Abandono",
-   "description": "Rodapé da Presunção: 1.ª linha à esquerda (ex.: XSS_RH.FR.031), restantes à direita (ex.: Rev. 00 de 24.03.2022)."
+   "description": "1.ª linha à esquerda, restantes à direita."
   },
   {
    "fieldname": "presuncao_assinatura",
@@ -891,13 +888,13 @@
    "fieldname": "presuncao_base_legal",
    "fieldtype": "Small Text",
    "label": "Base Legal — Presunção de Abandono",
-   "description": "Completa \"Nos termos do …, tal situação configura presunção de abandono\". Vazio = \"n.º 3 do artigo 115 da Lei n.º 13/2023, de 25 de agosto\"."
+   "description": "Vazio = n.º 3 do art. 115 da Lei n.º 13/2023."
   },
   {
    "fieldname": "contactos_documentos",
    "fieldtype": "Small Text",
    "label": "Contactos (Barra do Rodapé)",
-   "description": "Barra escura no rodapé das cartas (ex.: Presunção). Um item por linha: telefones, morada, site, e-mail."
+   "description": "Um item por linha."
   },
   {
    "fieldname": "tab_ss_fat",
@@ -910,7 +907,7 @@
    "label": "Método de Faturação Padrão",
    "options": "Vigilantes Activos\nContratual",
    "default": "Vigilantes Activos",
-   "description": "Como a Faturação Mensal conta os vigilantes de cada contrato, quando o contrato (Projecto) está em \"Predefinido\". <b>Vigilantes Activos</b>: vigilantes Activos do contrato no momento da pré-visualização. <b>Contratual</b>: o Nº de Vigilantes escrito na tabela de Faturação do contrato. A tarifa vem sempre da tabela de Faturação do contrato."
+   "description": "Activos: vigilantes no momento. Contratual: nº do contrato."
   },
   {
    "fieldname": "detalhe_fatura_padrao",
@@ -918,7 +915,7 @@
    "label": "Detalhe da Factura Padrão",
    "options": "Por Contrato\nPor Posto\nPor Posto (uma linha)",
    "default": "Por Contrato",
-   "description": "Como as linhas da factura são agrupadas, quando o Cliente está em \"Predefinido\". <b>Por Contrato</b>: uma linha por contrato e regime. <b>Por Posto</b>: uma linha por posto e regime, com o Nome Financeiro do posto. <b>Por Posto (uma linha)</b>: uma única linha por posto (quantidade 1, valor = total do posto) com a composição no texto, ex. 'Agência Baixa — 2 × H24 + 1 × TDN'. Nos contratos Contratuais (sem vigilantes por posto), as duas opções Por Posto dão uma linha por regime com a lista dos postos."
+   "description": "Agrupamento das linhas da factura."
   },
   {
    "fieldname": "sec_ss_fat_auto",
@@ -930,7 +927,7 @@
    "fieldtype": "Check",
    "label": "Activar Faturação Automática",
    "default": "0",
-   "description": "Interruptor geral. Quando activo, uma tarefa diária factura os clientes com <b>Faturação Automática</b> marcada na ficha do Cliente, a partir do seu dia de faturação. Se o dia passar sem factura (servidor parado, erro de configuração), a tarefa tenta de novo nos dias seguintes até ao fim desse mês. Um cliente já facturado no mês (por qualquer via) nunca é facturado de novo; uma factura automática cancelada <b>não</b> é recriada."
+   "description": "Factura diariamente os clientes com Faturação Automática."
   },
   {
    "fieldname": "submeter_faturas_automaticas",
@@ -938,7 +935,7 @@
    "label": "Submeter Facturas Automáticas",
    "default": "0",
    "depends_on": "eval:doc.faturacao_automatica",
-   "description": "Desligado: as facturas ficam em <b>rascunho</b> para revisão. Ligado: são submetidas (lançadas na contabilidade); se a submissão falhar, a factura fica em rascunho e é reportada."
+   "description": "Desligado: as facturas ficam em rascunho."
   },
   {
    "fieldname": "col_ss_fat_auto",
@@ -949,7 +946,7 @@
    "fieldtype": "Int",
    "label": "Dia de Faturação Padrão",
    "default": "25",
-   "description": "Dia do mês (1–31) em que se factura, quando o Cliente não define o seu. Num mês mais curto, usa-se o último dia (31 = sempre o último dia)."
+   "description": "Quando o Cliente não define. 31 = último dia."
   },
   {
    "fieldname": "mes_faturado_padrao",
@@ -957,12 +954,12 @@
    "label": "Mês Facturado Padrão",
    "options": "Mês Corrente\nMês Anterior",
    "default": "Mês Corrente",
-   "description": "<b>Mês Corrente</b>: factura-se o próprio mês (adiantado — dia 25 de Outubro factura Outubro). <b>Mês Anterior</b>: factura-se o mês que terminou (vencido — dia 5 de Novembro factura Outubro)."
+   "description": "Corrente: adiantado. Anterior: vencido."
   }
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-10-23 10:00:00.000000",
+ "modified": "2026-10-23 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "SIGOS Setup",
  "name": "SIGOS Settings",

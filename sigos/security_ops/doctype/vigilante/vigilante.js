@@ -145,7 +145,7 @@ frappe.ui.form.on("Vigilante", {
 			// with a throwaway posto just to immediately bench the guard via Rotatividade.
 			frm.add_custom_button(__("Ativar em Reserva"), () => {
 				_mudar_estado_op(frm, "colocar_em_reserva", __("Ativar em Reserva"),
-					__("O vigilante fica empregado e disponível para redistribuição, sem posto atribuído — não passa por Activo."));
+					__("Fica empregado e disponível, sem posto."));
 			}, __("Acções"));
 		}
 
@@ -180,7 +180,7 @@ frappe.ui.form.on("Vigilante", {
 		if (pode_ops && ["Activo", "Reserva"].includes(frm.doc.status)) {
 			frm.add_custom_button(__("Inactivar"), () => {
 				_mudar_estado_op(frm, "inactivar", __("Inactivar Vigilante"),
-					__("O vigilante sai do posto e da escala e o Funcionário passa a <b>Suspenso</b>. Use para suspensões temporárias."));
+					__("Sai do posto e da escala; o Funcionário fica <b>Suspenso</b>."));
 			}, __("Acções"));
 		}
 	},
@@ -258,7 +258,7 @@ function _abandono_de_posto(frm) {
 			? ` — <a href="/app/presuncao-de-abandono/${encodeURIComponent(frm.doc.presuncao_abandono)}">${__("Presunção {0}", [frappe.utils.escape_html(frm.doc.presuncao_abandono)])}</a>`
 			: "";
 		frm.dashboard.set_headline_alert(
-			__("Em <b>Abandono de Posto</b> desde {0}{1}. Fora do posto e da escala, salário congelado (a empresa não paga até ao regresso) e sem registo de faltas.",
+			__("Em <b>Abandono de Posto</b> desde {0}{1} · salário congelado.",
 				[fmt(frm.doc.data_inicio_abandono), pres]),
 			"red",
 		);
@@ -290,7 +290,7 @@ function _abandono_de_posto(frm) {
 
 	if (pode_ops) {
 		frm.add_custom_button(__("Criar Presunção de Abandono"), () => frappe.confirm(
-			__("Abrir a Presunção de Abandono com as faltas desta sequência? O vigilante passa a <b>Abandono de Posto</b>: continua no posto e na escala, mas deixa de contar na lotação do posto."),
+			__("Abrir a Presunção de Abandono? O vigilante sai do posto e o salário fica congelado."),
 			() => frappe.xcall("sigos.abandono.criar_presuncao_manual", { vigilante: frm.doc.name })
 				.then((nome) => {
 					frappe.show_alert({ message: __("Presunção {0} aberta.", [nome]), indicator: "red" }, 6);
@@ -318,7 +318,7 @@ function _doente(frm) {
 				title: __("Marcar Doente (Baixa Médica)"),
 				fields: [
 					{ fieldtype: "HTML", options: `<p class="text-muted" style="margin-bottom:8px">${__(
-						"O vigilante sai do posto e da escala (o turno fica como vaga) e o salário fica congelado até ao regresso. Não são registadas faltas durante a baixa. Até 3 dias de doença são pagos pela empresa; 4 ou mais, todos os dias são pagos pelo INSS (descontados).")}</p>` },
+						"Sai do posto e o salário fica congelado até ao regresso. Até 3 dias paga a empresa; mais, paga o INSS.")}</p>` },
 					{ fieldname: "data_inicio", fieldtype: "Date", label: __("Doente desde"), reqd: 1,
 						default: frappe.datetime.get_today() },
 					{ fieldname: "atestado", fieldtype: "Attach", label: __("Atestado Médico (opcional)") },
@@ -341,7 +341,7 @@ function _doente(frm) {
 
 	if (frm.doc.status !== "Doente") return;
 	frm.dashboard.set_headline_alert(
-		__("<b>Doente</b> (Baixa Médica {0}) — fora do posto e da escala; fora das folhas de salário (pago pelo INSS).",
+		__("<b>Doente</b> · Baixa Médica {0} · salário congelado.",
 			[frappe.utils.escape_html(frm.doc.baixa_medica || "")]),
 		"blue",
 	);
@@ -368,7 +368,7 @@ function _doente(frm) {
 						options: destinos, default: destinos[0].value },
 					{ fieldname: "data_regresso", fieldtype: "Date", label: __("Data de Regresso"), reqd: 1,
 						default: frappe.datetime.get_today(),
-						description: baixa ? __("Doente desde {0}. Até 3 dias: pagos pela empresa. 4 ou mais: todos os dias até à véspera do regresso pagos pelo INSS (descontados).", [fmt(baixa.data_inicio)]) : "" },
+						description: baixa ? __("Doente desde {0}.", [fmt(baixa.data_inicio)]) : "" },
 					{ fieldname: "atestado", fieldtype: "Attach", label: __("Atestado / Justificação (opcional)") },
 					{ fieldname: "observacoes", fieldtype: "Small Text", label: __("Observações") },
 				],
@@ -409,7 +409,7 @@ function _suspenso(frm) {
 	if (frm.is_new() || frm.doc.status !== "Suspenso Preventivamente") return;
 	const part = frm.doc.participacao_suspensao;
 	frm.dashboard.set_headline_alert(
-		__("<b>Suspenso preventivamente</b>{0} — fora do posto e da escala até ao fim do processo disciplinar.",
+		__("<b>Suspenso preventivamente</b>{0} · aguarda o processo disciplinar.",
 			[part ? ` (<a href="/app/participacao/${encodeURIComponent(part)}">${frappe.utils.escape_html(part)}</a>)` : ""]),
 		"red",
 	);
@@ -437,7 +437,7 @@ function _suspenso(frm) {
 					title: __("Fim da Suspensão Preventiva"),
 					fields: [
 						{ fieldtype: "HTML", options: `<p class="text-muted" style="margin-bottom:8px">${__(
-							"O processo terminou sem demissão. (Uma demissão é registada pelo Processo Disciplinar e fecha a suspensão automaticamente.)")}</p>` },
+							"Use quando o processo terminar sem despedimento.")}</p>` },
 						{ fieldname: "destino", fieldtype: "Select", label: __("Destino"), reqd: 1,
 							options: destinos, default: destinos[0].value },
 						{ fieldname: "data_regresso", fieldtype: "Date", label: __("Data de Regresso"), reqd: 1,
@@ -498,7 +498,7 @@ function _salario_congelado(frm, fmt) {
 		frm.add_custom_button(__("Congelar Salário"), () => {
 			frappe.prompt(
 				[
-					{ fieldtype: "HTML", options: `<p class="text-muted">${__("O vigilante deixa de entrar nas Payroll Entries e não pode ter Salary Slips até o salário ser descongelado (automaticamente no regresso ou na demissão). Os meses congelados processam-se depois, já com as justificações.")}</p>` },
+					{ fieldtype: "HTML", options: `<p class="text-muted">${__("Fica fora das folhas de salário até ser descongelado.")}</p>` },
 					{ fieldname: "motivo", fieldtype: "Small Text", label: __("Motivo"), reqd: 1 },
 				],
 				(v) => frm.call("congelar_salario", { motivo: v.motivo }).then(() => frm.reload_doc()),
@@ -537,7 +537,7 @@ function _dialogo_regresso(frm, postoAnterior) {
 		title: __("Registar Regresso"),
 		fields: [
 			{ fieldtype: "HTML", options: `<p class="text-muted" style="margin-bottom:8px">${
-				__("O salário é descongelado e volta a ser pago a partir de hoje — o período em abandono não é pago. Fecha a Presunção como <b>Regressou</b> (se já foi encaminhada para Processo Disciplinar, o processo continua).")}</p>` },
+				__("Volta a ser pago a partir de hoje. O período em abandono não é pago.")}</p>` },
 			{ fieldname: "destino", fieldtype: "Select", label: __("Destino"), reqd: 1,
 				options: destinos, default: destinos[0].value },
 			{ fieldtype: "Section Break" },
@@ -548,7 +548,7 @@ function _dialogo_regresso(frm, postoAnterior) {
 				description: __("Por defeito, a primeira falta da sequência.") },
 			{ fieldname: "justificar_ate", fieldtype: "Date", label: __("Justificar até"),
 				default: ontem, depends_on: "eval:doc.justificado",
-				description: __("Por defeito, ontem. As faltas fora deste período continuam descontadas. Para vários períodos separados, crie Justificações de Faltas adicionais (sem prazo dentro do abandono).") },
+				description: __("As faltas fora deste período continuam descontadas.") },
 			{ fieldname: "doenca", fieldtype: "Check", label: __("Doença (atestado médico)"),
 				depends_on: "eval:doc.justificado",
 				description: __("As faltas ficam limpas; até 3 dias pagos pela empresa, 4 ou mais pagos pelo INSS (descontados).") },
@@ -632,7 +632,7 @@ function _definir_salario(frm) {
 // ─── Repor Salário Padrão de Reserva ───────────────────────────────────────────
 function _repor_salario_padrao_reserva(frm) {
 	frappe.confirm(
-		__("Repor o salário base deste vigilante para o <b>Salário Base Padrão para Reserva</b> configurado em SIGOS Settings? Isto substitui o valor actual."),
+		__("Repor o salário base para o <b>Salário Base Padrão para Reserva</b>? Substitui o valor actual."),
 		() => {
 			frappe.xcall("sigos.api.repor_salario_padrao_reserva", { vigilante: frm.doc.name }).then((r) => {
 				frappe.show_alert({

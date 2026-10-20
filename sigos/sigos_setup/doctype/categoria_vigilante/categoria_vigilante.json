@@ -57,7 +57,7 @@
    "fieldname": "sec_salario_base",
    "fieldtype": "Section Break",
    "label": "Salário Base Padrão (Personalização de Cliente)",
-   "description": "Opcional — salário base por omissão para vigilantes nesta categoria, SEM depender de contrato. Usado quando o vigilante não tem salário manual definido e (não tem Projecto/Contrato, ou o contrato não tem uma tarifa própria para o seu regime). Deixe vazio se este cliente sempre define o salário por contrato ou manualmente."
+   "description": "Opcional. Usado quando o contrato não define o salário."
   },
   {
    "fieldname": "salario_base",
@@ -68,7 +68,7 @@
    "fieldname": "sec_subsidio",
    "fieldtype": "Section Break",
    "label": "Subsídio Automático (Personalização de Cliente)",
-   "description": "Opcional — usado apenas por clientes com SIGOS Settings.subsidios_categoria_funcao_activo activo. Quando definido, todo o vigilante nesta categoria recebe este subsídio na Salary Slip."
+   "description": "Opcional. Só com Subsídios por Categoria activo."
   },
   {
    "fieldname": "componente_subsidio",
@@ -87,7 +87,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-23 10:00:00.000000",
+ "modified": "2026-10-23 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "SIGOS Setup",
  "name": "Categoria Vigilante",

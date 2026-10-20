@@ -477,7 +477,7 @@ function _pt_suspensao(frm) {
 	if (frm.doc.suspensao_desde) {
 		const ativa = !frm.doc.suspensao_ate;
 		frm.dashboard.add_comment(ativa
-			? __("<b>Suspenso preventivamente</b> desde {0} — remuneração: <b>{1}</b>. Fora do posto até ao fim do processo.",
+			? __("<b>Suspenso preventivamente</b> desde {0} · {1}.",
 				[fmt(frm.doc.suspensao_desde), frappe.utils.escape_html(frm.doc.suspensao_remuneracao || "")])
 			: __("Suspensão preventiva de {0} a {1} ({2}) — {3}.",
 				[fmt(frm.doc.suspensao_desde), fmt(frm.doc.suspensao_ate),
@@ -495,10 +495,10 @@ function _pt_suspensao(frm) {
 				title: __("Suspensão Preventiva"),
 				fields: [
 					{ fieldtype: "HTML", options: `<p class="text-muted" style="margin-bottom:8px">${__(
-						"O vigilante sai já do posto e da escala (o turno fica como vaga) enquanto o Jurista conduz o Processo Disciplinar. Não se registam faltas durante a suspensão. Termina com a demissão (decisão do processo) ou com <b>Registar Regresso</b> no Vigilante.")}</p>` },
+						"O vigilante sai já do posto até à decisão do processo.")}</p>` },
 					{ fieldname: "remuneracao", fieldtype: "Select", label: __("Remuneração durante a suspensão"), reqd: 1,
 						options: ["", "Pago Normalmente", "Salário Congelado", "Não Pago"].join("\n"),
-						description: __("Pago Normalmente: sem alteração. Salário Congelado: sem folha até ao fim — no regresso decide-se se o período é pago. Não Pago: os dias são descontados.") },
+						description: __("Congelado: decide-se no regresso se o período é pago.") },
 					{ fieldname: "data_inicio", fieldtype: "Date", label: __("Suspenso desde"), reqd: 1,
 						default: frappe.datetime.get_today() },
 					{ fieldname: "motivo", fieldtype: "Small Text", label: __("Motivo / Notas") },
@@ -560,7 +560,7 @@ function _botao_processo(frm) {
 		frm.add_custom_button(__("Registar Repreensão"), () => {
 			frappe.prompt(
 				[
-					{ fieldtype: "HTML", options: `<p class="text-muted">${__("Repreensão: fica registada no histórico do vigilante, sem efeito no posto nem no salário. Ao atingir o limite de repreensões, é-lhe perguntado se quer abrir um Processo Disciplinar.")}</p>` },
+					{ fieldtype: "HTML", options: `<p class="text-muted">${__("Fica no histórico do vigilante, sem efeito no posto nem no salário.")}</p>` },
 					{ fieldname: "observacoes", fieldtype: "Small Text", label: __("Observações do Jurista") },
 				],
 				(v) => frm.call("registar_repreensao", { observacoes: v.observacoes || null }).then((r) => {

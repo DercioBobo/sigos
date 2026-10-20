@@ -138,7 +138,8 @@
   {
    "fieldname": "sec_posto",
    "fieldtype": "Section Break",
-   "label": "Posto Anterior (libertado na Presunção)"
+   "label": "Posto Anterior (libertado na Presunção)",
+   "collapsible": 1
   },
   {
    "fieldname": "posto_de_vigilancia",
@@ -189,7 +190,8 @@
    "fieldname": "sec_janela",
    "fieldtype": "Section Break",
    "label": "Período em Abandono (salário congelado)",
-   "description": "Do dia da Presunção até à véspera do regresso: não pago pela empresa (salário congelado) e sem registo de faltas. Uma justificação não paga estes dias — só limpa as faltas anteriores e repõe as férias."
+   "description": "Não pago pela empresa e sem registo de faltas.",
+   "collapsible": 1
   },
   {
    "fieldname": "abandono_desde",
@@ -268,7 +270,9 @@
    "fieldname": "sec_faltas",
    "fieldtype": "Section Break",
    "label": "Faltas (Prova)",
-   "description": "As faltas por justificar desde a primeira falta até à véspera da Presunção (as que levaram ao abandono). A partir da Presunção não se registam faltas. Enquanto Aberta, folhas entregues tarde para esses dias são acrescentadas; deixa de mudar quando o Jurista a coloca Em Análise."
+   "description": "Faltas que originaram a presunção.",
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:['Aberta','Em Análise'].includes(doc.estado)"
   },
   {
    "fieldname": "faltas",
@@ -280,7 +284,9 @@
   {
    "fieldname": "sec_jurista",
    "fieldtype": "Section Break",
-   "label": "Jurista"
+   "label": "Jurista",
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:doc.estado == 'Em Análise' || doc.processo_disciplinar"
   },
   {
    "fieldname": "jurista",
@@ -299,7 +305,7 @@
    "fieldname": "data_conhecimento_infracao",
    "fieldtype": "Date",
    "label": "Data de Conhecimento da Infracção",
-   "description": "Dia em que o vigilante tomou conhecimento da presunção. Passa para o Processo Disciplinar."
+   "description": "Passa para o Processo Disciplinar."
   },
   {
    "fieldname": "col_6",
@@ -314,7 +320,10 @@
   },
   {
    "fieldname": "sec_obs",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "collapsible": 1,
+   "label": "Observações do Jurista",
+   "collapsible_depends_on": "eval:doc.observacoes_jurista || doc.estado == 'Em Análise'"
   },
   {
    "fieldname": "observacoes_jurista",
@@ -345,7 +354,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-22 16:00:00.000000",
+ "modified": "2026-10-23 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "Disciplinar",
  "name": "Presuncao De Abandono",

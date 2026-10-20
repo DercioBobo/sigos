@@ -33,7 +33,7 @@
    "label": "Gravidade Sugerida",
    "options": "\nBaixa\nMédia\nAlta",
    "in_list_view": 1,
-   "description": "Pré-preenche a gravidade na Participação (pode ser alterada)."
+   "description": "Pré-preenche a gravidade na Participação."
   },
   {
    "fieldname": "col_break_1",
@@ -51,13 +51,13 @@
    "fieldname": "ordem",
    "fieldtype": "Int",
    "label": "Ordem no Formulário",
-   "description": "Posição na lista de infracções da Participação (e no impresso). 0 = no fim, por ordem alfabética."
+   "description": "Posição na lista. 0 = no fim."
   },
   {
    "fieldname": "pede_descricao",
    "fieldtype": "Check",
    "label": "Pede Descrição",
-   "description": "Ao marcar esta infracção (ex.: Outras) a Participação exige uma descrição."
+   "description": "Exige descrição na Participação (ex.: Outras)."
   },
   {
    "fieldname": "sec_desc",
@@ -71,7 +71,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-21 20:00:00.000000",
+ "modified": "2026-10-23 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "Disciplinar",
  "name": "Tipo De Infracao",

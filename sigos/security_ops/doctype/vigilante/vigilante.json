@@ -237,7 +237,7 @@
    "read_only": 1,
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "description": "Definido pelo sistema — use os botões (Admitir RH, Ativar) e as operações (Rotatividade, Demissão) para mudar o estado. Mantém o Funcionário e a escala consistentes."
+   "description": "Definido pelo sistema através das acções e operações."
   },
   {
    "fieldname": "cobertura_de_posto_activa",
@@ -247,7 +247,7 @@
    "read_only": 1,
    "no_copy": 1,
    "depends_on": "eval:doc.cobertura_de_posto_activa",
-   "description": "Este vigilante está Activo como Cobridor temporário — a cobrir outro colega ausente — em vez de ocupar um posto próprio. Definido/limpo automaticamente pela Cobertura De Posto."
+   "description": "A cobrir um colega ausente (Cobertura De Posto)."
   },
   {
    "fieldname": "baixa_medica",
@@ -285,7 +285,7 @@
    "read_only": 1,
    "no_copy": 1,
    "depends_on": "eval:doc.abandono_inicio_ausencia",
-   "description": "Primeiro dia da sequência de ausências que levou ao Abandono de Posto (antes da marcação). Justificações que cubram dias desde esta data não estão sujeitas ao prazo de justificação."
+   "description": "Primeiro dia da sequência de ausências."
   },
   {
    "fieldname": "data_inicio_abandono",
@@ -294,7 +294,7 @@
    "read_only": 1,
    "no_copy": 1,
    "depends_on": "eval:doc.data_inicio_abandono",
-   "description": "Dia em que a Presunção de Abandono foi aberta: o vigilante saiu do posto e da escala, o salário foi congelado e deixou de ser pago pela empresa; não se registam faltas."
+   "description": "Dia da Presunção de Abandono."
   },
   {
    "fieldname": "data_fim_abandono",
@@ -303,7 +303,7 @@
    "read_only": 1,
    "no_copy": 1,
    "depends_on": "eval:doc.data_fim_abandono",
-   "description": "Último dia do Abandono de Posto (véspera do regresso, ou fecho por demissão)."
+   "description": "Véspera do regresso ou data de saída."
   },
   {
    "fieldname": "abandono_primeira_falta",
@@ -312,7 +312,7 @@
    "read_only": 1,
    "no_copy": 1,
    "depends_on": "eval:doc.abandono_primeira_falta",
-   "description": "Primeira falta da sequência ininterrupta que disparou o alerta de Abandono de Posto (tarefa diária)."
+   "description": "Primeira falta da sequência detectada."
   },
   {
    "fieldname": "abandono_detectado_em",
@@ -321,7 +321,7 @@
    "read_only": 1,
    "no_copy": 1,
    "depends_on": "eval:doc.abandono_detectado_em",
-   "description": "Data em que a tarefa diária detectou a sequência de ausências acima do limite (SIGOS Settings)."
+   "description": "Data da detecção automática."
   },
   {
    "fieldname": "salario_congelado",
@@ -332,7 +332,7 @@
    "default": "0",
    "in_standard_filter": 1,
    "depends_on": "eval:doc.salario_congelado",
-   "description": "Congelado automaticamente em Abandono de Posto e Doente (e descongelado no regresso/demissão). Enquanto activo, o vigilante é retirado das Payroll Entries e não pode ter Salary Slips."
+   "description": "Fora das folhas de salário enquanto activo."
   },
   {
    "fieldname": "salario_congelado_desde",
@@ -363,7 +363,7 @@
    "fieldname": "data_admissao",
    "fieldtype": "Date",
    "label": "Data de Admissão",
-   "description": "Editável por RH e por Operações — as restantes secções RH (bancários, INSS, salário, empresa) continuam exclusivas do RH."
+   "description": "Editável por RH e Operações."
   },
   {
    "fieldname": "col_break_prof",
@@ -466,7 +466,7 @@
    "label": "Posição",
    "hidden": 1,
    "permlevel": 1,
-   "description": "Função/posição do vigilante dentro do posto (ex: Chefe de Equipa, Motorista)."
+   "description": "Ex.: Chefe de Equipa, Motorista."
   },
   {
    "fieldname": "supervisor",
@@ -474,7 +474,7 @@
    "label": "Supervisor",
    "hidden": 1,
    "permlevel": 1,
-   "description": "Nome do supervisor responsável por este vigilante. Texto livre, sem lista fixa de valores."
+   "description": "Supervisor responsável (texto livre)."
   },
   {
    "fieldname": "col_break_aloc",
@@ -513,7 +513,7 @@
    "label": "Subsídios Combináveis",
    "hidden": 1,
    "permlevel": 1,
-   "description": "Personalização de cliente — funções que dão direito a subsídio e que podem ocorrer em simultâneo (um vigilante pode acumular mais do que uma)."
+   "description": "Funções com subsídio (acumuláveis)."
   },
   {
    "fieldname": "chefe_de_turno",
@@ -638,7 +638,7 @@
    "fieldname": "salario_base_manual",
    "fieldtype": "Currency",
    "label": "Salário Base (manual)",
-   "description": "Deixe vazio para herdar o salário base do contrato (por regime). Preencha apenas para excepções a este vigilante.",
+   "description": "Vazio = salário do contrato. Preencha só para excepções.",
    "permlevel": 2
   },
   {
@@ -648,7 +648,7 @@
    "default": "0",
    "hidden": 1,
    "read_only": 1,
-   "description": "Interno: marca que o valor acima em Salário Base (manual) foi escrito pela lógica automática de Rotatividade/Reserva (SIGOS Settings.reter_salario_base_em_rotatividade) — o maior entre o que o vigilante já recebia e o que o novo posto/regime paga — e não definido por RH via \"Definir Salário\". Permite que essa lógica continue a actualizar o valor em mudanças seguintes sem tocar numa excepção definida manualmente por RH."
+   "description": "Interno: valor mantido automaticamente pela Rotatividade/Reserva."
   },
   {
    "fieldname": "tab_geral",
@@ -685,7 +685,7 @@
    "link_fieldname": "vigilante"
   }
  ],
- "modified": "2026-10-22 10:00:00.000000",
+ "modified": "2026-10-23 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "Security Ops",
  "name": "Vigilante",
