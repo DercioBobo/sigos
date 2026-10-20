@@ -32,3 +32,5 @@ sigos.patches.sigos_stamp_fatura_no_copy
 sigos.patches.seed_abandono_de_posto
 sigos.patches.remover_operacao_abp
 sigos.patches.abandono_modo_automatico
+sigos.patches.seed_tipos_infracao_participacao
+sigos.patches.migrar_participacao_formulario

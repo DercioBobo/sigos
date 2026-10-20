@@ -119,7 +119,11 @@
   "turno_equipa_activo",
   "admissao_automatica_activo",
   "posto_interno_por_omissao",
-  "nao_herdar_salario_por_omissao"
+  "nao_herdar_salario_por_omissao",
+  "sec_ss_impressos",
+  "local_documentos",
+  "col_ss_impressos",
+  "codigo_formulario_participacao"
  ],
  "fields": [
   {
@@ -798,6 +802,28 @@
    "description": "Quando activo, o diálogo \"Definir Salário Base\" abre sempre com a opção \"Herdar salário do contrato\" DESMARCADA por omissão (mesmo quando o vigilante ainda não tem override manual) — para clientes que preferem definir o salário caso a caso em vez de herdar do contrato/regime/categoria."
   },
   {
+   "fieldname": "sec_ss_impressos",
+   "fieldtype": "Section Break",
+   "label": "Documentos Impressos",
+   "description": "Cabeçalho e rodapé dos impressos (ex.: Participação). O logótipo é o da Empresa Padrão (Company → Logo)."
+  },
+  {
+   "fieldname": "local_documentos",
+   "fieldtype": "Data",
+   "label": "Local nos Documentos",
+   "description": "Cidade do fecho \"<Local>, aos .. de .. de ..\". Vazio = nome da Delegação do documento."
+  },
+  {
+   "fieldname": "col_ss_impressos",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "codigo_formulario_participacao",
+   "fieldtype": "Small Text",
+   "label": "Código do Formulário — Participação",
+   "description": "Impresso no rodapé da Participação (ex.: XSS_OP.FR.006 / REV.00.05.11.2021). Uma linha por linha impressa."
+  },
+  {
    "fieldname": "tab_ss_fat",
    "fieldtype": "Tab Break",
    "label": "Faturação"
@@ -860,7 +886,7 @@
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-10-21 14:00:00.000000",
+ "modified": "2026-10-21 16:00:00.000000",
  "modified_by": "Administrator",
  "module": "SIGOS Setup",
  "name": "SIGOS Settings",

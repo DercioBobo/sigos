@@ -9,29 +9,58 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "sec_deck",
+  "deck_participacao",
+  "sec_cabecalho",
   "naming_series",
   "data",
   "horas",
   "col_break_1",
   "delegacao",
   "gravidade",
+  "sec_participante",
+  "participante",
+  "participante_numero",
+  "col_participante",
+  "participante_categoria",
+  "participante_nome",
   "sec_colaborador",
   "vigilante",
   "nome_do_vigilante",
   "mecanografico",
   "col_part_1",
-  "posto",
-  "posto_nome",
   "categoria",
   "sec_infracao",
-  "ocorrencia_referente",
+  "infracoes",
+  "outras_descricao",
+  "col_infracao",
   "tipo_de_infracao",
+  "ocorrencia_referente",
+  "sec_relatorio",
+  "posto",
+  "posto_nome",
+  "col_relatorio",
   "relato",
-  "col_part_2",
+  "sec_testemunhas",
+  "tabela_testemunhas",
   "testemunhas",
   "registado_por"
  ],
  "fields": [
+  {
+   "fieldname": "sec_deck",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "deck_participacao",
+   "fieldtype": "HTML",
+   "label": "Participação"
+  },
+  {
+   "fieldname": "sec_cabecalho",
+   "fieldtype": "Section Break",
+   "label": "Cabeçalho"
+  },
   {
    "fieldname": "naming_series",
    "fieldtype": "Select",
@@ -43,7 +72,7 @@
   {
    "fieldname": "data",
    "fieldtype": "Date",
-   "label": "Data",
+   "label": "Data da Ocorrência",
    "reqd": 1,
    "default": "Today",
    "in_list_view": 1,
@@ -53,7 +82,7 @@
    "fieldname": "horas",
    "fieldtype": "Data",
    "label": "Horas",
-   "description": "Hora da ocorrência (ex.: 14h30)."
+   "description": "Hora da ocorrência (HH:MM)."
   },
   {
    "fieldname": "col_break_1",
@@ -77,17 +106,50 @@
    "default": "Média",
    "reqd": 1,
    "in_list_view": 1,
-   "in_standard_filter": 1
+   "in_standard_filter": 1,
+   "description": "Sugerida pela infracção mais grave marcada; pode ser alterada."
+  },
+  {
+   "fieldname": "sec_participante",
+   "fieldtype": "Section Break",
+   "label": "O Participante"
+  },
+  {
+   "fieldname": "participante",
+   "fieldtype": "Link",
+   "options": "Vigilante",
+   "label": "Participante (Vigilante)",
+   "description": "Quem participa (ex.: o supervisor). Opcional — preenche número, categoria e nome; para quem não é vigilante, escreva-os directamente."
+  },
+  {
+   "fieldname": "participante_numero",
+   "fieldtype": "Data",
+   "label": "Número do Participante"
+  },
+  {
+   "fieldname": "col_participante",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "participante_categoria",
+   "fieldtype": "Data",
+   "label": "Categoria do Participante"
+  },
+  {
+   "fieldname": "participante_nome",
+   "fieldtype": "Data",
+   "label": "Nome do Participante",
+   "description": "Obrigatório para submeter."
   },
   {
    "fieldname": "sec_colaborador",
    "fieldtype": "Section Break",
-   "label": "Vigilante"
+   "label": "O Infractor"
   },
   {
    "fieldname": "vigilante",
    "fieldtype": "Link",
-   "label": "Vigilante",
+   "label": "Infractor (Vigilante)",
    "options": "Vigilante",
    "reqd": 1,
    "in_list_view": 1,
@@ -112,22 +174,6 @@
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "posto",
-   "fieldtype": "Link",
-   "label": "Posto",
-   "options": "Posto De Vigilancia",
-   "fetch_from": "vigilante.posto_de_vigilancia",
-   "read_only": 1,
-   "in_standard_filter": 1
-  },
-  {
-   "fieldname": "posto_nome",
-   "fieldtype": "Data",
-   "label": "Nome do Posto",
-   "fetch_from": "posto.nome_do_posto",
-   "read_only": 1
-  },
-  {
    "fieldname": "categoria",
    "fieldtype": "Link",
    "label": "Categoria",
@@ -139,7 +185,35 @@
   {
    "fieldname": "sec_infracao",
    "fieldtype": "Section Break",
-   "label": "Infracção"
+   "label": "Tipo de Infracção"
+  },
+  {
+   "fieldname": "infracoes",
+   "fieldtype": "Table MultiSelect",
+   "options": "Participacao Infracao",
+   "label": "Infracções",
+   "description": "Uma ou mais (obrigatório para submeter)."
+  },
+  {
+   "fieldname": "outras_descricao",
+   "fieldtype": "Data",
+   "label": "Outras — Descrição",
+   "description": "Obrigatória quando é marcada uma infracção que pede descrição (ex.: Outras)."
+  },
+  {
+   "fieldname": "col_infracao",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "tipo_de_infracao",
+   "fieldtype": "Link",
+   "label": "Infracção Principal",
+   "options": "Tipo De Infracao",
+   "reqd": 0,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "read_only": 1,
+   "description": "A primeira infracção marcada (usada em listas, relatórios e no Processo Disciplinar)."
   },
   {
    "fieldname": "ocorrencia_referente",
@@ -149,28 +223,55 @@
    "read_only": 1
   },
   {
-   "fieldname": "tipo_de_infracao",
+   "fieldname": "sec_relatorio",
+   "fieldtype": "Section Break",
+   "label": "Relatório"
+  },
+  {
+   "fieldname": "posto",
    "fieldtype": "Link",
-   "label": "Tipo de Infracção",
-   "options": "Tipo De Infracao",
-   "reqd": 1,
-   "in_list_view": 1,
-   "in_standard_filter": 1
+   "label": "Posto da Ocorrência",
+   "options": "Posto De Vigilancia",
+   "fetch_from": "vigilante.posto_de_vigilancia",
+   "read_only": 0,
+   "in_standard_filter": 1,
+   "fetch_if_empty": 1,
+   "description": "Por defeito o posto do infractor."
+  },
+  {
+   "fieldname": "posto_nome",
+   "fieldtype": "Data",
+   "label": "Nome do Posto",
+   "fetch_from": "posto.nome_do_posto",
+   "read_only": 1
+  },
+  {
+   "fieldname": "col_relatorio",
+   "fieldtype": "Column Break"
   },
   {
    "fieldname": "relato",
    "fieldtype": "Text",
-   "label": "Relato dos Factos",
+   "label": "Reportagem",
    "reqd": 1
   },
   {
-   "fieldname": "col_part_2",
-   "fieldtype": "Column Break"
+   "fieldname": "sec_testemunhas",
+   "fieldtype": "Section Break",
+   "label": "Do Facto Foram Testemunhas"
+  },
+  {
+   "fieldname": "tabela_testemunhas",
+   "fieldtype": "Table",
+   "options": "Participacao Testemunha",
+   "label": "Testemunhas"
   },
   {
    "fieldname": "testemunhas",
    "fieldtype": "Small Text",
-   "label": "Testemunhas"
+   "label": "Testemunhas (texto — registos antigos)",
+   "read_only": 1,
+   "depends_on": "eval:doc.testemunhas"
   },
   {
    "fieldname": "registado_por",
@@ -182,7 +283,7 @@
   }
  ],
  "links": [],
- "modified": "2026-06-13 00:00:00.000000",
+ "modified": "2026-10-21 16:00:00.000000",
  "modified_by": "Administrator",
  "module": "Disciplinar",
  "name": "Participacao",
@@ -264,5 +365,6 @@
  "sort_order": "DESC",
  "title_field": "nome_do_vigilante",
  "track_changes": 1,
- "app": "sigos"
+ "app": "sigos",
+ "default_print_format": "Participação"
 }

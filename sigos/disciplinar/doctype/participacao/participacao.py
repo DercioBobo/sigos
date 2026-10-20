@@ -1,14 +1,105 @@
+import re
+
 import frappe
 from frappe import _
 from frappe.model.document import Document
 from frappe.utils import formatdate
 
+_ORDEM_GRAVIDADE = {"Baixa": 1, "Média": 2, "Alta": 3}
+
 
 class Participacao(Document):
+	"""
+	Participação — follows the paper form (XSS_OP.FR.006): O Participante (who
+	reports), O Infractor (the guard), Tipo de Infracção (a checklist — one or more,
+	`infracoes`), Relatório (posto, horas, data, reportagem) and the witnesses.
+	`tipo_de_infracao` is kept as the PRINCIPAL infracção (the first one marked) for
+	lists, reports and the Processo Disciplinar. Drafts may be incomplete (e.g. one
+	opened from an Ocorrência); the form's required parts are enforced on submit.
+	"""
 
 	def validate(self):
 		if not self.registado_por:
 			self.registado_por = frappe.session.user
+		self._sincronizar_infracoes()
+		self._preencher_participante()
+		self._preencher_testemunhas()
+		self._normalizar_horas()
+
+	def before_submit(self):
+		if not self.infracoes:
+			frappe.throw(_("Marque pelo menos um <b>Tipo de Infracção</b>."), title=_("Participação Incompleta"))
+		if not (self.participante_nome or "").strip():
+			frappe.throw(_("Indique <b>O Participante</b> (quem faz a participação)."),
+				title=_("Participação Incompleta"))
+		pedem = [
+			r.tipo_de_infracao for r in self.infracoes
+			if frappe.db.get_value("Tipo De Infracao", r.tipo_de_infracao, "pede_descricao")
+		]
+		if pedem and not (self.outras_descricao or "").strip():
+			frappe.throw(_("Descreva a infracção <b>{0}</b>.").format(", ".join(pedem)),
+				title=_("Participação Incompleta"))
+
+	# ─── Form normalisation ──────────────────────────────────────────────────────
+
+	def _sincronizar_infracoes(self):
+		"""Checklist ↔ principal: an old/API record with only tipo_de_infracao gets it
+		as its first row; duplicates are dropped; the principal is the first row;
+		an empty gravidade takes the most serious suggested one."""
+		if not self.infracoes and self.tipo_de_infracao:
+			self.append("infracoes", {"tipo_de_infracao": self.tipo_de_infracao})
+		vistos, linhas = set(), []
+		for r in self.infracoes or []:
+			if r.tipo_de_infracao and r.tipo_de_infracao not in vistos:
+				vistos.add(r.tipo_de_infracao)
+				linhas.append(r)
+		self.set("infracoes", linhas)
+		self.tipo_de_infracao = linhas[0].tipo_de_infracao if linhas else None
+		if not self.gravidade and linhas:
+			sugeridas = [
+				frappe.db.get_value("Tipo De Infracao", r.tipo_de_infracao, "gravidade_sugerida")
+				for r in linhas
+			]
+			sugeridas = [g for g in sugeridas if g in _ORDEM_GRAVIDADE]
+			if sugeridas:
+				self.gravidade = max(sugeridas, key=_ORDEM_GRAVIDADE.get)
+
+	def _preencher_participante(self):
+		if self.participante and self.participante == self.vigilante:
+			frappe.throw(_("O participante não pode ser o próprio infractor."), title=_("Participante"))
+		if self.participante:
+			v = frappe.db.get_value(
+				"Vigilante", self.participante, ["mecanografico", "categoria", "nome_completo"], as_dict=True
+			) or {}
+			self.participante_numero = self.participante_numero or v.get("mecanografico")
+			self.participante_categoria = self.participante_categoria or v.get("categoria")
+			self.participante_nome = self.participante_nome or v.get("nome_completo")
+
+	def _preencher_testemunhas(self):
+		"""Fill a witness from their Vigilante, drop blank rows, never the infractor."""
+		linhas = []
+		for r in self.tabela_testemunhas or []:
+			if r.vigilante:
+				if r.vigilante == self.vigilante:
+					frappe.throw(_("O infractor não pode ser testemunha da própria participação."),
+						title=_("Testemunhas"))
+				v = frappe.db.get_value(
+					"Vigilante", r.vigilante, ["mecanografico", "categoria", "nome_completo"], as_dict=True
+				) or {}
+				r.numero = r.numero or v.get("mecanografico")
+				r.categoria = r.categoria or v.get("categoria")
+				r.nome = r.nome or v.get("nome_completo")
+			if (r.nome or "").strip() or r.vigilante:
+				linhas.append(r)
+		for i, r in enumerate(linhas, start=1):
+			r.idx = i
+		self.set("tabela_testemunhas", linhas)
+
+	def _normalizar_horas(self):
+		"""'14h30' / '14.30' / '9:5' → 'HH:MM' (the form's time picker sends HH:MM:SS)."""
+		m = re.match(r"^\s*(\d{1,2})\s*[hH:.]\s*(\d{1,2})", self.horas or "")
+		if m and int(m.group(1)) < 24 and int(m.group(2)) < 60:
+			self.horas = f"{int(m.group(1)):02d}:{int(m.group(2)):02d}"
 
 	def on_submit(self):
 		self._registar_timeline(_("registada"))
@@ -60,7 +151,7 @@ class Participacao(Document):
 			"delegacao": self.delegacao,
 			"vigilante": self.vigilante,
 			"gravidade": self.gravidade,
-			"motivo": self.tipo_de_infracao,
+			"motivo": ", ".join(r.tipo_de_infracao for r in self.infracoes) or self.tipo_de_infracao,
 			"detalhes": self.relato,
 			"participacao_referente": self.name,
 			"automatico": razao,
@@ -153,11 +244,36 @@ class Participacao(Document):
 		if not self.vigilante:
 			return
 		from sigos.timeline import registar
+		infracoes = ", ".join(r.tipo_de_infracao for r in self.infracoes or []) or self.tipo_de_infracao
 		texto = _("Participação {0} — <b>{1}</b> ({2})").format(
-			accao, self.tipo_de_infracao or _("(sem tipo)"), self.gravidade or "-"
+			accao, infracoes or _("(sem tipo)"), self.gravidade or "-"
 		)
 		if self.posto:
 			texto += _(" · posto <b>{0}</b>").format(self.posto)
 		if self.data:
 			texto += _(" · {0}").format(formatdate(self.data))
 		registar(self.vigilante, texto, self)
+
+
+@frappe.whitelist()
+def participante_padrao():
+	"""The current user as the default participante: their Vigilante (via the
+	Employee linked to the user) when there is one, else just their name."""
+	user = frappe.session.user
+	emp = frappe.db.get_value(
+		"Employee", {"user_id": user, "status": "Active"},
+		["name", "employee_name", "custom_vigilante", "designation"], as_dict=True,
+	)
+	if emp and emp.custom_vigilante:
+		v = frappe.db.get_value(
+			"Vigilante", emp.custom_vigilante, ["name", "mecanografico", "categoria", "nome_completo"],
+			as_dict=True,
+		)
+		if v:
+			return {"participante": v.name, "participante_numero": v.mecanografico,
+				"participante_categoria": v.categoria, "participante_nome": v.nome_completo}
+	if emp:
+		return {"participante_numero": emp.name, "participante_categoria": emp.designation,
+			"participante_nome": emp.employee_name}
+	return {"participante_nome": frappe.db.get_value("User", user, "full_name")}
+

@@ -29,17 +29,20 @@ function _filtro_vigilante(frm) {
 // Read-only preview of the original Participação that opened this process.
 // gravidade/motivo/detalhes below are just a snapshot HR can freely edit while
 // working the process, so this keeps the untouched original report visible for
-// reference (testemunhas has no equivalent field on the Processo Disciplinar).
+// reference (the witnesses have no equivalent on the Processo Disciplinar).
 function _mostrar_preview_participacao(frm) {
 	const w = frm.fields_dict.participacao_preview?.$wrapper;
 	if (!w) return;
 	if (!frm.doc.participacao_referente) { w.html(""); return; }
 
-	frappe.db.get_value("Participacao", frm.doc.participacao_referente, [
-		"data", "horas", "posto", "posto_nome", "gravidade", "tipo_de_infracao", "relato", "testemunhas",
-	]).then((r) => {
-		const p = r.message;
+	frappe.db.get_doc("Participacao", frm.doc.participacao_referente).then((p) => {
 		if (!p) { w.html(""); return; }
+		const infracoes = (p.infracoes || []).map((r) => r.tipo_de_infracao).join(", ") || p.tipo_de_infracao;
+		const testemunhas = (p.tabela_testemunhas || [])
+			.map((t) => [t.nome, t.numero && `Nº ${t.numero}`, t.categoria].filter(Boolean).join(" · "))
+			.join("\n") || p.testemunhas;
+		const participante = [p.participante_nome, p.participante_numero && `Nº ${p.participante_numero}`,
+			p.participante_categoria].filter(Boolean).join(" · ");
 
 		const esc = frappe.utils.escape_html;
 		const celula = (label, val) => val
@@ -60,10 +63,11 @@ function _mostrar_preview_participacao(frm) {
 					${celula(__("Data"), quando)}
 					${celula(__("Posto"), p.posto_nome || p.posto)}
 					${celula(__("Gravidade"), p.gravidade)}
-					${celula(__("Tipo de Infracção"), p.tipo_de_infracao)}
+					${celula(__("Participante"), participante)}
 				</div>
-				${bloco(__("Relato dos Factos"), p.relato)}
-				${bloco(__("Testemunhas"), p.testemunhas)}
+				${bloco(__("Infracções"), infracoes + (p.outras_descricao ? ` (${p.outras_descricao})` : ""))}
+				${bloco(__("Reportagem"), p.relato)}
+				${bloco(__("Testemunhas"), testemunhas)}
 			</div>
 		`);
 	});

@@ -1,0 +1,57 @@
+{
+ "actions": [],
+ "creation": "2026-10-21 16:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "istable": 1,
+ "field_order": [
+  "vigilante",
+  "numero",
+  "categoria",
+  "nome"
+ ],
+ "fields": [
+  {
+   "fieldname": "vigilante",
+   "fieldtype": "Link",
+   "options": "Vigilante",
+   "label": "Vigilante",
+   "in_list_view": 1,
+   "columns": 3,
+   "description": "Opcional — preenche número, categoria e nome. Para alguém que não é vigilante, escreva-os directamente."
+  },
+  {
+   "fieldname": "numero",
+   "fieldtype": "Data",
+   "label": "Número",
+   "in_list_view": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "categoria",
+   "fieldtype": "Data",
+   "label": "Categoria",
+   "in_list_view": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "nome",
+   "fieldtype": "Data",
+   "label": "Nome",
+   "in_list_view": 1,
+   "columns": 3
+  }
+ ],
+ "links": [],
+ "modified": "2026-10-21 16:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Disciplinar",
+ "name": "Participacao Testemunha",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "app": "sigos"
+}
