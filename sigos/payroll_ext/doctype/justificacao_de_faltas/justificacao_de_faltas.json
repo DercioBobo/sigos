@@ -16,6 +16,7 @@
   "sec_faltas",
   "dia_de_inicio",
   "dias_a_justificar",
+  "doenca",
   "col_break_2",
   "dia_de_fim",
   "numero",
@@ -83,6 +84,13 @@
    "default": "1"
   },
   {
+   "fieldname": "doenca",
+   "fieldtype": "Check",
+   "label": "Doença (atestado médico)",
+   "default": "0",
+   "description": "As faltas ficam limpas, mas os dias seguem a regra de doença (SIGOS Settings): até 3 dias pagos pela empresa; 4 ou mais, todos pagos pelo INSS (descontados do salário)."
+  },
+  {
    "fieldname": "col_break_2",
    "fieldtype": "Column Break"
   },
@@ -128,7 +136,7 @@
  ],
  "is_submittable": 1,
  "links": [],
- "modified": "2026-06-02 00:00:00.000000",
+ "modified": "2026-10-21 14:00:00.000000",
  "modified_by": "Administrator",
  "module": "Payroll Ext",
  "name": "Justificacao De Faltas",

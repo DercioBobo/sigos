@@ -32,6 +32,7 @@ from sigos.utils import (
 	calcular_meias_dobras_vigilante,
 	calcular_horas_extras_vigilante,
 	calcular_faltas_vermelhas_vigilante,
+	calcular_faltas_detalhado,
 )
 
 
@@ -215,7 +216,7 @@ def _vigilante_em_reserva(doc):
 	if not doc.custom_vigilante:
 		return False
 	estado = frappe.db.get_value("Vigilante", doc.custom_vigilante, "status")
-	return estado in ("Reserva", "Abandono de Posto")
+	return estado in ("Reserva", "Abandono de Posto", "Doente")
 
 
 def _componentes_aplicaveis(project, vigilante):
@@ -927,7 +928,10 @@ def _add_horas_extras(doc):
 def _dias_fora_emprego(doc):
 	"""Calendar days within the slip period that are NOT paid: outside the
 	employment window [date_of_joining, relieving_date] — not yet joined or already
-	left. 0 for a normal full-month employee."""
+	left — plus, inside it, sick days paid by INSS (the 3-day rule: Baixas Médicas
+	and sickness-justified faltas longer than N days, sigos.doenca) and days of an
+	Abandono de Posto episode (from the Presunção to the day before the return,
+	sigos.abandono). 0 for a normal full-month employee."""
 	if not (doc.employee and doc.start_date and doc.end_date):
 		return 0
 	emp = frappe.db.get_value(
@@ -940,7 +944,14 @@ def _dias_fora_emprego(doc):
 	emp_start = max(start, getdate(emp.date_of_joining)) if emp.date_of_joining else start
 	emp_end = min(end, getdate(emp.relieving_date)) if emp.relieving_date else end
 	empregado = (date_diff(emp_end, emp_start) + 1) if emp_start <= emp_end else 0
-	return max(0, total - empregado)
+	fora = 0
+	if doc.get("custom_vigilante") and emp_start <= emp_end:
+		from sigos.abandono import dias_abandono
+		from sigos.doenca import dias_inss
+		# Union — a day is unpaid once, whatever the reason.
+		fora = len(dias_inss(doc.custom_vigilante, emp_start, emp_end)
+			| dias_abandono(doc.custom_vigilante, emp_start, emp_end))
+	return max(0, total - empregado + fora)
 
 
 def _get_componente_proporcional():
@@ -964,7 +975,7 @@ def _get_componente_proporcional():
 
 def _add_proporcional_admissao_demissao(doc):
 	"""Deduct the base portion for days the employee was NOT in service this period
-	(joined or left mid-month): base × dias_fora / total_dias. Uses the exact calendar
+	(joined or left mid-month, on Baixa Médica or in Abandono de Posto): base × dias_fora / total_dias. Uses the exact calendar
 	fraction (independent of the faltas divisor) and is disjoint from faltas — no
 	Ausencias exist outside the employment window. No-op for full-month employees."""
 	if not (doc.employee and doc.start_date and doc.end_date):
@@ -1098,6 +1109,99 @@ def _deduzir_ferias_faltas_vermelhas(doc):
 			f"SalarySlip {doc.name}: erro ao abater férias por faltas vermelhas: {e}",
 			"SIGOS Faltas Vermelhas",
 		)
+
+
+def reinstituir_ferias_justificacao(doc, method=None):
+	"""
+	Justificacao De Faltas on_submit: give back the férias that already-processed
+	payslips withheld for Vermelha faltas now justified (customer-specific, SIGOS
+	Settings.faltas_normal_vermelha_activo — the only path where faltas cost
+	férias, _deduzir_ferias_faltas_vermelhas). Faltas not yet processed need
+	nothing: their payslip already sees the justification. Credit = min(Vermelha
+	faltas in the window processed in a submitted slip, days those slips withheld),
+	as a +Leave Ledger Entry owned by the justification (reversed on cancel).
+	"""
+	settings = frappe.get_single("SIGOS Settings")
+	if not settings.faltas_normal_vermelha_activo or not doc.get("vigilante"):
+		return
+	try:
+		emp = doc.get("funcionario") or frappe.db.get_value("Vigilante", doc.vigilante, "funcionario")
+		if not emp or not (doc.dia_de_inicio and doc.dia_de_fim):
+			return
+		linhas = [
+			r for r in calcular_faltas_detalhado(doc.vigilante, doc.dia_de_inicio, doc.dia_de_fim)
+			if r.get("subtipo_falta") == "Vermelha" and r.get("processado_em_folha")
+		]
+		if not linhas:
+			return
+		folhas = list({r["processado_em_folha"] for r in linhas})
+		retido = -sum(flt(l.leaves) for l in frappe.get_all(
+			"Leave Ledger Entry",
+			filters={"transaction_type": "Salary Slip", "transaction_name": ["in", folhas], "docstatus": 1},
+			fields=["leaves"],
+		))
+		dias = min(sum(r["n_de_faltas"] or 0 for r in linhas), retido)
+		if dias <= 0:
+			return
+		leave_type = settings.leave_type_ferias or "Ferias"
+		from sigos.ferias import _buscar_alocacao
+		alloc = _buscar_alocacao(emp, leave_type)
+		if not alloc:
+			frappe.log_error(
+				f"Justificacao {doc.name}: sem Leave Allocation de '{leave_type}' para {emp} — "
+				"não foi possível repor as férias.", "SIGOS Faltas Vermelhas",
+			)
+			return
+		lle = frappe.get_doc({
+			"doctype": "Leave Ledger Entry", "employee": emp, "leave_type": leave_type,
+			"transaction_type": "Justificacao De Faltas", "transaction_name": doc.name,
+			"leaves": flt(dias), "from_date": alloc["from_date"], "to_date": alloc["to_date"],
+			"is_carry_forward": 0, "is_expired": 0, "is_lwp": 0,
+			"company": alloc.get("company"),
+		})
+		lle.flags.ignore_permissions = True
+		lle.insert()
+		lle.submit()
+		frappe.db.set_value(
+			"Leave Allocation", alloc["name"],
+			{
+				"new_leaves_allocated": flt(alloc.get("new_leaves_allocated")) + dias,
+				"total_leaves_allocated": flt(alloc.get("total_leaves_allocated")) + dias,
+			},
+			update_modified=False,
+		)
+		frappe.msgprint(
+			f"Repostos <b>{dias:g}</b> dia(s) de férias retidos por faltas vermelhas agora justificadas.",
+			indicator="green", alert=True,
+		)
+	except Exception as e:
+		frappe.log_error(f"Justificacao {doc.name}: erro ao repor férias: {e}", "SIGOS Faltas Vermelhas")
+
+
+def reverter_ferias_justificacao(doc, method=None):
+	"""Justificacao De Faltas on_cancel: undo the férias credit it made (if any)."""
+	try:
+		for name in frappe.get_all(
+			"Leave Ledger Entry",
+			filters={"transaction_type": "Justificacao De Faltas", "transaction_name": doc.name, "docstatus": 1},
+			pluck="name",
+		):
+			lle = frappe.get_doc("Leave Ledger Entry", name)
+			lle.flags.ignore_permissions = True
+			lle.cancel()
+			alloc = frappe.db.get_value(
+				"Leave Allocation",
+				{"employee": lle.employee, "leave_type": lle.leave_type, "from_date": lle.from_date,
+				 "to_date": lle.to_date, "docstatus": 1},
+				["name", "new_leaves_allocated", "total_leaves_allocated"], as_dict=True,
+			)
+			if alloc:
+				frappe.db.set_value("Leave Allocation", alloc.name, {
+					"new_leaves_allocated": flt(alloc.new_leaves_allocated) - flt(lle.leaves),
+					"total_leaves_allocated": flt(alloc.total_leaves_allocated) - flt(lle.leaves),
+				}, update_modified=False)
+	except Exception as e:
+		frappe.log_error(f"Justificacao {doc.name}: erro ao reverter férias: {e}", "SIGOS Faltas Vermelhas")
 
 
 def _reverter_ferias_faltas_vermelhas(doc):

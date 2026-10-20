@@ -25,6 +25,7 @@ frappe.ui.form.on("Vigilante", {
 		_toggle_supervisor(frm);
 		_toggle_subsidios_comb(frm);
 		_abandono_de_posto(frm);
+		_doente(frm);
 
 		// Ver Escala — only for active guards already assigned to a posto
 		if (!frm.is_new() && frm.doc.status === "Activo" && frm.doc.posto_de_vigilancia) {
@@ -234,9 +235,9 @@ function _toggle_subsidios_comb(frm) {
 // ─── Abandono de Posto (sigos/abandono.py) ─────────────────────────────────────
 // Detected (daily job flagged a streak, guard still Activo/Reserva): red headline
 // with the live streak + "Criar Presunção de Abandono" (Apenas Alerta mode).
-// In Abandono (Presunção open): the guard stays on posto + escala but out of the
-// posto's headcount — headline + Ver Presunção / Registar Regresso (stay, Reserva
-// or a new posto, optionally justified) / Demitir (DEM wizard).
+// In Abandono (Presunção open): off posto + escala, salary frozen, no faltas —
+// headline + Ver Presunção / Registar Regresso (previous posto if it still has
+// room, Reserva or a new posto, optionally justified) / Demitir (DEM wizard).
 function _abandono_de_posto(frm) {
 	if (frm.is_new()) return;
 	const pode_ops = frappe.user.has_role("Aprovador Operações")
@@ -256,7 +257,7 @@ function _abandono_de_posto(frm) {
 			? ` — <a href="/app/presuncao-de-abandono/${encodeURIComponent(frm.doc.presuncao_abandono)}">${__("Presunção {0}", [frappe.utils.escape_html(frm.doc.presuncao_abandono)])}</a>`
 			: "";
 		frm.dashboard.set_headline_alert(
-			__("Em <b>Abandono de Posto</b> desde {0}{1}. Continua no posto e na escala (marque as faltas por turno), mas não conta na lotação do posto — pode colocar outro vigilante.",
+			__("Em <b>Abandono de Posto</b> desde {0}{1}. Fora do posto e da escala, salário congelado (a empresa não paga até ao regresso) e sem registo de faltas.",
 				[fmt(frm.doc.data_inicio_abandono), pres]),
 			"red",
 		);
@@ -294,6 +295,108 @@ function _abandono_de_posto(frm) {
 	}
 }
 
+// ─── Doentes (sigos/doenca.py) ─────────────────────────────────────────────────
+// Activo/Reserva: "Marcar Doente" (off posto + escala, Baixa Médica opened).
+// Doente: headline + Ver Baixa / Registar Regresso (previous posto if it still has
+// room, Reserva, or a new posto via APR). Paid by INSS meanwhile — out of payroll.
+const _PAPEIS_DOENCA = ["Aprovador Operações", "Operações SIGOS", "Aprovador RH", "RH Normal",
+	"SIGOS Manager", "System Manager"];
+
+function _doente(frm) {
+	if (frm.is_new()) return;
+	const pode = _PAPEIS_DOENCA.some((r) => frappe.user.has_role(r));
+	const fmt = (d) => frappe.datetime.str_to_user(d);
+
+	if (["Activo", "Reserva"].includes(frm.doc.status) && pode) {
+		frm.add_custom_button(__("Marcar Doente"), () => {
+			const d = new frappe.ui.Dialog({
+				title: __("Marcar Doente (Baixa Médica)"),
+				fields: [
+					{ fieldtype: "HTML", options: `<p class="text-muted" style="margin-bottom:8px">${__(
+						"O vigilante sai do posto e da escala (o turno fica como vaga) e o salário fica congelado até ao regresso. Não são registadas faltas durante a baixa. Até 3 dias de doença são pagos pela empresa; 4 ou mais, todos os dias são pagos pelo INSS (descontados).")}</p>` },
+					{ fieldname: "data_inicio", fieldtype: "Date", label: __("Doente desde"), reqd: 1,
+						default: frappe.datetime.get_today() },
+					{ fieldname: "atestado", fieldtype: "Attach", label: __("Atestado Médico (opcional)") },
+					{ fieldname: "observacoes", fieldtype: "Small Text", label: __("Observações") },
+				],
+				primary_action_label: __("Marcar Doente"),
+				primary_action(v) {
+					if (v.data_inicio > frappe.datetime.get_today()) {
+						frappe.msgprint(__("A data não pode ser no futuro.")); return;
+					}
+					d.hide();
+					frm.call("marcar_doente", {
+						data_inicio: v.data_inicio, atestado: v.atestado || null, observacoes: v.observacoes || null,
+					}).then(() => frm.reload_doc());
+				},
+			});
+			d.show();
+		}, __("Acções"));
+	}
+
+	if (frm.doc.status !== "Doente") return;
+	frm.dashboard.set_headline_alert(
+		__("<b>Doente</b> (Baixa Médica {0}) — fora do posto e da escala; fora das folhas de salário (pago pelo INSS).",
+			[frappe.utils.escape_html(frm.doc.baixa_medica || "")]),
+		"blue",
+	);
+	if (frm.doc.baixa_medica) {
+		frm.add_custom_button(__("Ver Baixa Médica"),
+			() => frappe.set_route("Form", "Baixa Medica", frm.doc.baixa_medica), __("Acções"));
+	}
+	if (!pode) return;
+	frm.add_custom_button(__("Registar Regresso"), () => {
+		const abrir = (baixa) => {
+			const destinos = [];
+			if (baixa && baixa.posto_anterior) {
+				destinos.push({ value: "Posto Anterior",
+					label: __("Voltar ao posto anterior ({0}) — só se ainda houver vaga", [baixa.posto_anterior]) });
+			}
+			destinos.push(
+				{ value: "Reserva", label: __("Ficar em Reserva") },
+				{ value: "Novo Posto", label: __("Atribuir um novo posto (abre a Rotatividade APR)") },
+			);
+			const d = new frappe.ui.Dialog({
+				title: __("Regresso da Baixa Médica"),
+				fields: [
+					{ fieldname: "destino", fieldtype: "Select", label: __("Destino"), reqd: 1,
+						options: destinos, default: destinos[0].value },
+					{ fieldname: "data_regresso", fieldtype: "Date", label: __("Data de Regresso"), reqd: 1,
+						default: frappe.datetime.get_today(),
+						description: baixa ? __("Doente desde {0}. Até 3 dias: pagos pela empresa. 4 ou mais: todos os dias até à véspera do regresso pagos pelo INSS (descontados).", [fmt(baixa.data_inicio)]) : "" },
+					{ fieldname: "atestado", fieldtype: "Attach", label: __("Atestado / Justificação (opcional)") },
+					{ fieldname: "observacoes", fieldtype: "Small Text", label: __("Observações") },
+				],
+				primary_action_label: __("Confirmar Regresso"),
+				primary_action(v) {
+					if (v.data_regresso > frappe.datetime.get_today()) {
+						frappe.msgprint(__("A data de regresso não pode ser no futuro.")); return;
+					}
+					d.hide();
+					frm.call("registar_regresso_doenca", {
+						destino: v.destino, data_regresso: v.data_regresso,
+						atestado: v.atestado || null, observacoes: v.observacoes || null,
+					}).then(() => {
+						if (v.destino === "Novo Posto") {
+							frappe.route_options = { vigilante: frm.doc.name, abreviatura_op: "APR" };
+							frappe.new_doc("Rotatividade");
+						} else {
+							frm.reload_doc();
+						}
+					});
+				},
+			});
+			d.show();
+		};
+		if (frm.doc.baixa_medica) {
+			frappe.db.get_value("Baixa Medica", frm.doc.baixa_medica, ["posto_anterior", "data_inicio"])
+				.then((r) => abrir(r.message)).catch(() => abrir(null));
+		} else {
+			abrir(null);
+		}
+	}, __("Acções"));
+}
+
 // Congelar Salário (RH): only for guards in Abandono de Posto; frozen guards are
 // left out of Payroll Entries until the freeze is lifted (by hand here, or
 // automatically on Registar Regresso / Demissão).
@@ -320,7 +423,7 @@ function _salario_congelado(frm, fmt) {
 		}
 		return;
 	}
-	if (pode_rh && frm.doc.status === "Abandono de Posto") {
+	if (pode_rh && ["Abandono de Posto", "Doente"].includes(frm.doc.status)) {
 		frm.add_custom_button(__("Congelar Salário"), () => {
 			frappe.prompt(
 				[
@@ -334,18 +437,26 @@ function _salario_congelado(frm, fmt) {
 	}
 }
 
-// The guard came back: stay on the posto they never left (only if it still has
-// room — a replacement may have been placed meanwhile), Reserva, or a new posto
-// (APR wizard). A justification files a Justificacao De Faltas over the episode.
-// The open Presunção closes as "Regressou".
+// The guard came back: previous posto (only if it is still active and has room —
+// the slot became a Vaga), Reserva, or a new posto (APR wizard). The salary is
+// unfrozen (pay restarts today; the abandono period stays unpaid). A justification
+// files a Justificacao De Faltas: the faltas before the limit are cleared and the
+// férias withheld for them come back. The open Presunção closes as "Regressou".
 function _registar_regresso(frm) {
+	if (!frm.doc.presuncao_abandono) { _dialogo_regresso(frm, null); return; }
+	frappe.db.get_value("Presuncao De Abandono", frm.doc.presuncao_abandono, "posto_de_vigilancia")
+		.then((r) => _dialogo_regresso(frm, (r.message || {}).posto_de_vigilancia || null))
+		.catch(() => _dialogo_regresso(frm, null));
+}
+
+function _dialogo_regresso(frm, postoAnterior) {
 	const desde = frm.doc.abandono_inicio_ausencia || frm.doc.abandono_primeira_falta
 		|| frm.doc.data_inicio_abandono;
 	const ontem = frappe.datetime.add_days(frappe.datetime.get_today(), -1);
 	const destinos = [];
-	if (frm.doc.posto_de_vigilancia) {
-		destinos.push({ value: "Posto Actual",
-			label: __("Continuar no posto actual ({0}) — se ainda houver vaga", [frm.doc.nome_do_posto || frm.doc.posto_de_vigilancia]) });
+	if (postoAnterior) {
+		destinos.push({ value: "Posto Anterior",
+			label: __("Voltar ao posto anterior ({0}) — só se ainda houver vaga", [postoAnterior]) });
 	}
 	destinos.push(
 		{ value: "Reserva", label: __("Ficar em Reserva") },
@@ -355,18 +466,21 @@ function _registar_regresso(frm) {
 		title: __("Registar Regresso"),
 		fields: [
 			{ fieldtype: "HTML", options: `<p class="text-muted" style="margin-bottom:8px">${
-				__("Fecha a Presunção de Abandono como <b>Regressou</b> (se já foi encaminhada para Processo Disciplinar, o processo continua).")}</p>` },
+				__("O salário é descongelado e volta a ser pago a partir de hoje — o período em abandono não é pago. Fecha a Presunção como <b>Regressou</b> (se já foi encaminhada para Processo Disciplinar, o processo continua).")}</p>` },
 			{ fieldname: "destino", fieldtype: "Select", label: __("Destino"), reqd: 1,
 				options: destinos, default: destinos[0].value },
 			{ fieldtype: "Section Break" },
 			{ fieldname: "justificado", fieldtype: "Check",
-				label: __("Apresentou justificação (perdoar os dias de ausência)") },
+				label: __("Apresentou justificação (limpa as faltas e repõe as férias)") },
 			{ fieldname: "justificar_desde", fieldtype: "Date", label: __("Justificar desde"),
 				default: desde, depends_on: "eval:doc.justificado",
 				description: __("Por defeito, a primeira falta da sequência.") },
 			{ fieldname: "justificar_ate", fieldtype: "Date", label: __("Justificar até"),
 				default: ontem, depends_on: "eval:doc.justificado",
 				description: __("Por defeito, ontem. As faltas fora deste período continuam descontadas. Para vários períodos separados, crie Justificações de Faltas adicionais (sem prazo dentro do abandono).") },
+			{ fieldname: "doenca", fieldtype: "Check", label: __("Doença (atestado médico)"),
+				depends_on: "eval:doc.justificado",
+				description: __("As faltas ficam limpas; até 3 dias pagos pela empresa, 4 ou mais pagos pelo INSS (descontados).") },
 			{ fieldname: "justificativo", fieldtype: "Attach", label: __("Justificativo"),
 				depends_on: "eval:doc.justificado" },
 			{ fieldname: "observacoes", fieldtype: "Small Text", label: __("Observações da Justificação"),
@@ -391,6 +505,7 @@ function _registar_regresso(frm) {
 				justificado: vals.justificado ? 1 : 0,
 				justificar_desde: vals.justificado ? vals.justificar_desde : null,
 				justificar_ate: vals.justificado ? vals.justificar_ate : null,
+				doenca: vals.justificado && vals.doenca ? 1 : 0,
 				justificativo: vals.justificado ? vals.justificativo : null,
 				observacoes: vals.justificado ? vals.observacoes : null,
 				destino: vals.destino,
@@ -471,12 +586,14 @@ const _DASH_REQ = {
 	"Pre-Adimissão RH": ["delegacao", "categoria", "data_admissao"],
 	"Reserva":          ["categoria", "delegacao", "mecanografico", "data_admissao"],
 	"Abandono de Posto": ["categoria", "delegacao", "mecanografico", "data_admissao"],
+	"Doente": ["categoria", "delegacao", "mecanografico", "data_admissao"],
 };
 const _DASH_STATUS_CLS = {
 	"Activo": "vigd-st-on", "Reserva": "vigd-st-res",
 	"Pre-Adimissão": "vigd-st-pre", "Pre-Adimissão RH": "vigd-st-pre",
 	"Inactivo": "vigd-st-off", "Demitido": "vigd-st-dem",
 	"Abandono de Posto": "vigd-st-abd",
+	"Doente": "vigd-st-doe",
 };
 const _DASH_PER_CLS = { "Manhã": "cell-manha", "Noite": "cell-noite", "Tarde": "cell-tarde" };
 
@@ -501,6 +618,8 @@ function _render_mini_dash(frm) {
 	let postoOpts = { req: req.has("posto_de_vigilancia") };
 	if (frm.doc.status === "Reserva" && !frm.doc.posto_de_vigilancia) {
 		postoOpts = { html: `<span class="vigd-dim">${__("Reserva — sem posto")}</span>` };
+	} else if (frm.doc.status === "Doente") {
+		postoOpts = { html: `<span class="vigd-dim">${__("Doente — sem posto (Baixa Médica)")}</span>` };
 	} else if (frm.doc.status === "Abandono de Posto" && !frm.doc.posto_de_vigilancia) {
 		postoOpts = { html: `<span class="vigd-dim">${__("Abandono — da Reserva")}</span>` };
 	}
@@ -578,6 +697,7 @@ function _inject_dash_css() {
 .vigd-st-off { background: #e2e3e5; color: #41464b; }
 .vigd-st-dem { background: #f8d7da; color: #842029; }
 .vigd-st-abd { background: #ffe5d0; color: #9a3412; }
+.vigd-st-doe { background: #e0ecff; color: #1e40af; }
 .vigd-cobertura-badge { display: inline-block; margin-left: 6px; padding: 2px 10px; border-radius: 999px;
   font-size: .82em; font-weight: 600; background: #fff3cd; color: #856404; }
 .vigd-chip { display: inline-block; padding: 2px 10px; border-radius: 999px; color: #fff; font-size: .82em; font-weight: 700; }

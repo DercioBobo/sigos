@@ -4,18 +4,21 @@ from frappe.model.document import Document
 from frappe.utils import add_days, cint, getdate, today
 
 # Statuses that require an active Employee record
-_REQUER_EMPLOYEE = frozenset({"Pre-Adimissão", "Activo", "Reserva", "Abandono de Posto", "Inactivo", "Demitido"})
+_REQUER_EMPLOYEE = frozenset({"Pre-Adimissão", "Activo", "Reserva", "Abandono de Posto", "Doente", "Inactivo", "Demitido"})
 
 # Canonical Vigilante → Employee status map (single source of truth, shared with sync.py)
 # "Reserva" = benched/available (posto closed) — still employed, so Employee stays Active.
-# "Abandono de Posto" = Presunção de Abandono open (sigos.abandono) — still employed and
-# still on posto + escala until the process concludes, so also Active.
+# "Abandono de Posto" = Presunção de Abandono open (sigos.abandono) — off posto + escala,
+# salary frozen, still employed until the process concludes, so also Active.
 VIGILANTE_TO_EMP_STATUS = {
 	"Pre-Adimissão RH": "Active",
 	"Pre-Adimissão":    "Active",
 	"Activo":            "Active",
 	"Reserva":          "Active",
 	"Abandono de Posto": "Active",
+	# "Doente" = on sick leave (Baixa Médica, sigos.doenca) — off posto + escala, still
+	# employed (paid by INSS, left out of the company payroll meanwhile).
+	"Doente":           "Active",
 	"Inactivo":         "Suspended",
 	"Demitido":         "Left",
 }
@@ -38,17 +41,13 @@ CAMPOS_OPERACIONAIS_RESERVA = (
 )
 
 
-# Statuses that keep the guard on their posto's escala. Abandono de Posto keeps it so
-# faltas go on being marked by turno while the Presunção is open; only "Activo" counts
-# towards the posto's headcount (occupancy / capacity / billing), so a replacement can
-# be placed on top.
-_EM_ESCALA_DO_POSTO = ("Activo", "Abandono de Posto")
-
-
-def _na_reserva(doc):
-	"""In the delegação's Reserva escala: Reserva, or a reserve who went into
-	Abandono (no posto) — stays there for the same reason as above."""
-	return doc.status == "Reserva" or (doc.status == "Abandono de Posto" and not doc.posto_de_vigilancia)
+# Statuses whose salary is frozen while in them (no Payroll Entry, no Salary Slip):
+# a known abandonment (Presunção open) and sick leave (paid by INSS). Applied and
+# lifted automatically by Vigilante._congelar_por_estado.
+_ESTADOS_SALARIO_CONGELADO = {
+	"Abandono de Posto": "Abandono de Posto",
+	"Doente": "Doente (Baixa Médica — pago pelo INSS)",
+}
 
 
 def limpar_campos_operacionais(vig):
@@ -74,6 +73,7 @@ class Vigilante(Document):
 		self._auto_activar_com_posto()
 		self._validar_status_com_posto()
 		self._carimbar_abandono()
+		self._congelar_por_estado()
 		self._validar_capacidade_posto()
 		self._validar_link_employee()
 		self._guardar_mudanca_regime()
@@ -84,6 +84,7 @@ class Vigilante(Document):
 	def on_update(self):
 		self._registar_congelamento_auto()
 		self._fechar_presuncao_se_saiu()
+		self._fechar_baixa_se_saiu()
 		self._atualizar_ocupacao_postos()
 		self._migrar_escala_se_mudou()
 		self._seed_salario_base()
@@ -318,7 +319,7 @@ class Vigilante(Document):
 		# Trigger on posto/regime change OR on activeness change (e.g. demissão:
 		# status leaves Activo with same posto, so they must be pulled from the escala).
 		posto_regime_mudou = (old_posto, old_regime) != (new_posto, new_regime)
-		activo_mudou = (before.status in _EM_ESCALA_DO_POSTO) != (self.status in _EM_ESCALA_DO_POSTO)
+		activo_mudou = (before.status == "Activo") != (self.status == "Activo")
 		if not (posto_regime_mudou or activo_mudou):
 			return
 
@@ -327,7 +328,7 @@ class Vigilante(Document):
 		# a remove-only migration: the guard leaves the old escala but joins none.
 		if self.flags.get("escala_modo") == "sem_escala":
 			destino = (None, None)
-		elif self.status in _EM_ESCALA_DO_POSTO and new_posto and new_regime:
+		elif self.status == "Activo" and new_posto and new_regime:
 			destino = (new_posto, new_regime)
 		else:
 			destino = (None, None)
@@ -359,10 +360,10 @@ class Vigilante(Document):
 		Reserva escala for a delegação (most won't have one); warns when there's
 		more than one (ambiguous — needs a manual pick).
 		"""
-		entrou_reserva = not _na_reserva(before) and _na_reserva(self)
-		saiu_reserva = _na_reserva(before) and not _na_reserva(self)
+		entrou_reserva = before.status != "Reserva" and self.status == "Reserva"
+		saiu_reserva = before.status == "Reserva" and self.status != "Reserva"
 		delegacao_mudou_em_reserva = (
-			_na_reserva(before) and _na_reserva(self)
+			before.status == "Reserva" and self.status == "Reserva"
 			and before.delegacao != self.delegacao
 		)
 		if not (entrou_reserva or saiu_reserva or delegacao_mudou_em_reserva):
@@ -559,7 +560,7 @@ class Vigilante(Document):
 		episode's data_fim_abandono is cleared. Leaving the status by any path
 		(registar_regresso sets its own end; a DEM Rotatividade doesn't) closes it
 		at yesterday — the end of the Presunção's faltas and of the deadline-free
-		justification window. Also applies/lifts the automatic salary freeze.
+		justification window and of the unpaid period.
 		"""
 		before = self.get_doc_before_save()
 		if self.status != "Abandono de Posto":
@@ -571,10 +572,6 @@ class Vigilante(Document):
 					getdate(add_days(today(), -1)),
 					getdate(add_days(self.data_inicio_abandono, -1)),
 				)
-			if before and before.status == "Abandono de Posto" and self.salario_congelado:
-				# The process ended (return / dismissal) — the freeze ends with it.
-				self._descongelar_campos()
-				self.flags.salario_descongelado = True
 			return
 		if before and before.status == "Abandono de Posto":
 			return
@@ -598,13 +595,29 @@ class Vigilante(Document):
 		):
 			self.abandono_inicio_ausencia = self.data_inicio_abandono
 
-		from sigos.abandono import congelar_ao_marcar
-		if congelar_ao_marcar() and not self.salario_congelado:
-			self.salario_congelado = 1
-			self.salario_congelado_desde = self.data_inicio_abandono
-			self.salario_congelado_motivo = _("Congelado automaticamente ao marcar Abandono de Posto.")
-			self.salario_congelado_por = frappe.session.user
-			self.flags.salario_congelado_auto = True
+	def _congelar_por_estado(self):
+		"""Entering Abandono de Posto or Doente freezes the salary; leaving it (return
+		/ dismissal) lifts the freeze — pay restarts on the return date (the period
+		itself is deducted by salary_slip_hooks._dias_fora_emprego)."""
+		before = self.get_doc_before_save()
+		antes = before.status if before else None
+		if antes == self.status:
+			return
+		if self.status in _ESTADOS_SALARIO_CONGELADO:
+			if not self.salario_congelado:
+				self.salario_congelado = 1
+				self.salario_congelado_desde = (
+					self.flags.get("congelado_desde")
+					or (self.data_inicio_abandono if self.status == "Abandono de Posto" else None)
+					or today()
+				)
+				self.salario_congelado_motivo = _("Congelado automaticamente — {0}.").format(
+					_ESTADOS_SALARIO_CONGELADO[self.status])
+				self.salario_congelado_por = frappe.session.user
+				self.flags.salario_congelado_auto = _ESTADOS_SALARIO_CONGELADO[self.status]
+		elif antes in _ESTADOS_SALARIO_CONGELADO and self.salario_congelado:
+			self._descongelar_campos()
+			self.flags.salario_descongelado = _ESTADOS_SALARIO_CONGELADO[antes]
 
 	def _fechar_presuncao_se_saiu(self):
 		"""Left Abandono (return / dismissal): close the open Presunção — Concluída
@@ -615,7 +628,15 @@ class Vigilante(Document):
 		from sigos.abandono import PRESUNCAO_CONCLUIDA, PRESUNCAO_REGRESSOU, fechar_presuncao
 
 		estado = PRESUNCAO_CONCLUIDA if self.status == "Demitido" else PRESUNCAO_REGRESSOU
-		fechar_presuncao(self.name, estado, self.flags.get("nota_fecho_presuncao"))
+		fechar_presuncao(self.name, estado, self.flags.get("nota_fecho_presuncao"), self.data_fim_abandono)
+
+	def _fechar_baixa_se_saiu(self):
+		"""Left Doente by a path other than Registar Regresso (e.g. a DEM dismissal):
+		close the open Baixa Médica as of today (sigos.doenca)."""
+		before = self.get_doc_before_save()
+		if before and before.status == "Doente" and self.status != "Doente":
+			from sigos.doenca import ao_sair_de_doente
+			ao_sair_de_doente(self)
 
 	def _registar_congelamento_auto(self):
 		"""Timeline + message for the freeze changes _carimbar_abandono made."""
@@ -623,10 +644,12 @@ class Vigilante(Document):
 			return
 		from sigos.timeline import registar
 		if self.flags.salario_congelado_auto:
-			registar(self.name, _("<b>Salário congelado</b> automaticamente (Abandono de Posto)."), self)
+			registar(self.name, _("<b>Salário congelado</b> automaticamente — {0}.").format(
+				self.flags.salario_congelado_auto), self)
 		if self.flags.salario_descongelado:
 			from sigos.abandono import aviso_descongelado
-			registar(self.name, _("<b>Salário descongelado</b> — fim do Abandono de Posto."), self)
+			registar(self.name, _("<b>Salário descongelado</b> — fim de {0}.").format(
+				self.flags.salario_descongelado), self)
 			frappe.msgprint(aviso_descongelado(self.name), title=_("Salário Descongelado"), indicator="blue")
 		self.flags.salario_congelado_auto = self.flags.salario_descongelado = False
 
@@ -820,21 +843,24 @@ class Vigilante(Document):
 
 	@frappe.whitelist()
 	def registar_regresso(self, motivo=None, justificado=0, justificar_desde=None,
-			justificativo=None, observacoes=None, destino="Reserva", justificar_ate=None):
+			justificativo=None, observacoes=None, destino="Reserva", justificar_ate=None, doenca=0):
 		"""
-		A guard in Abandono de Posto came back. The episode ends yesterday and the
-		open Presunção closes as "Regressou" (_fechar_presuncao_se_saiu). destino:
-		  - "Posto Actual": back to Activo on the posto they never left — only if
-		    it still has room (a replacement may have been placed meanwhile);
-		  - "Reserva": benched (off posto/escala);
+		A guard in Abandono de Posto came back. The episode ends yesterday (unpaid
+		up to there, salary unfrozen — pay restarts today) and the open Presunção
+		closes as "Regressou" (_fechar_presuncao_se_saiu). destino:
+		  - "Posto Anterior": back to Activo on the posto they held before the
+		    Presunção — only if it is still active and has room;
+		  - "Reserva": benched;
 		  - "Novo Posto": benched, then the form opens the APR wizard.
 		Dismissal instead goes through a DEM Rotatividade (Presunção → Concluída).
 
 		`justificado`: the guard brought a justification — file a Justificacao De
 		Faltas over [`justificar_desde`, `justificar_ate`] (defaults: the streak's
 		first falta .. yesterday). A partial justification (10 of 17 days) just
-		narrows the range; the rest stays deducted. Filed BEFORE the status change
-		so the closing Presunção already leaves the justified faltas out.
+		narrows the range; the rest stays deducted. The justification also gives
+		back férias withheld for those faltas (salary_slip_hooks.
+		reinstituir_ferias_justificacao) but does NOT pay the frozen period. Filed
+		BEFORE the status change so the closing Presunção leaves those faltas out.
 		"""
 		from sigos.abandono import justificar_abandono
 
@@ -848,10 +874,19 @@ class Vigilante(Document):
 		) not in (0, "0"):
 			frappe.throw(_("Anexe o <b>Justificativo</b> para justificar o abandono."))
 
-		if destino not in ("Posto Actual", "Reserva", "Novo Posto"):
+		if destino not in ("Posto Anterior", "Reserva", "Novo Posto"):
 			frappe.throw(_("Destino inválido: {0}").format(destino))
-		if destino == "Posto Actual" and not (self.posto_de_vigilancia and self.regime_do_vigilante):
-			frappe.throw(_("O vigilante não tem posto/regime — escolha Reserva ou Novo Posto."))
+		pres = None
+		if destino == "Posto Anterior":
+			pres = frappe.db.get_value(
+				"Presuncao De Abandono", self.presuncao_abandono,
+				["posto_de_vigilancia", "regime", "turno_anterior", "tipo_de_vigilante_anterior"],
+				as_dict=True,
+			) if self.presuncao_abandono else None
+			if not (pres and pres.posto_de_vigilancia and pres.regime):
+				frappe.throw(_("Sem posto anterior — escolha Reserva ou Novo Posto."))
+			if frappe.db.get_value("Posto De Vigilancia", pres.posto_de_vigilancia, "estado") != "Activo":
+				frappe.throw(_("O posto anterior <b>{0}</b> já não está activo.").format(pres.posto_de_vigilancia))
 
 		ontem = getdate(add_days(today(), -1))
 		inicio = getdate(self.data_inicio_abandono) if self.data_inicio_abandono else ontem
@@ -870,16 +905,22 @@ class Vigilante(Document):
 						frappe.format_value(ate, {"fieldtype": "Date"})),
 					title=_("Justificação"),
 				)
-			just = justificar_abandono(self.name, de, ate, justificativo, observacoes)
+			just = justificar_abandono(self.name, de, ate, justificativo, observacoes, doenca)
 
 		# Returning the same day it was opened — keep fim >= inicio-1 (empty episode).
 		self.data_fim_abandono = max(ontem, getdate(add_days(inicio, -1)))
 		self.abandono_detectado_em = None
 		self.abandono_primeira_falta = None
 		self.flags.nota_fecho_presuncao = motivo
-		if destino == "Posto Actual":
-			# Capacity is re-checked on save (_validar_capacidade_posto counts Activo
-			# only — a replacement placed during the abandono may have filled the slot).
+		if destino == "Posto Anterior":
+			# Capacity is re-checked on save (_validar_capacidade_posto) — the slot
+			# may have been filled meanwhile; the old turno is preferred if free.
+			self.posto_de_vigilancia = pres.posto_de_vigilancia
+			self.regime_do_vigilante = pres.regime
+			if pres.tipo_de_vigilante_anterior:
+				self.tipo_de_vigilante = pres.tipo_de_vigilante_anterior
+			if pres.turno_anterior:
+				self.flags.turno_inicial_preferido = pres.turno_anterior
 			self.status = "Activo"
 			self.save()
 		else:
@@ -887,8 +928,8 @@ class Vigilante(Document):
 
 		from sigos.timeline import registar
 		fica = (
-			_("continua no posto <b>{0}</b>").format(self.nome_do_posto or self.posto_de_vigilancia)
-			if destino == "Posto Actual" else _("fica em <b>Reserva</b>")
+			_("volta ao posto <b>{0}</b>").format(self.nome_do_posto or self.posto_de_vigilancia)
+			if destino == "Posto Anterior" else _("fica em <b>Reserva</b>")
 		)
 		texto = _("<b>Regressou</b> do Abandono de Posto ({0} a {1}) — {2}.").format(
 			frappe.format_value(self.data_inicio_abandono, {"fieldtype": "Date"}),
@@ -908,6 +949,20 @@ class Vigilante(Document):
 		return {"status": self.status, "justificacao": just}
 
 	@frappe.whitelist()
+	def marcar_doente(self, data_inicio=None, atestado=None, observacoes=None):
+		"""Sick leave: open a Baixa Médica, take the guard off posto + escala (the
+		vacated turno becomes a Vaga). See sigos.doenca."""
+		from sigos.doenca import marcar_doente
+		return marcar_doente(self, data_inicio, atestado, observacoes)
+
+	@frappe.whitelist()
+	def registar_regresso_doenca(self, destino="Reserva", data_regresso=None, atestado=None, observacoes=None):
+		"""Back from sick leave: Posto Anterior (if it still has room) / Reserva /
+		Novo Posto (the form then opens APR). Closes the Baixa Médica."""
+		from sigos.doenca import registar_regresso
+		return registar_regresso(self, destino, data_regresso, atestado, observacoes)
+
+	@frappe.whitelist()
 	def congelar_salario(self, motivo=None):
 		"""RH: freeze a guard in Abandono de Posto out of payroll until the process
 		ends. Written with db.set_value (no full save — nothing else changes, and a
@@ -916,8 +971,8 @@ class Vigilante(Document):
 		from sigos.abandono import PAPEIS_CONGELAR
 
 		frappe.only_for(PAPEIS_CONGELAR)
-		if self.status != "Abandono de Posto":
-			frappe.throw(_("Só é possível congelar o salário de um vigilante em <b>Abandono de Posto</b>."))
+		if self.status not in _ESTADOS_SALARIO_CONGELADO:
+			frappe.throw(_("Só é possível congelar o salário de um vigilante em <b>Abandono de Posto</b> ou <b>Doente</b>."))
 		if self.salario_congelado:
 			frappe.throw(_("O salário já está congelado."), title=_("Sem alteração"))
 		motivo = (motivo or "").strip()

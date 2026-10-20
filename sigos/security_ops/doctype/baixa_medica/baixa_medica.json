@@ -1,0 +1,307 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "naming_series:",
+ "creation": "2026-10-21 10:00:00.000000",
+ "doctype": "DocType",
+ "document_type": "Document",
+ "editable_grid": 0,
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "vigilante",
+  "nome_do_vigilante",
+  "mecanografico",
+  "col_1",
+  "estado",
+  "delegacao",
+  "col_2",
+  "data_inicio",
+  "data_regresso",
+  "dias",
+  "pago_por",
+  "sec_posto",
+  "posto_anterior",
+  "regime_anterior",
+  "col_3",
+  "turno_anterior",
+  "tipo_de_vigilante_anterior",
+  "estado_anterior",
+  "col_4",
+  "vaga",
+  "destino_regresso",
+  "sec_docs",
+  "atestado_medico",
+  "col_5",
+  "observacoes"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Série",
+   "options": "BXM-.YY.-.##",
+   "default": "BXM-.YY.-.##",
+   "reqd": 1,
+   "set_only_once": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "vigilante",
+   "fieldtype": "Link",
+   "options": "Vigilante",
+   "label": "Vigilante",
+   "reqd": 1,
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "nome_do_vigilante",
+   "fieldtype": "Data",
+   "label": "Nome do Vigilante",
+   "fetch_from": "vigilante.nome_completo",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "mecanografico",
+   "fieldtype": "Data",
+   "label": "Mecanográfico",
+   "fetch_from": "vigilante.mecanografico",
+   "read_only": 1
+  },
+  {
+   "fieldname": "col_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "estado",
+   "fieldtype": "Select",
+   "label": "Estado",
+   "options": "Em Curso\nConcluída",
+   "default": "Em Curso",
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "delegacao",
+   "fieldtype": "Link",
+   "options": "Delegacao",
+   "label": "Delegação",
+   "fetch_from": "vigilante.delegacao",
+   "read_only": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "col_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "data_inicio",
+   "fieldtype": "Date",
+   "label": "Doente Desde",
+   "reqd": 1,
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "data_regresso",
+   "fieldtype": "Date",
+   "label": "Data de Regresso",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "dias",
+   "fieldtype": "Int",
+   "label": "Dias de Baixa",
+   "read_only": 1,
+   "description": "Dias de calendário de baixa (até à véspera do regresso)."
+  },
+  {
+   "fieldname": "pago_por",
+   "fieldtype": "Data",
+   "label": "Pago Por",
+   "read_only": 1,
+   "in_list_view": 1,
+   "description": "Empresa quando a baixa não passa do limite de dias de SIGOS Settings (3 por defeito); INSS acima disso (todos os dias descontados)."
+  },
+  {
+   "fieldname": "sec_posto",
+   "fieldtype": "Section Break",
+   "label": "Posto Anterior"
+  },
+  {
+   "fieldname": "posto_anterior",
+   "fieldtype": "Link",
+   "options": "Posto De Vigilancia",
+   "label": "Posto Anterior",
+   "read_only": 1
+  },
+  {
+   "fieldname": "regime_anterior",
+   "fieldtype": "Link",
+   "options": "Regime",
+   "label": "Regime Anterior",
+   "read_only": 1
+  },
+  {
+   "fieldname": "col_3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "turno_anterior",
+   "fieldtype": "Link",
+   "options": "Turno",
+   "label": "Turno Anterior",
+   "read_only": 1
+  },
+  {
+   "fieldname": "tipo_de_vigilante_anterior",
+   "fieldtype": "Data",
+   "label": "Tipo de Vigilante Anterior",
+   "read_only": 1
+  },
+  {
+   "fieldname": "estado_anterior",
+   "fieldtype": "Data",
+   "label": "Estado Anterior",
+   "read_only": 1
+  },
+  {
+   "fieldname": "col_4",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "vaga",
+   "fieldtype": "Link",
+   "options": "Vaga De Posto",
+   "label": "Vaga Aberta",
+   "read_only": 1
+  },
+  {
+   "fieldname": "destino_regresso",
+   "fieldtype": "Data",
+   "label": "Destino no Regresso",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_docs",
+   "fieldtype": "Section Break",
+   "label": "Atestado e Observações"
+  },
+  {
+   "fieldname": "atestado_medico",
+   "fieldtype": "Attach",
+   "label": "Atestado Médico / Justificação"
+  },
+  {
+   "fieldname": "col_5",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "observacoes",
+   "fieldtype": "Small Text",
+   "label": "Observações"
+  }
+ ],
+ "links": [],
+ "modified": "2026-10-21 14:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Security Ops",
+ "name": "Baixa Medica",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "write": 1,
+   "create": 0,
+   "delete": 1,
+   "permlevel": 0
+  },
+  {
+   "role": "SIGOS Manager",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "write": 1,
+   "create": 0,
+   "delete": 0,
+   "permlevel": 0
+  },
+  {
+   "role": "Aprovador Operações",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "write": 1,
+   "create": 0,
+   "delete": 0,
+   "permlevel": 0
+  },
+  {
+   "role": "Operações SIGOS",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "write": 1,
+   "create": 0,
+   "delete": 0,
+   "permlevel": 0
+  },
+  {
+   "role": "Aprovador RH",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "write": 1,
+   "create": 0,
+   "delete": 0,
+   "permlevel": 0
+  },
+  {
+   "role": "RH Normal",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "write": 1,
+   "create": 0,
+   "delete": 0,
+   "permlevel": 0
+  }
+ ],
+ "search_fields": "nome_do_vigilante,mecanografico",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "nome_do_vigilante",
+ "show_title_field_in_link": 1,
+ "track_changes": 1,
+ "app": "sigos"
+}

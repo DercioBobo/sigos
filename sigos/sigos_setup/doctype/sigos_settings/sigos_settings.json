@@ -19,8 +19,8 @@
   "abandono_criterio",
   "abandono_dias_limite",
   "col_ss_abandono",
-  "abandono_congelar_salario",
-  "abandono_faltas_automaticas",
+  "sec_ss_doenca",
+  "doenca_dias_pagos_empresa",
   "tab_ss_rh",
   "percentagem_maxima_emprestimo",
   "meses_maximos_emprestimo",
@@ -191,8 +191,8 @@
    "fieldtype": "Select",
    "label": "Modo de Abandono de Posto",
    "options": "Desactivado\nApenas Alerta\nAutomático",
-   "default": "Apenas Alerta",
-   "description": "Apenas Alerta: notifica (sino) Operações e Jurista e mostra o aviso no Vigilante, com o botão Criar Presunção de Abandono. Automático: notifica E abre a Presunção de Abandono automaticamente. Com a Presunção aberta o vigilante passa a Abandono de Posto: continua no posto e na escala (as faltas continuam a ser marcadas por turno), mas deixa de contar na lotação do posto. Desactivado: sem detecção (as Presunções já abertas continuam a acumular faltas)."
+   "default": "Automático",
+   "description": "Automático (recomendado): ao atingir o limite abre a Presunção de Abandono durante a noite. Apenas Alerta: notifica (sino) e mostra o botão Criar Presunção de Abandono no Vigilante. Com a Presunção aberta o vigilante sai do posto e da escala (o turno fica como vaga), o salário é congelado (a empresa deixa de pagar até ao regresso) e não se registam mais faltas. Desactivado: sem detecção."
   },
   {
    "fieldname": "abandono_criterio",
@@ -216,19 +216,17 @@
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "abandono_congelar_salario",
-   "fieldtype": "Select",
-   "label": "Congelar Salário (Abandono)",
-   "options": "Manual\nAo marcar Abandono",
-   "default": "Manual",
-   "description": "Manual: o RH congela/descongela no Vigilante (botão Congelar Salário), a qualquer momento enquanto está em Abandono de Posto. Ao marcar Abandono: congela automaticamente quando a Rotatividade ABP é aplicada. Em ambos os casos descongela automaticamente no regresso (Registar Regresso) ou na demissão. Um vigilante congelado é retirado das Payroll Entries e não pode ter Salary Slips — os meses congelados processam-se depois de descongelar, já com as justificações."
+   "fieldname": "sec_ss_doenca",
+   "fieldtype": "Section Break",
+   "label": "Doença (Baixa Médica)",
+   "description": "Regra de pagamento dos dias de doença — vigilantes marcados Doente e faltas justificadas por doença (atestado médico)."
   },
   {
-   "fieldname": "abandono_faltas_automaticas",
-   "fieldtype": "Check",
-   "label": "Marcar Faltas Automaticamente (Abandono)",
-   "default": "0",
-   "description": "Enquanto o vigilante está em Abandono de Posto, o sistema regista todos os dias a falta de cada turno da sua escala (folgas não), com o peso normal do turno, numa folha \"Falta Automática (Abandono)\". Os supervisores deixam de ter de o marcar. Atenção: se o vigilante voltar e ninguém usar Registar Regresso, as faltas continuam a ser marcadas."
+   "fieldname": "doenca_dias_pagos_empresa",
+   "fieldtype": "Int",
+   "label": "Dias de Doença Pagos pela Empresa",
+   "default": "3",
+   "description": "Uma doença até este número de dias é paga pela empresa (nada é descontado). Acima disso, TODOS os dias são pagos pelo INSS e descontados do salário (ex.: 3 → 1 a 3 dias pagos pela empresa; 4 ou mais, nenhum)."
   },
   {
    "fieldname": "tab_ss_rh",
@@ -862,7 +860,7 @@
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-10-20 20:00:00.000000",
+ "modified": "2026-10-21 14:00:00.000000",
  "modified_by": "Administrator",
  "module": "SIGOS Setup",
  "name": "SIGOS Settings",

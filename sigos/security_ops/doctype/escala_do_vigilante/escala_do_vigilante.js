@@ -216,15 +216,12 @@ function _sincronizar_vigilantes(frm) {
 	// the shared Regime here is a property of THIS escala, not of each guard —
 	// filtering by delegação + status is the complete match, unlike the Posto
 	// branch which also matches the guard's own regime.
-	// Abandono de Posto (Presunção open) keeps the guard on their escala — faltas
-	// are still marked by turno; they only stop counting in the posto's headcount.
 	const filters = reserva
-		? [["delegacao", "=", frm.doc.delegacao], ["status", "in", ["Reserva", "Abandono de Posto"]],
-			["posto_de_vigilancia", "is", "not set"]]
+		? [["delegacao", "=", frm.doc.delegacao], ["status", "=", "Reserva"]]
 		: [
 			["posto_de_vigilancia", "=", frm.doc.posto_de_vigilancia],
 			["regime_do_vigilante", "=", frm.doc.regime_do_vigilante],
-			["status", "in", ["Activo", "Abandono de Posto"]],
+			["status", "=", "Activo"],
 		];
 
 	frappe.call({
@@ -633,28 +630,13 @@ function _load_and_render(frm) {
 	// simply empty, so the label suffix is a no-op either way.
 	const equipas = frappe.db.get_list("Turno Da Equipa", { fields: ["name", "codigo"], limit_page_length: 0 })
 		.catch(() => []);
-	// Guards in Abandono de Posto get a badge on their row (cosmetic — they stay on the escala).
-	const nomesVig = [...new Set((frm.doc.tabela_de_escala || []).map(r => r.vigilante).filter(Boolean))];
-	const abandonos = nomesVig.length
-		? frappe.db.get_list("Vigilante", {
-			filters: { name: ["in", nomesVig], status: "Abandono de Posto" },
-			fields: ["name", "presuncao_abandono", "data_inicio_abandono"], limit_page_length: 0,
-		}).catch(() => [])
-		: Promise.resolve([]);
 	Promise.all([
 		frappe.db.get_value("Regime", frm.doc.regime_do_vigilante, "tipo_ciclo"),
 		frappe.xcall("sigos.api.get_regime_turnos", { regime: frm.doc.regime_do_vigilante }),
 		licencas,
 		equipas,
-		abandonos,
-	]).then(([tc, seq, lic, eqs, abd]) => {
+	]).then(([tc, seq, lic, eqs]) => {
 		frm._esc_licencas = lic || {};
-		frm._esc_abandono = {};
-		frm._esc_abandono_desde = {};
-		(abd || []).forEach(v => {
-			frm._esc_abandono[v.name] = v.presuncao_abandono || true;
-			frm._esc_abandono_desde[v.name] = v.data_inicio_abandono || "";
-		});
 		const equipaLabel = {};
 		(eqs || []).forEach(e => { equipaLabel[e.name] = _short_equipa(e.name, e.codigo); });
 		_render_grid(frm, tc?.message?.tipo_ciclo || null, seq || [], equipaLabel);
@@ -695,14 +677,6 @@ function _abrev_licenca(tipo) {
 	});
 	const letras = (limpo.match(/[a-z]/g) || []).slice(0, 3).join("");
 	return (letras || "LIC").toUpperCase();
-}
-function _nome_com_abandono(frm, vig, nome) {
-	const abd = frm._esc_abandono && frm._esc_abandono[vig];
-	if (!abd) return nome;
-	const tip = typeof abd === "string"
-		? __("Abandono de Posto — Presunção {0}. Continua na escala; não conta na lotação.", [abd])
-		: __("Abandono de Posto. Continua na escala; não conta na lotação.");
-	return `${nome} <span class="esc-abd-badge" title="${frappe.utils.escape_html(tip)}">${__("ABANDONO")}</span>`;
 }
 function _badge_licenca(tipo) {
 	if (!tipo) return "";
@@ -789,10 +763,7 @@ function _coverage_for_day(d, ctx) {
 	if (!periodos.length) return null;
 
 	const counts = {};
-	const abdDesde = (ctx.frm && ctx.frm._esc_abandono_desde) || {};
 	ctx.guards.forEach(vig => {
-		// Abandono de Posto: still scheduled, but never coverage from the day it began.
-		if (vig in abdDesde && d >= abdDesde[vig]) return;
 		const r = ctx.cellMap[`${vig}|${d}`];
 		const p = r && periodoDe[r.turno];   // folga rows don't count
 		if (p) counts[p] = (counts[p] || 0) + 1;
@@ -900,7 +871,7 @@ function _render_week(wrapper, toolbar, ctx) {
 	let body = cov;
 	guards.forEach((vig, gi) => {
 		body += `<tr class="esc-wk-row" style="animation-delay:${Math.min(gi * 28, 320)}ms">
-			<td class="esc-wk-name ${frm._esc_abandono && frm._esc_abandono[vig] ? "esc-abd-row" : ""}" title="${vig}">${_nome_com_abandono(frm, vig, nameMap[vig] || vig)}</td>`;
+			<td class="esc-wk-name" title="${vig}">${nameMap[vig] || vig}</td>`;
 		dias.forEach((d, di) => {
 			const r = cellMap[`${vig}|${d}`];
 			const isPast = d < hoje;
@@ -987,7 +958,7 @@ function _render_compact(wrapper, toolbar, ctx) {
 	// Body
 	let body = coverageRow;
 	guards.forEach(vig => {
-		body += `<tr><td class="esc-name-col ${ctx.frm._esc_abandono && ctx.frm._esc_abandono[vig] ? "esc-abd-row" : ""}" title="${vig}">${_nome_com_abandono(ctx.frm, vig, nameMap[vig] || vig)}</td>`;
+		body += `<tr><td class="esc-name-col" title="${vig}">${nameMap[vig] || vig}</td>`;
 		datas.forEach(d => {
 			const r = cellMap[`${vig}|${d}`];
 			const isPast = d < hoje;
@@ -1062,12 +1033,6 @@ function _inject_ferias_css() {
 	const css = `
 .esc-wk-cell { position: relative; }
 .esc-cell { position: relative; }
-.esc-abd-badge {
-	display: inline-block; margin-left: 4px; vertical-align: middle;
-	font-size: 8px; font-weight: 800; letter-spacing: .04em;
-	color: #fff; background: #c0392b; border-radius: 3px; padding: 0 4px; line-height: 1.6;
-}
-.esc-abd-row { background: #fdecec !important; color: #9b2c2c; }
 .esc-fer-badge {
 	position: absolute; top: 2px; right: 2px; z-index: 2;
 	font-size: 8px; font-weight: 800; letter-spacing: .03em;

@@ -494,10 +494,10 @@ sigos.build_rotatividade_wizard = function (opts) {
 	function _searchGuards(txt, $res, soSub, onPick) {
 		// Main guard comes from the reserve pool for a "Destacar da Reserva" op; a
 		// Demissão can apply to either an active or a benched (Reserva) guard; else Activo.
-		// A guard in Abandono de Posto (Presunção open) can be dismissed too.
+		// A guard in Abandono de Posto (Presunção open) or Doente can be dismissed too.
 		const status = soSub ? "Activo"
 			: S.flags.de_reserva ? "Reserva"
-			: S.flags.demite ? ["Activo", "Reserva", "Abandono de Posto"]
+			: S.flags.demite ? ["Activo", "Reserva", "Abandono de Posto", "Doente"]
 			: "Activo";
 		frappe.call({
 			method: "sigos.api.search_vigilantes_rich",

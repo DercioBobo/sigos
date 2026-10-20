@@ -369,7 +369,6 @@ sigos.PainelOperacional = class PainelOperacional {
 			<div class="po-guard st-${g.estado}" data-vig="${frappe.utils.escape_html(g.vigilante)}" title="${this._estado_label(g.estado)}">
 				<span class="po-gdot"></span>
 				<span class="po-gname">${frappe.utils.escape_html(g.nome || g.vigilante)}</span>
-				${g.estado === "abandono" ? `<span class="po-turno" style="color:var(--bad);font-weight:700">${__("ABANDONO")}</span>` : ""}
 				${g.turno ? `<span class="po-turno">${frappe.utils.escape_html(g.turno)}</span>` : ""}
 				${sub}
 			</div>`;
@@ -379,7 +378,6 @@ sigos.PainelOperacional = class PainelOperacional {
 		return {
 			presente: __("Presente"), falta: __("Falta"), ferias: __("Licença"),
 			substituido: __("Substituido"), atraso: __("Atraso / saida antecipada"),
-			abandono: __("Abandono de Posto (nao conta como cobertura)"),
 		}[e] || e;
 	}
 
@@ -799,8 +797,6 @@ sigos.PainelOperacional = class PainelOperacional {
 .po-gdot { width:8px; height:8px; border-radius:50%; flex:none; background:var(--ink3); }
 .st-presente .po-gdot { background:var(--good); }
 .st-falta .po-gdot { background:var(--bad); }
-.st-abandono .po-gdot { background:var(--bad); box-shadow:0 0 0 2px var(--bad); }
-.st-abandono .po-gname { color:var(--bad); text-decoration:line-through; }
 .st-ferias .po-gdot { background:var(--info); }
 .st-substituido .po-gdot { background:var(--violet); }
 .st-atraso .po-gdot { background:var(--amber); }

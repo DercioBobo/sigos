@@ -22,6 +22,14 @@
   "posto_de_vigilancia",
   "col_3",
   "regime",
+  "turno_anterior",
+  "tipo_de_vigilante_anterior",
+  "estado_anterior",
+  "vaga",
+  "sec_janela",
+  "abandono_desde",
+  "col_janela",
+  "abandono_ate",
   "sec_resumo",
   "primeira_falta",
   "ultima_falta",
@@ -129,13 +137,13 @@
   {
    "fieldname": "sec_posto",
    "fieldtype": "Section Break",
-   "label": "Posto"
+   "label": "Posto Anterior (libertado na Presunção)"
   },
   {
    "fieldname": "posto_de_vigilancia",
    "fieldtype": "Link",
    "options": "Posto De Vigilancia",
-   "label": "Posto (na detecção)",
+   "label": "Posto Anterior",
    "read_only": 1,
    "in_standard_filter": 1
   },
@@ -148,6 +156,54 @@
    "fieldtype": "Link",
    "options": "Regime",
    "label": "Regime",
+   "read_only": 1
+  },
+  {
+   "fieldname": "turno_anterior",
+   "fieldtype": "Link",
+   "options": "Turno",
+   "label": "Turno Anterior",
+   "read_only": 1
+  },
+  {
+   "fieldname": "tipo_de_vigilante_anterior",
+   "fieldtype": "Data",
+   "label": "Tipo de Vigilante Anterior",
+   "read_only": 1
+  },
+  {
+   "fieldname": "estado_anterior",
+   "fieldtype": "Data",
+   "label": "Estado Anterior",
+   "read_only": 1
+  },
+  {
+   "fieldname": "vaga",
+   "fieldtype": "Link",
+   "options": "Vaga De Posto",
+   "label": "Vaga Aberta",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_janela",
+   "fieldtype": "Section Break",
+   "label": "Período em Abandono (salário congelado)",
+   "description": "Do dia da Presunção até à véspera do regresso: não pago pela empresa (salário congelado) e sem registo de faltas. Uma justificação não paga estes dias — só limpa as faltas anteriores e repõe as férias."
+  },
+  {
+   "fieldname": "abandono_desde",
+   "fieldtype": "Date",
+   "label": "Em Abandono Desde",
+   "read_only": 1
+  },
+  {
+   "fieldname": "col_janela",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "abandono_ate",
+   "fieldtype": "Date",
+   "label": "Até (véspera do regresso)",
    "read_only": 1
   },
   {
@@ -211,7 +267,7 @@
    "fieldname": "sec_faltas",
    "fieldtype": "Section Break",
    "label": "Faltas (Prova)",
-   "description": "Todas as faltas por justificar desde a primeira falta. Enquanto a Presunção está Aberta, as novas faltas são acrescentadas automaticamente; deixa de acumular quando o Jurista a coloca Em Análise."
+   "description": "As faltas por justificar desde a primeira falta até à véspera da Presunção (as que levaram ao abandono). A partir da Presunção não se registam faltas. Enquanto Aberta, folhas entregues tarde para esses dias são acrescentadas; deixa de mudar quando o Jurista a coloca Em Análise."
   },
   {
    "fieldname": "faltas",
@@ -282,7 +338,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-20 18:00:00.000000",
+ "modified": "2026-10-21 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Disciplinar",
  "name": "Presuncao De Abandono",

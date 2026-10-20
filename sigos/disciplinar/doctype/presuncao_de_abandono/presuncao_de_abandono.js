@@ -11,7 +11,7 @@ frappe.ui.form.on("Presuncao De Abandono", {
 		frm.page.set_indicator(__(frm.doc.estado), _PAB_CORES[frm.doc.estado] || "gray");
 		frm.dashboard.set_headline_alert(
 			frm.doc.estado === "Aberta"
-				? __("Aberta — as novas faltas de {0} continuam a ser acrescentadas até o Jurista a colocar Em Análise.", [frappe.utils.escape_html(frm.doc.nome_do_vigilante || frm.doc.vigilante)])
+				? __("Aberta — {0} está fora do posto, com o salário congelado. Faltas entregues tarde (antes da Presunção) ainda são acrescentadas até o Jurista a colocar Em Análise.", [frappe.utils.escape_html(frm.doc.nome_do_vigilante || frm.doc.vigilante)])
 				: __("Prova fechada: {0} dia(s) com falta, {1} falta(s), de {2} a {3}.", [
 					frm.doc.total_dias || 0, frm.doc.total_faltas || 0,
 					frappe.datetime.str_to_user(frm.doc.primeira_falta) || "—",

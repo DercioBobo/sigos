@@ -126,9 +126,16 @@ doc_events = {
 		"on_update_after_submit": "sigos.painel.notificar_mudanca",
 	},
 	"Justificacao De Faltas": {
-		# a justified falta leaves the open Presunção de Abandono's evidence
-		"on_submit": "sigos.abandono.ao_mudar_justificacao",
-		"on_cancel": "sigos.abandono.ao_mudar_justificacao",
+		# a justified falta leaves the open Presunção de Abandono's evidence, and
+		# férias withheld for it (faltas vermelhas, already processed) come back
+		"on_submit": [
+			"sigos.abandono.ao_mudar_justificacao",
+			"sigos.payroll_ext.salary_slip_hooks.reinstituir_ferias_justificacao",
+		],
+		"on_cancel": [
+			"sigos.abandono.ao_mudar_justificacao",
+			"sigos.payroll_ext.salary_slip_hooks.reverter_ferias_justificacao",
+		],
 	},
 	"Ocorrencia": {
 		"after_insert": "sigos.painel.notificar_mudanca",

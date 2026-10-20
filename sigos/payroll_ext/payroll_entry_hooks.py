@@ -31,7 +31,7 @@ def before_validate(doc, method):
 
 
 def _excluir_salarios_congelados(doc):
-	"""Guards with Salário Congelado (Abandono de Posto) are never paid by a
+	"""Guards with Salário Congelado (Abandono de Posto / Doente) are never paid by a
 	Payroll Entry — pruned on every save AND on submit (submit re-validates), so
 	a freeze applied after "Get Employees" still takes effect. Their months are
 	processed after the freeze is lifted."""
