@@ -1,0 +1,88 @@
+{
+ "actions": [],
+ "creation": "2026-10-20 18:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 0,
+ "engine": "InnoDB",
+ "istable": 1,
+ "field_order": [
+  "data",
+  "turno",
+  "posto",
+  "regime",
+  "tipo_de_ausencia",
+  "n_de_faltas",
+  "ausencia"
+ ],
+ "fields": [
+  {
+   "fieldname": "data",
+   "fieldtype": "Date",
+   "label": "Data",
+   "in_list_view": 1,
+   "read_only": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "turno",
+   "fieldtype": "Link",
+   "options": "Turno",
+   "label": "Turno",
+   "in_list_view": 1,
+   "read_only": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "posto",
+   "fieldtype": "Link",
+   "options": "Posto De Vigilancia",
+   "label": "Posto",
+   "in_list_view": 1,
+   "read_only": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "regime",
+   "fieldtype": "Link",
+   "options": "Regime",
+   "label": "Regime",
+   "read_only": 1
+  },
+  {
+   "fieldname": "tipo_de_ausencia",
+   "fieldtype": "Data",
+   "label": "Tipo",
+   "in_list_view": 1,
+   "read_only": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "n_de_faltas",
+   "fieldtype": "Int",
+   "label": "Nº de Faltas",
+   "in_list_view": 1,
+   "read_only": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "ausencia",
+   "fieldtype": "Link",
+   "options": "Ausencias",
+   "label": "Folha de Ausências",
+   "in_list_view": 1,
+   "read_only": 1,
+   "columns": 2
+  }
+ ],
+ "links": [],
+ "modified": "2026-10-20 18:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Disciplinar",
+ "name": "Presuncao Abandono Falta",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "app": "sigos"
+}

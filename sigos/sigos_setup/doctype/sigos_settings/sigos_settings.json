@@ -19,9 +19,8 @@
   "abandono_criterio",
   "abandono_dias_limite",
   "col_ss_abandono",
-  "abandono_tipo_infracao",
-  "abandono_desconto",
   "abandono_congelar_salario",
+  "abandono_faltas_automaticas",
   "tab_ss_rh",
   "percentagem_maxima_emprestimo",
   "meses_maximos_emprestimo",
@@ -193,7 +192,7 @@
    "label": "Modo de Abandono de Posto",
    "options": "Desactivado\nApenas Alerta\nAutomático",
    "default": "Apenas Alerta",
-   "description": "Apenas Alerta: notifica Operações (sino) e mostra o aviso no Vigilante, com botão para marcar via Rotatividade (ABP). Automático: notifica E marca o vigilante automaticamente (cria e aplica a Rotatividade ABP, sem substituto — o posto fica desfalcado)."
+   "description": "Apenas Alerta: notifica (sino) Operações e Jurista e mostra o aviso no Vigilante, com o botão Criar Presunção de Abandono. Automático: notifica E abre a Presunção de Abandono automaticamente. Com a Presunção aberta o vigilante passa a Abandono de Posto: continua no posto e na escala (as faltas continuam a ser marcadas por turno), mas deixa de contar na lotação do posto. Desactivado: sem detecção (as Presunções já abertas continuam a acumular faltas)."
   },
   {
    "fieldname": "abandono_criterio",
@@ -217,13 +216,6 @@
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "abandono_tipo_infracao",
-   "fieldtype": "Link",
-   "label": "Tipo de Infracção (Participação Automática)",
-   "options": "Tipo De Infracao",
-   "description": "Tipo de Infracção usado na Participação criada automaticamente ao marcar Abandono de Posto. Padrão: \"Abandono de Posto\" — atribuído automaticamente após a instalação."
-  },
-  {
    "fieldname": "abandono_congelar_salario",
    "fieldtype": "Select",
    "label": "Congelar Salário (Abandono)",
@@ -232,12 +224,11 @@
    "description": "Manual: o RH congela/descongela no Vigilante (botão Congelar Salário), a qualquer momento enquanto está em Abandono de Posto. Ao marcar Abandono: congela automaticamente quando a Rotatividade ABP é aplicada. Em ambos os casos descongela automaticamente no regresso (Registar Regresso) ou na demissão. Um vigilante congelado é retirado das Payroll Entries e não pode ter Salary Slips — os meses congelados processam-se depois de descongelar, já com as justificações."
   },
   {
-   "fieldname": "abandono_desconto",
-   "fieldtype": "Select",
-   "label": "Registo e Desconto (Abandono)",
-   "options": "Faltas\nDias não remunerados\nDias não remunerados (sem registo de ausências)\nNenhum (sem registo nem desconto)",
-   "default": "Faltas",
-   "description": "O que acontece a cada dia de calendário em que o vigilante está em Abandono de Posto. Faltas: é criada automaticamente uma ausência \"Ausência em Abandono\" por dia, descontada como 1 falta. Dias não remunerados: a ausência diária é criada só como registo (0 faltas) e os dias são descontados no Proporcional (salário base × dias / dias do mês). Dias não remunerados (sem registo de ausências): só o desconto no Proporcional, sem ausências diárias. Nenhum: nem ausências nem desconto. Nunca falta + dia não remunerado — o mesmo dia seria descontado duas vezes."
+   "fieldname": "abandono_faltas_automaticas",
+   "fieldtype": "Check",
+   "label": "Marcar Faltas Automaticamente (Abandono)",
+   "default": "0",
+   "description": "Enquanto o vigilante está em Abandono de Posto, o sistema regista todos os dias a falta de cada turno da sua escala (folgas não), com o peso normal do turno, numa folha \"Falta Automática (Abandono)\". Os supervisores deixam de ter de o marcar. Atenção: se o vigilante voltar e ninguém usar Registar Regresso, as faltas continuam a ser marcadas."
   },
   {
    "fieldname": "tab_ss_rh",
@@ -871,7 +862,7 @@
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-10-20 10:00:00.000000",
+ "modified": "2026-10-20 20:00:00.000000",
  "modified_by": "Administrator",
  "module": "SIGOS Setup",
  "name": "SIGOS Settings",

@@ -233,10 +233,10 @@ function _toggle_subsidios_comb(frm) {
 
 // ─── Abandono de Posto (sigos/abandono.py) ─────────────────────────────────────
 // Detected (daily job flagged a streak, guard still Activo/Reserva): red headline
-// with the live streak + "Marcar Abandono de Posto", which opens the Rotatividade
-// wizard on the ABP operação so Ops pick the substituto there.
-// Already in Abandono: headline with the start date + Registar Regresso
-// (Reserva or a new posto, optionally justified) / Demitir (DEM wizard).
+// with the live streak + "Criar Presunção de Abandono" (Apenas Alerta mode).
+// In Abandono (Presunção open): the guard stays on posto + escala but out of the
+// posto's headcount — headline + Ver Presunção / Registar Regresso (stay, Reserva
+// or a new posto, optionally justified) / Demitir (DEM wizard).
 function _abandono_de_posto(frm) {
 	if (frm.is_new()) return;
 	const pode_ops = frappe.user.has_role("Aprovador Operações")
@@ -252,13 +252,18 @@ function _abandono_de_posto(frm) {
 	_salario_congelado(frm, fmt);
 
 	if (frm.doc.status === "Abandono de Posto") {
-		const pintar_abd = (efeito) => frm.dashboard.set_headline_alert(
-			__("Em <b>Abandono de Posto</b> desde {0}{1}, até ao regresso ou demissão.",
-				[fmt(frm.doc.data_inicio_abandono), efeito ? ` — ${efeito}` : ""]),
+		const pres = frm.doc.presuncao_abandono
+			? ` — <a href="/app/presuncao-de-abandono/${encodeURIComponent(frm.doc.presuncao_abandono)}">${__("Presunção {0}", [frappe.utils.escape_html(frm.doc.presuncao_abandono)])}</a>`
+			: "";
+		frm.dashboard.set_headline_alert(
+			__("Em <b>Abandono de Posto</b> desde {0}{1}. Continua no posto e na escala (marque as faltas por turno), mas não conta na lotação do posto — pode colocar outro vigilante.",
+				[fmt(frm.doc.data_inicio_abandono), pres]),
 			"red",
 		);
-		pintar_abd("");
-		frappe.xcall("sigos.abandono.resumo_desconto").then((t) => pintar_abd(t));
+		if (frm.doc.presuncao_abandono) {
+			frm.add_custom_button(__("Ver Presunção"),
+				() => frappe.set_route("Form", "Presuncao De Abandono", frm.doc.presuncao_abandono), __("Acções"));
+		}
 		if (pode_ops) {
 			frm.add_custom_button(__("Registar Regresso"), () => _registar_regresso(frm), __("Acções"));
 			frm.add_custom_button(__("Demitir"), () => abrir("DEM"), __("Acções"));
@@ -278,7 +283,14 @@ function _abandono_de_posto(frm) {
 		.then((r) => { if (r && r.valor) pintar(r.texto, r.limite); });
 
 	if (pode_ops) {
-		frm.add_custom_button(__("Marcar Abandono de Posto"), () => abrir("ABP"), __("Acções"));
+		frm.add_custom_button(__("Criar Presunção de Abandono"), () => frappe.confirm(
+			__("Abrir a Presunção de Abandono com as faltas desta sequência? O vigilante passa a <b>Abandono de Posto</b>: continua no posto e na escala, mas deixa de contar na lotação do posto."),
+			() => frappe.xcall("sigos.abandono.criar_presuncao_manual", { vigilante: frm.doc.name })
+				.then((nome) => {
+					frappe.show_alert({ message: __("Presunção {0} aberta.", [nome]), indicator: "red" }, 6);
+					frm.reload_doc();
+				}),
+		), __("Acções"));
 	}
 }
 
@@ -322,24 +334,30 @@ function _salario_congelado(frm, fmt) {
 	}
 }
 
-// The guard came back. Never straight back to the old posto: they land in Reserva,
-// and "Novo Posto" then opens the APR wizard to pick one. A justification files a
-// Justificacao De Faltas over the episode (pardons the days in payroll).
+// The guard came back: stay on the posto they never left (only if it still has
+// room — a replacement may have been placed meanwhile), Reserva, or a new posto
+// (APR wizard). A justification files a Justificacao De Faltas over the episode.
+// The open Presunção closes as "Regressou".
 function _registar_regresso(frm) {
 	const desde = frm.doc.abandono_inicio_ausencia || frm.doc.abandono_primeira_falta
 		|| frm.doc.data_inicio_abandono;
 	const ontem = frappe.datetime.add_days(frappe.datetime.get_today(), -1);
+	const destinos = [];
+	if (frm.doc.posto_de_vigilancia) {
+		destinos.push({ value: "Posto Actual",
+			label: __("Continuar no posto actual ({0}) — se ainda houver vaga", [frm.doc.nome_do_posto || frm.doc.posto_de_vigilancia]) });
+	}
+	destinos.push(
+		{ value: "Reserva", label: __("Ficar em Reserva") },
+		{ value: "Novo Posto", label: __("Atribuir um novo posto (abre a Rotatividade APR)") },
+	);
 	const d = new frappe.ui.Dialog({
 		title: __("Registar Regresso"),
 		fields: [
 			{ fieldtype: "HTML", options: `<p class="text-muted" style="margin-bottom:8px">${
-				__("O vigilante volta a ser remunerado a partir de hoje. Não regressa automaticamente ao posto anterior.")}</p>` },
+				__("Fecha a Presunção de Abandono como <b>Regressou</b> (se já foi encaminhada para Processo Disciplinar, o processo continua).")}</p>` },
 			{ fieldname: "destino", fieldtype: "Select", label: __("Destino"), reqd: 1,
-				options: [
-					{ value: "Reserva", label: __("Ficar em Reserva") },
-					{ value: "Novo Posto", label: __("Atribuir um novo posto (abre a Rotatividade APR)") },
-				],
-				default: "Reserva" },
+				options: destinos, default: destinos[0].value },
 			{ fieldtype: "Section Break" },
 			{ fieldname: "justificado", fieldtype: "Check",
 				label: __("Apresentou justificação (perdoar os dias de ausência)") },
@@ -348,7 +366,7 @@ function _registar_regresso(frm) {
 				description: __("Por defeito, a primeira falta da sequência.") },
 			{ fieldname: "justificar_ate", fieldtype: "Date", label: __("Justificar até"),
 				default: ontem, depends_on: "eval:doc.justificado",
-				description: __("Por defeito, ontem. Os dias fora deste período continuam descontados. Para vários períodos separados, crie Justificações de Faltas adicionais (sem prazo dentro do abandono).") },
+				description: __("Por defeito, ontem. As faltas fora deste período continuam descontadas. Para vários períodos separados, crie Justificações de Faltas adicionais (sem prazo dentro do abandono).") },
 			{ fieldname: "justificativo", fieldtype: "Attach", label: __("Justificativo"),
 				depends_on: "eval:doc.justificado" },
 			{ fieldname: "observacoes", fieldtype: "Small Text", label: __("Observações da Justificação"),
@@ -483,8 +501,8 @@ function _render_mini_dash(frm) {
 	let postoOpts = { req: req.has("posto_de_vigilancia") };
 	if (frm.doc.status === "Reserva" && !frm.doc.posto_de_vigilancia) {
 		postoOpts = { html: `<span class="vigd-dim">${__("Reserva — sem posto")}</span>` };
-	} else if (frm.doc.status === "Abandono de Posto") {
-		postoOpts = { html: `<span class="vigd-dim">${__("Abandono — sem posto")}</span>` };
+	} else if (frm.doc.status === "Abandono de Posto" && !frm.doc.posto_de_vigilancia) {
+		postoOpts = { html: `<span class="vigd-dim">${__("Abandono — da Reserva")}</span>` };
 	}
 
 	const cobridorBadge = frm.doc.cobertura_de_posto_activa

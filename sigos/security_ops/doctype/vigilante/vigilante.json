@@ -15,6 +15,7 @@
   "nome_completo",
   "status",
   "cobertura_de_posto_activa",
+  "presuncao_abandono",
   "abandono_inicio_ausencia",
   "data_inicio_abandono",
   "data_fim_abandono",
@@ -247,6 +248,16 @@
    "description": "Este vigilante está Activo como Cobridor temporário — a cobrir outro colega ausente — em vez de ocupar um posto próprio. Definido/limpo automaticamente pela Cobertura De Posto."
   },
   {
+   "fieldname": "presuncao_abandono",
+   "fieldtype": "Link",
+   "options": "Presuncao De Abandono",
+   "label": "Presunção de Abandono",
+   "read_only": 1,
+   "no_copy": 1,
+   "depends_on": "eval:doc.presuncao_abandono",
+   "description": "Última Presunção de Abandono aberta para este vigilante."
+  },
+  {
    "fieldname": "abandono_inicio_ausencia",
    "fieldtype": "Date",
    "label": "Ausente desde",
@@ -258,11 +269,11 @@
   {
    "fieldname": "data_inicio_abandono",
    "fieldtype": "Date",
-   "label": "Abandono de Posto desde",
+   "label": "Em Abandono de Posto desde",
    "read_only": 1,
    "no_copy": 1,
    "depends_on": "eval:doc.data_inicio_abandono",
-   "description": "Data em que o vigilante foi marcado em Abandono de Posto. A partir deste dia (inclusive) os dias são registados/descontados conforme SIGOS Settings (Registo e Desconto)."
+   "description": "Dia em que a Presunção de Abandono foi aberta. O vigilante continua no posto e na escala (as faltas continuam a ser marcadas por turno), mas deixa de contar na lotação do posto."
   },
   {
    "fieldname": "data_fim_abandono",
@@ -271,7 +282,7 @@
    "read_only": 1,
    "no_copy": 1,
    "depends_on": "eval:doc.data_fim_abandono",
-   "description": "Último dia não remunerado — preenchido quando o vigilante regressa (Registar Regresso)."
+   "description": "Último dia do Abandono de Posto (véspera do regresso, ou fecho por demissão)."
   },
   {
    "fieldname": "abandono_primeira_falta",
@@ -653,7 +664,7 @@
    "link_fieldname": "vigilante"
   }
  ],
- "modified": "2026-10-20 16:00:00.000000",
+ "modified": "2026-10-20 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "Security Ops",
  "name": "Vigilante",

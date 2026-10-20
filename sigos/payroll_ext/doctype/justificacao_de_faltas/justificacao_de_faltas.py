@@ -41,8 +41,7 @@ class JustificacaoDeFaltas(Document):
 
 		# Nothing to justify → nothing to save. Only once the guard + window are known
 		# (before that the form is still being filled and required-field checks apply).
-		if (self.vigilante and self.dia_de_inicio and self.dia_de_fim and real <= 0
-				and not self._cobre_abandono()):
+		if self.vigilante and self.dia_de_inicio and self.dia_de_fim and real <= 0:
 			frappe.throw(
 				_("O vigilante {0} não tem faltas entre {1} e {2}. "
 				  "Não é possível registar uma Justificação de Faltas sem faltas.").format(
@@ -56,12 +55,9 @@ class JustificacaoDeFaltas(Document):
 	def _cobre_abandono(self):
 		"""The window lies within the guard's (latest) Abandono de Posto episode —
 		from the first day of the absence streak (abandono_inicio_ausencia) to the
-		return/dismissal. Such a justification:
-		  - may have 0 faltas: in the "Dias não remunerados" modes those days are
-		    0-falta rows but still unpaid, and this is what pardons them
-		    (salary_slip_hooks._dias_abandono);
-		  - is not bound by the prazo: the guard was absent, so the proof normally
-		    only arrives with the return, often weeks after the justified days."""
+		return/dismissal. Such a justification is not bound by the prazo: the guard was
+		absent, so the proof normally only arrives with the return, often weeks
+		after the justified days."""
 		if not (self.vigilante and self.dia_de_inicio and self.dia_de_fim):
 			return False
 		ab = frappe.db.get_value(

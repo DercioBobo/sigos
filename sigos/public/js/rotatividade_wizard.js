@@ -207,12 +207,12 @@ sigos.build_rotatividade_wizard = function (opts) {
 			doctype: "Operacao De Rotatividade",
 			filters: { activo: 1 },
 			fields: ["name", "abreviatura", "operacao", "muda_posto", "muda_regime",
-				"requer_substituto", "demite", "enviar_reserva", "marca_abandono", "de_reserva", "descricao"],
+				"requer_substituto", "demite", "enviar_reserva", "de_reserva", "descricao"],
 			order_by: "abreviatura", limit_page_length: 0,
 		},
 		callback: (r) => {
 			S.operacoes = r.message || [];
-			// Pre-selected operação (e.g. the Vigilante "Marcar Abandono de Posto" banner)
+			// Pre-selected operação (e.g. the Vigilante "Demitir" / "Novo Posto" buttons)
 			const pre = (opts.prefill || {}).abreviatura_op;
 			const op = pre && S.operacoes.find((o) => o.name === pre);
 			if (op && !S.op) _selectOp(op);
@@ -337,7 +337,6 @@ sigos.build_rotatividade_wizard = function (opts) {
 			if (o.muda_regime) p.push(`<span class="rotw2-pic" title="${__("Muda regime")}">🕘 ${__("Regime")}</span>`);
 			if (o.requer_substituto) p.push(`<span class="rotw2-pic" title="${__("Substituto")}">⇄ ${__("Substituto")}</span>`);
 			if (o.enviar_reserva) p.push(`<span class="rotw2-pic" title="${__("Enviar p/ Reserva")}">🪑 ${__("→ Reserva")}</span>`);
-			if (o.marca_abandono) p.push(`<span class="rotw2-pic rotw2-pic-dem" title="${__("Abandono de Posto")}">⛔ ${__("Abandono")}</span>`);
 			if (o.de_reserva) p.push(`<span class="rotw2-pic" title="${__("Atribuir Posto aos Reservas")}">🎯 ${__("da Reserva")}</span>`);
 			if (o.demite) p.push(`<span class="rotw2-pic rotw2-pic-dem" title="${__("Demissão")}">⚑ ${__("Demite")}</span>`);
 			const sel = S.op && S.op.name === o.name ? "sel" : "";
@@ -376,7 +375,6 @@ sigos.build_rotatividade_wizard = function (opts) {
 			muda_posto: !!op.muda_posto, muda_regime: !!op.muda_regime,
 			requer_substituto: !!op.requer_substituto,
 			demite: !!op.demite, enviar_reserva: !!op.enviar_reserva,
-			marca_abandono: !!op.marca_abandono,
 			de_reserva: !!op.de_reserva,
 		};
 		// Sourcing from the reserve pool? clear any previously-picked Activo guard
@@ -400,15 +398,11 @@ sigos.build_rotatividade_wizard = function (opts) {
 			? `<div class="rotw-sub" style="background:#fff8e6;border:1px solid #ffe08a;color:#8a6d1a;margin-bottom:10px">🪑 ${__(
 				"O vigilante sai do posto <b>{0}</b> e fica em <b>Reserva</b> (disponível, não demitido).",
 				[frappe.utils.escape_html(S.vig.posto || "—")])}</div>` : "";
-		const abandonoNote = S.flags.marca_abandono
-			? `<div class="rotw-sub" style="background:#fdecef;border:1px solid #f5c2c9;color:#842029;margin-bottom:10px">⛔ ${__(
-				"O vigilante sai do posto <b>{0}</b> e da escala e fica em <b>Abandono de Posto</b>: continua empregado e fica fora do banco de reserva (o desconto no salário segue SIGOS Settings — ver avisos). É criada uma Participação (rascunho).",
-				[frappe.utils.escape_html(S.vig.posto || "—")])}</div>` : "";
 
 		return `
 			<div class="rotw-sec-num">${__("O que muda para")} <b>${frappe.utils.escape_html(S.vig.nome_completo || S.vig.name)}</b></div>
-			${reservaNote}${abandonoNote}
-			<div class="rotw2-changes">${rows.join("") || ((S.flags.enviar_reserva || S.flags.marca_abandono) ? "" : `<div class="rotw-none">${__("Esta operação não altera posto ou regime directamente.")}</div>`)}</div>
+			${reservaNote}
+			<div class="rotw2-changes">${rows.join("") || (S.flags.enviar_reserva ? "" : `<div class="rotw-none">${__("Esta operação não altera posto ou regime directamente.")}</div>`)}</div>
 			<div class="rotw2-field"><label>${__("Tipo de Rotatividade")}</label><div id="ctrl-motivo"></div></div>
 			<div id="rotw-demfields" style="${demite ? "" : "display:none"}">
 				<div class="rotw2-field"><label>${__("Motivo de Demissão")}</label><div id="ctrl-motiv_demi"></div></div>
@@ -500,12 +494,10 @@ sigos.build_rotatividade_wizard = function (opts) {
 	function _searchGuards(txt, $res, soSub, onPick) {
 		// Main guard comes from the reserve pool for a "Destacar da Reserva" op; a
 		// Demissão can apply to either an active or a benched (Reserva) guard; else Activo.
-		// Abandono de Posto applies to anyone in service (also a benched reserve who
-		// stopped showing up); a guard already in Abandono can still be dismissed.
+		// A guard in Abandono de Posto (Presunção open) can be dismissed too.
 		const status = soSub ? "Activo"
 			: S.flags.de_reserva ? "Reserva"
 			: S.flags.demite ? ["Activo", "Reserva", "Abandono de Posto"]
-			: S.flags.marca_abandono ? ["Activo", "Reserva"]
 			: "Activo";
 		frappe.call({
 			method: "sigos.api.search_vigilantes_rich",

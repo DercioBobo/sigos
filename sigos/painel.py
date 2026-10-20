@@ -51,7 +51,7 @@ def painel_operacional(data=None, delegacao=None, cliente=None, posto=None, busc
 		guardas = []
 		gaps = 0
 		for r in linhas:
-			estado, cobertura, cobre_nome = _estado_guarda(r, ausencias, ferias)
+			estado, cobertura, cobre_nome = _estado_guarda(r, ausencias, ferias, d)
 			agg["escalados"] += 1
 			agg[_AGG_KEY[estado]] += 1
 			if not cobertura:
@@ -142,7 +142,11 @@ def _sparkline(ate_d, nomes_posto):
 		rows = frappe.db.sql(
 			"""
 			SELECT te.data AS d, COUNT(*) AS escalados,
-			       SUM(CASE WHEN g.vigilante IS NOT NULL OR EXISTS (
+			       SUM(CASE WHEN g.vigilante IS NOT NULL
+			                 -- Abandono de Posto: scheduled but never coverage
+			                 OR (vv.status = 'Abandono de Posto'
+			                     AND te.data >= vv.data_inicio_abandono)
+			                 OR EXISTS (
 			             SELECT 1 FROM `tabLeave Application` f
 			             WHERE f.employee = vv.funcionario AND f.status = 'Approved'
 			               AND f.docstatus = 1
@@ -183,6 +187,7 @@ def _sparkline(ate_d, nomes_posto):
 _AGG_KEY = {
 	"presente": "presentes",
 	"falta": "faltas",
+	"abandono": "faltas",
 	"ferias": "ferias",
 	"substituido": "substituidos",
 	"atraso": "atrasos",
@@ -191,10 +196,19 @@ _ORD_PERIODO = {"Manhã": 0, "Tarde": 1, "Noite": 2, "Único": 3}
 _ORD_COBERTURA = {"descoberto": 0, "sem_escala": 1, "lacuna": 2, "coberto": 3}
 
 
-def _estado_guarda(row, ausencias, ferias):
+def _estado_guarda(row, ausencias, ferias, d=None):
 	"""Resolve a scheduled guard's live state. Returns (estado, coberto, cobre_nome)."""
 	vig = row["vigilante"]
 	aus = ausencias.get(vig)
+	if _em_abandono(row, d):
+		# Presunção de Abandono open: still on the escala (faltas by turno) but never
+		# coverage — a gap from the start, not only once today's sheet is submitted.
+		# Covered only when someone was explicitly put on the turno.
+		if aus and aus["tipo"] == "Falta":
+			cobre = aus.get("substituto") or aus.get("dobra") or aus.get("adiantar")
+			if cobre or aus.get("accao") in ("Substituto", "Dobra de Turno", "Adiantamento de Turno"):
+				return ("substituido", True, aus.get("cobre_nome"))
+		return ("abandono", False, None)
 	if aus:
 		cobre = aus.get("substituto") or aus.get("dobra") or aus.get("adiantar")
 		if aus["tipo"] == "Falta":
@@ -208,6 +222,13 @@ def _estado_guarda(row, ausencias, ferias):
 	if vig in ferias:
 		return ("ferias", False, None)
 	return ("presente", True, None)
+
+
+def _em_abandono(row, d):
+	"""Guard in Abandono de Posto on day `d` (latest episode on the Vigilante)."""
+	if row.get("status") != "Abandono de Posto" or not row.get("data_inicio_abandono"):
+		return False
+	return d is None or getdate(d) >= getdate(row["data_inicio_abandono"])
 
 
 def _postos_activos(delegacao, cliente, posto):
@@ -239,6 +260,7 @@ def _escala_do_dia(d, nomes_posto):
 		"""
 		SELECT e.posto_de_vigilancia AS posto,
 		       te.vigilante, v.nome_completo, v.mecanografico,
+		       v.status, v.data_inicio_abandono,
 		       te.turno, COALESCE(NULLIF(te.periodo, ''), t.periodo) AS periodo, te.regime
 		FROM `tabTabela De Escala De Vigilante` te
 		JOIN `tabEscala Do Vigilante` e ON e.name = te.parent AND e.estado = 'Activo'

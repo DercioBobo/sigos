@@ -219,9 +219,10 @@ function _mount_header_controls(frm, w, formEditable) {
 
 	const c_tipo_registo = frappe.ui.form.make_control({
 		df: { fieldtype: "Select", fieldname: "tipo_de_registo",
+			// "Falta Automática (Abandono)" is system-generated — shown only on those docs.
 			options: "Normal\nAbandono de Posto\nFalta de Reserva"
-				+ (frm.doc.tipo_de_registo === "Ausência em Abandono" ? "\nAusência em Abandono" : ""),
-			read_only: ro || frm.doc.tipo_de_registo === "Ausência em Abandono",
+				+ (frm.doc.tipo_de_registo === "Falta Automática (Abandono)" ? "\nFalta Automática (Abandono)" : ""),
+			read_only: ro || frm.doc.tipo_de_registo === "Falta Automática (Abandono)",
 			onchange: () => {
 				const v = c_tipo_registo.get_value() || "Normal";
 				const atual = frm.doc.tipo_de_registo || "Normal";

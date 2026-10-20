@@ -47,6 +47,7 @@ fixtures = [
 			"Supervisor SIGOS",
 			"SIGOS Manager",
 			"SMV Integration",
+			"Jurista",
 		]]],
 	},
 	{
@@ -119,9 +120,15 @@ doc_events = {
 	# Live nudge for the Painel Operacional CCO (re-fetch when ground truth changes).
 	# These run IN ADDITION to each doctype's own controller handlers.
 	"Ausencias": {
-		"on_submit": "sigos.painel.notificar_mudanca",
-		"on_cancel": "sigos.painel.notificar_mudanca",
+		# + pile the new faltas onto an open Presunção de Abandono (sigos.abandono)
+		"on_submit": ["sigos.painel.notificar_mudanca", "sigos.abandono.ao_mudar_ausencias"],
+		"on_cancel": ["sigos.painel.notificar_mudanca", "sigos.abandono.ao_mudar_ausencias"],
 		"on_update_after_submit": "sigos.painel.notificar_mudanca",
+	},
+	"Justificacao De Faltas": {
+		# a justified falta leaves the open Presunção de Abandono's evidence
+		"on_submit": "sigos.abandono.ao_mudar_justificacao",
+		"on_cancel": "sigos.abandono.ao_mudar_justificacao",
 	},
 	"Ocorrencia": {
 		"after_insert": "sigos.painel.notificar_mudanca",

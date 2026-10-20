@@ -10,13 +10,11 @@ class Rotatividade(Document):
 		self._validar_regra_3meses()
 		self._validar_substituto_categoria()
 		self._validar_transferencia_contrato()
-		self._validar_abandono()
 
 	def before_submit(self):
 		self._validar_regra_3meses()
 		self._validar_substituto_categoria()
 		self._validar_transferencia_contrato()
-		self._validar_abandono()
 
 	def on_submit(self):
 		if (self.get("workflow_state") or "Aprovado") != "Aprovado":
@@ -25,7 +23,6 @@ class Rotatividade(Document):
 			return
 
 		op = self._get_operacao()
-		abandono = bool(op and op.get("marca_abandono")) and not (op.demite or self.motivo == "Demissão")
 
 		# 1. Apply the operation's changes to the main guard. vig.save() cascades:
 		#    occupation recount, Employee sync, and the keystone escala migration.
@@ -71,16 +68,6 @@ class Rotatividade(Document):
 			if turno_vago:
 				vig.flags.turno_inicial_preferido = turno_vago
 			limpar_campos_operacionais(vig)
-		# Abandono de Posto: same release as Reserva (off posto + escala, still
-		# employed) but a separate status — kept out of every reserve pool, and
-		# unpaid from data_inicio_abandono on (salary_slip_hooks._dias_fora_emprego).
-		elif abandono:
-			from sigos.security_ops.doctype.vigilante.vigilante import limpar_campos_operacionais
-
-			vig.status = "Abandono de Posto"
-			vig.data_inicio_abandono = self.data or today()
-			vig.data_fim_abandono = None
-			limpar_campos_operacionais(vig)
 
 		vig.save(ignore_permissions=True)
 
@@ -105,8 +92,7 @@ class Rotatividade(Document):
 		#      Auto-closes later, whenever anyone lands on that exact slot (see
 		#      escala_do_vigilante._adicionar_vigilante_a_escala).
 		slot_preenchido = bool(op and op.requer_substituto and self.novo_vigilante and posto_vago)
-		liberta_vaga = demite or abandono or (op and op.enviar_reserva)
-		if posto_vago and turno_vago and self.regime and liberta_vaga and not slot_preenchido:
+		if posto_vago and turno_vago and self.regime and (demite or (op and op.enviar_reserva)) and not slot_preenchido:
 			from sigos.security_ops.doctype.vaga_de_posto.vaga_de_posto import abrir_vaga
 			abrir_vaga(
 				posto=posto_vago,
@@ -116,11 +102,9 @@ class Rotatividade(Document):
 				origem_rotatividade=self.name,
 			)
 
-		# 3. Create the Demissão record / the Abandono de Posto Participação
+		# 3. Create the Demissão record
 		if demite:
 			self._criar_demissao()
-		elif abandono:
-			self._criar_participacao_abandono(posto_vago, vig)
 
 		# 4. Vigilante timeline — what changed, with a link back to this rotatividade
 		from sigos.timeline import registar
@@ -133,9 +117,6 @@ class Rotatividade(Document):
 			partes.append(_("<b>demitido</b>"))
 		elif op and op.enviar_reserva:
 			partes.append(_("enviado para a <b>Reserva</b>"))
-		elif abandono:
-			partes.append(_("marcado em <b>Abandono de Posto</b> (desde {0})").format(
-				frappe.format_value(self.data or today(), {"fieldtype": "Date"})))
 		rotulo = op.operacao if op else (self.abreviatura_op or "Rotatividade")
 		registar(self.vigilante,
 			_("Rotatividade <b>{0}</b>: {1}").format(rotulo, ", ".join(partes) or _("aplicada")), self)
@@ -212,70 +193,7 @@ class Rotatividade(Document):
 				indicator="red",
 			)
 
-	def _criar_participacao_abandono(self, posto, vig):
-		"""Draft Participação (the official warning, front door of the disciplinary
-		chain) for the abandonment — left as a draft so RH/Ops review the relato and
-		submit it, which then follows the normal Processo Disciplinar path."""
-		tipo = (
-			frappe.db.get_single_value("SIGOS Settings", "abandono_tipo_infracao")
-			or "Abandono de Posto"
-		)
-		if not frappe.db.exists("Tipo De Infracao", tipo):
-			frappe.msgprint(
-				_("Tipo de Infracção <b>{0}</b> não existe — a Participação de Abandono de Posto "
-				  "não foi criada. Configure-o em SIGOS Settings.").format(tipo),
-				indicator="orange",
-			)
-			return
-		try:
-			relato = _("Abandono de Posto (Rotatividade {0}).").format(self.name)
-			if vig.abandono_primeira_falta:
-				relato += " " + _("Ausente desde {0}.").format(
-					frappe.format_value(vig.abandono_primeira_falta, {"fieldtype": "Date"}))
-			if self.motivo_rotatividade:
-				relato += "\n" + self.motivo_rotatividade
-			part = frappe.get_doc({
-				"doctype": "Participacao",
-				"data": self.data or today(),
-				"delegacao": vig.delegacao,
-				"vigilante": self.vigilante,
-				"posto": posto,
-				"categoria": vig.categoria,
-				"tipo_de_infracao": tipo,
-				"gravidade": frappe.db.get_value("Tipo De Infracao", tipo, "gravidade_sugerida") or "Alta",
-				"relato": relato,
-			})
-			part.insert(ignore_permissions=True)
-			frappe.msgprint(
-				_("Participação <b>{0}</b> criada (rascunho) para o Abandono de Posto.").format(part.name),
-				alert=True,
-			)
-		except Exception as e:
-			frappe.log_error(
-				f"Rotatividade {self.name}: erro ao criar Participacao de abandono para {self.vigilante}: {e}",
-				"SIGOS Rotatividade",
-			)
-			frappe.msgprint(
-				_("<b>Atenção:</b> não foi possível criar a Participação de Abandono de Posto para "
-				  "<b>{0}</b> ({1}). Crie-a manualmente.").format(self.vigilante, e),
-				title=_("Participação Automática Falhou"),
-				indicator="red",
-			)
-
 	# ─── Validation helpers ────────────────────────────────────────────────────
-
-	def _validar_abandono(self):
-		"""Abandono de Posto only applies to a guard currently in service."""
-		op = self._get_operacao()
-		if not (op and op.get("marca_abandono") and self.vigilante):
-			return
-		estado = frappe.db.get_value("Vigilante", self.vigilante, "status")
-		if estado not in ("Activo", "Reserva"):
-			frappe.throw(
-				_("Só um vigilante <b>Activo</b> ou em <b>Reserva</b> pode ser marcado em Abandono "
-				  "de Posto (estado actual: <b>{0}</b>).").format(estado or "-"),
-				title=_("Estado Inválido"),
-			)
 
 	def _validar_transferencia_contrato(self):
 		"""
@@ -345,8 +263,8 @@ def regra_3meses_info(vigilante, op=None, excluir_doc=None):
 	check (sigos.api.rotatividade_regra_3meses) — so the field's shown/hidden state
 	always agrees with what submit will actually enforce.
 	"""
-	# Involuntary moves (demissão / posto closed → reserva / abandono) aren't churn — exempt.
-	if op and (op.demite or op.get("enviar_reserva") or op.get("marca_abandono")):
+	# Involuntary moves (demissão / posto closed → reserva) aren't churn — exempt.
+	if op and (op.demite or op.get("enviar_reserva")):
 		return {"aplica": False}
 
 	dias_minimos = frappe.db.get_single_value("SIGOS Settings", "dias_minimos_rotatividade") or 90

@@ -1,6 +1,7 @@
 
 [pre_model_sync]
 sigos.patches.rename_deducoes_proventos
+sigos.patches.criar_papel_jurista
 
 [post_model_sync]
 sigos.patches.normalizar_estados
@@ -29,3 +30,4 @@ sigos.patches.divisor_folha_30_dias
 sigos.patches.separar_faturacao_do_contrato
 sigos.patches.sigos_stamp_fatura_no_copy
 sigos.patches.seed_abandono_de_posto
+sigos.patches.remover_operacao_abp

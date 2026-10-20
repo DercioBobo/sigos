@@ -56,7 +56,6 @@ def _seed_settings_defaults():
 		"leave_type_ferias": ("Leave Type", "Ferias"),
 		"aprovador_rh": ("Role", "Aprovador RH"),
 		"aprovador_operacoes": ("Role", "Aprovador Operações"),
-		"abandono_tipo_infracao": ("Tipo De Infracao", "Abandono de Posto"),
 	}
 	try:
 		settings = frappe.get_single("SIGOS Settings")
