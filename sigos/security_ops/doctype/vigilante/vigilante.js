@@ -249,6 +249,8 @@ function _abandono_de_posto(frm) {
 		frappe.new_doc("Rotatividade");
 	};
 
+	_salario_congelado(frm, fmt);
+
 	if (frm.doc.status === "Abandono de Posto") {
 		const pintar_abd = (efeito) => frm.dashboard.set_headline_alert(
 			__("Em <b>Abandono de Posto</b> desde {0}{1}, até ao regresso ou demissão.",
@@ -266,17 +268,57 @@ function _abandono_de_posto(frm) {
 
 	if (!frm.doc.abandono_detectado_em || !["Activo", "Reserva"].includes(frm.doc.status)) return;
 
-	const pintar = (dias, limite) => frm.dashboard.set_headline_alert(
-		__("Possível <b>Abandono de Posto</b>: {0} dias seguidos de ausência desde {1} (limite: {2}).",
-			[dias, fmt(frm.doc.abandono_primeira_falta), limite]),
+	const pintar = (texto, limite) => frm.dashboard.set_headline_alert(
+		__("Possível <b>Abandono de Posto</b>: {0} desde {1} (limite: {2}).",
+			[texto, fmt(frm.doc.abandono_primeira_falta), limite]),
 		"red",
 	);
-	pintar("≥", "…");
+	pintar(__("ausência seguida"), "…");
 	frappe.xcall("sigos.abandono.sequencia_vigilante", { vigilante: frm.doc.name })
-		.then((r) => { if (r && r.dias) pintar(r.dias, r.limite); });
+		.then((r) => { if (r && r.valor) pintar(r.texto, r.limite); });
 
 	if (pode_ops) {
 		frm.add_custom_button(__("Marcar Abandono de Posto"), () => abrir("ABP"), __("Acções"));
+	}
+}
+
+// Congelar Salário (RH): only for guards in Abandono de Posto; frozen guards are
+// left out of Payroll Entries until the freeze is lifted (by hand here, or
+// automatically on Registar Regresso / Demissão).
+function _salario_congelado(frm, fmt) {
+	const pode_rh = ["Aprovador RH", "RH Normal", "SIGOS Manager", "System Manager"]
+		.some((r) => frappe.user.has_role(r));
+	if (frm.doc.salario_congelado) {
+		frm.dashboard.add_comment(
+			__("<b>Salário congelado</b> desde {0} — fora das Payroll Entries até ser descongelado. Motivo: {1}",
+				[fmt(frm.doc.salario_congelado_desde), frappe.utils.escape_html(frm.doc.salario_congelado_motivo || "—")]),
+			"blue", true,
+		);
+		if (pode_rh) {
+			frm.add_custom_button(__("Descongelar Salário"), () => {
+				frappe.prompt(
+					[{ fieldname: "motivo", fieldtype: "Small Text", label: __("Motivo (opcional)") }],
+					(v) => frm.call("descongelar_salario", { motivo: v.motivo || null }).then((r) => {
+						if (r.message) frappe.msgprint({ message: r.message, title: __("Salário Descongelado"), indicator: "blue" });
+						frm.reload_doc();
+					}),
+					__("Descongelar Salário"), __("Descongelar"),
+				);
+			}, __("Acções"));
+		}
+		return;
+	}
+	if (pode_rh && frm.doc.status === "Abandono de Posto") {
+		frm.add_custom_button(__("Congelar Salário"), () => {
+			frappe.prompt(
+				[
+					{ fieldtype: "HTML", options: `<p class="text-muted">${__("O vigilante deixa de entrar nas Payroll Entries e não pode ter Salary Slips até o salário ser descongelado (automaticamente no regresso ou na demissão). Os meses congelados processam-se depois, já com as justificações.")}</p>` },
+					{ fieldname: "motivo", fieldtype: "Small Text", label: __("Motivo"), reqd: 1 },
+				],
+				(v) => frm.call("congelar_salario", { motivo: v.motivo }).then(() => frm.reload_doc()),
+				__("Congelar Salário"), __("Congelar"),
+			);
+		}, __("Acções"));
 	}
 }
 

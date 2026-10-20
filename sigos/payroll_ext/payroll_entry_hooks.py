@@ -27,6 +27,29 @@ import frappe
 def before_validate(doc, method):
 	_default_payroll_payable_account(doc)
 	_filtrar_employees_por_criterio(doc)
+	_excluir_salarios_congelados(doc)
+
+
+def _excluir_salarios_congelados(doc):
+	"""Guards with Salário Congelado (Abandono de Posto) are never paid by a
+	Payroll Entry — pruned on every save AND on submit (submit re-validates), so
+	a freeze applied after "Get Employees" still takes effect. Their months are
+	processed after the freeze is lifted."""
+	from sigos.abandono import vigilantes_congelados
+
+	linhas = doc.get("employees") or []
+	congelados = vigilantes_congelados([l.employee for l in linhas if l.employee])
+	if not congelados:
+		return
+	doc.set("employees", [l for l in linhas if l.employee not in congelados])
+	if doc.meta.has_field("number_of_employees"):
+		doc.number_of_employees = len(doc.employees)
+	frappe.msgprint(
+		"Retirados desta Payroll Entry por terem o <b>salário congelado</b> (Abandono de "
+		"Posto): " + ", ".join(f"{emp} ({vig})" for emp, vig in sorted(congelados.items())),
+		title="Salários Congelados",
+		indicator="orange",
+	)
 
 
 def _default_payroll_payable_account(doc):

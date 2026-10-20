@@ -69,6 +69,7 @@ class Vigilante(Document):
 		self._avisar_duplicado_por_documento()
 
 	def on_update(self):
+		self._registar_congelamento_auto()
 		self._atualizar_ocupacao_postos()
 		self._migrar_escala_se_mudou()
 		self._seed_salario_base()
@@ -555,6 +556,10 @@ class Vigilante(Document):
 					getdate(add_days(today(), -1)),
 					getdate(add_days(self.data_inicio_abandono, -1)),
 				)
+			if before and before.status == "Abandono de Posto" and self.salario_congelado:
+				# The process ended (return / dismissal) — the freeze ends with it.
+				self._descongelar_campos()
+				self.flags.salario_descongelado = True
 			return
 		if before and before.status == "Abandono de Posto":
 			return
@@ -577,6 +582,33 @@ class Vigilante(Document):
 			getdate(self.abandono_inicio_ausencia) > getdate(self.data_inicio_abandono)
 		):
 			self.abandono_inicio_ausencia = self.data_inicio_abandono
+
+		from sigos.abandono import congelar_ao_marcar
+		if congelar_ao_marcar() and not self.salario_congelado:
+			self.salario_congelado = 1
+			self.salario_congelado_desde = self.data_inicio_abandono
+			self.salario_congelado_motivo = _("Congelado automaticamente ao marcar Abandono de Posto.")
+			self.salario_congelado_por = frappe.session.user
+			self.flags.salario_congelado_auto = True
+
+	def _registar_congelamento_auto(self):
+		"""Timeline + message for the freeze changes _carimbar_abandono made."""
+		if not (self.flags.salario_congelado_auto or self.flags.salario_descongelado):
+			return
+		from sigos.timeline import registar
+		if self.flags.salario_congelado_auto:
+			registar(self.name, _("<b>Salário congelado</b> automaticamente (Abandono de Posto)."), self)
+		if self.flags.salario_descongelado:
+			from sigos.abandono import aviso_descongelado
+			registar(self.name, _("<b>Salário descongelado</b> — fim do Abandono de Posto."), self)
+			frappe.msgprint(aviso_descongelado(self.name), title=_("Salário Descongelado"), indicator="blue")
+		self.flags.salario_congelado_auto = self.flags.salario_descongelado = False
+
+	def _descongelar_campos(self):
+		self.salario_congelado = 0
+		self.salario_congelado_desde = None
+		self.salario_congelado_motivo = None
+		self.salario_congelado_por = None
 
 	def _validar_capacidade_posto(self):
 		"""Prevent assigning more vigilantes than the posto's maximum."""
@@ -835,6 +867,53 @@ class Vigilante(Document):
 			texto += _(" — motivo: {0}").format(motivo)
 		registar(self.name, texto, self)
 		return {"status": self.status, "justificacao": just}
+
+	@frappe.whitelist()
+	def congelar_salario(self, motivo=None):
+		"""RH: freeze a guard in Abandono de Posto out of payroll until the process
+		ends. Written with db.set_value (no full save — nothing else changes, and a
+		stale open form then gets the usual "modified" conflict instead of silently
+		unfreezing)."""
+		from sigos.abandono import PAPEIS_CONGELAR
+
+		frappe.only_for(PAPEIS_CONGELAR)
+		if self.status != "Abandono de Posto":
+			frappe.throw(_("Só é possível congelar o salário de um vigilante em <b>Abandono de Posto</b>."))
+		if self.salario_congelado:
+			frappe.throw(_("O salário já está congelado."), title=_("Sem alteração"))
+		motivo = (motivo or "").strip()
+		if not motivo:
+			frappe.throw(_("Indique o motivo do congelamento."))
+		frappe.db.set_value("Vigilante", self.name, {
+			"salario_congelado": 1,
+			"salario_congelado_desde": today(),
+			"salario_congelado_motivo": motivo,
+			"salario_congelado_por": frappe.session.user,
+		})
+		from sigos.timeline import registar
+		registar(self.name, _("<b>Salário congelado</b> — {0}").format(motivo), self)
+		return True
+
+	@frappe.whitelist()
+	def descongelar_salario(self, motivo=None):
+		"""RH: lift the freeze by hand (it also lifts itself on return/dismissal)."""
+		from sigos.abandono import PAPEIS_CONGELAR, aviso_descongelado
+
+		frappe.only_for(PAPEIS_CONGELAR)
+		if not self.salario_congelado:
+			frappe.throw(_("O salário não está congelado."), title=_("Sem alteração"))
+		frappe.db.set_value("Vigilante", self.name, {
+			"salario_congelado": 0,
+			"salario_congelado_desde": None,
+			"salario_congelado_motivo": None,
+			"salario_congelado_por": None,
+		})
+		from sigos.timeline import registar
+		texto = _("<b>Salário descongelado</b>")
+		if (motivo or "").strip():
+			texto += _(" — {0}").format(motivo.strip())
+		registar(self.name, texto, self)
+		return aviso_descongelado(self.name)
 
 	@frappe.whitelist()
 	def inactivar(self, motivo=None):

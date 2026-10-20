@@ -136,7 +136,25 @@ def _validar_periodo_sem_sobreposicao(doc):
 		)
 
 
+def _bloquear_salario_congelado(doc):
+	"""No Salary Slip (draft or submit) for a guard whose salary is frozen
+	(Abandono de Posto) — the Payroll Entry already leaves them out; this closes
+	the manual/API path. Unfreeze on the Vigilante first."""
+	if not doc.employee or doc.docstatus == 2:
+		return
+	from sigos.abandono import vigilantes_congelados
+
+	vig = vigilantes_congelados([doc.employee]).get(doc.employee)
+	if vig:
+		frappe.throw(
+			f"O salário de <b>{vig}</b> ({doc.employee}) está <b>congelado</b> (Abandono de "
+			"Posto). Descongele-o no Vigilante antes de processar a folha.",
+			title="Salário Congelado",
+		)
+
+
 def before_validate(doc, method):
+	_bloquear_salario_congelado(doc)
 	_validar_periodo_sem_sobreposicao(doc)     # fail fast, before any computation
 	_add_project_subsidios(doc)
 	_add_subsidio_arma(doc)

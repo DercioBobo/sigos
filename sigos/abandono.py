@@ -58,7 +58,24 @@ def _modo():
 
 
 def _dias_limite():
+	"""The threshold — calendar days or faltas, per abandono_criterio."""
 	return cint(frappe.db.get_single_value("SIGOS Settings", "abandono_dias_limite")) or 15
+
+
+# SIGOS Settings.abandono_criterio — what the streak is measured in.
+CRITERIO_DIAS = "Dias de Calendário"   # a day is a day (folgas included, leave excluded)
+CRITERIO_FALTAS = "Nº de Faltas"       # sum of the turno-weighted faltas (1ª Manhã = 3 ...)
+
+
+def _criterio():
+	return frappe.db.get_single_value("SIGOS Settings", "abandono_criterio") or CRITERIO_DIAS
+
+
+def _descrever(info):
+	"""'19 dias seguidos de ausência' / '40 faltas em ausência seguida'."""
+	if info.get("unidade") == "faltas":
+		return _("{0} faltas em ausência seguida").format(info.get("valor", 0))
+	return _("{0} dias seguidos de ausência").format(info.get("valor", 0))
 
 
 # SIGOS Settings.abandono_desconto — what happens to each day a guard spends in
@@ -103,13 +120,69 @@ def resumo_desconto():
 	return descricao_desconto()
 
 
+# ─── Congelar Salário ───────────────────────────────────────────────────────────
+# A frozen guard is left out of every Payroll Entry and can't get a Salary Slip
+# (payroll_entry_hooks / salary_slip_hooks). The months frozen are simply not
+# processed yet — once the process ends (return / dismissal / manual unfreeze)
+# RH creates those slips, which then already see any justification. Fields live
+# on the Vigilante (permlevel 0, read-only, written only here and in
+# Vigilante._carimbar_abandono).
+
+PAPEIS_CONGELAR = ("System Manager", "SIGOS Manager", "Aprovador RH", "RH Normal")
+
+
+def congelar_ao_marcar():
+	return (frappe.db.get_single_value("SIGOS Settings", "abandono_congelar_salario") or "Manual") == "Ao marcar Abandono"
+
+
+def vigilantes_congelados(employees=None):
+	"""{employee: vigilante} for frozen guards (optionally among `employees`)."""
+	filters = {"salario_congelado": 1, "funcionario": ["is", "set"]}
+	if employees is not None:
+		if not employees:
+			return {}
+		filters["funcionario"] = ["in", list(employees)]
+	return {
+		v.funcionario: v.name
+		for v in frappe.get_all("Vigilante", filters=filters, fields=["name", "funcionario"])
+	}
+
+
+def folhas_em_falta(vigilante):
+	"""Where payroll stopped for this guard: the last SUBMITTED slip's end_date
+	(None if never paid) — the frozen months start right after it."""
+	emp = frappe.db.get_value("Vigilante", vigilante, "funcionario")
+	if not emp:
+		return None
+	ult = frappe.get_all(
+		"Salary Slip", filters={"employee": emp, "docstatus": 1},
+		fields=["end_date"], order_by="end_date desc", limit=1,
+	)
+	return ult[0].end_date if ult else None
+
+
+def aviso_descongelado(vigilante):
+	ultima = folhas_em_falta(vigilante)
+	if ultima:
+		return _("Salário descongelado. Última folha processada até <b>{0}</b> — crie as "
+			"Salary Slips em falta a partir de <b>{1}</b> (Payroll Entry ou individualmente).").format(
+			frappe.format_value(ultima, {"fieldtype": "Date"}),
+			frappe.format_value(add_days(ultima, 1), {"fieldtype": "Date"}))
+	return _("Salário descongelado. O vigilante ainda não tem nenhuma Salary Slip submetida — "
+		"processe os meses em falta.")
+
+
 # ─── Streak computation ─────────────────────────────────────────────────────────
 
 def calcular_sequencia_ausencia(vigilante, ate=None, desde=None):
 	"""
 	Current unbroken absence streak for a guard, ending at `ate` (default:
 	yesterday — today's sheets may not be filed yet). Returns
-	{"inicio": date|None, "dias": int, "ultima_falta": date|None}.
+	{"inicio", "dias", "faltas", "ultima_falta", "valor", "unidade"}:
+	`dias` = calendar days, `faltas` = the same streak's absences weighted like
+	payroll (utils.calcular_faltas_detalhado: turno weight + consecutive de-dup),
+	`valor`/`unidade` = whichever SIGOS Settings.abandono_criterio compares to
+	the limit. The streak itself (which days break it) is the same either way.
 
 	`desde` widens the lookback (e.g. the stored abandono_primeira_falta) —
 	otherwise it covers the limit plus a month, which the escala's own
@@ -120,7 +193,9 @@ def calcular_sequencia_ausencia(vigilante, ate=None, desde=None):
 	if desde and getdate(desde) < inicio_janela:
 		inicio_janela = getdate(desde)
 
-	vazio = {"inicio": None, "dias": 0, "ultima_falta": None}
+	unidade = "faltas" if _criterio() == CRITERIO_FALTAS else "dias"
+	vazio = {"inicio": None, "dias": 0, "faltas": 0, "ultima_falta": None,
+		"valor": 0, "unidade": unidade}
 
 	dias_trabalho = _dias_de_trabalho(vigilante, inicio_janela, ate)
 	if not dias_trabalho:
@@ -145,11 +220,30 @@ def calcular_sequencia_ausencia(vigilante, ate=None, desde=None):
 
 	neutros |= {d for d, c in classe.items() if c == "neutro"}
 	licenca_no_periodo = sum(1 for d in neutros if inicio <= d <= ate)
+	dias = max(0, date_diff(ate, inicio) + 1 - licenca_no_periodo)
+	faltas = _faltas_na_sequencia(vigilante, inicio, ate, justificados)
 	return {
 		"inicio": inicio,
-		"dias": max(0, date_diff(ate, inicio) + 1 - licenca_no_periodo),
+		"dias": dias,
+		"faltas": faltas,
 		"ultima_falta": ultima,
+		"valor": faltas if unidade == "faltas" else dias,
+		"unidade": unidade,
 	}
+
+
+def _faltas_na_sequencia(vigilante, inicio, ate, justificados):
+	"""Weighted faltas of the streak, counted exactly like payroll (e.g. 1ª Manhã
+	= 3 + 2ª Manhã = 1 -> 4), unjustified absence rows only."""
+	from sigos.utils import calcular_faltas_detalhado
+
+	return sum(
+		r["n_de_faltas"] or 0
+		for r in calcular_faltas_detalhado(vigilante, inicio, ate)
+		if r["tipo_de_ausencia"] in _TIPOS_AUSENTE
+		and not r.get("tipo_justificacao")
+		and getdate(r["data"]) not in justificados
+	)
 
 
 def _dias_de_trabalho(vigilante, de, ate):
@@ -309,7 +403,7 @@ def _processar(v, modo, limite, ontem):
 		return
 
 	info = calcular_sequencia_ausencia(v.name, ontem, desde=v.abandono_primeira_falta)
-	if info["dias"] < limite:
+	if info["valor"] < limite:
 		if v.abandono_detectado_em:
 			_limpar_sinal(v.name)
 		return
@@ -322,8 +416,8 @@ def _processar(v, modo, limite, ontem):
 		_notificar(v, info, modo)
 		from sigos.timeline import registar
 		registar(v.name, _(
-			"<b>Possível Abandono de Posto</b> — {0} dias seguidos de ausência desde {1}."
-		).format(info["dias"], frappe.format_value(info["inicio"], {"fieldtype": "Date"})))
+			"<b>Possível Abandono de Posto</b> — {0} desde {1}."
+		).format(_descrever(info), frappe.format_value(info["inicio"], {"fieldtype": "Date"})))
 
 	if modo == "Automático":
 		# Keep the alert even if the marking below fails (it's retried tomorrow,
@@ -332,9 +426,8 @@ def _processar(v, modo, limite, ontem):
 		try:
 			marcar_abandono(
 				v.name,
-				_("Marcado automaticamente: {0} dias seguidos de ausência desde {1} "
-				  "(limite: {2}).").format(
-					info["dias"], frappe.format_value(info["inicio"], {"fieldtype": "Date"}), limite),
+				_("Marcado automaticamente: {0} desde {1} (limite: {2}).").format(
+					_descrever(info), frappe.format_value(info["inicio"], {"fieldtype": "Date"}), limite),
 			)
 		except Exception as ex:
 			frappe.db.rollback()
@@ -373,12 +466,12 @@ def _notificar(v, info, modo):
 	for user in _destinatarios():
 		frappe.get_doc({
 			"doctype": "Notification Log",
-			"subject": _("Abandono de Posto: {0} — {1} dias seguidos ausente").format(nome, info["dias"]),
+			"subject": _("Abandono de Posto: {0} — {1}").format(nome, _descrever(info)),
 			"email_content": _(
-				"<b>{0}</b> ({1}) está ausente há <b>{2}</b> dias seguidos, desde {3} "
+				"<b>{0}</b> ({1}): <b>{2}</b>, desde {3} "
 				"(posto: {4}). {5}"
 			).format(
-				nome, v.name, info["dias"],
+				nome, v.name, _descrever(info),
 				frappe.format_value(info["inicio"], {"fieldtype": "Date"}),
 				v.posto_de_vigilancia or "—", accao,
 			),
@@ -425,6 +518,7 @@ def sequencia_vigilante(vigilante):
 	info = calcular_sequencia_ausencia(vigilante, desde=desde)
 	info["limite"] = _dias_limite()
 	info["modo"] = _modo()
+	info["texto"] = _descrever(info)
 	return info
 
 

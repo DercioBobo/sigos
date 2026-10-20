@@ -16,10 +16,12 @@
   "justificativo_faltas_obrigatorio",
   "sec_ss_abandono",
   "abandono_modo",
+  "abandono_criterio",
   "abandono_dias_limite",
   "col_ss_abandono",
   "abandono_tipo_infracao",
   "abandono_desconto",
+  "abandono_congelar_salario",
   "tab_ss_rh",
   "percentagem_maxima_emprestimo",
   "meses_maximos_emprestimo",
@@ -183,7 +185,7 @@
    "fieldname": "sec_ss_abandono",
    "fieldtype": "Section Break",
    "label": "Abandono de Posto",
-   "description": "Detecção diária de vigilantes com ausências seguidas. Conta dias de calendário desde a primeira falta (folgas incluídas), cada dia conta 1 independentemente do peso do turno. Um dia trabalhado ou uma falta justificada quebra a sequência; licenças aprovadas não quebram nem contam."
+   "description": "Detecção diária de vigilantes com ausências seguidas, medidas em dias de calendário ou em nº de faltas (ver critério). Um dia trabalhado ou uma falta justificada quebra a sequência; licenças aprovadas não quebram nem contam."
   },
   {
    "fieldname": "abandono_modo",
@@ -194,12 +196,21 @@
    "description": "Apenas Alerta: notifica Operações (sino) e mostra o aviso no Vigilante, com botão para marcar via Rotatividade (ABP). Automático: notifica E marca o vigilante automaticamente (cria e aplica a Rotatividade ABP, sem substituto — o posto fica desfalcado)."
   },
   {
+   "fieldname": "abandono_criterio",
+   "fieldtype": "Select",
+   "label": "Contar a Ausência Seguida em",
+   "options": "Dias de Calendário\nNº de Faltas",
+   "default": "Dias de Calendário",
+   "depends_on": "eval:doc.abandono_modo!='Desactivado'",
+   "description": "Dias de Calendário: cada dia conta 1, folgas incluídas (ex.: 1ª Manhã + 2ª Manhã = 2). Nº de Faltas: soma das faltas com o peso do turno, como na folha de salário (ex.: 1ª Manhã = 3 + 2ª Manhã = 1 = 4). A sequência é a mesma nos dois casos — só muda a forma de a medir."
+  },
+  {
    "fieldname": "abandono_dias_limite",
    "fieldtype": "Int",
-   "label": "Dias Seguidos de Ausência",
+   "label": "Limite (Dias ou Faltas)",
    "default": "15",
    "depends_on": "eval:doc.abandono_modo!='Desactivado'",
-   "description": "Número de dias de calendário seguidos em falta a partir do qual o vigilante é considerado em Abandono de Posto."
+   "description": "A partir deste valor (em dias de calendário ou em nº de faltas, conforme o critério acima) o vigilante é considerado em Abandono de Posto."
   },
   {
    "fieldname": "col_ss_abandono",
@@ -211,6 +222,14 @@
    "label": "Tipo de Infracção (Participação Automática)",
    "options": "Tipo De Infracao",
    "description": "Tipo de Infracção usado na Participação criada automaticamente ao marcar Abandono de Posto. Padrão: \"Abandono de Posto\" — atribuído automaticamente após a instalação."
+  },
+  {
+   "fieldname": "abandono_congelar_salario",
+   "fieldtype": "Select",
+   "label": "Congelar Salário (Abandono)",
+   "options": "Manual\nAo marcar Abandono",
+   "default": "Manual",
+   "description": "Manual: o RH congela/descongela no Vigilante (botão Congelar Salário), a qualquer momento enquanto está em Abandono de Posto. Ao marcar Abandono: congela automaticamente quando a Rotatividade ABP é aplicada. Em ambos os casos descongela automaticamente no regresso (Registar Regresso) ou na demissão. Um vigilante congelado é retirado das Payroll Entries e não pode ter Salary Slips — os meses congelados processam-se depois de descongelar, já com as justificações."
   },
   {
    "fieldname": "abandono_desconto",

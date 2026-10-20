@@ -20,6 +20,10 @@
   "data_fim_abandono",
   "abandono_primeira_falta",
   "abandono_detectado_em",
+  "salario_congelado",
+  "salario_congelado_desde",
+  "salario_congelado_motivo",
+  "salario_congelado_por",
   "sec_pessoais",
   "data_de_nascimento",
   "idade",
@@ -286,6 +290,42 @@
    "no_copy": 1,
    "depends_on": "eval:doc.abandono_detectado_em",
    "description": "Data em que a tarefa diária detectou a sequência de ausências acima do limite (SIGOS Settings)."
+  },
+  {
+   "fieldname": "salario_congelado",
+   "fieldtype": "Check",
+   "label": "Salário Congelado",
+   "read_only": 1,
+   "no_copy": 1,
+   "default": "0",
+   "in_standard_filter": 1,
+   "depends_on": "eval:doc.salario_congelado",
+   "description": "Enquanto activo, o vigilante é retirado das Payroll Entries e não pode ter Salary Slips. Descongela automaticamente no regresso ou na demissão."
+  },
+  {
+   "fieldname": "salario_congelado_desde",
+   "fieldtype": "Date",
+   "label": "Salário Congelado Desde",
+   "read_only": 1,
+   "no_copy": 1,
+   "depends_on": "eval:doc.salario_congelado"
+  },
+  {
+   "fieldname": "salario_congelado_motivo",
+   "fieldtype": "Small Text",
+   "label": "Motivo do Congelamento",
+   "read_only": 1,
+   "no_copy": 1,
+   "depends_on": "eval:doc.salario_congelado"
+  },
+  {
+   "fieldname": "salario_congelado_por",
+   "fieldtype": "Link",
+   "options": "User",
+   "label": "Congelado Por",
+   "read_only": 1,
+   "no_copy": 1,
+   "depends_on": "eval:doc.salario_congelado"
   },
   {
    "fieldname": "data_admissao",
@@ -613,7 +653,7 @@
    "link_fieldname": "vigilante"
   }
  ],
- "modified": "2026-10-20 14:00:00.000000",
+ "modified": "2026-10-20 16:00:00.000000",
  "modified_by": "Administrator",
  "module": "Security Ops",
  "name": "Vigilante",
