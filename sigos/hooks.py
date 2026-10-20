@@ -18,6 +18,7 @@ app_include_js = [
 	"/assets/sigos/js/sigos_quick_docs.js",
 	"/assets/sigos/js/escala_wizard.js",
 	"/assets/sigos/js/rotatividade_wizard.js",
+	"/assets/sigos/js/ficha_vigilante.js",
 	"/assets/sigos/js/project_subsidio_matrix.js",
 ]
 

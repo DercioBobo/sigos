@@ -7,6 +7,11 @@ frappe.ui.form.on("Processo Disciplinar", {
 	refresh(frm) {
 		_filtro_vigilante(frm);
 		_mostrar_preview_participacao(frm);
+		_ficha(frm);
+	},
+
+	vigilante(frm) {
+		_ficha(frm);
 	},
 
 	delegacao(frm) {
@@ -71,4 +76,14 @@ function _mostrar_preview_participacao(frm) {
 			</div>
 		`);
 	});
+}
+
+// Ficha do Vigilante — the decision dossier (public/js/ficha_vigilante.js +
+// sigos.disciplinar.dossie): seniority, situation, attendance, férias, pay and debts,
+// disciplinary history, material to return. The current process is excluded from
+// "processos anteriores".
+function _ficha(frm) {
+	const f = frm.fields_dict.ficha_vigilante;
+	if (!f || !(window.sigos && window.sigos.ficha_vigilante)) return;
+	sigos.ficha_vigilante.render(f.$wrapper, frm.doc.vigilante, { processo: frm.is_new() ? null : frm.doc.name });
 }

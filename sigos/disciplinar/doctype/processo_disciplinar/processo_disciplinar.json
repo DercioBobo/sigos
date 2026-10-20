@@ -22,6 +22,28 @@
   "data",
   "delegacao",
   "automatico",
+  "sec_ficha",
+  "ficha_vigilante",
+  "sec_origem",
+  "origem",
+  "repreensao_referente",
+  "presuncao_referente",
+  "col_origem_1",
+  "data_ocorrencia",
+  "hora_ocorrencia",
+  "data_conhecimento_infracao",
+  "prazo_processo_ate",
+  "fora_de_prazo",
+  "justificacao_fora_de_prazo",
+  "col_origem_2",
+  "posto_ocorrencia",
+  "posto_ocorrencia_nome",
+  "participante",
+  "sec_origem_b",
+  "infracoes",
+  "outras_descricao",
+  "col_origem_3",
+  "testemunhas",
   "sec_processo",
   "participacao_referente",
   "participacao_preview",
@@ -59,10 +81,11 @@
   {
    "fieldname": "data",
    "fieldtype": "Date",
-   "label": "Data",
+   "label": "Data de Abertura",
    "reqd": 1,
    "in_list_view": 1,
-   "default": "Today"
+   "default": "Today",
+   "description": "Dia em que o processo foi aberto. A data da infracção é a Data da Ocorrência."
   },
   {
    "fieldname": "delegacao",
@@ -135,6 +158,134 @@
    "label": "Categoria",
    "fetch_from": "vigilante.categoria",
    "read_only": 1
+  },
+  {
+   "fieldname": "sec_ficha",
+   "fieldtype": "Section Break",
+   "label": "Ficha do Vigilante",
+   "depends_on": "eval:doc.vigilante",
+   "description": "Tudo o que é preciso para decidir: antiguidade, situação, assiduidade, férias, salário e dívidas, histórico disciplinar e material em posse."
+  },
+  {
+   "fieldname": "ficha_vigilante",
+   "fieldtype": "HTML",
+   "label": "Ficha do Vigilante"
+  },
+  {
+   "fieldname": "sec_origem",
+   "fieldtype": "Section Break",
+   "label": "Origem e Ocorrência",
+   "description": "Preenchido automaticamente a partir do documento de origem (só os campos vazios — pode corrigir)."
+  },
+  {
+   "fieldname": "origem",
+   "fieldtype": "Select",
+   "label": "Origem",
+   "read_only": 1,
+   "options": "\nParticipação\nRepreensão\nPresunção de Abandono\nManual",
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "repreensao_referente",
+   "fieldtype": "Link",
+   "options": "Repreensao",
+   "label": "Repreensão",
+   "read_only": 1
+  },
+  {
+   "fieldname": "presuncao_referente",
+   "fieldtype": "Link",
+   "options": "Presuncao De Abandono",
+   "label": "Presunção de Abandono",
+   "read_only": 1
+  },
+  {
+   "fieldname": "col_origem_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "data_ocorrencia",
+   "fieldtype": "Date",
+   "label": "Data da Ocorrência",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "hora_ocorrencia",
+   "fieldtype": "Data",
+   "label": "Hora da Ocorrência"
+  },
+  {
+   "fieldname": "data_conhecimento_infracao",
+   "fieldtype": "Date",
+   "label": "Data de Conhecimento da Infracção",
+   "description": "Dia em que o vigilante tomou conhecimento da infracção."
+  },
+  {
+   "fieldname": "prazo_processo_ate",
+   "fieldtype": "Date",
+   "label": "Prazo para Abrir o Processo",
+   "read_only": 1,
+   "description": "Data de Conhecimento + prazo (SIGOS Settings)."
+  },
+  {
+   "fieldname": "fora_de_prazo",
+   "fieldtype": "Check",
+   "label": "Fora de Prazo",
+   "read_only": 1,
+   "no_copy": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "justificacao_fora_de_prazo",
+   "fieldtype": "Small Text",
+   "label": "Justificação (Fora de Prazo)",
+   "no_copy": 1,
+   "description": "Só um gestor (SIGOS Manager) pode avançar fora de prazo — fica registado aqui."
+  },
+  {
+   "fieldname": "col_origem_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "posto_ocorrencia",
+   "fieldtype": "Link",
+   "options": "Posto De Vigilancia",
+   "label": "Posto da Ocorrência"
+  },
+  {
+   "fieldname": "posto_ocorrencia_nome",
+   "fieldtype": "Data",
+   "label": "Nome do Posto da Ocorrência",
+   "fetch_from": "posto_ocorrencia.nome_do_posto",
+   "read_only": 1
+  },
+  {
+   "fieldname": "participante",
+   "fieldtype": "Data",
+   "label": "Participante"
+  },
+  {
+   "fieldname": "sec_origem_b",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "infracoes",
+   "fieldtype": "Small Text",
+   "label": "Infracções"
+  },
+  {
+   "fieldname": "outras_descricao",
+   "fieldtype": "Data",
+   "label": "Outras — Descrição"
+  },
+  {
+   "fieldname": "col_origem_3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "testemunhas",
+   "fieldtype": "Small Text",
+   "label": "Testemunhas"
   },
   {
    "fieldname": "sec_processo",
@@ -257,7 +408,7 @@
  ],
  "is_submittable": 1,
  "links": [],
- "modified": "2026-10-21 20:00:00.000000",
+ "modified": "2026-10-22 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "Disciplinar",
  "name": "Processo Disciplinar",

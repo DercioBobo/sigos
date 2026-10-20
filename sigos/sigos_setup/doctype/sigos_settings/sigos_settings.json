@@ -40,6 +40,9 @@
   "reprimendas_media_pd",
   "col_break_disc",
   "reprimendas_alta_pd",
+  "repreensoes_para_processo",
+  "prazo_participacao_dias",
+  "prazo_processo_dias",
   "sec_ss_rh360",
   "painel_rh_360_activo",
   "tab_ss_pay",
@@ -353,6 +356,27 @@
    "label": "Participações Alta → Processo Disciplinar",
    "default": "1",
    "depends_on": "acumulacao_pd_activa"
+  },
+  {
+   "fieldname": "repreensoes_para_processo",
+   "fieldtype": "Int",
+   "label": "Repreensões até Propor Processo",
+   "default": "3",
+   "description": "Ao registar a N.ª repreensão de um vigilante (desde o último Processo Disciplinar), o Jurista é questionado se quer abrir um processo. Nunca abre sozinho."
+  },
+  {
+   "fieldname": "prazo_participacao_dias",
+   "fieldtype": "Int",
+   "label": "Prazo para Criar a Participação (dias)",
+   "default": "10",
+   "description": "Dias de calendário após a Data de Conhecimento da Infracção. Depois disso a Participação é recusada (um gestor pode avançar com justificação)."
+  },
+  {
+   "fieldname": "prazo_processo_dias",
+   "fieldtype": "Int",
+   "label": "Prazo para Abrir o Processo Disciplinar (dias)",
+   "default": "15",
+   "description": "Dias de calendário após a Data de Conhecimento da Infracção para abrir o Processo Disciplinar. Não se aplica à Presunção de Abandono."
   },
   {
    "fieldname": "sec_ss_rh360",
@@ -914,7 +938,7 @@
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-10-21 18:00:00.000000",
+ "modified": "2026-10-22 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "SIGOS Setup",
  "name": "SIGOS Settings",

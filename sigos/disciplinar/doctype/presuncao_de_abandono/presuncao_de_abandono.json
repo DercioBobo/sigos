@@ -45,6 +45,7 @@
   "sec_jurista",
   "jurista",
   "data_analise",
+  "data_conhecimento_infracao",
   "col_6",
   "processo_disciplinar",
   "sec_obs",
@@ -295,6 +296,12 @@
    "read_only": 1
   },
   {
+   "fieldname": "data_conhecimento_infracao",
+   "fieldtype": "Date",
+   "label": "Data de Conhecimento da Infracção",
+   "description": "Dia em que o vigilante tomou conhecimento da presunção. Passa para o Processo Disciplinar."
+  },
+  {
    "fieldname": "col_6",
    "fieldtype": "Column Break"
   },
@@ -338,7 +345,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-21 18:00:00.000000",
+ "modified": "2026-10-22 16:00:00.000000",
  "modified_by": "Administrator",
  "module": "Disciplinar",
  "name": "Presuncao De Abandono",

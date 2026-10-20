@@ -108,6 +108,7 @@ class PresuncaoDeAbandono(Document):
 				self.name, frappe.utils.formatdate(self.primeira_falta), self.total_dias or 0,
 				self.total_faltas or 0, faltas),
 			"automatico": _("Presunção de Abandono {0}").format(self.name),
+			"presuncao_referente": self.name,
 		})
 		pd.insert(ignore_permissions=True)
 		return pd.name

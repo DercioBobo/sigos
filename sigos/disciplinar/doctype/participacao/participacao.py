@@ -21,6 +21,7 @@ class Participacao(Document):
 	def validate(self):
 		if not self.registado_por:
 			self.registado_por = frappe.session.user
+		self._validar_conhecimento()
 		self._sincronizar_infracoes()
 		self._preencher_participante()
 		self._preencher_testemunhas()
@@ -41,6 +42,23 @@ class Participacao(Document):
 				title=_("Participação Incompleta"))
 
 	# ─── Form normalisation ──────────────────────────────────────────────────────
+
+	def _validar_conhecimento(self):
+		"""Data de Conhecimento: not in the future, not before the incident, and the
+		participação must be CREATED within the deadline (sigos.disciplinar.prazos) —
+		counted against the creation day, so a timely draft stays valid."""
+		if not self.data_conhecimento_infracao:
+			return
+		from frappe.utils import getdate, today
+		from sigos.disciplinar.prazos import exigir, prazo_participacao
+
+		dc = getdate(self.data_conhecimento_infracao)
+		if dc > getdate(today()):
+			frappe.throw(_("A Data de Conhecimento da Infracção não pode ser no futuro."))
+		if self.data and dc < getdate(self.data):
+			frappe.throw(_("A Data de Conhecimento não pode ser anterior à data da ocorrência."))
+		criada = getdate(self.creation) if self.creation else getdate(today())
+		exigir(self, dc, prazo_participacao(), _("a Participação tem de ser criada"), criada)
 
 	def _sincronizar_infracoes(self):
 		"""Checklist ↔ principal: an old/API record with only tipo_de_infracao gets it
@@ -125,8 +143,8 @@ class Participacao(Document):
 						self.name, self.nome_do_vigilante or self.vigilante, infracoes),
 					"email_content": (
 						_("Processo Disciplinar <b>{0}</b> já aberto automaticamente.").format(pd) if pd
-						else _("Participação submetida ({0}, gravidade {1}). Abra-a para criar o "
-							   "<b>Processo Disciplinar</b>.").format(infracoes, self.gravidade or "-")
+						else _("Participação submetida ({0}, gravidade {1}). Abra-a para decidir: "
+							   "<b>Repreensão</b> ou <b>Processo Disciplinar</b>.").format(infracoes, self.gravidade or "-")
 					),
 					"for_user": user,
 					"type": "Alert",
@@ -157,7 +175,27 @@ class Participacao(Document):
 	# ─── Disciplinary process ────────────────────────────────────────────────────
 
 	@frappe.whitelist()
-	def criar_processo_disciplinar(self):
+	def registar_repreensao(self, observacoes=None):
+		"""Jurista's light outcome: a submitted Repreensão (record only). Returns
+		{name, numero, limite, propor_processo} — the UI asks whether to open a
+		Processo Disciplinar when the limit is reached."""
+		from sigos.disciplinar.doctype.repreensao.repreensao import limite_repreensoes
+
+		frappe.has_permission("Repreensao", "create", throw=True)
+		if self.docstatus != 1:
+			frappe.throw(_("Submeta a participação primeiro."))
+		rep = frappe.get_doc({
+			"doctype": "Repreensao", "participacao": self.name,
+			"observacoes": (observacoes or "").strip() or None,
+		})
+		rep.insert()
+		rep.submit()
+		lim = limite_repreensoes()
+		return {"name": rep.name, "numero": rep.numero, "limite": lim,
+			"propor_processo": rep.numero >= lim and not self.processo_disciplinar}
+
+	@frappe.whitelist()
+	def criar_processo_disciplinar(self, justificacao_fora_de_prazo=None):
 		"""Open a draft Processo Disciplinar pre-filled from this participação.
 		Returns the (existing or new) process name so the UI can route to it.
 
@@ -180,28 +218,33 @@ class Participacao(Document):
 			)
 			return existente
 
-		processo = self._abrir_processo(_("Participação {0}").format(self.name))
+		processo = self._abrir_processo(_("Participação {0}").format(self.name),
+			justificacao_fora_de_prazo=justificacao_fora_de_prazo)
 		frappe.msgprint(
 			_("Processo Disciplinar {0} criado a partir desta participação.").format(processo),
 			indicator="blue", alert=True,
 		)
 		return processo
 
-	def _abrir_processo(self, razao):
+	def _abrir_processo(self, razao, repreensao=None, justificacao_fora_de_prazo=None):
 		"""Insert a draft Processo Disciplinar from this participação. `razao` is
 		stamped on `automatico` (the audit trail of why the process opened). The PD
 		is keyed only on the vigilante; the Employee is derived downstream when needed."""
 		processo = frappe.get_doc({
 			"doctype": "Processo Disciplinar",
-			"data": self.data,
+			"data": frappe.utils.today(),  # Data de Abertura; the incident date is data_ocorrencia
 			"delegacao": self.delegacao,
 			"vigilante": self.vigilante,
 			"gravidade": self.gravidade,
+			"repreensao_referente": repreensao,
+			"justificacao_fora_de_prazo": (justificacao_fora_de_prazo or "").strip() or None,
 			"motivo": ", ".join(r.tipo_de_infracao for r in self.infracoes) or self.tipo_de_infracao,
 			"detalhes": self.relato,
 			"participacao_referente": self.name,
 			"automatico": razao,
 		})
+		# the rest of the origin (ocorrência, conhecimento, participante, infracções,
+		# testemunhas…) is snapshotted by ProcessoDisciplinar._preencher_da_origem
 		processo.insert(ignore_permissions=True)  # links back in ProcessoDisciplinar.after_insert
 		return processo.name
 

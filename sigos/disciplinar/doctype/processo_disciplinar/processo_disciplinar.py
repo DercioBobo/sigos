@@ -5,6 +5,71 @@ from frappe.model.document import Document
 
 class ProcessoDisciplinar(Document):
 
+	def validate(self):
+		self._preencher_da_origem()
+		self._validar_prazo()
+
+	def _validar_prazo(self):
+		"""A process from a Participação (directly or through a Repreensão) must be
+		opened within the deadline counted from the Data de Conhecimento da Infracção
+		(sigos.disciplinar.prazos). Checked when it's opened — or when an existing
+		draft is first linked to a participação. The Presunção de Abandono has none."""
+		from sigos.disciplinar.prazos import exigir, prazo_processo
+
+		if not self.participacao_referente:
+			return
+		antes = self.get_doc_before_save()
+		if not (self.is_new() or (antes and antes.participacao_referente != self.participacao_referente)):
+			return
+		conhecimento = frappe.db.get_value(
+			"Participacao", self.participacao_referente, "data_conhecimento_infracao")
+		e = exigir(self, conhecimento, prazo_processo(), _("o Processo Disciplinar tem de ser aberto"))
+		if e:
+			self.prazo_processo_ate = e["limite"]
+
+	def _preencher_da_origem(self):
+		"""Snapshot everything relevant from the document(s) that originated the
+		process — so the Jurista never has to go back to them. Only EMPTY fields are
+		filled: whatever the Jurista corrected stays."""
+		def por(campo, valor):
+			if valor not in (None, "") and not self.get(campo):
+				self.set(campo, valor)
+
+		if self.repreensao_referente and not self.participacao_referente:
+			self.participacao_referente = frappe.db.get_value(
+				"Repreensao", self.repreensao_referente, "participacao")
+		por("origem", "Repreensão" if self.repreensao_referente
+			else "Participação" if self.participacao_referente
+			else "Presunção de Abandono" if self.presuncao_referente else "Manual")
+
+		if self.participacao_referente:
+			p = frappe.get_doc("Participacao", self.participacao_referente)
+			infr = ", ".join(r.tipo_de_infracao for r in p.infracoes or []) or p.tipo_de_infracao
+			por("data_ocorrencia", p.data)
+			por("hora_ocorrencia", p.horas)
+			por("data_conhecimento_infracao", p.data_conhecimento_infracao)
+			por("posto_ocorrencia", p.posto)
+			por("participante", " · ".join(x for x in (
+				p.participante_nome, p.participante_numero and _("Nº {0}").format(p.participante_numero),
+				p.participante_categoria) if x))
+			por("infracoes", infr)
+			por("outras_descricao", p.outras_descricao)
+			por("testemunhas", "\n".join(
+				" · ".join(x for x in (t.nome, t.numero and _("Nº {0}").format(t.numero), t.categoria) if x)
+				for t in p.tabela_testemunhas or []) or p.testemunhas)
+			por("motivo", infr)
+			por("detalhes", p.relato)
+			por("gravidade", p.gravidade)
+		elif self.presuncao_referente:
+			pr = frappe.get_doc("Presuncao De Abandono", self.presuncao_referente)
+			por("data_ocorrencia", pr.primeira_falta)
+			por("data_conhecimento_infracao", pr.data_conhecimento_infracao)
+			por("posto_ocorrencia", pr.posto_de_vigilancia)
+			por("infracoes", _("Abandono de Posto — ausente desde {0}: {1} dia(s) com falta, {2} falta(s)").format(
+				frappe.utils.formatdate(pr.primeira_falta), pr.total_dias or 0, pr.total_faltas or 0))
+			por("motivo", _("Abandono de Posto"))
+			por("gravidade", "Alta")
+
 	def after_insert(self):
 		# Fires the moment an investigation opens (draft, before any decisão is
 		# known) — the posto needs covering immediately, not only once the
@@ -172,7 +237,9 @@ class ProcessoDisciplinar(Document):
 
 			demissao_doc = frappe.get_doc({
 				"doctype": "Demissao",
-				"data_de_demissao": self.data,
+				# the decision day (this process is being submitted now) — not the day it
+				# was opened nor the day of the infraction
+				"data_de_demissao": frappe.utils.today(),
 				"vigilante": self.vigilante,
 				"mecanografico": self.mecanografico,
 				"delegacao": self.delegacao,

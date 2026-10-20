@@ -1,0 +1,302 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "naming_series:",
+ "creation": "2026-10-22 14:00:00.000000",
+ "doctype": "DocType",
+ "document_type": "Document",
+ "editable_grid": 0,
+ "engine": "InnoDB",
+ "is_submittable": 1,
+ "field_order": [
+  "naming_series",
+  "data",
+  "participacao",
+  "col_1",
+  "numero",
+  "jurista",
+  "sec_vig",
+  "vigilante",
+  "nome_do_vigilante",
+  "col_2",
+  "mecanografico",
+  "delegacao",
+  "sec_inf",
+  "infracoes",
+  "col_3",
+  "gravidade",
+  "data_conhecimento_infracao",
+  "sec_obs",
+  "observacoes",
+  "processo_disciplinar"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Série",
+   "options": "REP-.YY.-.##",
+   "default": "REP-.YY.-.##",
+   "reqd": 1,
+   "set_only_once": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "data",
+   "fieldtype": "Date",
+   "label": "Data",
+   "reqd": 1,
+   "default": "Today",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "participacao",
+   "fieldtype": "Link",
+   "options": "Participacao",
+   "label": "Participação",
+   "reqd": 1,
+   "set_only_once": 1,
+   "in_list_view": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "col_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "numero",
+   "fieldtype": "Int",
+   "label": "Nº da Repreensão",
+   "read_only": 1,
+   "in_list_view": 1,
+   "description": "1ª, 2ª, 3ª… para este vigilante desde o último Processo Disciplinar."
+  },
+  {
+   "fieldname": "jurista",
+   "fieldtype": "Link",
+   "options": "User",
+   "label": "Jurista",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_vig",
+   "fieldtype": "Section Break",
+   "label": "Vigilante"
+  },
+  {
+   "fieldname": "vigilante",
+   "fieldtype": "Link",
+   "options": "Vigilante",
+   "label": "Vigilante",
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "nome_do_vigilante",
+   "fieldtype": "Data",
+   "label": "Nome do Vigilante",
+   "read_only": 1,
+   "fetch_from": "vigilante.nome_completo"
+  },
+  {
+   "fieldname": "col_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "mecanografico",
+   "fieldtype": "Data",
+   "label": "Mecanográfico",
+   "read_only": 1,
+   "fetch_from": "vigilante.mecanografico"
+  },
+  {
+   "fieldname": "delegacao",
+   "fieldtype": "Link",
+   "options": "Delegacao",
+   "label": "Delegação",
+   "read_only": 1,
+   "fetch_from": "vigilante.delegacao",
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "sec_inf",
+   "fieldtype": "Section Break",
+   "label": "Infracção"
+  },
+  {
+   "fieldname": "infracoes",
+   "fieldtype": "Small Text",
+   "label": "Infracções",
+   "read_only": 1
+  },
+  {
+   "fieldname": "col_3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "gravidade",
+   "fieldtype": "Data",
+   "label": "Gravidade",
+   "read_only": 1
+  },
+  {
+   "fieldname": "data_conhecimento_infracao",
+   "fieldtype": "Date",
+   "label": "Data de Conhecimento da Infracção",
+   "read_only": 1,
+   "description": "Da Participação."
+  },
+  {
+   "fieldname": "sec_obs",
+   "fieldtype": "Section Break",
+   "label": "Repreensão"
+  },
+  {
+   "fieldname": "observacoes",
+   "fieldtype": "Text",
+   "label": "Observações do Jurista",
+   "description": "Fica registado no histórico do vigilante. Sem efeito no posto nem no salário."
+  },
+  {
+   "fieldname": "processo_disciplinar",
+   "fieldtype": "Link",
+   "options": "Processo Disciplinar",
+   "label": "Processo Disciplinar",
+   "read_only": 1,
+   "allow_on_submit": 1,
+   "no_copy": 1,
+   "description": "Aberto a partir desta repreensão (decisão do Jurista quando atinge o limite)."
+  }
+ ],
+ "links": [],
+ "modified": "2026-10-22 16:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Disciplinar",
+ "name": "Repreensao",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "permlevel": 0,
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "submit": 1,
+   "cancel": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "amend": 0
+  },
+  {
+   "role": "SIGOS Manager",
+   "permlevel": 0,
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "submit": 1,
+   "cancel": 1,
+   "delete": 0,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "amend": 0
+  },
+  {
+   "role": "Jurista",
+   "permlevel": 0,
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "submit": 1,
+   "cancel": 1,
+   "delete": 0,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "amend": 0
+  },
+  {
+   "role": "Aprovador RH",
+   "permlevel": 0,
+   "read": 1,
+   "write": 0,
+   "create": 0,
+   "submit": 0,
+   "cancel": 0,
+   "delete": 0,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 0,
+   "amend": 0
+  },
+  {
+   "role": "RH Normal",
+   "permlevel": 0,
+   "read": 1,
+   "write": 0,
+   "create": 0,
+   "submit": 0,
+   "cancel": 0,
+   "delete": 0,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 0,
+   "amend": 0
+  },
+  {
+   "role": "Aprovador Operações",
+   "permlevel": 0,
+   "read": 1,
+   "write": 0,
+   "create": 0,
+   "submit": 0,
+   "cancel": 0,
+   "delete": 0,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 0,
+   "amend": 0
+  },
+  {
+   "role": "Operações SIGOS",
+   "permlevel": 0,
+   "read": 1,
+   "write": 0,
+   "create": 0,
+   "submit": 0,
+   "cancel": 0,
+   "delete": 0,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 0,
+   "amend": 0
+  }
+ ],
+ "search_fields": "nome_do_vigilante,participacao",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "nome_do_vigilante",
+ "show_title_field_in_link": 1,
+ "track_changes": 1,
+ "app": "sigos"
+}

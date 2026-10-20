@@ -111,6 +111,9 @@ function _pt_render(frm) {
 					<div data-pt="c-data"></div>
 				</div>
 				<div data-pt="c-relato"></div>
+				<div class="pt-conhec" data-pt="c-data_conhecimento_infracao"></div>
+				<div class="pt-prazo" data-pt="prazo"></div>
+				<div class="pt-just" data-pt="c-justificacao_fora_de_prazo"></div>
 			</section>
 
 			<section class="pt-card">
@@ -166,6 +169,14 @@ function _pt_render(frm) {
 	_pt_ctrl(frm, $("c-horas"), { fieldtype: "Time", fieldname: "horas", label: __("Horas") },
 		null, (v) => (v ? String(v).slice(0, 5) : v));
 	_pt_ctrl(frm, $("c-data"), { fieldtype: "Date", fieldname: "data", label: __("Data"), reqd: 1 });
+	_pt_ctrl(frm, $("c-data_conhecimento_infracao"), {
+		fieldtype: "Date", fieldname: "data_conhecimento_infracao", label: __("Data de Conhecimento da Infracção"),
+		reqd: 1, description: __("Conta o prazo para criar a participação e para abrir o Processo Disciplinar."),
+	});
+	_pt_ctrl(frm, $("c-justificacao_fora_de_prazo"), {
+		fieldtype: "Small Text", fieldname: "justificacao_fora_de_prazo", label: __("Justificação (Fora de Prazo)"),
+	});
+	frappe.xcall("sigos.disciplinar.prazos.prazos").then((p) => { frm._pt_prazos = p; _pt_prazo(frm); });
 	_pt_ctrl(frm, $("c-relato"), {
 		fieldtype: "Small Text", fieldname: "relato", label: __("Reportagem"), reqd: 1,
 		placeholder: __("O que aconteceu, onde, como foi detectado…"),
@@ -185,7 +196,10 @@ function _pt_render(frm) {
 
 // A real control bound to frm.doc[fieldname] — built once, value pushed on sync.
 function _pt_ctrl(frm, $parent, df, depois, transformar) {
-	const ro = frm.doc.docstatus !== 0;
+	// editavel_submetido: an allow_on_submit field — stays editable on a submitted
+	// participação (not cancelled) and is saved straight away ("Update").
+	const pos_submit = df.editavel_submetido && frm.doc.docstatus === 1;
+	const ro = frm.doc.docstatus !== 0 && !pos_submit;
 	const ctrl = frappe.ui.form.make_control({
 		df: Object.assign({}, df, {
 			read_only: ro ? 1 : 0,
@@ -195,6 +209,9 @@ function _pt_ctrl(frm, $parent, df, depois, transformar) {
 				if ((v || "") === (frm.doc[df.fieldname] || "")) return;
 				frm.set_value(df.fieldname, v || null).then(() => {
 					if (depois) depois(v);
+					if (pos_submit) {
+						frm.save("Update").then(() => frappe.show_alert({ message: __("Guardado."), indicator: "green" }, 3));
+					}
 					_pt_sync(frm);
 				});
 			},
@@ -266,6 +283,7 @@ function _pt_sync(frm) {
 	_pt_checklist(frm);
 	_pt_testemunhas(frm, true);
 	_pt_gravidade(frm);
+	_pt_prazo(frm);
 
 	const meta = [];
 	if (frm.doc.registado_por) meta.push(__("Registado por {0}", [esc(frm.doc.registado_por)]));
@@ -273,6 +291,33 @@ function _pt_sync(frm) {
 		meta.push(`<a href="/app/ocorrencia/${encodeURIComponent(frm.doc.ocorrencia_referente)}">${__("Ocorrência {0}", [esc(frm.doc.ocorrencia_referente)])}</a>`);
 	}
 	$("meta").html(meta.join(" · "));
+}
+
+// Deadline chip under the Data de Conhecimento: days left to create the participação
+// (draft) / to open the Processo (submitted); the manager-only justification input
+// shows once a deadline has passed.
+function _pt_prazo(frm) {
+	const $w = frm.fields_dict.deck_participacao.$wrapper;
+	const $c = $w.find('[data-pt="prazo"]');
+	const $j = $w.find('[data-pt="c-justificacao_fora_de_prazo"]');
+	const p = frm._pt_prazos;
+	const dc = frm.doc.data_conhecimento_infracao;
+	if (!p || !dc || frm.doc.docstatus === 2) { $c.html(""); $j.toggle(!!frm.doc.justificacao_fora_de_prazo); return; }
+	const submetida = frm.doc.docstatus === 1;
+	if (submetida && (frm.doc.processo_disciplinar || frm.doc.repreensao)) {
+		$c.html(""); $j.toggle(!!frm.doc.justificacao_fora_de_prazo); return;
+	}
+	const prazo = submetida ? p.processo : p.participacao;
+	const ref = frm.doc.creation && !submetida ? frm.doc.creation.slice(0, 10) : frappe.datetime.get_today();
+	const dias = frappe.datetime.get_diff(ref, dc);
+	const restam = prazo - dias;
+	const limite = frappe.datetime.str_to_user(frappe.datetime.add_days(dc, prazo));
+	const o_que = submetida ? __("abrir o Processo Disciplinar") : __("criar a participação");
+	const txt = restam < 0
+		? __("Prazo para {0} expirou a {1} ({2} dias).", [o_que, limite, prazo])
+		: __("Prazo para {0}: até {1} — faltam {2} dia(s).", [o_que, limite, restam]);
+	$c.html(`<span class="pt-prazo-chip ${restam < 0 ? "exp" : restam <= 3 ? "perto" : ""}">${txt}</span>`);
+	$j.toggle(!!frm.doc.justificacao_fora_de_prazo || (restam < 0 && !submetida && p.pode_forcar));
 }
 
 function _pt_checklist(frm) {
@@ -472,6 +517,28 @@ function _pt_suspensao(frm) {
 	});
 }
 
+// Before opening a Processo: in time → go; late → managers justify, others are told why.
+function _pt_com_prazo(frm, continuar) {
+	frappe.xcall("sigos.disciplinar.prazos.prazo_processo_da_participacao", { participacao: frm.doc.name })
+		.then((e) => {
+			if (!e || !e.expirado) { continuar(null); return; }
+			const msg = __("O prazo para abrir o Processo Disciplinar ({0} dias após {1}) expirou a {2}.",
+				[e.prazo, frappe.datetime.str_to_user(e.conhecimento), frappe.datetime.str_to_user(e.limite)]);
+			if (!e.pode_forcar) {
+				frappe.msgprint({ title: __("Prazo Expirado"), indicator: "red",
+					message: msg + "<br>" + __("Só um gestor (SIGOS Manager) pode avançar, com justificação.") });
+				return;
+			}
+			frappe.prompt(
+				[
+					{ fieldtype: "HTML", options: `<p class="text-danger">${msg}</p>` },
+					{ fieldname: "just", fieldtype: "Small Text", label: __("Justificação (Fora de Prazo)"), reqd: 1 },
+				],
+				(v) => continuar(v.just), __("Avançar Fora de Prazo"), __("Avançar"),
+			);
+		});
+}
+
 // ─── Processo Disciplinar (unchanged behaviour) ───────────────────────────────
 
 // On a submitted participação: "Ver Processo Disciplinar" for anyone who can read it,
@@ -481,24 +548,57 @@ function _botao_processo(frm) {
 	if (frm.doc.docstatus !== 1) return;
 	const abrir_pd = (nome) => frappe.set_route("Form", "Processo Disciplinar", nome);
 
+	if (frm.doc.repreensao) {
+		frm.add_custom_button(__("Ver Repreensão"), () => frappe.set_route("Form", "Repreensao", frm.doc.repreensao));
+	}
 	if (frm.doc.processo_disciplinar) {
 		frm.add_custom_button(__("Ver Processo Disciplinar"), () => abrir_pd(frm.doc.processo_disciplinar));
 		return;
 	}
+	// The Jurista's two outcomes: a light Repreensão (record only) or a Processo.
+	if (!frm.doc.repreensao && frappe.model.can_create("Repreensao")) {
+		frm.add_custom_button(__("Registar Repreensão"), () => {
+			frappe.prompt(
+				[
+					{ fieldtype: "HTML", options: `<p class="text-muted">${__("Repreensão: fica registada no histórico do vigilante, sem efeito no posto nem no salário. Ao atingir o limite de repreensões, é-lhe perguntado se quer abrir um Processo Disciplinar.")}</p>` },
+					{ fieldname: "observacoes", fieldtype: "Small Text", label: __("Observações do Jurista") },
+				],
+				(v) => frm.call("registar_repreensao", { observacoes: v.observacoes || null }).then((r) => {
+					const x = r.message || {};
+					frappe.show_alert({ message: __("Repreensão {0} registada ({1}.ª).", [x.name, x.numero]), indicator: "orange" }, 6);
+					if (x.propor_processo) {
+						frappe.confirm(
+							__("Esta é a <b>{0}.ª repreensão</b> deste vigilante (limite: {1}). Abrir um Processo Disciplinar?", [x.numero, x.limite]),
+							() => _pt_com_prazo(frm, (just) => frappe.xcall(
+								"sigos.disciplinar.doctype.repreensao.repreensao.abrir_processo_da_repreensao",
+								{ repreensao: x.name, justificacao_fora_de_prazo: just })
+								.then((pd) => { if (pd) abrir_pd(pd); else frm.reload_doc(); })),
+							() => frm.reload_doc(),
+						);
+					} else {
+						frm.reload_doc();
+					}
+				}),
+				__("Registar Repreensão"), __("Registar"),
+			);
+		}, __("Jurista"));
+	}
 	if (!frappe.model.can_create("Processo Disciplinar")) {
-		frm.dashboard.set_headline_alert(__("Submetida — aguarda o <b>Jurista</b> para abrir o Processo Disciplinar."), "blue");
+		if (!frm.doc.repreensao) {
+			frm.dashboard.set_headline_alert(__("Submetida — aguarda o <b>Jurista</b> (repreensão ou processo disciplinar)."), "blue");
+		}
 		return;
 	}
-	frm.dashboard.set_headline_alert(__("Ainda sem Processo Disciplinar."), "orange");
+	if (!frm.doc.repreensao) frm.dashboard.set_headline_alert(__("Aguarda decisão: repreensão ou processo disciplinar."), "orange");
 	frm.add_custom_button(__("Abrir Processo Disciplinar"), () => {
-		frappe.confirm(
+		_pt_com_prazo(frm, (just) => frappe.confirm(
 			__("Abrir um Processo Disciplinar para <b>{0}</b> a partir desta participação?",
 				[frappe.utils.escape_html(frm.doc.nome_do_vigilante || frm.doc.vigilante)]),
-			() => frm.call("criar_processo_disciplinar").then((res) => {
+			() => frm.call("criar_processo_disciplinar", { justificacao_fora_de_prazo: just }).then((res) => {
 				if (res.message) abrir_pd(res.message);
 			}),
-		);
-	}).addClass("btn-primary");
+		));
+	}, __("Jurista"));
 }
 
 // ─── Styles (ASCII-only, self-injected) ───────────────────────────────────────
@@ -554,6 +654,12 @@ function _pt_css() {
 .pt-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
 .pt-g-baixa { background: #2fa56a; } .pt-g-media { background: var(--pt-amber); } .pt-g-alta { background: var(--pt-red); }
 .pt-outras { margin-top: 8px; max-width: 520px; }
+.pt-conhec { max-width: 320px; margin-top: 4px; padding: 6px 10px; border-left: 3px solid var(--pt-amber); background: #fffaf0; border-radius: 6px; }
+.pt-prazo { margin: 4px 0; }
+.pt-prazo-chip { display: inline-block; font-size: 12px; padding: 3px 10px; border-radius: 999px; background: #e7f6ee; color: #1f7a4c; }
+.pt-prazo-chip.perto { background: #fff3dd; color: #8a5a00; }
+.pt-prazo-chip.exp { background: #fde8e8; color: #a32020; font-weight: 600; }
+.pt-just { max-width: 520px; }
 .pt-test { display: grid; grid-template-columns: 22px 1.6fr 1fr 1fr 2fr 28px; gap: 6px; align-items: center; margin-bottom: 6px; }
 .pt-ro .pt-test { grid-template-columns: 22px 1.6fr 1fr 1fr 2fr; }
 .pt-test-i { font-size: 11px; color: var(--pt-ink2); text-align: center; font-variant-numeric: tabular-nums; }
