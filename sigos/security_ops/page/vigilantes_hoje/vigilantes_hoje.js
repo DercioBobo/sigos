@@ -583,6 +583,8 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		const $menu = $(`<div class="vh-menu${this.theme === "dark" ? " theme-dark" : ""}"></div>`);
 		if (isFolga) {
 			$menu.append(`<span class="vh-menu-item disabled">${__("Em folga — sem acção disponível")}</span>`);
+		} else if (row.ja_outro_periodo) {
+			$menu.append(`<span class="vh-menu-item disabled">${__("Já tem ausência neste dia ({0})", [frappe.utils.escape_html(row.ja_outro_periodo)])}</span>`);
 		} else if (isSubmetida) {
 			$menu.append(this._menu_btn(__("Ver Perfil"), () => this._abrir_perfil_dialog(row)));
 		} else {
@@ -744,6 +746,8 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		const $actions = $in.find(".vh-actions");
 		if (isFolga) {
 			$actions.append(`<span class="vh-folga-note">${this._icon("info")} ${__("Em folga hoje — sem escala, por isso não há ausência para marcar.")}</span>`);
+		} else if (row.ja_outro_periodo) {
+			$actions.append(`<span class="vh-folga-note">${this._icon("info")} ${__("Já tem ausência registada neste dia, no período {0} ({1}).", [frappe.utils.escape_html(row.ja_outro_periodo), frappe.utils.escape_html(row.ja_registado_em)])}</span>`);
 		} else if (isSubmetida) {
 			$actions.append(`<span class="vh-folga-note">${this._icon("info")} ${__("Folha já submetida — só leitura. Use o formulário Ausencias para alterar.")}</span>`);
 			const $detBtn = $(`<button class="vh-actbtn primary">${__("Ver Perfil")}</button>`).appendTo($actions);
@@ -870,7 +874,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		</div>`);
 		d.$body.html($body);
 
-		if (!isFolga && !isSubmetida) {
+		if (!isFolga && !isSubmetida && !row.ja_outro_periodo) {
 			if (isMarcado) {
 				d.set_primary_action(__("Rever Marcação"), () => { d.hide(); this._abrir_marcar_dialog(row); });
 				d.set_secondary_action_label(__("Remover Marcação"));

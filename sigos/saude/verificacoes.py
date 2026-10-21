@@ -176,6 +176,28 @@ def postos_sem_contrato():
 	]
 
 
+@verificacao("ausencia_duplicada", "operacoes", "Ausências Duplicadas no Mesmo Dia", AVISO, OPS + RH,
+	"Vigilante com mais de uma ausência submetida no mesmo dia (períodos diferentes).")
+def ausencia_duplicada():
+	return [
+		linha("Vigilante", f"{d.vigilante} · {d.data}", d.nome, d.mecanografico or d.vigilante,
+			_("{0} · {1} · {2} faltas").format(_data(d.data), d.folhas, d.faltas),
+			d.delegacao, _ha(d.data), link=("Vigilante", d.vigilante))
+		for d in frappe.db.sql("""
+			SELECT ta.vigilante, a.data, MAX(v.nome_completo) AS nome,
+				MAX(v.mecanografico) AS mecanografico, MAX(v.delegacao) AS delegacao,
+				GROUP_CONCAT(CONCAT(a.periodo, ' (', a.name, ')') SEPARATOR ', ') AS folhas,
+				SUM(ta.n_de_faltas) AS faltas
+			FROM `tabTabela Ausencia` ta
+			JOIN `tabAusencias` a ON a.name = ta.parent
+			JOIN `tabVigilante` v ON v.name = ta.vigilante
+			WHERE a.docstatus = 1
+			GROUP BY ta.vigilante, a.data
+			HAVING COUNT(*) > 1
+		""", as_dict=True)
+	]
+
+
 # ═══ Abandono ═══════════════════════════════════════════════════════════════════
 
 @verificacao("limite_faltas", "abandono", "Limite de faltas atingido", CRITICO, OPS + ("Jurista",),

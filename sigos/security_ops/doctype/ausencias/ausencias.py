@@ -51,6 +51,7 @@ class Ausencias(Document):
 		self._validar_unicidade()
 		self._validar_grupo_delegacao()
 		self._validar_duplicados_na_tabela()
+		self._validar_vigilante_em_outro_doc()
 		self._validar_periodo_sem_registo()
 		self._validar_tipo_ausencia()
 		self._validar_subtipo_falta()
@@ -62,7 +63,6 @@ class Ausencias(Document):
 		self._avisar_licenca_aprovada()
 
 	def before_save(self):
-		self._validar_vigilante_em_outro_doc()
 		self._verificar_hora_limite()
 
 	def on_submit(self):
@@ -428,35 +428,40 @@ class Ausencias(Document):
 		if not vigilantes:
 			return
 
-		# NOTE: deliberately NOT filtered by grupo_delegados — an absence is an absence,
-		# regardless of which grupo's sheet recorded it (same guard, same data+periodo).
+		# One absence per guard per DAY: deliberately NOT filtered by grupo_delegados
+		# nor by período — a guard missing the Manhã can't also be absent on the Noite
+		# (or any other turno) of the same day. Runs in validate so it also holds on
+		# submit (before_save is skipped there).
 		outros = frappe.get_all(
 			"Ausencias",
 			filters={
 				"data": self.data,
-				"periodo": self.periodo,
 				"name": ["!=", self.name],
 				"docstatus": 1,
 			},
-			fields=["name"],
+			fields=["name", "periodo"],
 		)
 		if not outros:
 			return
 
-		nomes_outros = [d.name for d in outros]
+		periodo_de = {d.name: d.periodo for d in outros}
 		conflitos = frappe.get_all(
 			"Tabela Ausencia",
 			filters={
-				"parent": ["in", nomes_outros],
+				"parent": ["in", list(periodo_de)],
 				"vigilante": ["in", vigilantes],
 			},
-			fields=["vigilante"],
+			fields=["vigilante", "nome_do_vigilante", "parent"],
 		)
 		if conflitos:
-			nomes = ", ".join({c.vigilante for c in conflitos})
+			linhas = "<br>".join(
+				_("{0} — {1} ({2})").format(
+					frappe.bold(c.nome_do_vigilante or c.vigilante), c.parent, periodo_de.get(c.parent) or "-")
+				for c in conflitos
+			)
 			frappe.throw(
-				_("Já existe ausência registada para: <b>{0}</b> nesta data e período "
-				  "em outro documento submetido.").format(nomes)
+				_("Já existe ausência registada neste dia para:<br>{0}").format(linhas),
+				title=_("Ausência Já Registada"),
 			)
 
 	def _verificar_hora_limite(self):

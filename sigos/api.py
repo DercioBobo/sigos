@@ -909,10 +909,8 @@ def _marcar_ja_registados(rows, data, periodo, excluir_doc=None):
 	if excluir_doc:
 		excl = "AND a.name != %(excl)s"
 		params["excl"] = excluir_doc
-	periodo_clause = ""
-	if periodo:
-		periodo_clause = "AND a.periodo = %(p)s"
-		params["p"] = periodo
+	# All períodos of the day: an exact (vigilante, período) hit is the guard's own
+	# record; a hit on another período still blocks — one absence per guard per day.
 	conflitos = frappe.db.sql(
 		f"""
 		SELECT ta.vigilante, a.periodo, a.name AS doc, a.docstatus,
@@ -929,19 +927,30 @@ def _marcar_ja_registados(rows, data, periodo, excluir_doc=None):
 		LEFT JOIN `tabVigilante` v_mdb ON v_mdb.name = ta.vigilante_a_meia_dobra
 		LEFT JOIN `tabVigilante` v_adi ON v_adi.name = ta.vigilante_a_adiantar
 		LEFT JOIN `tabVigilante` v_he  ON v_he.name = ta.vigilante_a_horas_extras
-		WHERE a.docstatus < 2 AND a.data = %(d)s {periodo_clause}
+		WHERE a.docstatus < 2 AND a.data = %(d)s
 		  AND ta.vigilante IN %(vigs)s {excl}
 		""",
 		params,
 		as_dict=True,
 	)
 	por_chave = {}
+	por_vig = {}
 	for c in conflitos:
 		chave = (c.vigilante, c.periodo)
 		if chave not in por_chave or c.docstatus > por_chave[chave].docstatus:
 			por_chave[chave] = c
+		if c.vigilante not in por_vig or c.docstatus > por_vig[c.vigilante].docstatus:
+			por_vig[c.vigilante] = c
 	for r in rows:
 		c = por_chave.get((r.vigilante, r.periodo))
+		if not c and por_vig.get(r.vigilante):
+			# Absent on another período of the same day: blocked, but not this row's
+			# own record (no ja_ausencia_row, so boards don't open it for editing).
+			o = por_vig[r.vigilante]
+			r["ja_registado_em"] = o.doc
+			r["ja_registado_estado"] = _("ausência noutro período ({0})").format(o.periodo or "-")
+			r["ja_outro_periodo"] = o.periodo or "-"
+			continue
 		if c:
 			r["ja_registado_em"] = c.doc
 			r["ja_registado_estado"] = "Submetido" if c.docstatus == 1 else "Rascunho"
