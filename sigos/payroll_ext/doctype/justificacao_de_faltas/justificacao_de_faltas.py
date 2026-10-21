@@ -1,9 +1,63 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import getdate, date_diff, flt, cint
+from frappe.utils import add_months, getdate, date_diff, flt, cint
 
-from sigos.utils import calcular_faltas_vigilante
+from sigos.utils import calcular_faltas_detalhado, resolver_periodo_folha
+
+MESES_PT = ("Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho",
+	"Agosto", "Setembro", "Outubro", "Novembro", "Dezembro")
+
+
+def _outras_justificacoes(vigilante, de, ate, excluir=None):
+	"""Approved justifications of the same guard overlapping [de, ate]."""
+	from sigos.payroll_ext.salary_slip_hooks import _aprovado_filter
+	filters = {
+		"vigilante": vigilante,
+		"docstatus": 1,
+		"dia_de_inicio": ["<=", ate],
+		"dia_de_fim": [">=", de],
+	}
+	if excluir:
+		filters["name"] = ["!=", excluir]
+	filters.update(_aprovado_filter("Justificacao De Faltas"))
+	return frappe.get_all("Justificacao De Faltas", filters=filters,
+		fields=["name", "dia_de_inicio", "dia_de_fim"])
+
+
+def _periodo_da_folha(data):
+	"""Payroll period (resolver_periodo_folha) that contains `data`."""
+	data = getdate(data)
+	for ref in (data, add_months(data, 1)):
+		inicio, fim = resolver_periodo_folha(ref.month, ref.year)
+		if inicio <= data <= fim:
+			return {"inicio": inicio, "fim": fim, "nome": f"{MESES_PT[ref.month - 1]} {ref.year}"}
+	return None
+
+
+def detalhe_faltas(vigilante, dia_de_inicio, dia_de_fim, excluir=None):
+	"""Every falta in the window (same escala-aware weights as payroll), flagging
+	days already covered by another approved justification — those are not
+	cleared twice. `a_retirar` is what this justification takes off."""
+	de, ate = getdate(dia_de_inicio), getdate(dia_de_fim)
+	outras = _outras_justificacoes(vigilante, de, ate, excluir)
+	linhas = []
+	for r in calcular_faltas_detalhado(vigilante, de, ate):
+		coberta = next((o.name for o in outras
+			if getdate(o.dia_de_inicio) <= r["data"] <= getdate(o.dia_de_fim)), None)
+		linhas.append({
+			"data": r["data"],
+			"turno": r.get("turno"),
+			"posto": r.get("posto"),
+			"tipo": r.get("tipo_de_ausencia"),
+			"subtipo": r.get("subtipo_falta"),
+			"n": r["n_de_faltas"],
+			"coberta_por": coberta,
+			"ja_descontada": bool(r.get("processado_em_folha")),
+		})
+	total = sum(l["n"] for l in linhas)
+	ja = sum(l["n"] for l in linhas if l["coberta_por"])
+	return {"linhas": linhas, "total": total, "ja_justificadas": ja, "a_retirar": total - ja}
 
 
 class JustificacaoDeFaltas(Document):
@@ -24,8 +78,11 @@ class JustificacaoDeFaltas(Document):
 		"""
 		submetido = flt(self.numero)
 
+		det = None
 		if self.vigilante and self.dia_de_inicio and self.dia_de_fim:
-			real = calcular_faltas_vigilante(self.vigilante, self.dia_de_inicio, self.dia_de_fim)
+			det = detalhe_faltas(self.vigilante, self.dia_de_inicio, self.dia_de_fim,
+				excluir=None if self.is_new() else self.name)
+			real = det["a_retirar"]
 		else:
 			real = 0
 
@@ -41,6 +98,15 @@ class JustificacaoDeFaltas(Document):
 
 		# Nothing to justify → nothing to save. Only once the guard + window are known
 		# (before that the form is still being filled and required-field checks apply).
+		if det and real <= 0 and det["total"] > 0:
+			frappe.throw(
+				_("As faltas de {0} entre {1} e {2} já estão justificadas.").format(
+					frappe.bold(self.vigilante),
+					frappe.format(self.dia_de_inicio, {"fieldtype": "Date"}),
+					frappe.format(self.dia_de_fim, {"fieldtype": "Date"}),
+				),
+				title=_("Faltas Já Justificadas"),
+			)
 		if self.vigilante and self.dia_de_inicio and self.dia_de_fim and real <= 0:
 			frappe.throw(
 				_("O vigilante {0} não tem faltas entre {1} e {2}. "
@@ -104,13 +170,17 @@ class JustificacaoDeFaltas(Document):
 
 
 @frappe.whitelist()
-def preview_numero(vigilante, dia_de_inicio, dia_de_fim):
+def preview_numero(vigilante, dia_de_inicio, dia_de_fim, name=None, data_do_justificativo=None):
 	"""
-	Form preview of `numero` — returns the SAME escala-aware count that
-	_recompute_numero stamps on save, so what the user sees matches what is stored.
+	Form preview — the SAME count _recompute_numero stamps on save (a_retirar), plus
+	the per-day breakdown and the payroll period the faltas come off.
 	"""
 	from sigos.api import PAPEIS_SALARIO
 	frappe.only_for(PAPEIS_SALARIO)
 	if not (vigilante and dia_de_inicio and dia_de_fim):
-		return 0
-	return calcular_faltas_vigilante(vigilante, dia_de_inicio, dia_de_fim)
+		return {"linhas": [], "total": 0, "ja_justificadas": 0, "a_retirar": 0}
+	excluir = name if name and not name.startswith("new-") else None
+	det = detalhe_faltas(vigilante, dia_de_inicio, dia_de_fim, excluir)
+	if data_do_justificativo:
+		det["folha"] = _periodo_da_folha(data_do_justificativo)
+	return det

@@ -22,6 +22,8 @@
   "numero",
   "data_de_inicio",
   "data_de_fim",
+  "sec_retirar",
+  "faltas_html",
   "sec_justificativo",
   "justificativo",
   "observacoes"
@@ -103,7 +105,7 @@
   {
    "fieldname": "numero",
    "fieldtype": "Int",
-   "label": "Total de Faltas",
+   "label": "Faltas a Retirar",
    "read_only": 1
   },
   {
@@ -117,6 +119,17 @@
    "fieldtype": "Date",
    "label": "Fim do Mês",
    "read_only": 1
+  },
+  {
+   "fieldname": "sec_retirar",
+   "fieldtype": "Section Break",
+   "label": "Faltas a Retirar",
+   "depends_on": "eval:doc.vigilante && doc.dia_de_inicio && doc.dia_de_fim"
+  },
+  {
+   "fieldname": "faltas_html",
+   "fieldtype": "HTML",
+   "label": "Faltas a Retirar"
   },
   {
    "fieldname": "sec_justificativo",
@@ -136,7 +149,7 @@
  ],
  "is_submittable": 1,
  "links": [],
- "modified": "2026-10-23 18:00:00.000000",
+ "modified": "2026-10-24 09:00:00.000000",
  "modified_by": "Administrator",
  "module": "Payroll Ext",
  "name": "Justificacao De Faltas",
