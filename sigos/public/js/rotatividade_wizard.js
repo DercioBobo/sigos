@@ -211,14 +211,21 @@ sigos.build_rotatividade_wizard = function (opts) {
 			order_by: "abreviatura", limit_page_length: 0,
 		},
 		callback: (r) => {
-			// Dismissal = Processo Disciplinar outcome; only managers keep a manual DEM.
-			S.podeDemitir = ["System Manager", "SIGOS Manager"].some((x) => frappe.user.has_role(x));
-			S.operacoes = (r.message || []).filter((o) => S.podeDemitir || !o.demite);
-			// Pre-selected operação (e.g. the Vigilante "Demitir" / "Novo Posto" buttons)
-			const pre = (opts.prefill || {}).abreviatura_op;
-			const op = pre && S.operacoes.find((o) => o.name === pre);
-			if (op && !S.op) _selectOp(op);
-			_render();
+			// Dismissal = Processo Disciplinar outcome; only managers keep a manual DEM,
+			// unless SIGOS Settings.modo_demissao allows manual dismissal for everyone.
+			const ops = r.message || [];
+			frappe.call({
+				method: "sigos.security_ops.doctype.rotatividade.rotatividade.pode_demitir",
+				callback: (p) => {
+					S.podeDemitir = !!p.message;
+					S.operacoes = ops.filter((o) => S.podeDemitir || !o.demite);
+					// Pre-selected operação (e.g. the Vigilante "Demitir" / "Novo Posto" buttons)
+					const pre = (opts.prefill || {}).abreviatura_op;
+					const op = pre && S.operacoes.find((o) => o.name === pre);
+					if (op && !S.op) _selectOp(op);
+					_render();
+				},
+			});
 		},
 	});
 

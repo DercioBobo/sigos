@@ -270,9 +270,17 @@ function _abandono_de_posto(frm) {
 			frm.add_custom_button(__("Registar Regresso"), () => _registar_regresso(frm), __("Acções"));
 		}
 		// Dismissal goes through the Presunção → Jurista → Processo Disciplinar; only
-		// managers keep the manual DEM (admin escape hatch).
-		if (["System Manager", "SIGOS Manager"].some((r) => frappe.user.has_role(r))) {
-			frm.add_custom_button(__("Demitir (manual)"), () => abrir("DEM"), __("Acções"));
+		// managers keep the manual DEM (admin escape hatch), unless SIGOS Settings
+		// allows manual dismissal for everyone.
+		if (pode_ops) {
+			frappe.call({
+				method: "sigos.security_ops.doctype.rotatividade.rotatividade.pode_demitir",
+				callback: (r) => {
+					if (r.message && frm.doc.status === "Abandono de Posto") {
+						frm.add_custom_button(__("Demitir (manual)"), () => abrir("DEM"), __("Acções"));
+					}
+				},
+			});
 		}
 		return;
 	}

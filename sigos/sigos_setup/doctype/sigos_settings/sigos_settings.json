@@ -35,6 +35,7 @@
   "col_ss_ferias",
   "dias_maximos_ferias",
   "sec_ss_disc",
+  "modo_demissao",
   "acumulacao_pd_activa",
   "reprimendas_baixa_pd",
   "reprimendas_media_pd",
@@ -324,6 +325,14 @@
    "fieldname": "sec_ss_disc",
    "fieldtype": "Section Break",
    "label": "Escalação Automática PD"
+  },
+  {
+   "fieldname": "modo_demissao",
+   "fieldtype": "Select",
+   "label": "Demissão",
+   "options": "Via Processo Disciplinar\nManual e Via Processo Disciplinar",
+   "default": "Via Processo Disciplinar",
+   "description": "Manual: Operações também pode demitir por Rotatividade."
   },
   {
    "fieldname": "acumulacao_pd_activa",
@@ -959,7 +968,7 @@
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-10-23 18:00:00.000000",
+ "modified": "2026-10-24 09:00:00.000000",
  "modified_by": "Administrator",
  "module": "SIGOS Setup",
  "name": "SIGOS Settings",

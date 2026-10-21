@@ -5,12 +5,28 @@ from frappe.utils import date_diff, today, getdate
 
 # A dismissal is the outcome of a disciplinary process (Participação → Jurista →
 # Processo Disciplinar → decisão Demissão), not an operational move: only these
-# roles may still START a DEM / "Demissão" Rotatividade (admin escape hatch).
+# roles may still START a DEM / "Demissão" Rotatividade (admin escape hatch) —
+# unless SIGOS Settings.modo_demissao re-opens manual dismissal to everyone
+# (transition period while users adopt the Participação flow).
 PAPEIS_DEMISSAO_MANUAL = ("System Manager", "SIGOS Manager")
+MODO_DEMISSAO_MANUAL = "Manual e Via Processo Disciplinar"
+
+
+def demissao_manual_permitida():
+	from sigos.utils import valor_settings_bruto
+	return valor_settings_bruto("modo_demissao") == MODO_DEMISSAO_MANUAL
 
 
 def pode_demitir_manualmente(user=None):
+	if demissao_manual_permitida():
+		return True
 	return bool(set(frappe.get_roles(user)) & set(PAPEIS_DEMISSAO_MANUAL))
+
+
+@frappe.whitelist()
+def pode_demitir():
+	"""For the Rotatividade wizard: show DEM operações / motivo Demissão?"""
+	return pode_demitir_manualmente()
 
 
 class Rotatividade(Document):
