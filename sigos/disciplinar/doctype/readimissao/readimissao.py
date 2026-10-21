@@ -71,6 +71,10 @@ class Readimissao(Document):
 		vig.data_admissao = None
 		vig.status = "Pre-Adimissão RH"
 		vig.flags.ignore_sync = True
+		# data_admissao may be made mandatory via Customize Form; it is cleared on
+		# purpose here and RH must fill the new date before admitting
+		# (Vigilante._validar_data_admissao still enforces that).
+		vig.flags.ignore_mandatory = True
 		vig.save(ignore_permissions=True)
 
 		# Reiniciar a antiguidade de FÉRIAS (ano 1) — limpamos a âncora e a última
