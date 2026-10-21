@@ -1,0 +1,107 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-10-21 00:00:00.000000",
+ "description": "Linhas da Saúde SIGOS marcadas como ignoradas.",
+ "doctype": "DocType",
+ "document_type": "Other",
+ "engine": "InnoDB",
+ "field_order": [
+  "verificacao",
+  "titulo_verificacao",
+  "referencia",
+  "descricao",
+  "col_break_1",
+  "ate",
+  "motivo"
+ ],
+ "fields": [
+  {
+   "fieldname": "verificacao",
+   "fieldtype": "Data",
+   "label": "Verificação",
+   "reqd": 1,
+   "read_only": 1,
+   "search_index": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "titulo_verificacao",
+   "fieldtype": "Data",
+   "label": "Título",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "referencia",
+   "fieldtype": "Data",
+   "label": "Referência",
+   "reqd": 1,
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "descricao",
+   "fieldtype": "Data",
+   "label": "Descrição",
+   "read_only": 1
+  },
+  {
+   "fieldname": "col_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "ate",
+   "fieldtype": "Date",
+   "label": "Ignorar até",
+   "description": "Vazio = sempre.",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "motivo",
+   "fieldtype": "Small Text",
+   "label": "Motivo",
+   "reqd": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-10-21 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "SIGOS Setup",
+ "name": "Excecao De Saude",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 0,
+   "delete": 1,
+   "email": 0,
+   "export": 1,
+   "print": 0,
+   "read": 1,
+   "report": 1,
+   "role": "SIGOS Manager",
+   "share": 0,
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "descricao",
+ "track_changes": 1,
+ "app": "sigos"
+}

@@ -11,6 +11,18 @@ def daily():
 	_fechar_coberturas_expiradas()
 	_verificar_abandonos()
 	_processos_disciplinares()
+	_saude()
+
+
+def _saude():
+	"""Saúde SIGOS: expired 'ignore' exceptions come back; fresh counts for the morning."""
+	from sigos.saude import limpar_cache, limpar_excecoes_expiradas
+	try:
+		limpar_excecoes_expiradas()
+		limpar_cache()
+	except Exception as ex:
+		frappe.db.rollback()
+		frappe.log_error(f"Erro na limpeza da Saúde SIGOS: {ex}", "SIGOS Saúde")
 
 
 def _processos_disciplinares():
