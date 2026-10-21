@@ -107,7 +107,8 @@ doc_events = {
 		"validate": "sigos.contrato.project_validate",
 	},
 	"Sales Invoice": {
-		"validate": "sigos.faturacao.sales_invoice_validate",
+		"validate": ["sigos.faturacao.sales_invoice_po", "sigos.faturacao.sales_invoice_validate"],
+		"on_update_after_submit": "sigos.faturacao.sales_invoice_po_apos_submeter",
 	},
 	"Salary Slip": {
 		"before_insert": "sigos.payroll_ext.salary_slip_hooks.before_insert",

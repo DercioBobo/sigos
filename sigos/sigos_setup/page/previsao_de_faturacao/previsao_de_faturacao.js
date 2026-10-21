@@ -31,6 +31,16 @@ const PF_ESTADOS = {
 	manual:     { label: "Manual",             tone: "neu" },
 };
 
+// The table is split into these groups, most urgent first (empty ones are hidden).
+const PF_GRUPOS = [
+	{ key: "atencao",  label: "Requer atenção",        tone: "bad",   estados: ["problemas", "em_falta"] },
+	{ key: "pendente", label: "Na próxima execução",   tone: "amber", estados: ["pendente"] },
+	{ key: "manual",   label: "Por facturar (manual)", tone: "neu",   estados: ["manual"] },
+	{ key: "agendado", label: "Agendados",             tone: "info",  estados: ["agendado"] },
+	{ key: "faturado", label: "Facturados",            tone: "good",  estados: ["faturado"] },
+	{ key: "outros",   label: "Sem factura a emitir",  tone: "muted", estados: ["cancelado", "sem_linhas"] },
+];
+
 sigos.PrevisaoFaturacao = class PrevisaoFaturacao {
 	constructor(page, wrapper) {
 		this.page = page;
@@ -40,6 +50,7 @@ sigos.PrevisaoFaturacao = class PrevisaoFaturacao {
 		this.state = { search: "", estado: null };
 		this.data = null;
 		this.abertos = new Set();
+		this.fechados = new Set(["outros"]);   // collapsed groups
 		this.pode_executar = frappe.user.has_role("System Manager") || frappe.user.has_role("SIGOS Manager");
 
 		this._inject_fonts();
@@ -113,6 +124,11 @@ sigos.PrevisaoFaturacao = class PrevisaoFaturacao {
 		this.$body.find("[data-executar]").on("click", () => this._executar());
 
 		// Delegated: the table is re-rendered on every filter change.
+		this.$table.on("click", "[data-grupo]", (e) => {
+			const g = $(e.currentTarget).attr("data-grupo");
+			if (this.fechados.has(g)) this.fechados.delete(g); else this.fechados.add(g);
+			this._render_table();
+		});
 		this.$table.on("click", "[data-toggle-row]", (e) => {
 			if ($(e.target).closest("a, button").length) return;
 			const c = $(e.currentTarget).attr("data-toggle-row");
@@ -126,6 +142,10 @@ sigos.PrevisaoFaturacao = class PrevisaoFaturacao {
 		this.$table.on("click", "[data-extra]", (e) => {
 			e.stopPropagation();
 			this._fatura_extra($(e.currentTarget).attr("data-extra"));
+		});
+		this.$table.on("click", "[data-previa]", (e) => {
+			e.stopPropagation();
+			this._previa($(e.currentTarget).attr("data-previa"));
 		});
 		this.$table.on("click", "[data-faturar]", (e) => {
 			e.stopPropagation();
@@ -279,9 +299,34 @@ sigos.PrevisaoFaturacao = class PrevisaoFaturacao {
 					<th>${__("Estado")}</th>
 					<th class="pf-act-col"></th>
 				</tr></thead>
-				<tbody>${rows.map((c) => this._row_html(c)).join("")}</tbody>
+				${this._grupos_html(rows)}
 			</table>
 		`);
+	}
+
+	_grupos_html(rows) {
+		const esc = frappe.utils.escape_html;
+		const soma = (arr, f) => arr.reduce((a, c) => a + (f(c) || 0), 0);
+		return PF_GRUPOS.map((g) => {
+			const lst = rows.filter((c) => g.estados.includes(c.estado));
+			if (!lst.length) return "";
+			const fechado = this.fechados.has(g.key);
+			const valor = g.key === "faturado"
+				? soma(lst, (c) => soma(c.faturas, (f) => f.net_total))
+				: soma(lst, (c) => c.total);
+			return `<tbody class="pf-grp tone-${g.tone}">
+				<tr class="pf-grp-h ${fechado ? "is-closed" : ""}" data-grupo="${g.key}">
+					<td colspan="9">
+						<span class="pf-caret">${_pf_icon_caret()}</span>
+						<i class="pf-dot tone-${g.tone}"></i>
+						<span class="pf-grp-lbl">${esc(__(g.label))}</span>
+						<span class="pf-grp-n">${lst.length}</span>
+						${valor ? `<span class="pf-grp-v">${_pf_money(valor)}</span>` : ""}
+					</td>
+				</tr>
+				${fechado ? "" : lst.map((c) => this._row_html(c)).join("")}
+			</tbody>`;
+		}).join("");
 	}
 
 	_row_html(c) {
@@ -294,15 +339,17 @@ sigos.PrevisaoFaturacao = class PrevisaoFaturacao {
 		if (c.estado === "agendado" || c.estado === "pendente") estado_txt += ` · ${_pf_dia(ag.data)}`;
 		if (c.estado === "faturado" && c.faturas.some((f) => f.docstatus === 0)) estado_txt += ` · ${__("rascunho")}`;
 
-		const agenda_txt = ag.opt_in
-			? `${__("Dia {0}", [ag.dia >= 31 ? __("último") : ag.dia])} · ${ag.mes_faturado === "Mês Anterior" ? __("vencido") : __("adiantado")}`
-			: __("Manual");
+		const agenda_txt = (ag.opt_in
+			? `${__("Dia {0}", [ag.dia >= 31 ? __("último") : ag.dia])} · ${__("factura o {0}", [ag.mes_faturado === "Mês Anterior" ? __("mês anterior") : ag.mes_faturado === "Mês Seguinte" ? __("mês seguinte") : __("próprio mês")])}`
+			: __("Manual")) + (ag.perfil ? ` <span class="pf-muted">· ${esc(ag.perfil)}</span>` : "");
 
 		let acao = "";
 		if (c.faturas.length) {
 			acao = c.faturas.map((f) => `<a href="/app/sales-invoice/${encodeURIComponent(f.name)}">${esc(f.name)}</a>`).join(" ");
 		} else if (c.total) {
-			acao = `<button type="button" class="pf-btn pf-btn-sm" data-faturar="${esc(c.cliente)}">${__("Faturar")}</button>`;
+			acao = `<button type="button" class="pf-btn pf-btn-sm pf-btn-ghost" data-previa="${esc(c.cliente)}"
+				title="${__("Ver a factura como vai ficar (não é criada)")}">${__("Pré-visualizar")}</button>
+				<button type="button" class="pf-btn pf-btn-sm" data-faturar="${esc(c.cliente)}">${__("Faturar")}</button>`;
 		}
 
 		acao += ` <button type="button" class="pf-btn pf-btn-sm pf-btn-ghost" data-extra="${esc(c.cliente)}"
@@ -325,7 +372,7 @@ sigos.PrevisaoFaturacao = class PrevisaoFaturacao {
 				<td class="pf-num pf-strong">${c.total ? _pf_money(c.total) : "—"}</td>
 				<td class="pf-num">${_pf_delta(c.total, c.anterior)}</td>
 				<td><button type="button" class="pf-agenda ${ag.opt_in ? "is-auto" : ""}" data-agenda="${esc(c.cliente)}"
-					title="${__("Editar agenda de faturação")}">${agenda_txt}</button></td>
+					title="${__("Mudar o perfil de faturação")}">${agenda_txt}</button></td>
 				<td><span class="pf-status tone-${est.tone}"><i></i>${estado_txt}</span></td>
 				<td class="pf-act-col">${acao}</td>
 			</tr>
@@ -366,7 +413,7 @@ sigos.PrevisaoFaturacao = class PrevisaoFaturacao {
 			<table class="pf-lines">
 				<thead><tr>
 					<th>${__("Descrição")}</th><th>${__("Contrato")}</th><th>${__("Método")}</th>
-					<th class="pf-num">${__("Qtd")}</th><th class="pf-num">${__("Contratado")}</th>
+					<th class="pf-num">${__("Qtd")}</th><th class="pf-num">${__("Vigilantes")}</th><th class="pf-num">${__("Contratado")}</th>
 					<th class="pf-num">${__("Tarifa")}</th><th class="pf-num">${__("Total")}</th>
 				</tr></thead>
 				<tbody>${c.linhas.map((l) => `
@@ -375,6 +422,7 @@ sigos.PrevisaoFaturacao = class PrevisaoFaturacao {
 						<td><a href="/app/project/${encodeURIComponent(l.project)}">${esc(l.project)}</a></td>
 						<td>${esc(l.metodo)}</td>
 						<td class="pf-num">${l.quantidade}</td>
+						<td class="pf-num">${l.vigilantes == null ? "—" : l.vigilantes}</td>
 						<td class="pf-num">${l.quantidade_contratada || "—"}</td>
 						<td class="pf-num">${l.linha_unica ? `<span class="pf-muted">${__("por posto")}</span>` : l.valor_unitario ? _pf_money(l.valor_unitario) : `<span class="pf-tone-bad">${__("sem tarifa")}</span>`}${l.origem_tarifa === "Cliente" ? ` <span class="pf-badge tone-info" title="${__("Tarifa por regime do cliente (o contrato não define preço)")}">${__("cliente")}</span>` : ""}</td>
 						<td class="pf-num">${_pf_money(l.total)}</td>
@@ -390,32 +438,42 @@ sigos.PrevisaoFaturacao = class PrevisaoFaturacao {
 		if (!c) return;
 		const ag = c.agenda;
 		const d = new frappe.ui.Dialog({
-			title: __("Agenda de Faturação — {0}", [c.nome]),
+			title: __("Perfil de Faturação — {0}", [c.nome]),
 			fields: [
-				{ fieldname: "automatica", fieldtype: "Check", label: __("Faturação Automática"), default: ag.opt_in ? 1 : 0,
-					description: this.data.automatica_geral ? "" :
-						__("A Faturação Automática está desligada nas Definições SIGOS — a agenda fica guardada mas não corre.") },
-				{ fieldname: "dia", fieldtype: "Int", label: __("Dia de Faturação"), default: ag.dia_proprio ? ag.dia : 0,
-					depends_on: "eval:doc.automatica",
-					description: __("1–31; 0 = padrão das Definições SIGOS. Num mês mais curto usa-se o último dia.") },
-				{ fieldname: "mes_faturado", fieldtype: "Select", label: __("Mês Facturado"),
-					options: ["Predefinido", "Mês Corrente", "Mês Anterior"].join("\n"),
-					default: ag.mes_proprio ? ag.mes_faturado : "Predefinido", depends_on: "eval:doc.automatica",
-					description: __("Mês Corrente = adiantado; Mês Anterior = vencido.") },
+				{ fieldname: "perfil", fieldtype: "Link", label: __("Perfil de Faturação"),
+					options: "Perfil De Faturacao", default: ag.perfil_proprio ? ag.perfil : "",
+					description: __("Vazio: o perfil padrão das Definições SIGOS.") },
+				{ fieldname: "nota", fieldtype: "HTML", options: this.data.automatica_geral ? "" :
+					`<div class="text-muted small">${__("A Faturação Automática está desligada nas Definições SIGOS.")}</div>` },
 			],
 			primary_action_label: __("Guardar"),
 			primary_action: (vals) => {
-				frappe.xcall("sigos.faturacao.definir_agenda_cliente", {
-					cliente, automatica: vals.automatica ? 1 : 0, dia: vals.dia || 0,
-					mes_faturado: vals.mes_faturado || "Predefinido",
+				frappe.xcall("sigos.perfil_faturacao.definir_perfil_cliente", {
+					cliente, perfil: vals.perfil || "",
 				}).then(() => {
 					d.hide();
-					frappe.show_alert({ message: __("Agenda guardada."), indicator: "green" }, 4);
+					frappe.show_alert({ message: __("Perfil guardado."), indicator: "green" }, 4);
 					this._load();
 				});
 			},
 		});
 		d.show();
+	}
+
+	_previa(cliente) {
+		const c = (this.data.clientes || []).find((x) => x.cliente === cliente);
+		const d = new frappe.ui.Dialog({
+			title: __("Pré-visualizar Factura — {0}", [c ? c.nome : cliente]),
+			size: "extra-large",
+			fields: [{ fieldname: "folha", fieldtype: "HTML" }],
+		});
+		const $folha = d.fields_dict.folha.$wrapper;
+		$folha.html(`<div class="text-muted" style="padding:24px">${__("A preparar a factura...")}</div>`);
+		d.show();
+		frappe.xcall("sigos.sigos_setup.doctype.faturacao_mensal.faturacao_mensal.pre_visualizar_fatura_cliente",
+			{ cliente, mes_referencia: this._mes_str() })
+			.then((m) => sigos.mostrar_previa_fatura($folha, m || {}),
+				() => $folha.html(`<div class="text-danger" style="padding:24px">${__("Não foi possível pré-visualizar.")}</div>`));
 	}
 
 	_fatura_extra(cliente) {
@@ -536,6 +594,15 @@ sigos.PrevisaoFaturacao = class PrevisaoFaturacao {
 .pf-table > thead th { text-align:left; font-size:9.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink3); font-weight:700; padding:10px; border-bottom:1px solid var(--line); white-space:nowrap; }
 .pf-table > tbody > tr.pf-row > td { padding:10px; border-bottom:1px solid var(--line); color:var(--ink); white-space:nowrap; vertical-align:middle; }
 .pf-row { cursor:pointer; }
+.pf-grp-h { cursor:pointer; }
+.pf-grp-h > td { padding:9px 10px; background:var(--paper3); border-bottom:1px solid var(--line); border-top:1px solid var(--line); font-size:11px; text-transform:uppercase; letter-spacing:.06em; font-weight:700; color:var(--ink2); white-space:nowrap; }
+.pf-grp-h .pf-caret { display:inline-block; transform:rotate(90deg); margin-right:4px; vertical-align:middle; }
+.pf-grp-h.is-closed .pf-caret { transform:none; }
+.pf-grp-h .pf-dot { margin:0 6px 1px 2px; vertical-align:middle; }
+.pf-grp-n { display:inline-block; margin-left:8px; padding:1px 8px; border-radius:999px; background:var(--paper2); border:1px solid var(--line2); font-family:var(--mono); font-size:10.5px; color:var(--ink); }
+.pf-grp-v { float:right; font-family:var(--mono); font-size:12px; letter-spacing:0; text-transform:none; color:var(--ink); }
+.pf-grp.tone-bad .pf-grp-h > td { color:var(--bad); }
+.pf-dot.tone-muted { background:var(--ink3); }
 .pf-row:hover > td, .pf-row.is-open > td { background:var(--paper3); }
 .pf-table a { color:var(--accent); text-decoration:none; font-weight:600; }
 .pf-table a:hover { text-decoration:underline; }

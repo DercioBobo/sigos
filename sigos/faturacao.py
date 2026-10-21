@@ -17,6 +17,7 @@ from frappe.utils import (
 	nowdate, strip_html,
 )
 
+from sigos.perfil_faturacao import DESVIO_MES, MES_CORRENTE, perfis_dos_clientes
 from sigos.sigos_setup.doctype.faturacao_mensal.faturacao_mensal import (
 	ITEM_GROUP_FATURACAO,
 	PAPEIS_FATURACAO,
@@ -27,8 +28,27 @@ from sigos.sigos_setup.doctype.faturacao_mensal.faturacao_mensal import (
 	_verificar,
 	calcular_linhas,
 	codigo_item,
+	diferencas_contratuais,
 	empresa_faturacao,
 )
+
+
+def sales_invoice_po(doc, method=None):
+	"""Nr da PO (custom_nr_po) is mirrored into ERPNext's own Customer's Purchase Order
+	(po_no), so standard reports and print formats that use it see the same number."""
+	if not doc.meta.has_field("custom_nr_po"):
+		return
+	doc.custom_nr_po = (doc.custom_nr_po or "").strip() or None
+	antes = doc.get_doc_before_save()
+	if not doc.custom_nr_po and doc.po_no and not (antes and antes.get("custom_nr_po")):
+		doc.custom_nr_po = doc.po_no   # PO already set the ERPNext way (e.g. from a Sales Order)
+	doc.po_no = doc.custom_nr_po
+
+
+def sales_invoice_po_apos_submeter(doc, method=None):
+	"""The PO often arrives after the invoice is submitted (Nr da PO is editable then)."""
+	if doc.meta.has_field("custom_nr_po") and (doc.custom_nr_po or None) != (doc.po_no or None):
+		doc.db_set("po_no", doc.custom_nr_po or None, update_modified=False)
 
 
 def sales_invoice_validate(doc, method=None):
@@ -78,7 +98,8 @@ def obter_linhas_contrato(doc, mes_referencia, substituir=1):
 			title=_("Já Facturado"),
 		)
 
-	linhas, activos_contratos = calcular_linhas(si.customer)
+	linhas, activos_contratos = calcular_linhas(si.customer, mes)
+	dif = diferencas_contratuais(linhas)
 	sem_tarifa = [f"{l['project']} / {l['regime']}" for l in linhas
 		if l["quantidade"] and not l["valor_unitario"]]
 	linhas = [l for l in linhas if l["quantidade"] and l["valor_unitario"]]
@@ -104,21 +125,22 @@ def obter_linhas_contrato(doc, mes_referencia, substituir=1):
 	proj_nomes = {p: frappe.db.get_value("Project", p, "project_name") or p
 		for p in {l["project"] for l in linhas}}
 	for l in linhas:
-		texto = l.get("descricao") or "{0}{1} — {2}".format(
+		# the template already carries the month; the fallback adds it
+		texto = l.get("descricao") or "{0}{1} — {2} ({3})".format(
 			l["regime"], " [Temporário]" if l["tipo_posto"] == "Temporário" else "",
-			proj_nomes[l["project"]])
+			proj_nomes[l["project"]], mes_label)
 		si.append("items", {
 			"item_code": itens[codigo_item(l)],
 			"qty": 1 if l.get("linha_unica") else l["quantidade"],
 			"rate": l["valor_unitario"],
-			"description": f"{texto} ({mes_label})",
+			"description": texto,
 			"project": l["project"],
 		})
 
 	si.ignore_pricing_rule = 1   # the contract rate is final — no Pricing Rule may alter it
 	si.custom_mes_referencia = mes
 	if si.meta.has_field("custom_total_vigilantes"):
-		si.custom_total_vigilantes = sum(cint(l["quantidade"]) for l in linhas)
+		si.custom_total_vigilantes = sum(cint(l.get("vigilantes", l["quantidade"])) for l in linhas)
 
 	si.set_missing_values()
 	si.calculate_taxes_and_totals()
@@ -128,6 +150,11 @@ def obter_linhas_contrato(doc, mes_referencia, substituir=1):
 			_("Sem tarifa (não incluídos): {0}. Defina o preço no contrato (Faturação por Regime) ou no Cliente (Tarifas por Regime).").format(
 				", ".join(sem_tarifa)),
 			title=_("Tarifas em Falta"), indicator="orange")
+	if dif:
+		frappe.msgprint(
+			_("Quantidade do contrato diferente dos vigilantes activos (não impede a facturação):<br>{0}").format(
+				"<br>".join(dif)),
+			title=_("Contratual vs Activos"), indicator="blue")
 	if activos_contratos and get_last_day(mes) < getdate(nowdate()):
 		frappe.msgprint(
 			_("Contratos em <b>Vigilantes Activos</b> foram contados com o efectivo <b>de hoje</b>, "
@@ -138,46 +165,36 @@ def obter_linhas_contrato(doc, mes_referencia, substituir=1):
 
 
 # ─── Agenda: when each customer is billed ────────────────────────────────────
-# SIGOS Settings holds the master switch + defaults; the Customer opts in
-# (custom_faturacao_automatica) and may override the day and the billed month.
-# Invoices are per customer, so the schedule is too.
+# SIGOS Settings holds the master switch; the customer's billing profile says
+# whether it is billed automatically, on which day and which month. Invoices are
+# per customer, so the schedule is too.
 
-MES_CORRENTE = "Mês Corrente"
-MES_ANTERIOR = "Mês Anterior"
 _LOCK_AUTO = "sigos:faturacao_automatica:lock"
 
 
 def _agenda_clientes(clientes):
-	"""{cliente: _dict(automatica, opt_in, dia, mes_faturado, dia_proprio, mes_proprio)}."""
-	clientes = [c for c in clientes if c]
+	"""{cliente: _dict(automatica, opt_in, dia, mes_faturado, perfil, perfil_proprio)}."""
 	geral = cint(frappe.db.get_single_value("SIGOS Settings", "faturacao_automatica"))
-	dia_p = cint(frappe.db.get_single_value("SIGOS Settings", "dia_faturacao_padrao")) or 25
-	dia_p = min(max(dia_p, 1), 31)
-	mes_p = frappe.db.get_single_value("SIGOS Settings", "mes_faturado_padrao")
-	if mes_p not in (MES_CORRENTE, MES_ANTERIOR):
-		mes_p = MES_CORRENTE
-
-	proprio = {}
-	if clientes and frappe.db.has_column("Customer", "custom_faturacao_automatica"):
-		for c in frappe.get_all("Customer", filters={"name": ["in", clientes]},
-				fields=["name", "custom_faturacao_automatica", "custom_dia_faturacao",
-					"custom_mes_faturado"]):
-			proprio[c.name] = c
-
 	out = {}
-	for c in clientes:
-		r = proprio.get(c) or frappe._dict()
-		dia = cint(r.custom_dia_faturacao)
-		mes = r.custom_mes_faturado if r.custom_mes_faturado in (MES_CORRENTE, MES_ANTERIOR) else None
+	for c, p in perfis_dos_clientes(clientes).items():
 		out[c] = frappe._dict(
-			opt_in=bool(cint(r.custom_faturacao_automatica)),
-			automatica=bool(geral and cint(r.custom_faturacao_automatica)),
-			dia=min(dia, 31) if dia > 0 else dia_p,
-			dia_proprio=dia > 0,
-			mes_faturado=mes or mes_p,
-			mes_proprio=bool(mes),
+			opt_in=bool(p.faturacao_automatica),
+			automatica=bool(geral and p.faturacao_automatica),
+			dia=p.dia_faturacao,
+			mes_faturado=p.mes_faturado if p.mes_faturado in DESVIO_MES else MES_CORRENTE,
+			perfil=p.nome or "",
+			perfil_proprio=p.proprio,
 		)
 	return out
+
+
+def _clientes_automaticos():
+	"""Enabled customers with a contract whose billing profile bills automatically."""
+	clientes = frappe.get_all("Project", filters={"customer": ["is", "set"]},
+		pluck="customer", distinct=True)
+	activos = set(frappe.get_all("Customer",
+		filters={"name": ["in", clientes or [""]], "disabled": 0}, pluck="name"))
+	return sorted(c for c, p in perfis_dos_clientes(activos).items() if p.faturacao_automatica)
 
 
 def _dia_no_mes(data_no_mes, dia):
@@ -187,16 +204,15 @@ def _dia_no_mes(data_no_mes, dia):
 
 
 def _mes_da_execucao(data_execucao, mes_faturado):
-	"""Month billed by a run on this date: its own month, or the one before."""
+	"""Month billed by a run on this date: the one before, its own, or the next."""
 	inicio = get_first_day(data_execucao)
-	return getdate(add_months(inicio, -1)) if mes_faturado == MES_ANTERIOR else inicio
+	return getdate(add_months(inicio, DESVIO_MES.get(mes_faturado, 0)))
 
 
 def _data_da_execucao(mes_referencia, ag):
-	"""Date the automatic run bills this month (the next month's day when in arrears)."""
-	mes_exec = get_first_day(mes_referencia)
-	if ag.mes_faturado == MES_ANTERIOR:
-		mes_exec = getdate(add_months(mes_exec, 1))
+	"""Date the automatic run bills this month: the next month's day when in arrears,
+	the previous month's day when billed a month ahead."""
+	mes_exec = getdate(add_months(get_first_day(mes_referencia), -DESVIO_MES.get(ag.mes_faturado, 0)))
 	return _dia_no_mes(mes_exec, ag.dia)
 
 
@@ -228,16 +244,14 @@ def get_previsao_faturacao(mes_referencia=None):
 	mes = get_first_day(getdate(mes_referencia or hoje))
 	company = empresa_faturacao()
 
-	linhas, activos_contratos = calcular_linhas()
+	linhas, activos_contratos = calcular_linhas(mes=mes)
 	por_cliente = {}
 	for l in linhas:
 		if l["cliente"]:
 			por_cliente.setdefault(l["cliente"], []).append(l)
 	# Customers set to bill automatically show up even with nothing to bill.
-	if frappe.db.has_column("Customer", "custom_faturacao_automatica"):
-		for c in frappe.get_all("Customer",
-				filters={"custom_faturacao_automatica": 1, "disabled": 0}, pluck="name"):
-			por_cliente.setdefault(c, [])
+	for c in _clientes_automaticos():
+		por_cliente.setdefault(c, [])
 
 	clientes = sorted(por_cliente)
 	agenda = _agenda_clientes(clientes)
@@ -301,7 +315,7 @@ def get_previsao_faturacao(mes_referencia=None):
 			cliente=c,
 			nome=nomes.get(c) or c,
 			contratos=len({l["project"] for l in lns}),
-			vigilantes=sum(cint(l["quantidade"]) for l in billable),
+			vigilantes=sum(cint(l.get("vigilantes", l["quantidade"])) for l in billable),
 			total=sum(flt(l["total"]) for l in billable),
 			anterior=anterior,
 			em_falta=em_falta,
@@ -314,7 +328,7 @@ def get_previsao_faturacao(mes_referencia=None):
 			run=run and dict(name=run.name, registo=run.registo_automatico),
 			extras=extras.get(c, []),
 			linhas=[dict(project=l["project"], regime=l["regime"], descricao=l["descricao"],
-				metodo=l["metodo"], quantidade=l["quantidade"],
+				metodo=l["metodo"], quantidade=l["quantidade"], vigilantes=l.get("vigilantes"),
 				quantidade_contratada=l["quantidade_contratada"],
 				valor_unitario=l["valor_unitario"], origem_tarifa=l.get("origem_tarifa") or "",
 				linha_unica=l.get("linha_unica") or 0,
@@ -360,25 +374,6 @@ def _faturas_extra(company, mes, clientes):
 
 
 @frappe.whitelist()
-def definir_agenda_cliente(cliente, automatica=0, dia=0, mes_faturado="Predefinido"):
-	"""Edit a customer's billing schedule from the Previsão page."""
-	frappe.only_for(PAPEIS_FATURACAO)
-	if not frappe.db.exists("Customer", cliente):
-		frappe.throw(_("Cliente {0} não existe.").format(cliente))
-	dia = cint(dia)
-	if not 0 <= dia <= 31:
-		frappe.throw(_("O dia de faturação deve estar entre 1 e 31 (0 = padrão)."))
-	if mes_faturado not in ("Predefinido", MES_CORRENTE, MES_ANTERIOR):
-		frappe.throw(_("Mês facturado inválido."))
-	frappe.db.set_value("Customer", cliente, {
-		"custom_faturacao_automatica": cint(automatica),
-		"custom_dia_faturacao": dia,
-		"custom_mes_faturado": mes_faturado,
-	})
-	return _agenda_clientes([cliente])[cliente]
-
-
-@frappe.whitelist()
 def executar_faturacao_automatica_agora():
 	"""'Executar Agora' on the page: run today's automatic billing in the background."""
 	frappe.only_for(("System Manager", "SIGOS Manager"))
@@ -419,8 +414,7 @@ def _executar_faturacao_automatica(hoje):
 			"SIGOS Faturação Automática")
 		return
 
-	clientes = frappe.get_all("Customer",
-		filters={"custom_faturacao_automatica": 1, "disabled": 0}, pluck="name", order_by="name")
+	clientes = _clientes_automaticos()
 	agenda = _agenda_clientes(clientes)
 	submeter = cint(frappe.db.get_single_value("SIGOS Settings", "submeter_faturas_automaticas"))
 
@@ -436,7 +430,7 @@ def _executar_faturacao_automatica(hoje):
 		if _clientes_ja_faturados(company, mes, {cliente}):
 			continue   # billed by hand (or another route) already
 
-		linhas, activos = calcular_linhas(cliente)
+		linhas, activos = calcular_linhas(cliente, mes)
 		if not any(l["quantidade"] and l["valor_unitario"] for l in linhas):
 			continue   # nothing billable — the page shows it as 'Sem linhas'
 

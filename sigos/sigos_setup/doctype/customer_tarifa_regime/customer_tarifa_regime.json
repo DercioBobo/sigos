@@ -23,11 +23,11 @@
   {
    "fieldname": "valor",
    "fieldtype": "Currency",
-   "label": "Valor / Vigilante",
+   "label": "Valor Unitário",
    "reqd": 1,
    "in_list_view": 1,
    "columns": 2,
-   "description": "Preço mensal por vigilante neste regime, para os contratos deste cliente que não definem o seu."
+   "description": "Preço mensal por serviço (ou por vigilante) neste regime, para contratos sem preço próprio."
   },
   {
    "fieldname": "descricao",
@@ -40,7 +40,7 @@
  ],
  "istable": 1,
  "links": [],
- "modified": "2026-10-14 12:00:00.000000",
+ "modified": "2026-10-24 14:00:00.000000",
  "modified_by": "Administrator",
  "module": "SIGOS Setup",
  "name": "Customer Tarifa Regime",

@@ -1,0 +1,202 @@
+{
+ "actions": [],
+ "autoname": "field:nome",
+ "creation": "2026-10-24 14:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "nome",
+  "descricao",
+  "sec_contagem",
+  "faturar_por",
+  "metodo_faturacao",
+  "col_contagem",
+  "regimes",
+  "sec_factura",
+  "detalhe_fatura",
+  "modelo_descricao",
+  "pre_visualizacao",
+  "col_factura",
+  "variaveis_html",
+  "sec_emissao",
+  "faturacao_automatica",
+  "mes_faturado",
+  "col_emissao",
+  "dia_faturacao"
+ ],
+ "fields": [
+  {
+   "fieldname": "nome",
+   "fieldtype": "Data",
+   "label": "Nome do Perfil",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "descricao",
+   "fieldtype": "Small Text",
+   "label": "Notas"
+  },
+  {
+   "fieldname": "sec_contagem",
+   "fieldtype": "Section Break",
+   "label": "O que se Factura"
+  },
+  {
+   "fieldname": "faturar_por",
+   "fieldtype": "Select",
+   "label": "Faturar por",
+   "options": "Serviço\nVigilante",
+   "default": "Serviço",
+   "reqd": 1,
+   "in_list_view": 1,
+   "description": "Serviço: H24 com 3 vigilantes = 1. Vigilante: cada vigilante conta 1."
+  },
+  {
+   "fieldname": "metodo_faturacao",
+   "fieldtype": "Select",
+   "label": "Quantidade",
+   "options": "Vigilantes Activos\nContratual",
+   "default": "Vigilantes Activos",
+   "reqd": 1,
+   "description": "Activos: os vigilantes do contrato. Contratual: a quantidade escrita no contrato."
+  },
+  {
+   "fieldname": "col_contagem",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "regimes",
+   "fieldtype": "Table",
+   "label": "Vigilantes por Serviço (excepções)",
+   "options": "Perfil Faturacao Regime",
+   "description": "Só quando difere do Regime."
+  },
+  {
+   "fieldname": "sec_factura",
+   "fieldtype": "Section Break",
+   "label": "Como Aparece na Factura"
+  },
+  {
+   "fieldname": "detalhe_fatura",
+   "fieldtype": "Select",
+   "label": "Linhas da Factura",
+   "options": "Por Contrato\nPor Posto\nPor Posto (uma linha)",
+   "default": "Por Contrato",
+   "reqd": 1,
+   "in_list_view": 1,
+   "description": "Por Posto (uma linha): uma linha por posto com a soma dos regimes."
+  },
+  {
+   "fieldname": "modelo_descricao",
+   "fieldtype": "Small Text",
+   "label": "Texto da Linha",
+   "description": "Vazio: o texto de origem do SIGOS."
+  },
+  {
+   "fieldname": "pre_visualizacao",
+   "fieldtype": "HTML",
+   "label": "Pré-visualização"
+  },
+  {
+   "fieldname": "col_factura",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "variaveis_html",
+   "fieldtype": "HTML",
+   "label": "Variáveis",
+   "options": "<p style='font-size:12px;margin-bottom:4px'><b>Variáveis</b></p><table class='table table-sm' style='font-size:12px'><tr><td><code>{regime}</code></td><td>Regime (ex. H24). Na linha única: os regimes do posto.</td></tr><tr><td><code>{descricao}</code></td><td>Descrição na Factura do regime (contrato ou cliente); vazio = o regime.</td></tr><tr><td><code>{composicao}</code></td><td>Quantidades por regime, ex. 2 × H24 + 1 × TDN.</td></tr><tr><td><code>{quantidade}</code></td><td>Quantidade facturada (serviços ou vigilantes).</td></tr><tr><td><code>{vigilantes}</code></td><td>Número de vigilantes.</td></tr><tr><td><code>{nome_financeiro}</code></td><td>Nome financeiro do posto (ou o nome do posto). Sem posto: os postos do contrato.</td></tr><tr><td><code>{posto}</code></td><td>Nome do posto. Sem posto: os postos do contrato.</td></tr><tr><td><code>{indicativo}</code></td><td>Indicativo do posto.</td></tr><tr><td><code>{localizacao}</code></td><td>Localização do posto.</td></tr><tr><td><code>{delegacao}</code></td><td>Delegação do posto.</td></tr><tr><td><code>{tipo_posto}</code></td><td>Permanente ou Temporário.</td></tr><tr><td><code>{temporario}</code></td><td>&#x27;[Temporário]&#x27; nos postos temporários, senão vazio.</td></tr><tr><td><code>{postos}</code></td><td>Postos activos do contrato, separados por vírgula.</td></tr><tr><td><code>{contrato}</code></td><td>Nome do contrato (projecto).</td></tr><tr><td><code>{cliente}</code></td><td>Nome do cliente.</td></tr><tr><td><code>{mes}</code></td><td>Mês facturado, ex. Outubro.</td></tr><tr><td><code>{mes_num}</code></td><td>Mês facturado em número, ex. 10.</td></tr><tr><td><code>{ano}</code></td><td>Ano, ex. 2026.</td></tr><tr><td><code>{mes_ano}</code></td><td>Mês e ano, ex. Outubro 2026.</td></tr><tr><td><code>{periodo}</code></td><td>Período, ex. 01-10-2026 a 31-10-2026.</td></tr></table>"
+  },
+  {
+   "fieldname": "sec_emissao",
+   "fieldtype": "Section Break",
+   "label": "Quando se Factura"
+  },
+  {
+   "fieldname": "faturacao_automatica",
+   "fieldtype": "Check",
+   "label": "Faturação Automática",
+   "default": "0",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "mes_faturado",
+   "fieldtype": "Select",
+   "label": "Mês Facturado",
+   "options": "Mês Anterior\nMês Corrente\nMês Seguinte",
+   "default": "Mês Corrente",
+   "description": "Mês que a factura cobre: o anterior, o próprio ou o seguinte ao mês da emissão (também ao facturar à mão)."
+  },
+  {
+   "fieldname": "col_emissao",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "dia_faturacao",
+   "fieldtype": "Int",
+   "label": "Dia de Emissão",
+   "default": "25",
+   "depends_on": "faturacao_automatica",
+   "description": "31 = último dia do mês."
+  }
+ ],
+ "links": [],
+ "modified": "2026-10-24 15:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "SIGOS Setup",
+ "name": "Perfil De Faturacao",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "print": 1,
+   "report": 1,
+   "share": 1,
+   "email": 0
+  },
+  {
+   "role": "SIGOS Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "print": 1,
+   "report": 1,
+   "share": 1,
+   "email": 0
+  },
+  {
+   "role": "Accounts Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "print": 1,
+   "report": 1,
+   "share": 1,
+   "email": 0
+  },
+  {
+   "role": "Accounts User",
+   "read": 1,
+   "print": 1,
+   "report": 1,
+   "export": 0
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "nome",
+ "track_changes": 1
+}

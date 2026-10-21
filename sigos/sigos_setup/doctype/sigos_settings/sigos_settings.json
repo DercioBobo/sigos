@@ -96,14 +96,10 @@
   "reter_salario_base_em_rotatividade",
   "payroll_payable_account",
   "tab_ss_fat",
-  "metodo_faturacao_padrao",
-  "detalhe_fatura_padrao",
+  "perfil_faturacao_padrao",
   "sec_ss_fat_auto",
   "faturacao_automatica",
   "submeter_faturas_automaticas",
-  "col_ss_fat_auto",
-  "dia_faturacao_padrao",
-  "mes_faturado_padrao",
   "tab_ss_sis",
   "empresa_padrao",
   "col_ss_sis1",
@@ -911,20 +907,11 @@
    "label": "Faturação"
   },
   {
-   "fieldname": "metodo_faturacao_padrao",
-   "fieldtype": "Select",
-   "label": "Método de Faturação Padrão",
-   "options": "Vigilantes Activos\nContratual",
-   "default": "Vigilantes Activos",
-   "description": "Activos: vigilantes no momento. Contratual: nº do contrato."
-  },
-  {
-   "fieldname": "detalhe_fatura_padrao",
-   "fieldtype": "Select",
-   "label": "Detalhe da Factura Padrão",
-   "options": "Por Contrato\nPor Posto\nPor Posto (uma linha)",
-   "default": "Por Contrato",
-   "description": "Agrupamento das linhas da factura."
+   "fieldname": "perfil_faturacao_padrao",
+   "fieldtype": "Link",
+   "label": "Perfil de Faturação Padrão",
+   "options": "Perfil De Faturacao",
+   "description": "Para os clientes sem perfil próprio."
   },
   {
    "fieldname": "sec_ss_fat_auto",
@@ -934,9 +921,9 @@
   {
    "fieldname": "faturacao_automatica",
    "fieldtype": "Check",
-   "label": "Activar Faturação Automática",
+   "label": "Faturação Automática Activa",
    "default": "0",
-   "description": "Factura diariamente os clientes com Faturação Automática."
+   "description": "Interruptor geral da faturação automática."
   },
   {
    "fieldname": "submeter_faturas_automaticas",
@@ -945,30 +932,11 @@
    "default": "0",
    "depends_on": "eval:doc.faturacao_automatica",
    "description": "Desligado: as facturas ficam em rascunho."
-  },
-  {
-   "fieldname": "col_ss_fat_auto",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "dia_faturacao_padrao",
-   "fieldtype": "Int",
-   "label": "Dia de Faturação Padrão",
-   "default": "25",
-   "description": "Quando o Cliente não define. 31 = último dia."
-  },
-  {
-   "fieldname": "mes_faturado_padrao",
-   "fieldtype": "Select",
-   "label": "Mês Facturado Padrão",
-   "options": "Mês Corrente\nMês Anterior",
-   "default": "Mês Corrente",
-   "description": "Corrente: adiantado. Anterior: vencido."
   }
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-10-24 09:00:00.000000",
+ "modified": "2026-10-24 14:00:00.000000",
  "modified_by": "Administrator",
  "module": "SIGOS Setup",
  "name": "SIGOS Settings",

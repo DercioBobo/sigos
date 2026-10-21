@@ -169,13 +169,28 @@ sigos.render_escala_bloco = function (esc, destacar) {
 	return html;
 };
 
-// "Faturar Mês" (Customer / Project forms): pick the month, then open the customer's
-// Faturação Mensal run already previewed. Runs are per customer (all its contracts).
+// "Faturar Mês" (Customer / Project forms): pick the month — proposed from the
+// customer's billing profile (previous / current / next month) — then open the
+// customer's Faturação Mensal run already previewed. Runs are per customer.
 sigos.faturar_mes = function (cliente) {
 	if (!cliente) {
 		frappe.msgprint(__("Defina primeiro o Cliente."));
 		return;
 	}
+	frappe.xcall("sigos.perfil_faturacao.mes_proposto", { cliente })
+		.then((p) => _sigos_faturar_mes_dialog(cliente, p || {}),
+			() => _sigos_faturar_mes_dialog(cliente, {}));
+};
+
+function _sigos_faturar_mes_dialog(cliente, p) {
+	const mes = p.mes || frappe.datetime.get_today();
+	const nome_mes = (data) => {
+		const d = frappe.datetime.str_to_obj(data);
+		const t = d.toLocaleDateString(frappe.boot.lang || "pt", { month: "long", year: "numeric" });
+		return t.charAt(0).toUpperCase() + t.slice(1);
+	};
+	const regra = { "Mês Anterior": __("o mês anterior"), "Mês Seguinte": __("o mês seguinte") }[p.mes_faturado]
+		|| __("o próprio mês");
 	const d = new frappe.ui.Dialog({
 		title: __("Faturar Mês — {0}", [cliente]),
 		fields: [
@@ -184,8 +199,11 @@ sigos.faturar_mes = function (cliente) {
 				fieldtype: "Date",
 				label: __("Mês de Referência"),
 				reqd: 1,
-				default: frappe.datetime.get_today(),
-				description: __("Qualquer dia do mês a facturar. Inclui todos os contratos deste cliente."),
+				default: mes,
+				description: p.perfil
+					? __("Proposto: {0} — o perfil {1} factura {2}. Inclui todos os contratos deste cliente.",
+						[nome_mes(mes), p.perfil, regra])
+					: __("Qualquer dia do mês a facturar. Inclui todos os contratos deste cliente."),
 			},
 		],
 		primary_action_label: __("Pré-visualizar"),
@@ -202,4 +220,25 @@ sigos.faturar_mes = function (cliente) {
 		},
 	});
 	d.show();
+}
+
+// Invoice print preview (Faturação Mensal, Previsão de Faturação): the Sales
+// Invoice default print format, watermarked and NOT printable — only a real Sales
+// Invoice is printed. `m` = {html, style, formato} from the server.
+sigos.mostrar_previa_fatura = function ($wrapper, m) {
+	const marca = __("PRÉ-VISUALIZAÇÃO — NÃO É UMA FACTURA");
+	const $f = $(`<iframe style="width:100%;height:70vh;border:1px solid var(--border-color);border-radius:8px;background:#fff"></iframe>`);
+	$wrapper.empty().append(
+		`<div class="text-muted small" style="margin-bottom:8px">${__("Pré-visualização com o formato {0}. A factura não é criada; para imprimir, gere a factura.",
+			[frappe.utils.escape_html(m.formato || "Standard")])}</div>`, $f);
+	const doc = $f[0].contentDocument;
+	doc.open();
+	doc.write(`<!doctype html><html><head><meta charset="utf-8"><style>${m.style || ""}
+		.sigos-marca { position:fixed; top:40%; left:0; right:0; text-align:center; transform:rotate(-24deg);
+			font:700 40px sans-serif; color:rgba(200,30,30,.16); pointer-events:none; z-index:9999; }
+		@media print { body * { display:none !important; } body:after { content:"${marca}"; } }
+		</style></head>
+		<body oncontextmenu="return false"><div class="sigos-marca">${frappe.utils.escape_html(marca)}</div>
+		<div class="print-format-gutter"><div class="print-format">${m.html || ""}</div></div></body></html>`);
+	doc.close();
 };

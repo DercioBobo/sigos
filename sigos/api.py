@@ -2550,13 +2550,14 @@ def _get_regime_rate(project, regime):
 
 def resolver_metodo_faturacao(project):
 	"""
-	Billing count method for a contract: the Project's own choice, or the SIGOS
-	Settings default when it is 'Predefinido'/unset. 'Vigilantes Activos' is the
-	historical behaviour, so it is also the last-resort default.
+	Billing count method for a contract: the Project's own choice, or its customer's
+	billing profile when it is 'Predefinido'/unset.
 	"""
-	metodo = frappe.db.get_value("Project", project, "custom_metodo_faturacao") if project else None
+	from sigos.perfil_faturacao import perfil_do_cliente
+	metodo, cliente = (frappe.db.get_value("Project", project, ["custom_metodo_faturacao", "customer"])
+		if project else (None, None))
 	if metodo in (None, "", "Predefinido"):
-		metodo = frappe.db.get_single_value("SIGOS Settings", "metodo_faturacao_padrao")
+		metodo = perfil_do_cliente(cliente).metodo_faturacao if cliente else None
 	return metodo or "Vigilantes Activos"
 
 

@@ -603,6 +603,21 @@
  },
  {
   "doctype": "Custom Field",
+  "dt": "Sales Invoice",
+  "module": "SIGOS Setup",
+  "fieldname": "custom_nr_po",
+  "fieldtype": "Data",
+  "label": "Nr da PO",
+  "insert_after": "customer_name",
+  "no_copy": 1,
+  "allow_on_submit": 1,
+  "in_standard_filter": 1,
+  "in_list_view": 0,
+  "print_hide": 0,
+  "description": "Ordem de Compra dada pelo cliente."
+ },
+ {
+  "doctype": "Custom Field",
   "dt": "Project",
   "module": "SIGOS Setup",
   "fieldname": "custom_sec_sigos",
@@ -649,7 +664,7 @@
   "label": "Método de Faturação",
   "options": "Predefinido\nVigilantes Activos\nContratual",
   "default": "Predefinido",
-  "description": "Como a Faturação Mensal conta os vigilantes deste contrato. <b>Predefinido</b> segue as Definições SIGOS (separador Faturação).",
+  "description": "Predefinido: o do perfil de faturação do cliente.",
   "insert_after": "custom_sec_faturacao"
  },
  {
@@ -757,72 +772,27 @@
   "fieldname": "custom_sec_fatura_cliente",
   "fieldtype": "Section Break",
   "insert_after": "custom_tab_faturacao_sigos",
-  "label": "Factura"
+  "label": "Faturação"
  },
  {
   "doctype": "Custom Field",
   "dt": "Customer",
   "module": "SIGOS Setup",
-  "fieldname": "custom_detalhe_fatura",
-  "fieldtype": "Select",
-  "label": "Detalhe da Factura (SIGOS)",
-  "options": "Predefinido\nPor Contrato\nPor Posto\nPor Posto (uma linha)",
-  "default": "Predefinido",
-  "description": "Predefinido segue as Definições SIGOS. <b>Por Contrato</b>: uma linha por contrato e regime. <b>Por Posto</b>: uma linha por posto e regime, com o Nome Financeiro do posto. <b>Por Posto (uma linha)</b>: uma única linha por posto (quantidade 1, valor = total do posto) com a composição no texto, ex. 'Agência Baixa — 2 × H24 + 1 × TDN'. Nos contratos Contratuais (sem vigilantes por posto), as duas opções Por Posto dão uma linha por regime com a lista dos postos.",
+  "fieldname": "custom_perfil_faturacao",
+  "fieldtype": "Link",
+  "options": "Perfil De Faturacao",
+  "label": "Perfil de Faturação",
+  "description": "Vazio: o perfil padrão das Definições SIGOS.",
   "insert_after": "custom_sec_fatura_cliente"
  },
  {
   "doctype": "Custom Field",
   "dt": "Customer",
   "module": "SIGOS Setup",
-  "fieldname": "custom_sec_fat_auto_cliente",
-  "fieldtype": "Section Break",
-  "insert_after": "custom_detalhe_fatura",
-  "label": "Faturação Automática"
- },
- {
-  "doctype": "Custom Field",
-  "dt": "Customer",
-  "module": "SIGOS Setup",
-  "fieldname": "custom_faturacao_automatica",
-  "fieldtype": "Check",
-  "label": "Faturação Automática (SIGOS)",
-  "default": "0",
-  "description": "Factura este cliente automaticamente todos os meses (requer a Faturação Automática activa nas Definições SIGOS).",
-  "insert_after": "custom_sec_fat_auto_cliente"
- },
- {
-  "doctype": "Custom Field",
-  "dt": "Customer",
-  "module": "SIGOS Setup",
-  "fieldname": "custom_col_fat_auto_cliente",
-  "fieldtype": "Column Break",
-  "insert_after": "custom_faturacao_automatica"
- },
- {
-  "doctype": "Custom Field",
-  "dt": "Customer",
-  "module": "SIGOS Setup",
-  "fieldname": "custom_dia_faturacao",
-  "fieldtype": "Int",
-  "label": "Dia de Faturação",
-  "default": "0",
-  "depends_on": "eval:doc.custom_faturacao_automatica",
-  "description": "1–31; 0 = dia padrão das Definições SIGOS. Num mês mais curto, usa-se o último dia.",
-  "insert_after": "custom_col_fat_auto_cliente"
- },
- {
-  "doctype": "Custom Field",
-  "dt": "Customer",
-  "module": "SIGOS Setup",
-  "fieldname": "custom_mes_faturado",
-  "fieldtype": "Select",
-  "label": "Mês Facturado",
-  "options": "Predefinido\nMês Corrente\nMês Anterior",
-  "default": "Predefinido",
-  "depends_on": "eval:doc.custom_faturacao_automatica",
-  "description": "Mês Corrente = adiantado; Mês Anterior = vencido. Predefinido segue as Definições SIGOS.",
-  "insert_after": "custom_dia_faturacao"
+  "fieldname": "custom_perfil_resumo",
+  "fieldtype": "HTML",
+  "label": "Resumo da Faturação",
+  "insert_after": "custom_perfil_faturacao"
  },
  {
   "doctype": "Custom Field",
@@ -830,7 +800,7 @@
   "module": "SIGOS Setup",
   "fieldname": "custom_sec_tarifas_cliente",
   "fieldtype": "Section Break",
-  "insert_after": "custom_mes_faturado",
+  "insert_after": "custom_perfil_resumo",
   "label": "Tarifas por Regime"
  },
  {

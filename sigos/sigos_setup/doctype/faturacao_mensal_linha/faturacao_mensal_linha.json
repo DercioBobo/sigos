@@ -14,7 +14,11 @@
   "descricao",
   "metodo",
   "quantidade",
+  "vigilantes",
+  "faturar_por",
   "quantidade_contratada",
+  "quantidade_real",
+  "vigilantes_reais",
   "valor_unitario",
   "origem_tarifa",
   "total",
@@ -80,22 +84,47 @@
   {
    "fieldname": "quantidade",
    "fieldtype": "Int",
-   "label": "Vigilantes",
+   "label": "Quantidade",
    "read_only": 1,
    "in_list_view": 1,
    "columns": 1
+  },
+  {
+   "fieldname": "vigilantes",
+   "fieldtype": "Int",
+   "label": "Vigilantes",
+   "read_only": 1
+  },
+  {
+   "fieldname": "faturar_por",
+   "fieldtype": "Data",
+   "label": "Faturar por",
+   "read_only": 1
   },
   {
    "fieldname": "quantidade_contratada",
    "fieldtype": "Int",
    "label": "Contratados",
    "read_only": 1,
-   "description": "Nº de vigilantes na tabela de Faturação do contrato (referência)."
+   "description": "Quantidade na tabela de Faturação do contrato (referência)."
+  },
+  {
+   "fieldname": "quantidade_real",
+   "fieldtype": "Int",
+   "label": "Quantidade Real",
+   "read_only": 1,
+   "description": "Contratual: o que os vigilantes activos dariam (só informação)."
+  },
+  {
+   "fieldname": "vigilantes_reais",
+   "fieldtype": "Int",
+   "label": "Vigilantes Activos",
+   "read_only": 1
   },
   {
    "fieldname": "valor_unitario",
    "fieldtype": "Currency",
-   "label": "Valor / Vigilante",
+   "label": "Valor Unitário",
    "read_only": 1,
    "in_list_view": 1,
    "columns": 2
@@ -127,12 +156,12 @@
    "fieldtype": "Data",
    "label": "Composição",
    "read_only": 1,
-   "description": "Regimes e vigilantes da linha única, ex. H24:2,TDN:1."
+   "description": "Regimes e quantidades da linha única, ex. H24:2,TDN:1."
   }
  ],
  "istable": 1,
  "links": [],
- "modified": "2026-10-14 15:00:00.000000",
+ "modified": "2026-10-24 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "SIGOS Setup",
  "name": "Faturacao Mensal Linha",

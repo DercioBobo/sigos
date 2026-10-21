@@ -79,6 +79,28 @@ def resolver_tarifa(linha_contrato, tarifa_cliente):
 	return 0.0, "", desc_contrato
 
 
+# ─── Billing unit: per service or per guard (chosen in the billing profile) ──────
+
+def vigilantes_por_servico_regimes():
+	"""{regime: guards per billed service} from the Regime (default 1)."""
+	if not frappe.db.has_column("Regime", "vigilantes_por_servico"):
+		return {}
+	return {r.name: cint(r.vigilantes_por_servico) or 1
+		for r in frappe.get_all("Regime", fields=["name", "vigilantes_por_servico"])}
+
+
+def servicos(vigilantes, perfil, regime, por_regime):
+	"""Billed quantity for `vigilantes` guards of one posto in `regime`. Per guard:
+	the guard count. Per service: guards ÷ guards-per-service (the profile's
+	exception for the regime, else the Regime's), rounded UP — a short-staffed posto
+	still bills its whole service."""
+	from sigos.perfil_faturacao import FATURAR_SERVICO, vigilantes_por_servico
+	vigilantes = cint(vigilantes)
+	if perfil.faturar_por != FATURAR_SERVICO or vigilantes <= 0:
+		return vigilantes
+	return -(-vigilantes // vigilantes_por_servico(perfil, regime, por_regime))
+
+
 @frappe.whitelist()
 def get_tarifas_cliente(customer):
 	"""Contract form: the customer's rates, to show live totals for rows without a price."""

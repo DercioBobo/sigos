@@ -17,6 +17,7 @@ def after_install():
 	_set_employee_naming()
 	_ensure_ferias_leave_type()
 	_seed_settings_defaults()
+	_garantir_perfil_faturacao()
 
 
 def after_migrate():
@@ -38,6 +39,23 @@ def after_migrate():
 	_set_employee_naming()
 	_ensure_ferias_leave_type()
 	_seed_settings_defaults()
+	_garantir_perfil_faturacao()
+
+
+def _garantir_perfil_faturacao():
+	"""A 'Padrão' billing profile always exists and is the SIGOS Settings default
+	(fresh sites; existing ones get theirs from patches.perfis_de_faturacao)."""
+	try:
+		from sigos.perfil_faturacao import PERFIL, PERFIL_PADRAO
+		if not frappe.db.table_exists(PERFIL):
+			return
+		if not frappe.db.exists(PERFIL, PERFIL_PADRAO) and not frappe.db.count(PERFIL):
+			frappe.get_doc({"doctype": PERFIL, "nome": PERFIL_PADRAO}).insert(ignore_permissions=True)
+		if (not frappe.db.get_single_value("SIGOS Settings", "perfil_faturacao_padrao")
+				and frappe.db.exists(PERFIL, PERFIL_PADRAO)):
+			frappe.db.set_single_value("SIGOS Settings", "perfil_faturacao_padrao", PERFIL_PADRAO)
+	except Exception as e:
+		frappe.log_error(f"SIGOS: perfil de faturação padrão failed: {e}", "SIGOS Install")
 
 
 def _seed_settings_defaults():

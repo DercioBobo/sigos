@@ -24,6 +24,7 @@ frappe.ui.form.on("Faturacao Mensal", {
 		if (temLinhas) {
 			frm.add_custom_button(gerado ? __("Gerar Faturas em Falta") : __("Gerar Faturas"), () => _gerar(frm))
 				.removeClass("btn-default").addClass("btn-primary");
+			frm.add_custom_button(__("Pré-visualizar Factura"), () => _pre_visualizar_impressao(frm));
 		}
 
 		_render_deck(frm);
@@ -101,15 +102,24 @@ function _render_deck(frm) {
 				? `<span class="fat-temp">${__("Temp.")}</span>` : "";
 			const contr = r.metodo === "Contratual"
 				? `<span class="fat-metodo">${__("Contratual")}</span>` : "";
-			// Activos lines: flag a headcount that differs from the contract.
-			const dif = r.metodo !== "Contratual" && r.quantidade_contratada
-				&& r.quantidade_contratada !== r.quantidade
-				? `<span class="fat-dif" title="${__("Contratados no contrato")}">${__("contr.")} ${r.quantidade_contratada}</span>` : "";
+			// Activos lines: flag a headcount that differs from the contract;
+			// Contratual lines: flag a contracted qty that differs from the active guards.
+			let dif = "";
+			if (r.metodo !== "Contratual" && r.quantidade_contratada && r.quantidade_contratada !== r.quantidade) {
+				dif = `<span class="fat-dif" title="${__("Contratados no contrato")}">${__("contr.")} ${r.quantidade_contratada}</span>`;
+			} else if (r.metodo === "Contratual" && (r.quantidade_real || 0) !== (r.quantidade || 0)) {
+				const mais = (r.quantidade || 0) > (r.quantidade_real || 0);
+				dif = `<span class="fat-dif" title="${mais ? __("A facturar mais do que os activos") : __("A facturar menos do que os activos")}">${__("activos")} ${r.quantidade_real || 0}</span>`;
+			}
+			// Per-service customers: billed services, with the guards behind them.
+			const qtd = r.faturar_por === "Serviço"
+				? `${r.quantidade || 0} ${__("serv.")} · ${r.vigilantes || 0} ${__("vig.")}`
+				: `${r.quantidade || 0} ${__("vig.")}`;
 			return `
 			<div class="fat-line">
 				<span class="fat-reg">${r.linha_unica ? __("Posto") : frappe.utils.escape_html(r.regime || "—")}${temp}${contr}</span>
 				<span class="fat-proj" title="${frappe.utils.escape_html(r.project || "")}">${frappe.utils.escape_html(r.descricao || r.project || "")}</span>
-				<span class="fat-q">${r.quantidade || 0} ${__("vig.")}${dif}</span>
+				<span class="fat-q">${qtd}${dif}</span>
 				<span class="fat-u">${fmtC(r.valor_unitario)}${r.origem_tarifa === "Cliente"
 					? ` <span class="fat-metodo" title="${__("Tarifa por regime do cliente")}">${__("cliente")}</span>` : ""}</span>
 				<span class="fat-t">${fmtC(r.total)}</span>
@@ -187,4 +197,46 @@ function _inject_css() {
 	s.id = "sigos-fat-css";
 	s.textContent = css;
 	document.head.appendChild(s);
+}
+
+
+// Print preview: the customer's invoice built exactly as Gerar Faturas would and
+// rendered with the Sales Invoice print format (server rolls it back afterwards).
+function _pre_visualizar_impressao(frm) {
+	const clientes = [...new Set((frm.doc.linhas || [])
+		.filter(l => l.cliente && l.quantidade && l.valor_unitario)
+		.map(l => l.cliente))].sort();
+	if (!clientes.length) {
+		frappe.msgprint(__("Sem linhas facturáveis."));
+		return;
+	}
+	const d = new frappe.ui.Dialog({
+		title: __("Pré-visualizar Factura"),
+		size: "extra-large",
+		fields: [
+			{ fieldname: "cliente", fieldtype: "Select", label: __("Cliente"), options: clientes,
+				default: clientes[0], change: () => carregar() },
+			{ fieldtype: "Section Break" },
+			{ fieldname: "folha", fieldtype: "HTML" },
+		],
+	});
+	const $folha = () => d.fields_dict.folha.$wrapper;
+	let pedido = 0;
+	function carregar() {
+		const cliente = d.get_value("cliente");
+		if (!cliente) return;
+		if (frm.is_dirty()) {
+			$folha().html(`<div class="text-muted" style="padding:24px">${__("Guarde o documento primeiro.")}</div>`);
+			return;
+		}
+		const meu = ++pedido;
+		$folha().html(`<div class="text-muted" style="padding:24px">${__("A preparar a factura...")}</div>`);
+		frm.call("pre_visualizar_impressao", { cliente }).then((r) => {
+			if (meu === pedido) sigos.mostrar_previa_fatura($folha(), r.message || {});
+		}, () => {
+			if (meu === pedido) $folha().html(`<div class="text-danger" style="padding:24px">${__("Não foi possível pré-visualizar.")}</div>`);
+		});
+	}
+	d.show();
+	carregar();
 }

@@ -14,6 +14,7 @@
   "tipo_ciclo",
   "dias_por_grupo",
   "faltas_consecutivas_contam_um",
+  "vigilantes_por_servico",
   "sec_turnos",
   "turnos"
  ],
@@ -61,6 +62,14 @@
    "description": "Quando ligado: se o turno de TRABALHO anterior do vigilante também foi falta, esta falta conta 1 (as folgas já foram contadas nesse turno anterior). Ligue em regimes cujo 'Nº Faltas' inclui as folgas seguintes; deixe desligado se cada turno tem um peso próprio."
   },
   {
+   "fieldname": "vigilantes_por_servico",
+   "fieldtype": "Int",
+   "label": "Vigilantes por Serviço",
+   "default": "1",
+   "non_negative": 1,
+   "description": "Faturação por serviço: ex. H24 = 3 vigilantes facturados como 1."
+  },
+  {
    "fieldname": "sec_turnos",
    "fieldtype": "Section Break",
    "label": "Sequência de Turnos"
@@ -75,7 +84,7 @@
   }
  ],
  "links": [],
- "modified": "2026-06-02 00:00:00.000000",
+ "modified": "2026-10-24 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "SIGOS Setup",
  "name": "Regime",
