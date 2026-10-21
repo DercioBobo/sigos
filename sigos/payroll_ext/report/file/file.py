@@ -1,6 +1,6 @@
 import frappe
 from frappe import _
-from frappe.utils import get_first_day, get_last_day, getdate, today
+from frappe.utils import getdate
 
 MESES_PT = {
 	1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",
@@ -11,8 +11,10 @@ MESES_PT = {
 
 def execute(filters=None):
 	filters = filters or {}
-	de = getdate(filters.get("de_data") or get_first_day(today()))
-	ate = getdate(filters.get("ate_data") or get_last_day(today()))
+	if not filters.get("start_date") or not filters.get("end_date"):
+		return _columns(), []
+	de = getdate(filters["start_date"])
+	ate = getdate(filters["end_date"])
 
 	cond = ""
 	params = {"de": de, "ate": ate}
@@ -46,7 +48,8 @@ def execute(filters=None):
 		LEFT JOIN `tabProject` proj ON proj.name = ss.custom_projecto
 		LEFT JOIN `tabCustomer` cust ON cust.name = proj.customer
 		WHERE ss.docstatus = 1
-		  AND ss.posting_date BETWEEN %(de)s AND %(ate)s
+		  AND ss.start_date >= %(de)s
+		  AND ss.end_date <= %(ate)s
 		  {cond}
 		ORDER BY ss.employee_name
 		""",
@@ -54,7 +57,8 @@ def execute(filters=None):
 		as_dict=True,
 	)
 
-	descritivo_debito = _("Pag do Salário {0}").format(_(MESES_PT[de.month]))
+	# A payroll period is filed under the month it ends in (resolver_periodo_folha).
+	descritivo_debito = _("Pag do Salário {0}").format(_(MESES_PT[ate.month]))
 	descritivo_credito = _("Pag de Salario")
 
 	data = []
