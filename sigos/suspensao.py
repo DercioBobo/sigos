@@ -205,9 +205,12 @@ def remuneracao(vigilante_doc):
 
 
 def _episodios(vigilante, ate, so_nao_pagos=False):
-	filtros = {"vigilante": vigilante, "suspensao_desde": ["<=", ate], "docstatus": 1}
+	# "is set" first: Frappe compares an empty date as 0001-01-01, so "<= ate" alone
+	# would match every participação that was never a suspension.
+	filtros = [["vigilante", "=", vigilante], ["docstatus", "=", 1],
+		["suspensao_desde", "is", "set"], ["suspensao_desde", "<=", ate]]
 	if so_nao_pagos:
-		filtros["suspensao_remuneracao"] = REM_NAO_PAGO
+		filtros.append(["suspensao_remuneracao", "=", REM_NAO_PAGO])
 	return frappe.get_all("Participacao", filters=filtros,
 		fields=["name", "suspensao_desde", "suspensao_ate"])
 

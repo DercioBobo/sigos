@@ -672,7 +672,8 @@ def dias_abandono(vigilante, de, ate):
 		return set()
 	eps = frappe.get_all(
 		DOCTYPE_PRESUNCAO,
-		filters={"vigilante": vigilante, "abandono_desde": ["<=", ate]},
+		filters=[["vigilante", "=", vigilante], ["abandono_desde", "is", "set"],
+			["abandono_desde", "<=", ate]],
 		fields=["abandono_desde", "abandono_ate"],
 	)
 	dias = set()
@@ -694,7 +695,9 @@ def periodo_sem_registo(vigilante, data):
 	data = getdate(data)
 	for e in frappe.get_all(
 		DOCTYPE_PRESUNCAO,
-		filters={"vigilante": vigilante, "abandono_desde": ["<=", data]},
+		# "is set": an empty date would compare as 0001-01-01 and match
+		filters=[["vigilante", "=", vigilante], ["abandono_desde", "is", "set"],
+			["abandono_desde", "<=", data]],
 		fields=["name", "abandono_ate"],
 	):
 		if not e.abandono_ate or getdate(e.abandono_ate) >= data:
