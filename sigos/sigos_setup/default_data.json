@@ -1,11 +1,11 @@
 [
  {
   "doctype": "Categoria Vigilante",
-  "nome": "Vigilante Normal",  "bloqueada": 0
+  "nome": "Vigilante Normal",  "nome_faturacao": "Simples",  "bloqueada": 0
  },
  {
   "doctype": "Categoria Vigilante",
-  "nome": "Vigilante Armado",  "bloqueada": 0
+  "nome": "Vigilante Armado",  "nome_faturacao": "Armado",  "bloqueada": 0
  },
  {
   "doctype": "Categoria Vigilante",

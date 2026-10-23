@@ -37,3 +37,4 @@ sigos.patches.migrar_participacao_formulario
 sigos.patches.backfill_participacao_processo
 sigos.patches.pd_tramitacao_sancoes
 sigos.patches.perfis_de_faturacao
+sigos.patches.nome_faturacao_categorias

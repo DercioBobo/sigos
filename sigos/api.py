@@ -2519,33 +2519,31 @@ def search_vigilantes_rich(txt="", status="Activo", delegacao=None, excluir=None
 
 
 @frappe.whitelist()
-def get_regime_rate(project, regime):
+def get_regime_rate(project, regime, categoria=None):
 	"""
 	Monthly billed rate per vigilante for a regime under a contract (Project).
 	The contract's Finance table (Faturação por Regime), else the customer's Tarifas
 	por Regime (sigos.contrato.resolver_tarifa); neither -> 0, flagged by Faturacao Mensal.
 	"""
 	frappe.only_for(PAPEIS_INTERNOS)
-	return _get_regime_rate(project, regime)
+	return _get_regime_rate(project, regime, categoria)
 
 
-def _get_regime_rate(project, regime):
+def _get_regime_rate(project, regime, categoria=None):
 	"""
 	Unguarded core of get_regime_rate for server-side callers that enforce their
 	own role gate (e.g. Faturacao Mensal, which Accounts Manager may run without
 	holding any SIGOS role — calling the whitelisted wrapper would reject them).
 	"""
-	from sigos.contrato import resolver_tarifa, tarifas_do_cliente
+	from sigos.contrato import (linhas_contratadas, procurar_tarifa, resolver_tarifa,
+		tarifas_dos_clientes)
 
 	if not project:
 		return 0
-	linha = frappe.db.get_value(
-		"Project Faturacao Regime",
-		{"parent": project, "parenttype": "Project", "regime": regime},
-		["valor", "descricao"], as_dict=True,
-	)
 	cliente = frappe.db.get_value("Project", project, "customer")
-	return resolver_tarifa(linha, tarifas_do_cliente(cliente).get(regime))[0]
+	linha = procurar_tarifa(linhas_contratadas([project]), (project, regime), categoria)
+	tarifa = procurar_tarifa(tarifas_dos_clientes([cliente]), (cliente, regime), categoria)
+	return resolver_tarifa(linha, tarifa)[0]
 
 
 def resolver_metodo_faturacao(project):

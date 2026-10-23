@@ -701,9 +701,20 @@
   "doctype": "Custom Field",
   "dt": "Project",
   "module": "SIGOS Setup",
+  "fieldname": "custom_linhas_adicionais",
+  "fieldtype": "Table",
+  "options": "Linha Adicional Faturacao",
+  "label": "Linhas Adicionais",
+  "description": "Outras linhas na factura (arma, rádio, viatura…). Vazio: as do Cliente.",
+  "insert_after": "custom_faturacao_regimes"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Project",
+  "module": "SIGOS Setup",
   "fieldname": "custom_sec_faturacao_fim",
   "fieldtype": "Section Break",
-  "insert_after": "custom_faturacao_regimes"
+  "insert_after": "custom_linhas_adicionais"
  },
  {
   "doctype": "Custom Field",
@@ -813,5 +824,16 @@
   "label": "Tarifas por Regime",
   "options": "Customer Tarifa Regime",
   "description": "Preço por vigilante e por regime para TODOS os contratos deste cliente. Um contrato que define o seu próprio Valor / Vigilante usa sempre o seu; os outros usam este. Um regime sem preço em nenhum dos dois não é facturado (aparece como 'sem tarifa')."
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Customer",
+  "module": "SIGOS Setup",
+  "fieldname": "custom_linhas_adicionais",
+  "fieldtype": "Table",
+  "options": "Linha Adicional Faturacao",
+  "label": "Linhas Adicionais",
+  "description": "Outras linhas na factura de cada contrato que não tenha as suas.",
+  "insert_after": "custom_tarifas_regime"
  }
 ]

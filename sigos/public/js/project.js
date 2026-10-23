@@ -85,7 +85,9 @@ function _sigos_recalcular_faturacao(frm) {
 	const do_cliente = frm._sigos_tarifas_cliente || {};
 	let total = 0;
 	(frm.doc.custom_faturacao_regimes || []).forEach(r => {
-		const valor = flt(r.valor) || flt(do_cliente[r.regime]) || 0;
+		// customer rates are keyed "<regime>|<categoria>"; "<regime>|" = any categoria
+		const valor = flt(r.valor) || flt(do_cliente[`${r.regime}|${r.categoria || ""}`])
+			|| flt(do_cliente[`${r.regime}|`]) || 0;
 		const t = (cint(r.quantidade) || 0) * valor;
 		if (r.total !== t) frappe.model.set_value(r.doctype, r.name, "total", t);
 		total += t;
@@ -101,6 +103,7 @@ frappe.ui.form.on("Project", {
 
 frappe.ui.form.on("Project Faturacao Regime", {
 	regime: _sigos_recalcular_faturacao,
+	categoria: _sigos_recalcular_faturacao,
 	quantidade: _sigos_recalcular_faturacao,
 	valor: _sigos_recalcular_faturacao,
 });

@@ -17,6 +17,7 @@ from frappe.utils import (
 	nowdate, strip_html,
 )
 
+from sigos.contrato import nomes_faturacao_categorias, rotulo_tarifa
 from sigos.perfil_faturacao import DESVIO_MES, MES_CORRENTE, perfis_dos_clientes
 from sigos.sigos_setup.doctype.faturacao_mensal.faturacao_mensal import (
 	ITEM_GROUP_FATURACAO,
@@ -100,8 +101,9 @@ def obter_linhas_contrato(doc, mes_referencia, substituir=1):
 
 	linhas, activos_contratos = calcular_linhas(si.customer, mes)
 	dif = diferencas_contratuais(linhas)
-	sem_tarifa = [f"{l['project']} / {l['regime']}" for l in linhas
-		if l["quantidade"] and not l["valor_unitario"]]
+	nomes_cat = nomes_faturacao_categorias()
+	sem_tarifa = [f"{l['project']} / {rotulo_tarifa(l['regime'], l.get('categoria'), nomes_cat)}"
+		for l in linhas if l["quantidade"] and not l["valor_unitario"]]
 	linhas = [l for l in linhas if l["quantidade"] and l["valor_unitario"]]
 	if not linhas:
 		frappe.throw(
@@ -278,13 +280,14 @@ def get_previsao_faturacao(mes_referencia=None):
 	elif faturaveis:
 		verif = _verificar(frappe._dict(company=company, mes_referencia=mes, linhas=faturaveis))
 
+	nomes_cat = nomes_faturacao_categorias()
 	out = []
 	for c in clientes:
 		lns = por_cliente[c]
 		ag = agenda[c]
 		billable = [l for l in lns if l["quantidade"] and l["valor_unitario"]]
-		sem_tarifa = sorted({f"{l['project']} / {l['regime']}" for l in lns
-			if l["quantidade"] and not l["valor_unitario"]})
+		sem_tarifa = sorted({f"{l['project']} / {rotulo_tarifa(l['regime'], l.get('categoria'), nomes_cat)}"
+			for l in lns if l["quantidade"] and not l["valor_unitario"]})
 		em_falta = sum(max(cint(l["quantidade_contratada"]) - cint(l["quantidade"]), 0)
 			for l in lns if l["metodo"] == "Vigilantes Activos")
 		faturas = [detalhe_si[n] for n in ja.get(c, []) if n in detalhe_si]
@@ -327,7 +330,8 @@ def get_previsao_faturacao(mes_referencia=None):
 				grand_total=f.grand_total) for f in faturas],
 			run=run and dict(name=run.name, registo=run.registo_automatico),
 			extras=extras.get(c, []),
-			linhas=[dict(project=l["project"], regime=l["regime"], descricao=l["descricao"],
+			linhas=[dict(project=l["project"], regime=l["regime"], categoria=l.get("categoria") or "",
+				descricao=l["descricao"],
 				metodo=l["metodo"], quantidade=l["quantidade"], vigilantes=l.get("vigilantes"),
 				quantidade_contratada=l["quantidade_contratada"],
 				valor_unitario=l["valor_unitario"], origem_tarifa=l.get("origem_tarifa") or "",

@@ -9,6 +9,7 @@
   "cliente",
   "project",
   "regime",
+  "categoria",
   "posto",
   "tipo_posto",
   "descricao",
@@ -23,7 +24,9 @@
   "origem_tarifa",
   "total",
   "linha_unica",
-  "composicao"
+  "composicao",
+  "adicional",
+  "artigo"
  ],
  "fields": [
   {
@@ -52,6 +55,13 @@
    "read_only": 1,
    "in_list_view": 1,
    "columns": 2
+  },
+  {
+   "fieldname": "categoria",
+   "fieldtype": "Link",
+   "label": "Categoria",
+   "options": "Categoria Vigilante",
+   "read_only": 1
   },
   {
    "fieldname": "posto",
@@ -153,15 +163,28 @@
   },
   {
    "fieldname": "composicao",
-   "fieldtype": "Data",
+   "fieldtype": "Small Text",
    "label": "Composição",
    "read_only": 1,
    "description": "Regimes e quantidades da linha única, ex. H24:2,TDN:1."
+  },
+  {
+   "fieldname": "adicional",
+   "fieldtype": "Check",
+   "label": "Linha Adicional",
+   "read_only": 1
+  },
+  {
+   "fieldname": "artigo",
+   "fieldtype": "Link",
+   "label": "Artigo",
+   "options": "Item",
+   "read_only": 1
   }
  ],
  "istable": 1,
  "links": [],
- "modified": "2026-10-24 12:00:00.000000",
+ "modified": "2026-10-25 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "SIGOS Setup",
  "name": "Faturacao Mensal Linha",

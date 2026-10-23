@@ -7,6 +7,7 @@
  "engine": "InnoDB",
  "field_order": [
   "regime",
+  "categoria",
   "valor",
   "descricao"
  ],
@@ -18,7 +19,16 @@
    "options": "Regime",
    "reqd": 1,
    "in_list_view": 1,
-   "columns": 3
+   "columns": 2
+  },
+  {
+   "fieldname": "categoria",
+   "fieldtype": "Link",
+   "label": "Categoria",
+   "options": "Categoria Vigilante",
+   "in_list_view": 1,
+   "columns": 2,
+   "description": "Vazio: qualquer categoria."
   },
   {
    "fieldname": "valor",
@@ -34,13 +44,13 @@
    "fieldtype": "Data",
    "label": "Descrição na Factura",
    "in_list_view": 1,
-   "columns": 5,
-   "description": "Texto da linha na factura quando o contrato não tem o seu. Vazio: '<regime> — <contrato>'."
+   "columns": 4,
+   "description": "Texto da linha quando o contrato não tem o seu. Vazio: o regime e a categoria (ex. H24 Armado)."
   }
  ],
  "istable": 1,
  "links": [],
- "modified": "2026-10-24 14:00:00.000000",
+ "modified": "2026-10-25 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "SIGOS Setup",
  "name": "Customer Tarifa Regime",

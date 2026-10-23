@@ -19,8 +19,9 @@ MESES_PT = ("Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho",
 # name -> what it is (shown as help in SIGOS Settings, used to validate templates)
 VARIAVEIS = {
 	"regime": "Regime (ex. H24). Na linha única: os regimes do posto.",
-	"descricao": "Descrição na Factura do regime (contrato ou cliente); vazio = o regime.",
-	"composicao": "Quantidades por regime, ex. 2 × H24 + 1 × TDN.",
+	"categoria": "Nome na factura da categoria (ex. Armado). Na linha única: as do posto.",
+	"descricao": "Descrição na Factura da tarifa (contrato ou cliente); vazio = regime e categoria, ex. H24 Armado.",
+	"composicao": "Quantidades por regime e categoria, ex. 2 × H24 Armado + 1 × TDN Simples.",
 	"quantidade": "Quantidade facturada (serviços ou vigilantes).",
 	"vigilantes": "Número de vigilantes.",
 	"nome_financeiro": "Nome financeiro do posto (ou o nome do posto). Sem posto: os postos do contrato.",
@@ -99,7 +100,8 @@ def modelo_para(perfil, detalhe):
 
 def _exemplo(mes=None):
 	return dict(variaveis_do_mes(mes or frappe.utils.nowdate()),
-		regime="H24", descricao="H24", composicao="2 × H24 + 1 × TDN", quantidade=1,
+		regime="H24", categoria="Armado", descricao="H24 Armado",
+		composicao="2 × H24 Armado + 1 × TDN Simples", quantidade=1,
 		vigilantes=3, nome_financeiro="Agência Baixa", posto="Agência Baixa",
 		indicativo="AB-01", localizacao="Av. 25 de Setembro", delegacao="Maputo",
 		tipo_posto="Permanente", temporario="", postos="Agência Baixa, Sede",

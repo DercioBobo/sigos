@@ -3,15 +3,17 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import cint, cstr, flt, getdate, get_first_day, get_last_day, formatdate, nowdate, strip_html
 
-from sigos.contrato import (resolver_tarifa, servicos, tarifas_dos_clientes,
-	vigilantes_por_servico_regimes)
+from sigos.contrato import (ADICIONAL_FIXA, ADICIONAL_POSTOS, ADICIONAL_VIGILANTES,
+	adicional_por_ref, adicionais_do_contrato, linhas_contratadas, nomes_faturacao_categorias,
+	procurar_tarifa, resolver_tarifa, rotulo_tarifa, servicos, tabelas_adicionais,
+	tarifas_dos_clientes, vigilantes_por_servico_regimes)
 from sigos.perfil_faturacao import (DETALHE_POR_POSTO, DETALHE_UMA_LINHA, FATURAR_SERVICO,
 	PREDEFINIDO, perfis_dos_clientes, vigilantes_por_servico)
 
 
 class FaturacaoMensal(Document):
 
-	# ─── Preview: count per (contract, regime) x contract tariff ─────────────────
+	# ─── Preview: count per (contract, regime, categoria) x contract tariff ──────
 
 	@frappe.whitelist()
 	def preview(self):
@@ -20,13 +22,15 @@ class FaturacaoMensal(Document):
 		self.set("linhas", [])
 
 		linhas, activos_contratos = calcular_linhas(self.cliente, self.mes_referencia)
+		nomes = nomes_faturacao_categorias()
 
 		total_geral = 0
 		total_vig = 0
 		sem_tarifa = []
 		for l in linhas:
 			if l["quantidade"] and not l["valor_unitario"]:
-				sem_tarifa.append(f"{l['cliente'] or '?'} / {l['project']} / {l['regime']}")
+				sem_tarifa.append(f"{l['cliente'] or '?'} / {l['project']} / "
+					f"{rotulo_tarifa(l['regime'], l.get('categoria'), nomes)}")
 			self.append("linhas", l)
 			total_geral += l["total"]
 			total_vig += (l.get("vigilantes") or 0)
@@ -240,7 +244,8 @@ class FaturacaoMensal(Document):
 				"description": texto,
 				"project": ln.project,
 			})
-			total_vig += ln.vigilantes or ln.quantidade
+			if not ln.adicional:
+				total_vig += ln.vigilantes or ln.quantidade
 
 		if si.meta.has_field("custom_total_vigilantes"):
 			si.custom_total_vigilantes = total_vig
@@ -309,7 +314,7 @@ def pre_visualizar_fatura_cliente(cliente, mes_referencia=None):
 
 def calcular_linhas(cliente=None, mes=None, perfil=None):
 	"""
-	Billing lines per contract (Project) + regime — shared by the Faturacao Mensal
+	Billing lines per contract (Project) + regime + guard categoria — shared by the Faturacao Mensal
 	preview and the Sales Invoice 'Contratos SIGOS' fetch. Each contract is counted
 	with its own método de faturação (Project.custom_metodo_faturacao,
 	'Predefinido' -> the customer's billing profile, sigos.perfil_faturacao):
@@ -318,6 +323,12 @@ def calcular_linhas(cliente=None, mes=None, perfil=None):
 	    Vigilantes por Serviço rounded up (H24 with 3 guards = 1); per guard
 	    customers get the guard count.
 	  - Contratual: the Quantidade typed in the contract's Finance table.
+	Rates are per regime and optionally per categoria (H24 Armado / H24 Simples): a
+	guard's categoria uses its own row, else the regime's row without categoria
+	(procurar_tarifa). Active guards are always split by categoria; a Contratual
+	line takes the categoria of its contract row.
+	Linhas Adicionais (arma, rádio…) are added per contract (sigos.contrato) and,
+	on 'Por Posto (uma linha)', folded into the posto's line.
 	The rate comes from the contract's Finance table (Faturação por Regime), or — for a
 	row without a price, or a regime the contract doesn't list — from the customer's
 	Tarifas por Regime (resolver_tarifa). Each line says which (origem_tarifa).
@@ -358,22 +369,23 @@ def calcular_linhas(cliente=None, mes=None, perfil=None):
 	def uma_linha(proj):
 		return pf(proj).detalhe_fatura == DETALHE_UMA_LINHA
 
-	# Contracted qty + rate + invoice text per (contract, regime), from the Finance table.
-	contratado = {}
-	if contratos:
-		for f in frappe.get_all(
-			"Project Faturacao Regime",
-			filters={"parenttype": "Project", "parent": ["in", list(metodo)]},
-			fields=["parent", "regime", "quantidade", "valor", "descricao"],
-			order_by="parent, idx",
-		):
-			contratado[(f.parent, f.regime)] = f
+	# Contracted qty + rate + invoice text per (contract, regime, categoria), from the
+	# Finance table ('' categoria = any).
+	contratado = linhas_contratadas(list(metodo))
 	do_cliente = tarifas_dos_clientes(cliente_de.values())
+	nomes_cat = nomes_faturacao_categorias()
 
-	def tarifa(proj, regime):
+	def linha_contrato(proj, regime, cat):
+		"""(key, row) of the contract row that bills this regime + categoria."""
+		for k in ((proj, regime, cat or ""), (proj, regime, "")):
+			if k in contratado:
+				return k, contratado[k]
+		return None, None
+
+	def tarifa(proj, regime, cat):
 		"""(valor, origem, descricao) — contract first, then the customer."""
-		return resolver_tarifa(contratado.get((proj, regime)),
-			do_cliente.get((cliente_de.get(proj), regime)))
+		return resolver_tarifa(linha_contrato(proj, regime, cat)[1],
+			procurar_tarifa(do_cliente, (cliente_de.get(proj), regime), cat))
 
 	# Postos of these contracts: details for the line text, and the active ones per
 	# contract ({postos}, and {posto}/{nome_financeiro} on lines without one posto).
@@ -402,6 +414,7 @@ def calcular_linhas(cliente=None, mes=None, perfil=None):
 	# covered guard's own row avoids double-charging the customer for one slot.
 	activos_contratos = [p for p, m in metodo.items() if m == "Vigilantes Activos"]
 	vistos = set()
+	pendentes = []   # per-posto lines, merged below for 'Por Posto (uma linha)'
 	if activos_contratos:
 		rows = _activos_por_posto(activos_contratos)
 
@@ -411,57 +424,33 @@ def calcular_linhas(cliente=None, mes=None, perfil=None):
 			# rows are per posto, so a service is rounded up per posto
 			qtd = servicos(r.qtd, pf(r.project), r.regime, por_regime)
 			posto = r.posto if por_posto(r.project) else None
-			k = (r.project, r.regime, r.tipo_posto, posto)
+			cat = r.categoria or ""
+			k = (r.project, r.regime, cat, r.tipo_posto, posto)
+			ck, c = linha_contrato(r.project, r.regime, cat)
 			if k not in agrupado:
-				c = contratado.get((r.project, r.regime))
-				valor, origem, _desc = tarifa(r.project, r.regime)
+				valor, origem, _desc = tarifa(r.project, r.regime, cat)
 				agrupado[k] = dict(
-					project=r.project, regime=r.regime, tipo_posto=r.tipo_posto, posto=posto,
-					metodo="Vigilantes Activos", quantidade=0, vigilantes=0, faturar_por=modo,
-					quantidade_contratada=c.quantidade if c else 0,
+					project=r.project, regime=r.regime, categoria=cat, tipo_posto=r.tipo_posto,
+					posto=posto, metodo="Vigilantes Activos", quantidade=0, vigilantes=0,
+					faturar_por=modo, quantidade_contratada=c.quantidade if c else 0,
 					valor_unitario=valor, origem_tarifa=origem,
 				)
 			agrupado[k]["quantidade"] += qtd
 			agrupado[k]["vigilantes"] += r.qtd
-			vistos.add((r.project, r.regime))
+			if ck:
+				vistos.add(ck)
 
-		# 'Por Posto (uma linha)': each posto's priced regime lines become ONE line,
-		# billed 1 x the posto's total, its make-up in the text and in `composicao`
-		# (machine-readable, re-priced by the stale-preview check). An unpriced part
-		# stays its own line so it is still flagged 'sem tarifa', never hidden.
-		juntas = {}
-		for l in agrupado.values():
-			if not (l["posto"] and uma_linha(l["project"]) and l["quantidade"] and flt(l["valor_unitario"])):
-				linhas.append(l)
-				continue
-			juntas.setdefault((l["project"], l["posto"]), []).append(l)
-		for (proj, posto), partes in juntas.items():
-			partes.sort(key=lambda x: x["regime"])
-			origens = {x["origem_tarifa"] for x in partes}
-			temp = any(x["tipo_posto"] == "Temporário" for x in partes)
-			linhas.append(dict(
-				project=proj, regime="", posto=posto,
-				tipo_posto="Temporário" if temp else partes[0]["tipo_posto"],
-				metodo="Vigilantes Activos",
-				quantidade=sum(x["quantidade"] for x in partes),
-				vigilantes=sum(x["vigilantes"] for x in partes),
-				faturar_por=partes[0]["faturar_por"],
-				quantidade_contratada=0,
-				valor_unitario=sum(x["quantidade"] * flt(x["valor_unitario"]) for x in partes),
-				origem_tarifa=origens.pop() if len(origens) == 1 else "Contrato + Cliente",
-				linha_unica=1,
-				composicao=",".join(f"{x['regime']}:{x['quantidade']}" for x in partes),
-			))
+		pendentes.extend(agrupado.values())
 
 		# Contracted regimes with nobody active: a 0-qty line so the shortfall is
 		# visible in the preview (never invoiced — gerar_faturas skips qty 0).
-		for (proj, regime), c in contratado.items():
-			if (metodo.get(proj) == "Vigilantes Activos" and (proj, regime) not in vistos
+		for (proj, regime, cat), c in contratado.items():
+			if (metodo.get(proj) == "Vigilantes Activos" and (proj, regime, cat) not in vistos
 					and c.quantidade and cliente_de.get(proj)
 					and estado_de.get(proj) not in ("Completed", "Cancelled")):
-				valor, origem, _desc = tarifa(proj, regime)
+				valor, origem, _desc = tarifa(proj, regime, cat)
 				linhas.append(dict(
-					project=proj, regime=regime, tipo_posto="", posto=None,
+					project=proj, regime=regime, categoria=cat, tipo_posto="", posto=None,
 					metodo="Vigilantes Activos",
 					quantidade=0, vigilantes=0, faturar_por=pf(proj).faturar_por,
 					quantidade_contratada=c.quantidade,
@@ -475,20 +464,24 @@ def calcular_linhas(cliente=None, mes=None, perfil=None):
 		if m == "Contratual" and estado_de.get(p) not in ("Completed", "Cancelled")]
 	# For information only: what the active guards would bill (same per-posto rule
 	# as Vigilantes Activos), so a contracted qty above/below reality is visible.
+	# Guards count against the contract row that bills their categoria (its own row,
+	# else the regime's row without categoria).
 	real = {}
 	if contratuais:
 		for r in _activos_por_posto(contratuais):
 			q = servicos(r.qtd, pf(r.project), r.regime, por_regime)
-			acc = real.setdefault((r.project, r.regime), [0, 0])
+			ck = (linha_contrato(r.project, r.regime, r.categoria)[0]
+				or (r.project, r.regime, r.categoria or ""))
+			acc = real.setdefault(ck, [0, 0])
 			acc[0] += q
 			acc[1] += r.qtd
-	for (proj, regime), c in contratado.items():
+	for (proj, regime, cat), c in contratado.items():
 		if proj not in contratuais or not c.quantidade:
 			continue
-		valor, origem, _desc = tarifa(proj, regime)
-		q_real, v_real = real.pop((proj, regime), (0, 0))
+		valor, origem, _desc = tarifa(proj, regime, cat)
+		q_real, v_real = real.pop((proj, regime, cat), (0, 0))
 		linhas.append(dict(
-			project=proj, regime=regime, tipo_posto="", posto=None,
+			project=proj, regime=regime, categoria=cat, tipo_posto="", posto=None,
 			metodo="Contratual",
 			quantidade=c.quantidade, quantidade_contratada=c.quantidade,
 			quantidade_real=q_real, vigilantes_reais=v_real,
@@ -498,13 +491,97 @@ def calcular_linhas(cliente=None, mes=None, perfil=None):
 		))
 	# Active guards in a regime the contract doesn't bill: a 0-qty line (never
 	# invoiced) so it shows up in the comparison.
-	for (proj, regime), (q_real, v_real) in real.items():
-		valor, origem, _desc = tarifa(proj, regime)
+	for (proj, regime, cat), (q_real, v_real) in real.items():
+		valor, origem, _desc = tarifa(proj, regime, cat)
 		linhas.append(dict(
-			project=proj, regime=regime, tipo_posto="", posto=None, metodo="Contratual",
+			project=proj, regime=regime, categoria=cat, tipo_posto="", posto=None, metodo="Contratual",
 			quantidade=0, quantidade_contratada=0, quantidade_real=q_real, vigilantes_reais=v_real,
 			faturar_por=pf(proj).faturar_por, vigilantes=0,
 			valor_unitario=valor, origem_tarifa=origem,
+		))
+
+	# ── Linhas Adicionais (arma, rádio, viatura…) ── the contract's own, else its
+	# customer's, valid in the billed month. Only contracts billing something get
+	# them: Fixa needs a billed line; Vigilantes / Postos count the active guards
+	# (per posto for Por Posto customers on Vigilantes Activos).
+	tabelas = tabelas_adicionais(list(metodo), cliente_de.values())
+	desc_adicional = {}
+	if tabelas:
+		mes_ref = getdate(mes or nowdate())
+		faturados = {l["project"] for l in linhas + pendentes
+			if l["quantidade"] and flt(l["valor_unitario"])}
+		com_adicionais = {}
+		for proj in metodo:
+			if cliente_de.get(proj) and estado_de.get(proj) not in ("Completed", "Cancelled"):
+				ads = adicionais_do_contrato(tabelas, proj, cliente_de[proj], mes_ref)
+				if ads:
+					com_adicionais[proj] = ads
+		rows_de = {}
+		for r in (_activos_por_posto(list(com_adicionais)) if com_adicionais else []):
+			rows_de.setdefault(r.project, []).append(r)
+		for proj, ads in com_adicionais.items():
+			separar = por_posto(proj) and metodo[proj] == "Vigilantes Activos"
+			tipo_de = {r.posto: r.tipo_posto for r in rows_de.get(proj, [])}
+			for ref, ad in ads:
+				desc_adicional[(proj, ref)] = ad.descricao
+				contagem = {}
+				if ad.contar_por == ADICIONAL_FIXA:
+					if proj in faturados:
+						contagem[None] = cint(ad.quantidade)
+				else:
+					for r in rows_de.get(proj, []):
+						if ad.contar_por == ADICIONAL_VIGILANTES and (
+								(ad.categoria and r.categoria != ad.categoria)
+								or (ad.regime and r.regime != ad.regime)):
+							continue
+						posto = r.posto if separar else None
+						if ad.contar_por == ADICIONAL_POSTOS:
+							contagem.setdefault(posto, set()).add(r.posto)
+						else:
+							contagem[posto] = contagem.get(posto, 0) + cint(r.qtd)
+				for posto, q in contagem.items():
+					q = len(q) if isinstance(q, set) else q
+					if not q:
+						continue
+					(pendentes if posto else linhas).append(dict(
+						project=proj, regime="", categoria="", posto=posto,
+						tipo_posto=tipo_de.get(posto, "") if posto else "",
+						metodo="Adicional", quantidade=q, vigilantes=0,
+						faturar_por=pf(proj).faturar_por, quantidade_contratada=0,
+						valor_unitario=flt(ad.valor),
+						origem_tarifa="Contrato" if ref.startswith("P") else "Cliente",
+						adicional=1, artigo=ad.artigo or "", composicao=f"@{ref}:{q}",
+					))
+
+	# 'Por Posto (uma linha)': each posto's priced lines (regimes + extras) become ONE
+	# line, billed 1 x the posto's total, its make-up in the text and in `composicao`
+	# (machine-readable, re-priced by the stale-preview check). An unpriced part
+	# stays its own line so it is still flagged 'sem tarifa', never hidden.
+	juntas = {}
+	for l in pendentes:
+		if not (l["posto"] and uma_linha(l["project"]) and l["quantidade"] and flt(l["valor_unitario"])):
+			linhas.append(l)
+			continue
+		juntas.setdefault((l["project"], l["posto"]), []).append(l)
+	for (proj, posto), partes in juntas.items():
+		partes.sort(key=lambda x: (x.get("adicional") or 0, x["regime"], x["categoria"],
+			x.get("composicao") or ""))
+		servico = [x for x in partes if not x.get("adicional")]
+		origens = {x["origem_tarifa"] for x in partes}
+		temp = any(x["tipo_posto"] == "Temporário" for x in partes)
+		linhas.append(dict(
+			project=proj, regime="", categoria="", posto=posto,
+			tipo_posto="Temporário" if temp else partes[0]["tipo_posto"],
+			metodo="Vigilantes Activos",
+			quantidade=sum(x["quantidade"] for x in servico),
+			vigilantes=sum(x["vigilantes"] for x in servico),
+			faturar_por=partes[0]["faturar_por"],
+			quantidade_contratada=0,
+			valor_unitario=sum(x["quantidade"] * flt(x["valor_unitario"]) for x in partes),
+			origem_tarifa=origens.pop() if len(origens) == 1 else "Contrato + Cliente",
+			linha_unica=1,
+			composicao=",".join(x["composicao"] if x.get("adicional")
+				else f"{x['regime']}:{x['categoria']}:{x['quantidade']}" for x in partes),
 		))
 
 	# ── Line text from the template ──
@@ -516,20 +593,32 @@ def calcular_linhas(cliente=None, mes=None, perfil=None):
 	for l in linhas:
 		proj, cli = l["project"], cliente_de.get(l["project"])
 		if l.get("linha_unica"):
-			partes = [x.split(":") for x in l["composicao"].split(",")]
-			composicao = " + ".join(f"{q} × {reg}" for reg, q in partes)
-			regime_txt = " + ".join(reg for reg, _q in partes)
+			partes = partes_composicao(l["composicao"])
+			composicao = " + ".join(
+				f"{q} × {desc_adicional.get((proj, cat), '') if reg == '@' else rotulo_tarifa(reg, cat, nomes_cat)}"
+				for reg, cat, q in partes)
+			regime_txt = " + ".join(dict.fromkeys(reg for reg, _c, _q in partes if reg != "@"))
+			categoria_txt = " + ".join(dict.fromkeys(nomes_cat.get(c, c) for r, c, _q in partes
+				if c and r != "@"))
 			desc_regime = composicao
 			chave = DETALHE_UMA_LINHA
+		elif l.get("adicional"):
+			desc_regime = desc_adicional.get((proj, partes_composicao(l["composicao"])[0][1]), "")
+			composicao = f"{l['quantidade']} × {desc_regime}"
+			regime_txt = categoria_txt = ""
+			chave = DETALHE_POR_POSTO if l.get("posto") else "Por Contrato"
 		else:
-			composicao = f"{l['quantidade']} × {l['regime']}"
+			cat = l.get("categoria") or ""
+			rotulo = rotulo_tarifa(l["regime"], cat, nomes_cat)
+			composicao = f"{l['quantidade']} × {rotulo}"
 			regime_txt = l["regime"]
-			desc_regime = (tarifa(proj, l["regime"])[2] or "").strip() or l["regime"]
+			categoria_txt = nomes_cat.get(cat, cat)
+			desc_regime = (tarifa(proj, l["regime"], cat)[2] or "").strip() or rotulo
 			chave = DETALHE_POR_POSTO if por_posto(proj) else "Por Contrato"
 		pv = info_posto.get(l.get("posto")) if l.get("posto") else None
 		lista = ", ".join(postos_de.get(proj, []))
 		valores = dict(do_mes,
-			regime=regime_txt, descricao=desc_regime, composicao=composicao,
+			regime=regime_txt, categoria=categoria_txt, descricao=desc_regime, composicao=composicao,
 			quantidade=l["quantidade"], vigilantes=l.get("vigilantes"),
 			nome_financeiro=(pv.nome_financeiro or pv.nome_do_posto) if pv else lista,
 			posto=pv.nome_do_posto if pv else lista,
@@ -543,8 +632,8 @@ def calcular_linhas(cliente=None, mes=None, perfil=None):
 		)
 		l["descricao"] = render(modelo_para(pf(proj), chave), valores)
 
-	linhas.sort(key=lambda l: (cliente_de.get(l["project"]) or "", l["project"],
-		l["regime"], l["tipo_posto"] or "", l["descricao"] or ""))
+	linhas.sort(key=lambda l: (cliente_de.get(l["project"]) or "", l["project"], l.get("adicional") or 0,
+		l["regime"], l.get("categoria") or "", l["tipo_posto"] or "", l["descricao"] or ""))
 	for l in linhas:
 		l["cliente"] = cliente_de.get(l["project"])
 		l["valor_unitario"] = flt(l["valor_unitario"])
@@ -554,10 +643,27 @@ def calcular_linhas(cliente=None, mes=None, perfil=None):
 	return linhas, activos_contratos
 
 
+def partes_composicao(composicao):
+	"""[(regime, categoria, qtd)] of a merged posto line's composicao
+	('H24:Vigilante Armado:1,TDN::2'; older lines: 'H24:1'). An extra line part
+	'@P3:2' comes back as ('@', 'P3', 2)."""
+	out = []
+	for x in (composicao or "").split(","):
+		p = x.split(":")
+		if p[0].startswith("@") and len(p) == 2:
+			out.append(("@", p[0][1:], cint(p[1])))
+		elif len(p) == 2:
+			out.append((p[0], "", cint(p[1])))
+		elif len(p) == 3:
+			out.append((p[0], p[1], cint(p[2])))
+	return out
+
+
 def _activos_por_posto(projectos):
-	"""Activo guards per contract x regime x posto (Cobridor shadows excluded)."""
+	"""Activo guards per contract x regime x categoria x posto (Cobridor shadows excluded)."""
 	return frappe.db.sql("""
 		SELECT v.projecto AS project, v.regime_do_vigilante AS regime,
+		       IFNULL(v.categoria, '') AS categoria,
 		       COALESCE(pv.tipo_de_posto, 'Permanente') AS tipo_posto,
 		       v.posto_de_vigilancia AS posto,
 		       COUNT(*) AS qtd
@@ -567,23 +673,26 @@ def _activos_por_posto(projectos):
 		  AND v.projecto IN %(projectos)s
 		  AND v.regime_do_vigilante IS NOT NULL AND v.regime_do_vigilante != ''
 		  AND (v.cobertura_de_posto_activa IS NULL OR v.cobertura_de_posto_activa = '')
-		GROUP BY v.projecto, v.regime_do_vigilante, COALESCE(pv.tipo_de_posto, 'Permanente'),
-		         v.posto_de_vigilancia
+		GROUP BY v.projecto, v.regime_do_vigilante, IFNULL(v.categoria, ''),
+		         COALESCE(pv.tipo_de_posto, 'Permanente'), v.posto_de_vigilancia
 	""", {"projectos": tuple(projectos)}, as_dict=True)
 
 
 def diferencas_contratuais(linhas):
 	"""Contratual lines whose billed qty differs from the active guards — info only."""
 	out = []
+	nomes = None
 	for l in linhas:
 		if l.get("metodo") != "Contratual":
 			continue
 		q, real = cint(l.get("quantidade")), cint(l.get("quantidade_real"))
 		if q == real:
 			continue
+		if nomes is None:
+			nomes = nomes_faturacao_categorias()
 		unidade = _("serviços") if l.get("faturar_por") == FATURAR_SERVICO else _("vigilantes")
 		out.append(_("{0} / {1}: facturado <b>{2}</b>, activos <b>{3}</b> {4} ({5} {6})").format(
-			l.get("project"), l.get("regime"), q, real, unidade,
+			l.get("project"), rotulo_tarifa(l.get("regime"), l.get("categoria"), nomes), q, real, unidade,
 			_("a mais") if q > real else _("a menos"), abs(q - real)))
 	return out
 
@@ -599,6 +708,7 @@ PAPEIS_FATURACAO = ("System Manager", "SIGOS Manager", "Accounts Manager")
 ITEM_GROUP_FATURACAO = "Services"
 UOM_FATURACAO = "Unit"
 ITEM_POSTO = "VIG-POSTO"
+ITEM_ADICIONAL = "VIG-ADICIONAL"
 
 
 # ─── Pre-flight ──────────────────────────────────────────────────────────────
@@ -635,36 +745,40 @@ def _verificar(doc):
 
 	# ── Stale preview: the lines must still match the contracts ──
 	desactualizadas = []
-	contratado = {}
 	projectos = list({ln.project for ln in doc.linhas if ln.project})
-	if projectos:
-		for f in frappe.get_all("Project Faturacao Regime",
-				filters={"parenttype": "Project", "parent": ["in", projectos]},
-				fields=["parent", "regime", "quantidade", "valor", "descricao"]):
-			contratado[(f.parent, f.regime)] = f
+	contratado = linhas_contratadas(projectos)
 	cliente_actual = {p.name: p.customer for p in frappe.get_all("Project",
 		filters={"name": ["in", projectos or [""]]}, fields=["name", "customer"])}
 	do_cliente = tarifas_dos_clientes(cliente_actual.values())
+	adicionais = tabelas_adicionais(projectos, cliente_actual.values())
+
+	def preco(proj, cli, reg, cat):
+		if reg == "@":   # extra line: cat is its ref (P3 / C3)
+			return flt((adicional_por_ref(adicionais, cat, proj, cli) or {}).get("valor"))
+		return resolver_tarifa(procurar_tarifa(contratado, (proj, reg), cat),
+			procurar_tarifa(do_cliente, (cli, reg), cat))[0]
+
 	for ln in doc.linhas:
 		if not ln.quantidade:
 			continue
 		cli = cliente_actual.get(ln.project)
-		if ln.linha_unica:
-			partes = [x.split(":") for x in (ln.composicao or "").split(",") if ":" in x]
-			valor = sum(cint(q) * resolver_tarifa(contratado.get((ln.project, reg)),
-				do_cliente.get((cli, reg)))[0] for reg, q in partes)
+		if ln.linha_unica or ln.adicional:
+			partes = partes_composicao(ln.composicao)
+			valor = (sum(q * preco(ln.project, cli, reg, cat) for reg, cat, q in partes) if ln.linha_unica
+				else preco(ln.project, cli, "@", partes[0][1] if partes else ""))
 			if flt(valor) != flt(ln.valor_unitario) or cli != ln.cliente:
 				desactualizadas.append(f"{ln.project} / {ln.descricao or ln.posto}")
 			continue
-		c = contratado.get((ln.project, ln.regime))
-		valor = resolver_tarifa(c, do_cliente.get((cli, ln.regime)))[0]
+		cat = ln.get("categoria") or ""
+		c = procurar_tarifa(contratado, (ln.project, ln.regime), cat)
+		valor = resolver_tarifa(c, procurar_tarifa(do_cliente, (cli, ln.regime), cat))[0]
 		mudou = (
 			flt(valor) != flt(ln.valor_unitario)
 			or cliente_actual.get(ln.project) != ln.cliente
 			or (ln.metodo == "Contratual" and (not c or cint(c.quantidade) != cint(ln.quantidade)))
 		)
 		if mudou:
-			desactualizadas.append(f"{ln.project} / {ln.regime}")
+			desactualizadas.append(f"{ln.project} / {rotulo_tarifa(ln.regime, cat)}")
 	if desactualizadas:
 		erros.append(_("O contrato mudou desde a pré-visualização ({0}). Clique em "
 			"<b>Pré-visualizar</b> novamente.").format(", ".join(sorted(set(desactualizadas)))))
@@ -828,12 +942,22 @@ def _fmt_ja_faturados(ja):
 
 
 def codigo_item(ln):
-	"""Item code of a billing line: VIG-<regime>, or VIG-POSTO for a merged posto line."""
-	return ITEM_POSTO if ln.get("linha_unica") else f"VIG-{ln.get('regime')}"
+	"""Item code of a billing line: VIG-<regime>, VIG-POSTO for a merged posto line,
+	an extra line's own Artigo or VIG-ADICIONAL."""
+	if ln.get("linha_unica"):
+		return ITEM_POSTO
+	if ln.get("adicional"):
+		return ln.get("artigo") or ITEM_ADICIONAL
+	return f"VIG-{ln.get('regime')}"
 
 
 def _item_para_linha(ln):
 	"""Get or create the line's Item (see codigo_item)."""
+	if ln.get("adicional"):
+		if ln.get("artigo"):
+			return ln.get("artigo")
+		return _criar_item(ITEM_ADICIONAL, "Serviços Adicionais",
+			"Serviço adicional à vigilância (descrição na linha).")
 	if ln.get("linha_unica"):
 		return _criar_item(ITEM_POSTO, "Vigilância por Posto",
 			"Serviço de vigilância — total mensal do posto (composição na descrição da linha).")

@@ -675,10 +675,13 @@ def _faturar(nome, params):
 @verificacao("sem_tarifa", "faturacao", "Contratos sem tarifa", CRITICO, FIN,
 	"Regimes com vigilantes mas sem preço: não são facturados.")
 def sem_tarifa():
+	from sigos.contrato import nomes_faturacao_categorias, rotulo_tarifa
+	nomes = nomes_faturacao_categorias()
 	grupos = {}
 	for l in _linhas_faturacao():
 		if l["quantidade"] and not l["valor_unitario"]:
-			g = grupos.setdefault((l["project"], l["regime"]), {"cliente": l["cliente"], "n": 0})
+			chave = (l["project"], rotulo_tarifa(l["regime"], l.get("categoria"), nomes))
+			g = grupos.setdefault(chave, {"cliente": l["cliente"], "n": 0})
 			g["n"] += cint(l["quantidade"])
 	return [
 		linha("Project", f"{proj} · {regime}", proj, regime,

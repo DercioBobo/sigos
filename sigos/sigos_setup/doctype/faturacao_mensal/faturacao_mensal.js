@@ -112,12 +112,13 @@ function _render_deck(frm) {
 				dif = `<span class="fat-dif" title="${mais ? __("A facturar mais do que os activos") : __("A facturar menos do que os activos")}">${__("activos")} ${r.quantidade_real || 0}</span>`;
 			}
 			// Per-service customers: billed services, with the guards behind them.
-			const qtd = r.faturar_por === "Serviço"
+			const qtd = r.adicional ? `${r.quantidade || 0} ${__("un.")}`
+				: r.faturar_por === "Serviço"
 				? `${r.quantidade || 0} ${__("serv.")} · ${r.vigilantes || 0} ${__("vig.")}`
 				: `${r.quantidade || 0} ${__("vig.")}`;
 			return `
 			<div class="fat-line">
-				<span class="fat-reg">${r.linha_unica ? __("Posto") : frappe.utils.escape_html(r.regime || "—")}${temp}${contr}</span>
+				<span class="fat-reg">${r.linha_unica ? __("Posto") : r.adicional ? __("Adicional") : frappe.utils.escape_html(r.regime || "—")}${!r.linha_unica && r.categoria ? ` <span class="text-muted">· ${frappe.utils.escape_html(r.categoria)}</span>` : ""}${temp}${contr}</span>
 				<span class="fat-proj" title="${frappe.utils.escape_html(r.project || "")}">${frappe.utils.escape_html(r.descricao || r.project || "")}</span>
 				<span class="fat-q">${qtd}${dif}</span>
 				<span class="fat-u">${fmtC(r.valor_unitario)}${r.origem_tarifa === "Cliente"
