@@ -16,6 +16,7 @@
   "posto_nome",
   "sec_vigilante",
   "vigilante",
+  "nome_do_vigilante",
   "regime",
   "col_te1",
   "turno",
@@ -80,6 +81,14 @@
    "link_filters": "[[\"Vigilante\",\"status\",\"!=\",\"Demitido\"]]"
   },
   {
+   "fieldname": "nome_do_vigilante",
+   "fieldtype": "Data",
+   "label": "Nome do Vigilante",
+   "fetch_from": "vigilante.nome_completo",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
    "fieldname": "regime",
    "fieldtype": "Link",
    "label": "Regime",
@@ -131,7 +140,7 @@
   }
  ],
  "links": [],
- "modified": "2026-06-02 00:00:00.000000",
+ "modified": "2026-11-05 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Security Ops",
  "name": "Turnos Extras",
