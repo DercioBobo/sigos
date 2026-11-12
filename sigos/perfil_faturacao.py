@@ -124,7 +124,13 @@ def resumo_cliente(customer, perfil=None, mes=None):
 	p = perfil_do_cliente(customer, perfil if perfil is not None else None)
 	from sigos.sigos_setup.doctype.faturacao_mensal.faturacao_mensal import calcular_linhas
 	linhas, _activos = calcular_linhas(customer, mes, perfil=perfil)
+	from sigos.contrato import efectivo_dos_contratos
+	contratos = frappe.get_all("Project", filters={"customer": customer,
+		"status": ["not in", ("Completed", "Cancelled")]}, pluck="name")
+	ef = efectivo_dos_contratos(contratos).values()
 	return {
+		"postos_activos": sum(e.postos_activos for e in ef),
+		"vigilantes_activos": sum(e.vigilantes_activos for e in ef),
 		"perfil": p.nome or "",
 		"proprio": p.proprio,
 		"padrao": perfil_padrao() or "",

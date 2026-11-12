@@ -38,7 +38,10 @@ function _resumo_faturacao(frm) {
 			<td style="text-align:right;white-space:nowrap">${format_currency(l.total)}</td>
 		</tr>`).join("");
 		f.$wrapper.html(`<div style="border:1px solid var(--border-color);border-radius:8px;padding:12px 14px;margin-top:4px">
-			<div style="font-weight:600;margin-bottom:6px">${__("Perfil")}: ${nome}${origem}</div>
+			<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+				<span style="font-weight:600">${__("Perfil")}: ${nome}${origem}</span>
+				<span class="text-muted small">${__("{0} postos activos", [m.postos_activos || 0])} · ${__("{0} vigilantes activos", [m.vigilantes_activos || 0])}</span>
+			</div>
 			<ul style="margin:0 0 10px 18px;padding:0;font-size:12.5px">${pontos}</ul>
 			${linhas ? `<div class="text-muted small" style="margin-bottom:4px">${__("Factura deste mês")}</div>
 			<table class="table table-sm table-bordered" style="font-size:12px;margin:0">

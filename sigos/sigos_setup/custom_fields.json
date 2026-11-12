@@ -690,12 +690,21 @@
   "doctype": "Custom Field",
   "dt": "Project",
   "module": "SIGOS Setup",
+  "fieldname": "custom_efectivo_contrato",
+  "fieldtype": "HTML",
+  "label": "Efectivo do Contrato",
+  "insert_after": "custom_sec_faturacao_regimes"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Project",
+  "module": "SIGOS Setup",
   "fieldname": "custom_faturacao_regimes",
   "fieldtype": "Table",
   "options": "Project Faturacao Regime",
   "label": "Regimes e Tarifas",
   "description": "Nº de vigilantes e preço mensal por vigilante, por regime. A tarifa da Faturação Mensal vem sempre daqui.",
-  "insert_after": "custom_sec_faturacao_regimes"
+  "insert_after": "custom_efectivo_contrato"
  },
  {
   "doctype": "Custom Field",
@@ -707,6 +716,17 @@
   "label": "Linhas Adicionais",
   "description": "Outras linhas na factura (arma, rádio, viatura…). Vazio: as do Cliente.",
   "insert_after": "custom_faturacao_regimes"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Project",
+  "module": "SIGOS Setup",
+  "fieldname": "custom_distribuicao_postos",
+  "fieldtype": "Table",
+  "options": "Project Distribuicao Posto",
+  "label": "Distribuição por Posto",
+  "hidden": 1,
+  "insert_after": "custom_linhas_adicionais"
  },
  {
   "doctype": "Custom Field",

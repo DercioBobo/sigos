@@ -11,6 +11,7 @@ def project_validate(doc, method=None):
 	_regimes_unicos(doc, "custom_faturacao_regimes", _("Faturação por Regime"))
 	_regimes_unicos(doc, "custom_regime_rates", _("Salários por Regime"))
 	_validar_adicionais(doc)
+	_validar_distribuicao(doc)
 
 	# A row without its own price uses the customer's (Tarifas por Regime).
 	do_cliente = tarifas_dos_clientes([doc.customer])
@@ -205,3 +206,114 @@ def get_tarifas_cliente(customer):
 	frappe.has_permission("Customer", "read", customer, throw=True)
 	return {f"{regime}|{cat}": flt(r.valor)
 		for (_c, regime, cat), r in tarifas_dos_clientes([customer]).items()}
+
+
+# ─── Contratual per posto ('Distribuir por Posto') ───────────────────────────────
+# The contracted quantity is per regime (+ categoria). A contract may split it over
+# its postos (hidden table custom_distribuicao_postos, edited in the form's modal) so
+# a Por Posto customer billed Contratual gets one line per posto. Whatever is not
+# distributed stays on one contract-level line.
+
+def _validar_distribuicao(doc):
+	linhas = doc.get("custom_distribuicao_postos") or []
+	if not linhas:
+		return
+	contratado = {(r.regime, r.get("categoria") or ""): cint(r.quantidade)
+		for r in doc.get("custom_faturacao_regimes") or [] if r.regime}
+	postos = set(frappe.get_all("Posto De Vigilancia", filters={"project": doc.name}, pluck="name")) 		if not doc.is_new() else set()
+	soma, vistos, manter = {}, set(), []
+	for row in linhas:
+		q = cint(row.quantidade)
+		if q <= 0:
+			continue
+		chave = (row.regime, row.get("categoria") or "")
+		if chave not in contratado:
+			continue   # the regime left the Finance table: its split goes with it
+		if row.posto not in postos:
+			frappe.throw(_("Distribuição por Posto: o posto {0} não pertence a este contrato.").format(
+				row.posto), title=_("Distribuição Inválida"))
+		if (row.posto,) + chave in vistos:
+			frappe.throw(_("Distribuição por Posto: {0} / {1} repetido.").format(
+				row.posto, " ".join(c for c in chave if c)), title=_("Distribuição Inválida"))
+		vistos.add((row.posto,) + chave)
+		soma[chave] = soma.get(chave, 0) + q
+		manter.append(row)
+	for chave, q in soma.items():
+		if q > contratado[chave]:
+			frappe.throw(_("Distribuição por Posto: {0} tem {1} distribuídos mas só {2} contratados.").format(
+				" ".join(c for c in chave if c), q, contratado[chave]), title=_("Distribuição Inválida"))
+	if len(manter) != len(linhas):
+		doc.set("custom_distribuicao_postos", manter)
+
+
+def distribuicao_postos(projectos):
+	"""{(contrato, regime, categoria): {posto: quantidade}}."""
+	projectos = [p for p in set(projectos or []) if p]
+	if not projectos or not frappe.db.table_exists("Project Distribuicao Posto"):
+		return {}
+	out = {}
+	for r in frappe.get_all("Project Distribuicao Posto",
+			filters={"parenttype": "Project", "parentfield": "custom_distribuicao_postos",
+				"parent": ["in", projectos]},
+			fields=["parent", "posto", "regime", "categoria", "quantidade"], order_by="parent, idx"):
+		if cint(r.quantidade) > 0:
+			out.setdefault((r.parent, r.regime, r.categoria or ""), {})[r.posto] = cint(r.quantidade)
+	return out
+
+
+def efectivo_dos_contratos(projectos):
+	"""{contrato: {postos_activos, vigilantes_activos}} — postos Activo (not internal)
+	and billable Activo guards (Cobridor shadows excluded, as in billing)."""
+	from sigos.sigos_setup.doctype.faturacao_mensal.faturacao_mensal import _activos_por_posto
+	projectos = [p for p in set(projectos or []) if p]
+	out = {p: frappe._dict(postos_activos=0, vigilantes_activos=0) for p in projectos}
+	if not projectos:
+		return out
+	for p, n in frappe.db.sql("""SELECT project, COUNT(*) FROM `tabPosto De Vigilancia`
+			WHERE project IN %(p)s AND estado = 'Activo' AND IFNULL(posto_interno, 0) = 0
+			GROUP BY project""", {"p": tuple(projectos)}):
+		out[p].postos_activos = cint(n)
+	for r in _activos_por_posto(projectos):
+		out[r.project].vigilantes_activos += cint(r.qtd)
+	return out
+
+
+@frappe.whitelist()
+def efectivo_contrato(project):
+	"""Contract form strip + 'Distribuir por Posto' modal: the active postos and guards,
+	per posto split by regime + categoria with the quantity they would bill (per
+	service or per guard, as the customer's profile says)."""
+	frappe.has_permission("Project", "read", project, throw=True)
+	from sigos.api import resolver_metodo_faturacao
+	from sigos.perfil_faturacao import perfil_do_cliente
+	from sigos.sigos_setup.doctype.faturacao_mensal.faturacao_mensal import _activos_por_posto
+
+	cliente = frappe.db.get_value("Project", project, "customer")
+	perfil = perfil_do_cliente(cliente)
+	por_regime = vigilantes_por_servico_regimes()
+	distribuidos = {p for d in distribuicao_postos([project]).values() for p in d}
+
+	postos = {}
+	for pv in frappe.get_all("Posto De Vigilancia", filters={"project": project},
+			fields=["name", "nome_do_posto", "nome_financeiro", "estado", "tipo_de_posto", "posto_interno"],
+			order_by="nome_financeiro, nome_do_posto"):
+		if pv.posto_interno or (pv.estado != "Activo" and pv.name not in distribuidos):
+			continue
+		postos[pv.name] = dict(name=pv.name, nome=pv.nome_financeiro or pv.nome_do_posto or pv.name,
+			estado=pv.estado, tipo=pv.tipo_de_posto or "", vigilantes=0, partes=[])
+	for r in _activos_por_posto([project]):
+		p = postos.get(r.posto)
+		if not p:
+			continue
+		p["vigilantes"] += cint(r.qtd)
+		p["partes"].append(dict(regime=r.regime, categoria=r.categoria or "", vigilantes=cint(r.qtd),
+			servicos=servicos(r.qtd, perfil, r.regime, por_regime)))
+
+	ef = efectivo_dos_contratos([project])[project]
+	return dict(
+		postos_activos=ef.postos_activos, vigilantes_activos=ef.vigilantes_activos,
+		metodo=resolver_metodo_faturacao(project),
+		detalhe=perfil.detalhe_fatura, faturar_por=perfil.faturar_por,
+		pode_editar=bool(frappe.has_permission("Project", "write", project)),
+		postos=list(postos.values()),
+	)
