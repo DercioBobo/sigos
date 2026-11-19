@@ -97,6 +97,8 @@
   "payroll_payable_account",
   "tab_ss_fat",
   "perfil_faturacao_padrao",
+  "sec_ss_fat_iva",
+  "modelo_iva",
   "sec_ss_fat_auto",
   "faturacao_automatica",
   "submeter_faturas_automaticas",
@@ -914,6 +916,18 @@
    "description": "Para os clientes sem perfil próprio."
   },
   {
+   "fieldname": "sec_ss_fat_iva",
+   "fieldtype": "Section Break",
+   "label": "IVA"
+  },
+  {
+   "fieldname": "modelo_iva",
+   "fieldtype": "Link",
+   "label": "Modelo de IVA",
+   "options": "Sales Taxes and Charges Template",
+   "description": "Aplicado às facturas SIGOS, excepto clientes isentos."
+  },
+  {
    "fieldname": "sec_ss_fat_auto",
    "fieldtype": "Section Break",
    "label": "Faturação Automática"
@@ -936,7 +950,7 @@
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-10-24 14:00:00.000000",
+ "modified": "2026-11-19 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "SIGOS Setup",
  "name": "SIGOS Settings",

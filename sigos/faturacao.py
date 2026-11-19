@@ -144,6 +144,8 @@ def obter_linhas_contrato(doc, mes_referencia, substituir=1):
 	if si.meta.has_field("custom_total_vigilantes"):
 		si.custom_total_vigilantes = sum(cint(l.get("vigilantes", l["quantidade"])) for l in linhas)
 
+	from sigos.iva import aplicar_iva
+	aplicar_iva(si)
 	si.set_missing_values()
 	si.calculate_taxes_and_totals()
 

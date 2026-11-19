@@ -829,9 +829,20 @@
   "doctype": "Custom Field",
   "dt": "Customer",
   "module": "SIGOS Setup",
+  "fieldname": "custom_isento_iva",
+  "fieldtype": "Check",
+  "default": "0",
+  "label": "Isento de IVA",
+  "description": "As facturas SIGOS deste cliente saem sem IVA.",
+  "insert_after": "custom_perfil_resumo"
+ },
+ {
+  "doctype": "Custom Field",
+  "dt": "Customer",
+  "module": "SIGOS Setup",
   "fieldname": "custom_sec_tarifas_cliente",
   "fieldtype": "Section Break",
-  "insert_after": "custom_perfil_resumo",
+  "insert_after": "custom_isento_iva",
   "label": "Tarifas por Regime"
  },
  {

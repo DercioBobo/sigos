@@ -249,6 +249,8 @@ class FaturacaoMensal(Document):
 
 		if si.meta.has_field("custom_total_vigilantes"):
 			si.custom_total_vigilantes = total_vig
+		from sigos.iva import aplicar_iva
+		aplicar_iva(si)
 		return si
 
 	@frappe.whitelist()
@@ -932,10 +934,10 @@ def _verificar(doc):
 			pass
 
 	# ── Submit-time / content warnings ──
-	if not frappe.db.exists("Sales Taxes and Charges Template",
-			{"company": company, "is_default": 1, "disabled": 0}):
-		avisos.append(_("Sem modelo de impostos (IVA) predefinido para {0} — as facturas "
-			"serão criadas sem IVA.").format(company))
+	from sigos.iva import aviso_sem_iva
+	sem_iva = aviso_sem_iva(company)
+	if sem_iva:
+		avisos.append(sem_iva)
 
 	try:
 		dims = frappe.db.sql("""

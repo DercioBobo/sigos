@@ -1,8 +1,38 @@
 frappe.ui.form.on("SIGOS Settings", {
+	setup(frm) {
+		frm.set_query("modelo_iva", () => ({
+			filters: Object.assign({ disabled: 0 }, frm.doc.empresa_padrao ? { company: frm.doc.empresa_padrao } : {}),
+		}));
+	},
 	refresh(frm) {
 		_botoes_ferias(frm);
+		frm.add_custom_button(__("Criar Modelo de IVA"), () => _criar_modelo_iva(frm), __("Faturação"));
 	},
 });
+
+// IVA: a one-line template (taxa % sobre o total líquido) set as the SIGOS Modelo de IVA.
+function _criar_modelo_iva(frm) {
+	const d = new frappe.ui.Dialog({
+		title: __("Criar Modelo de IVA"),
+		fields: [
+			{ fieldname: "company", fieldtype: "Link", options: "Company", label: __("Empresa"), reqd: 1,
+				default: frm.doc.empresa_padrao || frappe.defaults.get_default("company") },
+			{ fieldname: "taxa", fieldtype: "Percent", label: __("Taxa de IVA"), reqd: 1, default: 16 },
+			{ fieldname: "conta", fieldtype: "Link", options: "Account", label: __("Conta de IVA"), reqd: 1,
+				get_query: () => ({ filters: { company: d.get_value("company"), is_group: 0,
+					root_type: ["in", ["Liability", "Asset"]] } }) },
+		],
+		primary_action_label: __("Criar"),
+		primary_action(v) {
+			frappe.xcall("sigos.iva.criar_modelo_iva", v).then((nome) => {
+				d.hide();
+				frm.reload_doc();
+				frappe.show_alert({ message: __("Modelo de IVA: {0}", [nome]), indicator: "green" }, 5);
+			});
+		},
+	});
+	d.show();
+}
 
 // Botões de migração de saldos iniciais de férias (operação pontual, opcional).
 function _botoes_ferias(frm) {
