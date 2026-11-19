@@ -16,7 +16,6 @@
   "data",
   "horas",
   "data_conhecimento_infracao",
-  "data_conhecimento_vigilante",
   "fora_de_prazo",
   "justificacao_fora_de_prazo",
   "col_break_1",
@@ -107,16 +106,9 @@
   {
    "fieldname": "data_conhecimento_infracao",
    "fieldtype": "Date",
-   "label": "Data de Conhecimento da Infracção",
+   "label": "Data de Conhecimento da Infracção pelo Vigilante",
    "description": "Conta os prazos da participação e do processo.",
    "reqd": 1
-  },
-  {
-   "fieldname": "data_conhecimento_vigilante",
-   "fieldtype": "Date",
-   "label": "Data de Conhecimento da Infracção pelo Vigilante",
-   "allow_on_submit": 1,
-   "description": "Dia em que o infractor tomou conhecimento da participação."
   },
   {
    "fieldname": "fora_de_prazo",

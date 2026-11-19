@@ -111,10 +111,7 @@ function _pt_render(frm) {
 					<div data-pt="c-horas"></div>
 				</div>
 				<div data-pt="c-relato"></div>
-				<div class="pt-conhec-row">
-					<div class="pt-conhec" data-pt="c-data_conhecimento_infracao"></div>
-					<div class="pt-conhec pt-conhec-vig" data-pt="c-data_conhecimento_vigilante"></div>
-				</div>
+				<div class="pt-conhec" data-pt="c-data_conhecimento_infracao"></div>
 				<div class="pt-prazo" data-pt="prazo"></div>
 				<div class="pt-just" data-pt="c-justificacao_fora_de_prazo"></div>
 			</section>
@@ -176,14 +173,9 @@ function _pt_render(frm) {
 		fieldtype: "Date", fieldname: "data", label: __("Data da Infracção"), reqd: 1, max: hoje,
 	});
 	_pt_ctrl(frm, $("c-data_conhecimento_infracao"), {
-		fieldtype: "Date", fieldname: "data_conhecimento_infracao", label: __("Data de Conhecimento da Infracção"),
+		fieldtype: "Date", fieldname: "data_conhecimento_infracao", label: __("Data de Conhecimento da Infracção pelo Vigilante"),
 		reqd: 1, description: __("Conta os prazos da participação e do processo."),
 		min: () => frm.doc.data, max: hoje,
-	});
-	_pt_ctrl(frm, $("c-data_conhecimento_vigilante"), {
-		fieldtype: "Date", fieldname: "data_conhecimento_vigilante",
-		label: __("Data de Conhecimento da Infracção pelo Vigilante"),
-		min: () => frm.doc.data, max: hoje, editavel_submetido: 1,
 	});
 	_pt_ctrl(frm, $("c-justificacao_fora_de_prazo"), {
 		fieldtype: "Small Text", fieldname: "justificacao_fora_de_prazo", label: __("Justificação (Fora de Prazo)"),
@@ -689,9 +681,7 @@ function _pt_css() {
 .pt-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
 .pt-g-baixa { background: #2fa56a; } .pt-g-media { background: var(--pt-amber); } .pt-g-alta { background: var(--pt-red); }
 .pt-outras { margin-top: 8px; max-width: 520px; }
-.pt-conhec-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 340px)); gap: 10px; margin-top: 4px; }
-.pt-conhec-vig { border-left-color: var(--pt-navy) !important; background: #f3f6fa !important; }
-.pt-conhec { margin-top: 0; padding: 6px 10px; border-left: 3px solid var(--pt-amber); background: #fffaf0; border-radius: 6px; }
+.pt-conhec { max-width: 340px; margin-top: 4px; padding: 6px 10px; border-left: 3px solid var(--pt-amber); background: #fffaf0; border-radius: 6px; }
 .pt-prazo { margin: 4px 0; }
 .pt-prazo-chip { display: inline-block; font-size: 12px; padding: 3px 10px; border-radius: 999px; background: #e7f6ee; color: #1f7a4c; }
 .pt-prazo-chip.perto { background: #fff3dd; color: #8a5a00; }
