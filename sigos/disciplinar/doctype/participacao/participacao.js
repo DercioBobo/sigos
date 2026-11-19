@@ -107,11 +107,14 @@ function _pt_render(frm) {
 				<h4><span class="pt-n">4</span>${__("Relatório")}</h4>
 				<div class="pt-row3 pt-row3-rel">
 					<div data-pt="c-posto"></div>
-					<div data-pt="c-horas"></div>
 					<div data-pt="c-data"></div>
+					<div data-pt="c-horas"></div>
 				</div>
 				<div data-pt="c-relato"></div>
-				<div class="pt-conhec" data-pt="c-data_conhecimento_infracao"></div>
+				<div class="pt-conhec-row">
+					<div class="pt-conhec" data-pt="c-data_conhecimento_infracao"></div>
+					<div class="pt-conhec pt-conhec-vig" data-pt="c-data_conhecimento_vigilante"></div>
+				</div>
 				<div class="pt-prazo" data-pt="prazo"></div>
 				<div class="pt-just" data-pt="c-justificacao_fora_de_prazo"></div>
 			</section>
@@ -166,12 +169,21 @@ function _pt_render(frm) {
 	_pt_ctrl(frm, $("c-posto"), {
 		fieldtype: "Link", fieldname: "posto", options: "Posto De Vigilancia", label: __("Posto"),
 	});
+	const hoje = () => frappe.datetime.get_today();
 	_pt_ctrl(frm, $("c-horas"), { fieldtype: "Time", fieldname: "horas", label: __("Horas") },
 		null, (v) => (v ? String(v).slice(0, 5) : v));
-	_pt_ctrl(frm, $("c-data"), { fieldtype: "Date", fieldname: "data", label: __("Data"), reqd: 1 });
+	_pt_ctrl(frm, $("c-data"), {
+		fieldtype: "Date", fieldname: "data", label: __("Data da Infracção"), reqd: 1, max: hoje,
+	});
 	_pt_ctrl(frm, $("c-data_conhecimento_infracao"), {
 		fieldtype: "Date", fieldname: "data_conhecimento_infracao", label: __("Data de Conhecimento da Infracção"),
-		reqd: 1, description: __("Conta o prazo para criar a participação e para abrir o Processo Disciplinar."),
+		reqd: 1, description: __("Conta os prazos da participação e do processo."),
+		min: () => frm.doc.data, max: hoje,
+	});
+	_pt_ctrl(frm, $("c-data_conhecimento_vigilante"), {
+		fieldtype: "Date", fieldname: "data_conhecimento_vigilante",
+		label: __("Data de Conhecimento da Infracção pelo Vigilante"),
+		min: () => frm.doc.data, max: hoje, editavel_submetido: 1,
 	});
 	_pt_ctrl(frm, $("c-justificacao_fora_de_prazo"), {
 		fieldtype: "Small Text", fieldname: "justificacao_fora_de_prazo", label: __("Justificação (Fora de Prazo)"),
@@ -200,6 +212,29 @@ function _pt_ctrl(frm, $parent, df, depois, transformar) {
 	// participação (not cancelled) and is saved straight away ("Update").
 	const pos_submit = df.editavel_submetido && frm.doc.docstatus === 1;
 	const ro = frm.doc.docstatus !== 0 && !pos_submit;
+	// Date/Time: SIGOS picker (sigos_datepicker.js) instead of Frappe's air-datepicker
+	if ((df.fieldtype === "Date" || df.fieldtype === "Time") && sigos.ui && sigos.ui.date_control) {
+		const fab = df.fieldtype === "Date" ? sigos.ui.date_control : sigos.ui.time_control;
+		const c = fab(Object.assign({}, df, {
+			parent: $parent,
+			read_only: ro ? 1 : 0,
+			value: frm.doc[df.fieldname],
+			onchange(v) {
+				if ((v || "") === (frm.doc[df.fieldname] || "")) return;
+				frm.set_value(df.fieldname, v || null).then(() => {
+					if (depois) depois(v);
+					if (pos_submit) {
+						frm.save("Update").then(() => frappe.show_alert({ message: __("Guardado."), indicator: "green" }, 3));
+					}
+					_pt_sync(frm);
+				});
+			},
+		}));
+		frm._pt_ctrl[df.fieldname] = c;
+		return c;
+	}
+	// fallback: never Frappe's Time control - it rejects our stored "HH:MM" ("must be in format")
+	if (df.fieldtype === "Time") df = Object.assign({}, df, { fieldtype: "Data", placeholder: "hh:mm" });
 	const ctrl = frappe.ui.form.make_control({
 		df: Object.assign({}, df, {
 			read_only: ro ? 1 : 0,
@@ -654,7 +689,9 @@ function _pt_css() {
 .pt-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
 .pt-g-baixa { background: #2fa56a; } .pt-g-media { background: var(--pt-amber); } .pt-g-alta { background: var(--pt-red); }
 .pt-outras { margin-top: 8px; max-width: 520px; }
-.pt-conhec { max-width: 320px; margin-top: 4px; padding: 6px 10px; border-left: 3px solid var(--pt-amber); background: #fffaf0; border-radius: 6px; }
+.pt-conhec-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 340px)); gap: 10px; margin-top: 4px; }
+.pt-conhec-vig { border-left-color: var(--pt-navy) !important; background: #f3f6fa !important; }
+.pt-conhec { margin-top: 0; padding: 6px 10px; border-left: 3px solid var(--pt-amber); background: #fffaf0; border-radius: 6px; }
 .pt-prazo { margin: 4px 0; }
 .pt-prazo-chip { display: inline-block; font-size: 12px; padding: 3px 10px; border-radius: 999px; background: #e7f6ee; color: #1f7a4c; }
 .pt-prazo-chip.perto { background: #fff3dd; color: #8a5a00; }

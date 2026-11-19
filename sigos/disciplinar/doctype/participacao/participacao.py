@@ -22,6 +22,7 @@ class Participacao(Document):
 		if not self.registado_por:
 			self.registado_por = frappe.session.user
 		self._validar_conhecimento()
+		self._validar_conhecimento_vigilante()
 		self._sincronizar_infracoes()
 		self._preencher_participante()
 		self._preencher_testemunhas()
@@ -56,9 +57,25 @@ class Participacao(Document):
 		if dc > getdate(today()):
 			frappe.throw(_("A Data de Conhecimento da Infracção não pode ser no futuro."))
 		if self.data and dc < getdate(self.data):
-			frappe.throw(_("A Data de Conhecimento não pode ser anterior à data da ocorrência."))
+			frappe.throw(_("A Data de Conhecimento não pode ser anterior à Data da Infracção."))
 		criada = getdate(self.creation) if self.creation else getdate(today())
 		exigir(self, dc, prazo_participacao(), _("a Participação tem de ser criada"), criada)
+
+	def before_update_after_submit(self):
+		self._validar_conhecimento_vigilante()
+
+	def _validar_conhecimento_vigilante(self):
+		"""Data em que o infractor tomou conhecimento (allow_on_submit — filled when he
+		signs): not in the future, not before the infracção."""
+		if not self.data_conhecimento_vigilante:
+			return
+		from frappe.utils import getdate, today
+
+		dv = getdate(self.data_conhecimento_vigilante)
+		if dv > getdate(today()):
+			frappe.throw(_("A Data de Conhecimento pelo Vigilante não pode ser no futuro."))
+		if self.data and dv < getdate(self.data):
+			frappe.throw(_("A Data de Conhecimento pelo Vigilante não pode ser anterior à Data da Infracção."))
 
 	def _sincronizar_infracoes(self):
 		"""Checklist ↔ principal: an old/API record with only tipo_de_infracao gets it
