@@ -25,7 +25,9 @@ def calendario(regime):
 	{name, regime, data_referencia, sequencia:[{turno, periodo, e_folga}], equipas:{equipa: indice}}"""
 	if not regime:
 		return None
-	cache = frappe.local.__dict__.setdefault("_sigos_cal_equipas", {})
+	cache = getattr(frappe.local, "sigos_cal_equipas", None)
+	if cache is None:
+		cache = frappe.local.sigos_cal_equipas = {}
 	if regime in cache:
 		return cache[regime]
 	nome = frappe.db.get_value("Calendario De Equipas", {"regime": regime, "activo": 1}, "name")
@@ -49,7 +51,7 @@ def calendario(regime):
 
 
 def limpar_cache():
-	frappe.local.__dict__.pop("_sigos_cal_equipas", None)
+	frappe.local.sigos_cal_equipas = {}
 
 
 def indice(cal, equipa, data, ajuste=0):
