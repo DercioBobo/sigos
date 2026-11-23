@@ -89,7 +89,7 @@ function _cal_aplicar(frm) {
 			},
 		});
 		d.fields_dict.b.$wrapper.html(`<div class="cal-ap">
-			<p>${__("Hoje mudam de turno <b>{0}</b> vigilante(s). Dias já editados à mão mantêm-se.", [total])}</p>${corpo}</div>`);
+			<p>${__("Rectificação: <b>{0}</b> vigilante(s) passam hoje para o turno da sua equipa. Dias já editados à mão mantêm-se.", [total])}</p>${corpo}</div>`);
 		d.show();
 	});
 }

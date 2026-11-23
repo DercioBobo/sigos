@@ -71,22 +71,20 @@ def turno_inicial(cal, equipa, ajuste=0):
 
 
 def equipa_do_turno_inicial(cal, turno, ajuste=0):
-	"""Team whose turno_inicial is `turno` — exact, else the nearest phase (None if no teams)."""
+	"""Team whose turno_inicial is `turno`. When none matches exactly (the guard's
+	escala was out of step), the team AT OR JUST BEHIND that position — a
+	rectification: a guard wrongly on 2a Manhã goes to the team on 1a Manhã
+	(user rule, 2026-11-23). None if the turno isn't in the regime."""
 	seq = [s["turno"] for s in cal.sequencia]
 	if turno not in seq:
 		return None
 	alvo, L = seq.index(turno), len(seq)
-	melhor, dist = None, None
-	for eq in sorted(cal.equipas):
-		pos = (cal.equipas[eq] + int(ajuste or 0)) % L
-		d = min((alvo - pos) % L, (pos - alvo) % L)
-		if dist is None or d < dist:
-			melhor, dist = eq, d
-	return melhor
+	return min(sorted(cal.equipas),
+		key=lambda eq: (alvo - (cal.equipas[eq] + int(ajuste or 0))) % L)
 
 
 def equipa_pela_fase(cal, turno_hoje, data, ajuste=0):
-	"""Team doing `turno_hoje` on `data` (nearest phase when none matches exactly)."""
+	"""Team doing `turno_hoje` on `data` (else the team just behind — see above)."""
 	seq = [s["turno"] for s in cal.sequencia]
 	if turno_hoje not in seq:
 		return None
@@ -176,8 +174,8 @@ def planear(esc, cal):
 	  1. a valid team already on the row is kept;
 	  2. escala already on the calendar + a carried turno_inicial (substitute, Vaga,
 	     return…) → the team owning that slot (turno_inicial is the same at every posto);
-	  3. escala moving onto the calendar → the team doing the guard's current turno today
-	     (nearest phase when none matches — that guard's rhythm shifts);
+	  3. escala moving onto the calendar → the team doing the guard's current turno today,
+	     else the team just behind it (rectification: 2a Manhã → the 1a Manhã team);
 	  4. otherwise the team with fewest guards here.
 	Returns [{row, vigilante, equipa, turno_inicial, turno_antes, turno_depois}]."""
 	hoje = getdate(nowdate())
