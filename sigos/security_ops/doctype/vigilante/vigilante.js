@@ -28,6 +28,11 @@ frappe.ui.form.on("Vigilante", {
 		_doente(frm);
 		_suspenso(frm);
 
+		// Histórico — everything that happened with the guard, on its own page
+		if (!frm.is_new()) {
+			frm.add_custom_button(__("Ver Histórico"), () => sigos.historico.abrir(frm.doc.name));
+		}
+
 		// Ver Escala — only for active guards already assigned to a posto
 		if (!frm.is_new() && frm.doc.status === "Activo" && frm.doc.posto_de_vigilancia) {
 			frm.add_custom_button(__("Ver Escala"), () => {

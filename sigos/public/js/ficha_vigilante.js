@@ -152,7 +152,8 @@ frappe.provide("sigos.ficha_vigilante");
 					<div><div class="fv-nome">${esc(id.nome || vigilante)}</div>
 					<div class="fv-meta">${__("Nº")} ${esc(id.mecanografico || "—")} · ${lnk("Vigilante", vigilante, __("abrir ficha"))}</div></div>
 				</div>
-				<button class="btn btn-xs btn-default fv-refresh">${__("Actualizar")}</button>
+				<div><a class="btn btn-xs btn-primary" href="/app/historico-vigilante/${encodeURIComponent(vigilante)}">${__("Ver Histórico Completo")}</a>
+				<button class="btn btn-xs btn-default fv-refresh">${__("Actualizar")}</button></div>
 			</div>
 			${sit ? `<div class="fv-sits">${sit}</div>` : ""}
 			<div class="fv-kpis">${kpis.join("")}</div>

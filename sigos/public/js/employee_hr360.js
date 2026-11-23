@@ -15,6 +15,9 @@ let _rh360_tab = {};        // employee name -> active tab key
 frappe.ui.form.on("Employee", {
 	refresh(frm) {
 		_rh360_setup(frm);
+		if (!frm.is_new() && frm.doc.custom_vigilante) {
+			frm.add_custom_button(__("Ver Histórico"), () => sigos.historico.abrir(frm.doc.custom_vigilante));
+		}
 	},
 });
 

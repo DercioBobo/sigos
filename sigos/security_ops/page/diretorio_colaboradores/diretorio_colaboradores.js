@@ -177,7 +177,6 @@ sigos.DiretorioColaboradores = class DiretorioColaboradores {
 		if (!name) return;
 		this.selected = name;
 		this.activeTab = "faltas";
-		this.historico = null;   // lazy-loaded per employee, see _render_tab_body
 		frappe.set_route("diretorio-colaboradores", name);
 		this.$rows.find(".dc-row").removeClass("is-active");
 		this.$rows.find(`[data-emp="${name}"]`).addClass("is-active");
@@ -265,19 +264,13 @@ sigos.DiretorioColaboradores = class DiretorioColaboradores {
 		if (this.activeTab === "historico") return this._render_tab_historico($b);
 	}
 
-	// Lazy — a guard's full Comment-based history can be sizeable and most profile
-	// views never open this tab, so it's only fetched (and cached per employee)
-	// once the user actually clicks it, unlike the other tabs' data (fetched
-	// eagerly with the rest of the profile in _select).
+	// Same component as the "Histórico do Vigilante" page (sigos.historico), timeline
+	// only — the profile header/KPIs above already cover the summary.
 	_render_tab_historico($b) {
-		if (this.historico) return $b.html(_dc_tab_historico(this.historico));
-		$b.html(`<div class="dc-list-msg">${__("A carregar histórico…")}</div>`);
-		const emp = this.selected;
-		frappe.xcall("sigos.api.get_employee_historico", { employee: emp }).then((hist) => {
-			if (this.selected !== emp) return; // user moved on while this was in flight
-			this.historico = hist;
-			if (this.activeTab === "historico") this.$profile.find("[data-tab-body]").html(_dc_tab_historico(hist));
-		});
+		const vig = this.profileData && this.profileData.vigilante;
+		if (!vig) return $b.html(`<p class="dc-msg">${__("Sem Vigilante (SIGOS) associado — histórico indisponível.")}</p>`);
+		$b.html(`<div class="dc-hist-top"><a class="dc-open-link" href="/app/historico-vigilante/${encodeURIComponent(vig)}">${__("Abrir página completa")} ${_dc_icon_arrow()}</a></div><div data-hist></div>`);
+		sigos.historico.montar($b.find("[data-hist]"), vig, { modo: "embutido" });
 	}
 
 	_run_action(act) {
@@ -319,7 +312,7 @@ sigos.DiretorioColaboradores = class DiretorioColaboradores {
 	_inject_css() {
 		if (document.getElementById("dc-css")) return;
 		const css = `
-/* SIGOS Diretório de Colaboradores - Operations Daylight. ASCII-only. */
+/* SIGOS Diretorio de Colaboradores - Operations Daylight. ASCII-only. */
 .sigos-dc { background:#F4F6FA; }
 .layout-main-section-wrapper:has(.sigos-dc), .page-body:has(.sigos-dc) { background:#F4F6FA; }
 .sigos-dc .page-head, .sigos-dc + .page-head { display:none; }
@@ -443,22 +436,7 @@ sigos.DiretorioColaboradores = class DiretorioColaboradores {
 .dc-field-val { font-family:var(--mono); color:var(--ink); font-feature-settings:"tnum" 1; }
 
 /* history timeline */
-.dc-tl { display:flex; flex-direction:column; }
-.dc-tl-item { display:flex; gap:12px; position:relative; padding-bottom:16px; }
-.dc-tl-item:not(:last-child)::before { content:""; position:absolute; left:4px; top:14px; bottom:-2px; width:1px; background:var(--line2); }
-.dc-tl-dot { width:9px; height:9px; border-radius:50%; margin-top:4px; flex:none; background:var(--ink3); position:relative; z-index:1; }
-.dc-tl-dot-bad { background:var(--bad); }
-.dc-tl-dot-amber { background:var(--amber); }
-.dc-tl-dot-good { background:var(--good); }
-.dc-tl-dot-info { background:var(--info); }
-.dc-tl-dot-now { background:var(--accent); box-shadow:0 0 0 3px var(--wash); }
-.dc-tl-body { display:flex; flex-direction:column; gap:2px; min-width:0; }
-.dc-tl-date { font-family:var(--mono); font-size:10px; color:var(--ink3); text-transform:uppercase; letter-spacing:.04em; }
-.dc-tl-txt { font-size:12.5px; color:var(--ink); line-height:1.5; }
-.dc-tl-txt a { color:var(--accent); text-decoration:none; }
-.dc-tl-txt a:hover { text-decoration:underline; }
-.dc-tl-now { padding-top:14px; margin-top:2px; border-top:1px dashed var(--line2); }
-.dc-tl-now .dc-tl-date { color:var(--accentInk); font-weight:700; }
+.dc-hist-top { display:flex; justify-content:flex-end; margin-bottom:10px; }
 
 @media (max-width: 860px) {
   .dc-layout { grid-template-columns:1fr; }
@@ -665,50 +643,4 @@ function _dc_tab_disciplinar(disc) {
 		{ label: __("Infração"), field: "tipo_de_infracao" },
 		{ label: __("Nome"), render: (r) => _dc_link("Participacao", r.name, r.name) },
 	]);
-}
-
-// Full history: every entry sigos.timeline.registar has ever written to this
-// guard's Vigilante (Rotatividade, Ausências, Participação, Processo Disciplinar,
-// Troca De Regime/Categoria, Demissão, Readmissão, Férias, Turnos Extras, Alocação
-// De Material...), oldest first, opened by a synthetic Admissão entry and closed
-// by a live "current status" snapshot — see sigos.api.get_employee_historico.
-function _dc_tab_historico(hist) {
-	if (!hist || !hist.vigilante) return `<p class="dc-msg">${__("Sem Vigilante (SIGOS) associado — histórico indisponível.")}</p>`;
-	const eventos = hist.eventos || [];
-	if (!eventos.length && !hist.actual) return `<p class="dc-msg">${__("Sem histórico registado.")}</p>`;
-
-	const itens = eventos.map((e) => `
-		<div class="dc-tl-item">
-			<span class="dc-tl-dot ${_dc_tl_tone(e.texto)}"></span>
-			<div class="dc-tl-body">
-				<span class="dc-tl-date">${frappe.datetime.str_to_user(e.data)}</span>
-				<span class="dc-tl-txt">${e.texto}</span>
-			</div>
-		</div>`).join("");
-
-	const a = hist.actual;
-	const atualHtml = a ? `
-		<div class="dc-tl-item dc-tl-now">
-			<span class="dc-tl-dot dc-tl-dot-now"></span>
-			<div class="dc-tl-body">
-				<span class="dc-tl-date">${__("Situação Actual")}</span>
-				<span class="dc-tl-txt">
-					<b>${frappe.utils.escape_html(a.status || "—")}</b>
-					${[a.posto, a.regime, a.categoria, a.delegacao, a.cliente].filter(Boolean)
-						.map((v) => frappe.utils.escape_html(v)).join(" · ")}
-				</span>
-			</div>
-		</div>` : "";
-
-	return `<div class="dc-tl">${itens}${atualHtml}</div>`;
-}
-
-function _dc_tl_tone(texto) {
-	const t = (texto || "").toLowerCase();
-	if (t.includes("demiss") || t.includes("demitido")) return "dc-tl-dot-bad";
-	if (t.includes("falta") || t.includes("ausênc") || t.includes("suspens")) return "dc-tl-dot-bad";
-	if (t.includes("participa") || t.includes("processo disciplinar")) return "dc-tl-dot-bad";
-	if (t.includes("reserva")) return "dc-tl-dot-amber";
-	if (t.includes("cobri") || t.includes("substitut") || t.includes("admiss")) return "dc-tl-dot-good";
-	return "dc-tl-dot-info";
 }
