@@ -100,6 +100,29 @@ frappe.provide("sigos.historico");
 				this._topo();
 				if (this.dados) this._side();
 			}).catch(() => this.$r.find('[data-hv="topo"]').html(""));
+			frappe.xcall("sigos.historico.hoje_vigilante", { vigilante: this.vig }).then((h) => {
+				this.hoje = h;
+				if (this.dossie) this._topo();
+			}).catch(() => {});
+		}
+
+		// "Hoje" chip: today's turno(s) from the active escala, or folga / sem escala.
+		_chipHoje() {
+			const h = this.hoje;
+			if (!h) return "";
+			const trab = (h.turnos || []).filter((t) => !t.e_folga);
+			let txt, tom = "";
+			if (trab.length) {
+				txt = trab.map((t) => [t.turno, t.periodo && t.periodo !== t.turno ? t.periodo : null, t.nome_do_posto || t.posto]
+					.filter(Boolean).join(" · ")).join(" + ");
+				tom = "on";
+			} else if ((h.turnos || []).length) {
+				txt = __("Folga");
+			} else {
+				txt = __("Sem escala");
+			}
+			const aus = h.ausencia ? ` <span class="hv-hoje-aus">${esc(h.ausencia.tipo || __("Ausência"))}</span>` : "";
+			return `<span class="hv-meta hv-hoje ${tom} ${h.ausencia ? "aus" : ""}"><i>${__("Hoje")}</i><b>${esc(txt)}</b>${aus}</span>`;
 		}
 
 		// ─── header + KPIs (page mode) ────────────────────────────────────
@@ -127,7 +150,10 @@ frappe.provide("sigos.historico");
 				kpi("assiduidade", __("Faltas este mês"), `${a.mes_atual || 0}${pill}`, __("{0} no mês anterior", [a.mes_anterior || 0]),
 					(a.mes_atual || 0) >= 3 ? "bad" : ""),
 				kpi("assiduidade", __("Faltas 12 meses"), a.doze_meses || 0,
-					__("{0} dia(s) · {1} justificada(s)", [a.dias_com_falta_12m || 0, a.justificadas_12m || 0])),
+					[__("{0} justificada(s)", [a.justificadas_12m || 0]),
+				 a.pendentes_12m ? __("{0} em aprovação", [a.pendentes_12m]) : "",
+				 __("{0} por justificar", [Math.max((a.doze_meses || 0) - (a.justificadas_12m || 0) - (a.pendentes_12m || 0), 0)])]
+					.filter(Boolean).join(" · ")),
 				kpi("assiduidade", __("Saldo de férias"), `${Math.round(ferias * 10) / 10}<small> ${__("dias")}</small>`,
 					(d.ferias || []).map((f) => esc(f.leave_type)).join(", ")),
 				kpi("disciplinar", __("Participações 12m"), di.participacoes_12m || 0,
@@ -161,6 +187,7 @@ frappe.provide("sigos.historico");
 							${id.data_admissao ? ` · ${__("admitido a {0}", [dt(id.data_admissao)])} (${antTxt})` : ""}
 						</div>
 						<div class="hv-head-l3">
+							${this._chipHoje()}
 							${chip(po.anterior ? __("Posto (anterior)") : __("Posto"), po.nome_do_posto || po.posto)}
 							${chip(__("Regime"), po.regime)}
 							${chip(__("Categoria"), id.categoria)}
@@ -280,9 +307,9 @@ frappe.provide("sigos.historico");
 			$f.off("click.hv").on("click.hv", "[data-abrir]", (e) => {
 				const k = $(e.currentTarget).attr("data-abrir");
 				this.abertos.has(k) ? this.abertos.delete(k) : this.abertos.add(k);
-				const $ev = $(e.currentTarget).closest(".hv-ev").toggleClass("aberto", this.abertos.has(k));
-				if (this.abertos.has(k)) this._doc($ev);
+				$(e.currentTarget).closest(".hv-ev").toggleClass("aberto", this.abertos.has(k));
 			});
+			$f.on("click.hv", ".hv-ev-det", (e) => $(e.currentTarget).toggleClass("solto"));
 		}
 
 		_evento(e, key) {
@@ -297,41 +324,23 @@ frappe.provide("sigos.historico");
 				: (e.valor != null && e.tipo === "faltas" ? `<span class="hv-valor hv-valor-f ${e.tom ? "hv-t-" + e.tom : ""}">${e.valor}<small>${__("faltas")}</small></span>` : "");
 			const itens = (e.itens || []);
 			const temDoc = !!(e.doctype && e.name);
-			const temMais = itens.length || (e.detalhe && e.detalhe.length > 0) || temDoc;
 			return `<li class="hv-ev ${e.cancelado ? "canc" : ""} ${e.rascunho ? "rasc" : ""} ${aberto ? "aberto" : ""} ${e.tom ? "hv-t-" + e.tom : ""}">
 				<div class="hv-ev-dia"><b>${d.getDate()}</b><span>${DIAS[d.getDay()]}</span></div>
 				<div class="hv-ev-no hv-c-${e.cat}">${ico(e.cat, "hv-ico-s")}</div>
 				<div class="hv-ev-card">
 					<div class="hv-ev-l1">${titulo}${estado}${valor}</div>
 					${e.sub ? `<div class="hv-ev-sub">${esc(e.sub)}</div>` : ""}
-					${e.detalhe ? `<div class="hv-ev-det">${esc(e.detalhe)}</div>` : ""}
-					${itens.length ? `<ul class="hv-itens">${itens.map((i) => `<li>
-						<span class="hv-mono">${dt(i.data)}</span>
-						<span class="${i.tom ? "hv-t-" + i.tom : ""}">${esc(i.texto)}</span>
-						${i.estado ? `<span class="hv-pill hv-pill-neutral">${esc(i.estado)}</span>` : ""}
-						${i.doctype && i.name ? `<a href="${url(i.doctype, i.name)}" class="hv-mono">${esc(i.name)}</a>` : ""}
-					</li>`).join("")}</ul>` : ""}
-					${temDoc ? `<div class="hv-doc" data-dt="${esc(e.doctype)}" data-dn="${esc(e.name)}"></div>` : ""}
+					${e.detalhe ? `<div class="hv-ev-det" title="${__("Clique para expandir")}">${esc(e.detalhe)}</div>` : ""}
+					${(e.resumo || []).length ? `<div class="hv-resumo">${e.resumo.map((r) =>
+						`<span class="hv-res hv-res-${r.tom}"><b>${r.n}</b> ${esc(r.label)}</span>`).join("")}</div>` : ""}
+					${itens.length ? `<ul class="hv-itens">${itens.map(itemHtml).join("")}</ul>` : ""}
 					<div class="hv-ev-foot">
-						${temDoc ? `<a class="hv-mono hv-ev-ref" href="${url(e.doctype, e.name)}" title="${__("Abrir documento")}">${esc(e.name)} &#8599;</a>` : ""}
-						${temMais ? `<button class="hv-mais" data-abrir="${esc(k)}"><span class="a">${itens.length ? __("Ver {0} registo(s)", [itens.length]) : __("Ver detalhe")}</span><span class="f">${__("Fechar")}</span></button>` : ""}
+						${temDoc ? `<a class="hv-mono hv-ev-ref" href="${url(e.doctype, e.name)}" target="_blank" rel="noopener" title="${__("Abrir num novo separador")}">${esc(e.name)} &#8599;</a>` : ""}
+						${itens.length ? `<button class="hv-mais" data-abrir="${esc(k)}"><span class="a">${__("Ver {0} registo(s)", [itens.length])}</span><span class="f">${__("Fechar")}</span></button>` : ""}
+						${temDoc ? `<a class="hv-mais hv-mais-doc" href="${url(e.doctype, e.name)}" target="_blank" rel="noopener">${__("Ver detalhe")} &#8599;</a>` : ""}
 					</div>
 				</div>
 			</li>`;
-		}
-
-		// Inline document detail (sigos.historico.detalhe_documento), cached per doc.
-		_doc($ev) {
-			const $d = $ev.find(".hv-doc");
-			if (!$d.length || $d.data("ok")) return;
-			const dtp = $d.attr("data-dt"), dn = $d.attr("data-dn"), chave = `${dtp}|${dn}`;
-			this.docs = this.docs || {};
-			const desenhar = (x) => { $d.data("ok", 1).html(docHtml(x)); };
-			if (this.docs[chave]) return desenhar(this.docs[chave]);
-			$d.html(`<div class="hv-doc-load">${__("A carregar documento…")}</div>`);
-			frappe.xcall("sigos.historico.detalhe_documento", { doctype: dtp, name: dn })
-				.then((x) => { this.docs[chave] = x; desenhar(x); })
-				.catch(() => $d.html(`<div class="hv-doc-load">${__("Sem permissão para ver este documento.")}</div>`));
 		}
 
 		// ─── side summary (page mode) ─────────────────────────────────────
@@ -399,22 +408,23 @@ frappe.provide("sigos.historico");
 		}
 	}
 
-	function docHtml(x) {
-		const campo = (c) => {
-			let v = esc(c.valor);
-			if (c.link) v = `<a href="${url(c.link.doctype, c.link.name)}">${v}</a>`;
-			else if (c.ficheiro) v = `<a href="${esc(c.ficheiro)}" target="_blank">${__("Ver anexo")}</a>`;
-			return `<div class="hv-f ${c.longo ? "hv-f-longo" : ""}"><span>${esc(c.label)}</span><b>${v}</b></div>`;
-		};
-		const secs = (x.seccoes || []).map((s) => `
-			${s.label ? `<div class="hv-doc-sec">${esc(s.label)}</div>` : ""}
-			<div class="hv-doc-grid">${s.campos.map(campo).join("")}</div>`).join("");
-		const tabs = (x.tabelas || []).map((t) => `
-			<div class="hv-doc-sec">${esc(t.label)}</div>
-			<div class="hv-doc-tw"><table class="hv-doc-t"><thead><tr>${t.colunas.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead>
-			<tbody>${t.linhas.map((l) => `<tr>${l.map((v) => `<td>${esc(v)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>
-			${t.mais ? `<div class="hv-nota">${__("+ {0} linha(s)", [t.mais])}</div>` : ""}`).join("");
-		return (secs + tabs) || `<div class="hv-doc-load">${__("Sem dados adicionais.")}</div>`;
+	// One line of an event's "Ver N registo(s)" list, as a small card. Links open in a new tab.
+	function itemHtml(i) {
+		const d = frappe.datetime.str_to_obj(i.data);
+		const ln = (dtp, dn, lbl) => `<a class="hv-it-ln" href="${url(dtp, dn)}" target="_blank" rel="noopener">${esc(lbl || dn)} &#8599;</a>`;
+		const links = [i.doctype && i.name ? ln(i.doctype, i.name) : "", ...(i.links || []).map((l) => ln(l.doctype, l.name, l.label))]
+			.filter(Boolean).join("");
+		return `<li class="hv-it ${i.tom ? "hv-t-" + i.tom : ""} ${i.estado_tom ? "hv-it-" + i.estado_tom : ""}">
+			<div class="hv-it-dia"><b>${d.getDate()}</b><span>${DIAS[d.getDay()]}</span></div>
+			<div class="hv-it-c">
+				<div class="hv-it-l1"><span class="hv-it-t">${esc(i.titulo || i.texto || "")}</span>
+					${i.valor != null ? `<span class="hv-it-n">${i.valor} ${__("falta(s)")}</span>` : ""}
+					${i.estado ? `<span class="hv-pill hv-pill-${i.estado_tom || "neutral"}">${esc(i.estado)}</span>` : ""}</div>
+				${(i.meta || []).length ? `<div class="hv-it-meta">${i.meta.map((m) => `<span>${esc(m)}</span>`).join("")}</div>` : ""}
+				${i.nota ? `<div class="hv-it-nota">${esc(i.nota)}</div>` : ""}
+			</div>
+			<div class="hv-it-ls">${links}</div>
+		</li>`;
 	}
 
 	function tomStatus(s) {
@@ -465,6 +475,10 @@ frappe.provide("sigos.historico");
 .hv-meta { display:inline-flex; gap:6px; align-items:baseline; background:var(--paper3); border-radius:9px; padding:5px 10px; }
 .hv-meta i { font-style:normal; color:var(--ink3); font-size:11px; text-transform:uppercase; letter-spacing:.04em; }
 .hv-meta b { font-weight:600; color:var(--ink); }
+.hv-hoje { background:var(--wash); box-shadow:inset 0 0 0 1px var(--accentLine, rgba(79,70,229,.25)); }
+.hv-hoje i { color:var(--accentInk); }
+.hv-hoje.aus { background:rgba(220,38,38,.08); box-shadow:inset 0 0 0 1px rgba(220,38,38,.25); }
+.hv-hoje-aus { font-size:11px; font-weight:600; color:#B91C1C; background:rgba(220,38,38,.12); border-radius:99px; padding:1px 8px; }
 .hv-status, .hv-chip { font-size:11.5px; font-weight:600; padding:3px 10px; border-radius:99px; background:var(--paper3); color:var(--graphite); }
 .hv-status.hv-st-good { background:rgba(22,163,74,.12); color:#15803D; } .hv-status.hv-st-bad { background:rgba(229,72,77,.12); color:#C93338; }
 .hv-status.hv-st-amber, .hv-chip-amber { background:rgba(245,158,11,.15); color:#B45309; }
@@ -549,33 +563,37 @@ frappe.provide("sigos.historico");
 .hv-ev-t { font-weight:600; font-size:13.5px; color:var(--ink) !important; text-decoration:none !important; }
 a.hv-ev-t:hover { color:var(--accentInk) !important; }
 .hv-ev-sub { color:var(--ink2); margin-top:2px; font-size:12.5px; }
-.hv-ev-det { display:none; margin-top:8px; padding:8px 10px; background:var(--paper3); border-radius:10px; color:var(--ink2); white-space:pre-wrap; font-size:12.5px; }
-.hv-itens { display:none; list-style:none; margin:8px 0 0; padding:0; border-top:1px dashed var(--line2); }
-.hv-itens li { display:flex; gap:10px; align-items:center; padding:5px 0; border-bottom:1px solid var(--line); font-size:12.5px; color:var(--ink2); }
-.hv-itens li:last-child { border-bottom:0; }
-.hv-itens li a { margin-left:auto; color:var(--accentInk); }
-.hv-ev.aberto .hv-ev-det, .hv-ev.aberto .hv-itens, .hv-print-all .hv-ev-det, .hv-print-all .hv-itens { display:block; }
-.hv-ev.aberto .hv-itens li, .hv-print-all .hv-itens li { display:flex; }
+.hv-ev-det { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; cursor:pointer; margin-top:8px; padding:8px 10px; background:var(--paper3); border-radius:10px; color:var(--ink2); white-space:pre-wrap; font-size:12.5px; }
+.hv-itens { display:none; list-style:none; margin:10px 0 0; padding:0; }
+.hv-ev-det.solto, .hv-print-all .hv-ev-det { display:block; }
+.hv-ev.aberto .hv-itens, .hv-print-all .hv-itens { display:block; }
+.hv-it { display:flex; gap:12px; align-items:flex-start; padding:9px 12px; margin-top:6px; background:var(--card); border:1px solid var(--line); border-left:3px solid var(--line2); border-radius:10px; }
+.hv-it.hv-it-good { border-left-color:var(--good); } .hv-it.hv-it-amber { border-left-color:var(--amber); } .hv-it.hv-it-bad { border-left-color:var(--bad); }
+.hv-it-dia { width:34px; text-align:center; line-height:1.1; flex:none; }
+.hv-it-dia b { display:block; font-family:"Space Grotesk",sans-serif; font-size:16px; color:var(--ink); }
+.hv-it-dia span { font-size:10.5px; color:var(--ink3); text-transform:uppercase; }
+.hv-it-c { flex:1; min-width:0; }
+.hv-it-l1 { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.hv-it-t { font-weight:600; color:var(--ink); font-size:13px; }
+.hv-it.hv-t-bad .hv-it-t { color:#C93338; }
+.hv-it-n { font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--ink2); }
+.hv-it-meta { display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
+.hv-it-meta span { font-size:11.5px; color:var(--ink2); background:var(--paper3); border-radius:6px; padding:1px 7px; }
+.hv-it-nota { margin-top:4px; font-size:12px; color:var(--ink3); font-style:italic; }
+.hv-it-ls { display:flex; flex-direction:column; align-items:flex-end; gap:3px; flex:none; }
+.hv-it-ln { font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--accentInk) !important; text-decoration:none !important; }
+.hv-it-ln:hover { text-decoration:underline !important; }
+.hv-resumo { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+.hv-res { font-size:12px; padding:3px 10px; border-radius:99px; background:var(--paper3); color:var(--ink2); }
+.hv-res b { font-family:"Space Grotesk",sans-serif; font-size:13px; margin-right:2px; }
+.hv-res-good { background:rgba(22,163,74,.12); color:#15803D; } .hv-res-amber { background:rgba(245,158,11,.15); color:#B45309; } .hv-res-bad { background:rgba(229,72,77,.12); color:#C93338; }
 .hv-ev-foot { display:flex; align-items:center; gap:10px; margin-top:6px; }
 .hv-ev-foot:empty { display:none; }
 .hv-ev-ref { color:var(--ink3) !important; font-size:11px; text-decoration:none !important; border-radius:6px; padding:1px 4px; margin-left:-4px; }
 .hv-ev-ref:hover { color:var(--accentInk) !important; background:var(--wash); }
-.hv-doc { display:none; margin-top:10px; border-top:1px dashed var(--line2); padding-top:6px; }
-.hv-ev.aberto .hv-doc { display:block; }
-.hv-doc-load { color:var(--ink3); font-size:12px; padding:8px 0; }
-.hv-doc-sec { color:var(--ink3); text-transform:uppercase; font-size:10.5px; letter-spacing:.05em; font-weight:600; margin:10px 0 6px; }
-.hv-doc-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:8px 18px; }
-.hv-f { display:flex; flex-direction:column; gap:1px; min-width:0; }
-.hv-f span { color:var(--ink3); font-size:11px; }
-.hv-f b { font-weight:500; color:var(--ink); font-size:12.5px; overflow-wrap:anywhere; }
-.hv-f b a { color:var(--accentInk); }
-.hv-f-longo { grid-column:1 / -1; }
-.hv-f-longo b { white-space:pre-wrap; background:var(--paper3); border-radius:8px; padding:6px 9px; color:var(--ink2); }
-.hv-doc-tw { overflow-x:auto; border:1px solid var(--line); border-radius:10px; }
-.hv-doc-t { width:100%; border-collapse:collapse; font-size:12px; }
-.hv-doc-t th { background:var(--paper3); color:var(--ink2); font-weight:600; text-align:left; padding:6px 9px; white-space:nowrap; }
-.hv-doc-t td { padding:6px 9px; border-top:1px solid var(--line); color:var(--ink); }
 .hv-mais { margin-left:auto; border:0; background:transparent; color:var(--accentInk); font-weight:600; font-size:12px; cursor:pointer; padding:0; }
+.hv-mais-doc { text-decoration:none !important; color:var(--accentInk) !important; }
+.hv-mais-doc + .hv-mais-doc, .hv-mais + .hv-mais-doc { margin-left:12px; }
 .hv-mais .f { display:none; } .hv-ev.aberto .hv-mais .a { display:none; } .hv-ev.aberto .hv-mais .f { display:inline; }
 .hv-ev.canc .hv-ev-card { opacity:.55; } .hv-ev.canc .hv-ev-t { text-decoration:line-through !important; }
 .hv-ev.rasc .hv-ev-card { border-style:dashed; }

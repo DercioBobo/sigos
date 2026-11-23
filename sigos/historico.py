@@ -43,6 +43,29 @@ def historico_vigilante(vigilante, de=None, ate=None, incluir_cancelados=0):
 
 
 @frappe.whitelist()
+def hoje_vigilante(vigilante):
+	"""Header chip: the guard's escala today (active escalas) — turno, período, posto,
+	folga — plus an absence already registered for today (submitted Ausências)."""
+	frappe.only_for(PAPEIS_DOSSIE)
+	hoje = getdate(nowdate())
+	turnos = frappe.db.sql("""
+		SELECT te.turno, COALESCE(NULLIF(te.periodo, ''), t.periodo) AS periodo,
+		       COALESCE(t.e_folga, 0) AS e_folga, te.posto, p.nome_do_posto
+		FROM `tabTabela De Escala De Vigilante` te
+		JOIN `tabEscala Do Vigilante` e ON e.name = te.parent AND e.estado = 'Activo'
+		LEFT JOIN `tabTurno` t ON t.name = te.turno
+		LEFT JOIN `tabPosto De Vigilancia` p ON p.name = te.posto
+		WHERE te.vigilante = %(v)s AND te.data = %(d)s
+		ORDER BY t.e_folga, te.turno""", {"v": vigilante, "d": hoje}, as_dict=True)
+	ausencia = frappe.db.sql("""
+		SELECT ta.tipo_de_ausencia AS tipo, a.name AS doc
+		FROM `tabTabela Ausencia` ta JOIN `tabAusencias` a ON a.name = ta.parent
+		WHERE a.docstatus = 1 AND a.data = %(d)s AND ta.vigilante = %(v)s
+		ORDER BY a.creation DESC LIMIT 1""", {"v": vigilante, "d": hoje}, as_dict=True)
+	return {"data": str(hoje), "turnos": turnos, "ausencia": ausencia[0] if ausencia else None}
+
+
+@frappe.whitelist()
 def vigilante_do_employee(employee):
 	frappe.only_for(PAPEIS_DOSSIE)
 	return frappe.db.get_value("Employee", employee, "custom_vigilante")
@@ -81,7 +104,7 @@ class _Historico:
 			order_by=order or f"{campo_data} desc", limit=LIMITE)
 
 	def add(self, cat, tipo, data, titulo, doctype=None, name=None, sub=None, detalhe=None,
-			estado=None, tom=None, valor=None, itens=None, row=None):
+			estado=None, tom=None, valor=None, itens=None, row=None, resumo=None):
 		if not data:
 			return
 		rascunho = cancelado = False
@@ -98,7 +121,7 @@ class _Historico:
 		self.eventos.append({
 			"cat": cat, "tipo": tipo, "data": str(getdate(data)), "titulo": titulo,
 			"sub": sub, "detalhe": detalhe, "estado": estado, "tom": tom,
-			"doctype": doctype, "name": name, "valor": valor, "itens": itens,
+			"doctype": doctype, "name": name, "valor": valor, "itens": itens, "resumo": resumo,
 			"rascunho": rascunho, "cancelado": cancelado,
 		})
 
@@ -244,46 +267,83 @@ class _Historico:
 					l.posto, l.turno), "doctype": "Ausencias", "name": l.ausencia} for l in linhas])
 
 	def _faltas(self):
+		"""Monthly faltas card. "Justificada" = covered by an APPROVED Justificação De
+		Faltas (what payroll takes off); the Ausência's own Tipo de Justificação is only
+		the reason noted at registration and is shown as such."""
 		from sigos.utils import calcular_faltas_detalhado
 		inicio = self.de or getdate(self.v.data_admissao or "2000-01-01")
 		linhas = calcular_faltas_detalhado(self.vig, inicio, self.ate)
+		self.justificacoes = justificacoes_do_vigilante(self.vig)
+		self.faltas_por_justificacao = {}
 		grupos = {}
 		for r in linhas:
 			grupos.setdefault((r["data"].year, r["data"].month), []).append(r)
 		for linhas_mes in grupos.values():
 			ultima = max(l["data"] for l in linhas_mes)
-			faltas = [l for l in linhas_mes if (l.get("tipo_de_ausencia") or "Falta") in ("Falta", "Falta de Reserva", "Abandono de Posto")]
-			ids_faltas = {id(l) for l in faltas}
-			outras = [l for l in linhas_mes if id(l) not in ids_faltas]
-			total = sum(l["n_de_faltas"] or 0 for l in faltas)
-			vermelhas = sum(1 for l in linhas_mes if l.get("subtipo_falta") == "Vermelha")
-			justif = sum(1 for l in linhas_mes if l.get("tipo_justificacao"))
-			tipos = {}
-			for l in outras:
-				tipos[l.get("tipo_de_ausencia")] = tipos.get(l.get("tipo_de_ausencia"), 0) + 1
+			e_falta = lambda l: (l.get("tipo_de_ausencia") or "Falta") in ("Falta", "Falta de Reserva", "Abandono de Posto")
+			total = just = pend = 0
+			vermelhas = 0
+			tipos, itens = {}, []
+			for l in sorted(linhas_mes, key=lambda x: x["data"], reverse=True):
+				falta = e_falta(l)
+				n = l["n_de_faltas"] or 0
+				ok, espera = cobertura_da_falta(l["data"], self.justificacoes) if falta else (None, None)
+				if falta:
+					total += n
+					if ok:
+						just += n
+						self.faltas_por_justificacao.setdefault(ok.name, []).append(l)
+					elif espera:
+						pend += n
+						self.faltas_por_justificacao.setdefault(espera.name, []).append(l)
+				else:
+					tipos[l.get("tipo_de_ausencia")] = tipos.get(l.get("tipo_de_ausencia"), 0) + 1
+				vermelha = l.get("subtipo_falta") == "Vermelha"
+				vermelhas += 1 if vermelha else 0
+				if not falta:
+					pill, ptom = None, None
+				elif ok:
+					pill, ptom = _("Justificada"), "good"
+				elif espera:
+					pill, ptom = _("Justificação pendente"), "amber"
+				else:
+					pill, ptom = _("Por justificar"), "bad"
+				itens.append({
+					"data": str(l["data"]),
+					"titulo": (l.get("tipo_de_ausencia") or _("Falta")) + (" " + _("Vermelha") if vermelha else ""),
+					"valor": n if falta else None,
+					"meta": [x for x in (l.get("turno"), l.get("posto")) if x],
+					"nota": _("Motivo indicado: {0}").format(l["tipo_justificacao"]) if l.get("tipo_justificacao") else None,
+					"estado": pill, "estado_tom": ptom,
+					"doctype": "Ausencias", "name": l.get("ausencia"),
+					"links": [{"doctype": "Justificacao De Faltas", "name": (ok or espera).name}] if (ok or espera) else [],
+					"tom": "bad" if vermelha else None,
+				})
+			por = total - just - pend
 			sub = self._txt(
-				_("{0} falta(s) em {1} dia(s)").format(total, len({l["data"] for l in faltas})) if faltas else None,
+				_("{0} falta(s) em {1} dia(s)").format(total, len({l["data"] for l in linhas_mes if e_falta(l)})) if total else None,
 				_("{0} vermelha(s)").format(vermelhas) if vermelhas else None,
-				_("{0} justificada(s)").format(justif) if justif else None,
 				*[f"{n} {(t or '').lower()}" for t, n in tipos.items()])
 			self.add("assiduidade", "faltas", ultima, _("Ausências — {0}").format(self._mes(ultima)), sub=sub,
-				tom="bad" if total >= 3 or vermelhas else ("amber" if total else None), valor=total,
-				itens=[{"data": str(l["data"]),
-					"texto": self._txt(
-						(l.get("tipo_de_ausencia") or _("Falta")) + (" " + _("Vermelha") if l.get("subtipo_falta") == "Vermelha" else ""),
-						_("{0} falta(s)").format(l["n_de_faltas"]) if id(l) in ids_faltas else None,
-						l.get("posto"), l.get("turno"),
-						_("justificada: {0}").format(l["tipo_justificacao"]) if l.get("tipo_justificacao") else None),
-					"doctype": "Ausencias", "name": l.get("ausencia"),
-					"tom": "bad" if l.get("subtipo_falta") == "Vermelha" else None}
-					for l in sorted(linhas_mes, key=lambda x: x["data"], reverse=True)])
+				tom="bad" if por >= 3 or vermelhas else ("amber" if por else None), valor=total,
+				resumo=[x for x in (
+					{"n": just, "label": _("justificada(s)"), "tom": "good"} if just else None,
+					{"n": pend, "label": _("em aprovação"), "tom": "amber"} if pend else None,
+					{"n": por, "label": _("por justificar"), "tom": "bad"} if por else None,
+				) if x] if total else None,
+				itens=itens)
 
 	def _assiduidade(self):
 		for r in self._docs("Justificacao De Faltas", {"vigilante": self.vig},
 				["dia_de_inicio", "dia_de_fim", "numero", "doenca", "observacoes", "fora_de_prazo",
 				 "justificacao_fora_de_prazo", "dias_de_atraso"], "data_do_justificativo"):
+			cobertas = sorted((getattr(self, "faltas_por_justificacao", {}) or {}).get(r.name, []),
+				key=lambda x: x["data"], reverse=True)
 			self.add("assiduidade", "justificacao", r.data_do_justificativo, _("Justificação de Faltas"),
 				"Justificacao De Faltas", r.name,
+				itens=[{"data": str(l["data"]), "titulo": l.get("tipo_de_ausencia") or _("Falta"),
+					"valor": l["n_de_faltas"], "meta": [x for x in (l.get("turno"), l.get("posto")) if x],
+					"doctype": "Ausencias", "name": l.get("ausencia")} for l in cobertas],
 				sub=self._txt(_("{0} a {1}").format(self._d(r.dia_de_inicio), self._d(r.dia_de_fim)),
 					_("{0} falta(s)").format(r.numero) if r.numero else None, _("doença") if r.doenca else None,
 					_("fora de prazo (+{0} dia(s))").format(r.dias_de_atraso or 0) if r.fora_de_prazo else None),
@@ -442,88 +502,25 @@ def _tom_estado(estado):
 	return None
 
 
-# ─── Inline document detail ("Ver detalhe" on any event) ────────────────────────
-
-_SEM_VALOR = {"Section Break", "Column Break", "Tab Break", "HTML", "Button", "Fold", "Heading", "Image",
-	"Password", "Signature", "Geolocation", "Table", "Table MultiSelect"}
-_IGNORAR = {"naming_series", "amended_from", "owner", "idx"}
-_LIMITE_LINHAS = 30
-
-
-@frappe.whitelist()
-def detalhe_documento(doctype, name):
-	"""Readable summary of any document in the history, so the user doesn't have to
-	leave the page: non-empty fields grouped by section, plus child tables (list-view
-	columns). Respects document AND field-level (permlevel) read permissions."""
-	frappe.only_for(PAPEIS_DOSSIE)
-	doc = frappe.get_doc(doctype, name)
-	doc.check_permission("read")
-	doc.apply_fieldlevel_read_permissions()
-	meta = doc.meta
-
-	seccoes, tabelas, atual = [], [], {"label": None, "campos": []}
-	for df in meta.fields:
-		if df.fieldtype in ("Section Break", "Tab Break"):
-			if atual["campos"]:
-				seccoes.append(atual)
-			atual = {"label": _(df.label) if df.label else None, "campos": []}
-			continue
-		if df.hidden or df.fieldname in _IGNORAR:
-			continue
-		valor = doc.get(df.fieldname)
-		if df.fieldtype == "Table":
-			linhas = valor or []
-			if not linhas:
-				continue
-			tabelas.append(_tabela(df, linhas))
-			continue
-		if df.fieldtype == "Table MultiSelect":
-			linhas = valor or []
-			if linhas:
-				cm = frappe.get_meta(df.options)
-				lf = next((c.fieldname for c in cm.fields if c.fieldtype == "Link"), None)
-				atual["campos"].append({"label": _(df.label), "valor": ", ".join(str(r.get(lf) or "") for r in linhas)})
-			continue
-		if df.fieldtype in _SEM_VALOR or valor in (None, ""):
-			continue
-		if df.fieldtype == "Check":
-			if not valor:
-				continue
-			txt = _("Sim")
-		elif df.fieldtype in ("Currency", "Float", "Int", "Percent") and not flt(valor):
-			continue
-		elif df.fieldtype == "Text Editor":
-			txt = frappe.utils.strip_html(valor).strip()
-		elif df.fieldtype == "Attach":
-			txt = valor
-		else:
-			txt = frappe.format_value(valor, df, doc=doc)
-			txt = frappe.utils.strip_html(str(txt)) if txt is not None else ""
-		if not str(txt).strip():
-			continue
-		item = {"label": _(df.label or df.fieldname), "valor": str(txt),
-			"longo": df.fieldtype in ("Text", "Small Text", "Long Text", "Text Editor", "Code")}
-		if df.fieldtype == "Link" and df.options and valor:
-			item["link"] = {"doctype": df.options, "name": valor}
-		elif df.fieldtype == "Attach":
-			item["ficheiro"] = valor
-		atual["campos"].append(item)
-	if atual["campos"]:
-		seccoes.append(atual)
-
-	estado = _("Cancelado") if doc.docstatus == 2 else (_("Rascunho") if doc.docstatus == 0 and meta.is_submittable else None)
-	return {"doctype": doctype, "name": name, "estado": doc.get("workflow_state") or estado,
-		"seccoes": seccoes, "tabelas": tabelas}
+def justificacoes_do_vigilante(vigilante):
+	"""Every non-cancelled Justificação De Faltas of the guard, flagged `aprovada`
+	(submitted + workflow Aprovado when a workflow exists) — the same rule payroll
+	uses to take faltas off."""
+	tem_wf = frappe.get_meta("Justificacao De Faltas").has_field("workflow_state")
+	campos = ["name", "dia_de_inicio", "dia_de_fim", "data_do_justificativo", "docstatus", "numero"]
+	if tem_wf:
+		campos.append("workflow_state")
+	out = frappe.get_all("Justificacao De Faltas",
+		filters={"vigilante": vigilante, "docstatus": ["<", 2]}, fields=campos, order_by="creation asc")
+	for j in out:
+		j.aprovada = j.docstatus == 1 and (not tem_wf or j.get("workflow_state") == "Aprovado")
+		j.de, j.ate = getdate(j.dia_de_inicio), getdate(j.dia_de_fim)
+	return out
 
 
-def _tabela(df, linhas):
-	cm = frappe.get_meta(df.options)
-	cols = [c for c in cm.fields if c.in_list_view and c.fieldtype not in _SEM_VALOR and not c.hidden][:6]
-	if not cols:
-		cols = [c for c in cm.fields if c.fieldtype not in _SEM_VALOR and not c.hidden][:4]
-	out = []
-	for r in linhas[:_LIMITE_LINHAS]:
-		out.append([frappe.utils.strip_html(str(frappe.format_value(r.get(c.fieldname), c, doc=r) or ""))
-			if r.get(c.fieldname) not in (None, "") else "" for c in cols])
-	return {"label": _(df.label or df.options), "colunas": [_(c.label or c.fieldname) for c in cols], "linhas": out,
-		"mais": max(0, len(linhas) - _LIMITE_LINHAS)}
+def cobertura_da_falta(data, justificacoes):
+	"""(approved, pending) Justificação covering `data` — approved wins; first by creation."""
+	d = getdate(data)
+	ok = next((j for j in justificacoes if j.aprovada and j.de <= d <= j.ate), None)
+	pend = None if ok else next((j for j in justificacoes if not j.aprovada and j.de <= d <= j.ate), None)
+	return ok, pend

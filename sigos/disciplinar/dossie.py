@@ -125,6 +125,23 @@ def _situacao(v):
 	return out
 
 
+def _justificadas(vigilante, detalhe):
+	"""12-month faltas split by an APPROVED / pending Justificação De Faltas covering
+	each day — same rule as payroll and the Histórico cards."""
+	from sigos.historico import cobertura_da_falta, justificacoes_do_vigilante
+	js = justificacoes_do_vigilante(vigilante)
+	ok = pend = 0
+	for r in detalhe:
+		if (r.get("tipo_de_ausencia") or "Falta") not in ("Falta", "Falta de Reserva", "Abandono de Posto"):
+			continue
+		a, p = cobertura_da_falta(r["data"], js)
+		if a:
+			ok += r["n_de_faltas"] or 0
+		elif p:
+			pend += r["n_de_faltas"] or 0
+	return {"justificadas_12m": ok, "pendentes_12m": pend}
+
+
 def _assiduidade(v, hoje):
 	from sigos.utils import calcular_faltas_detalhado, calcular_faltas_vigilante
 
@@ -151,7 +168,7 @@ def _assiduidade(v, hoje):
 		"tres_meses": calcular_faltas_vigilante(v.name, add_months(hoje, -3), hoje),
 		"doze_meses": sum(r["n_de_faltas"] or 0 for r in detalhe),
 		"dias_com_falta_12m": len({getdate(r["data"]) for r in detalhe}),
-		"justificadas_12m": sum(j.numero or 0 for j in justificacoes),
+		**_justificadas(v.name, detalhe),
 		"justificacoes": justificacoes[:8],
 		"recentes": [
 			{"data": r["data"], "turno": r.get("turno"), "posto": r.get("posto"), "tipo": r.get("tipo_de_ausencia"),
