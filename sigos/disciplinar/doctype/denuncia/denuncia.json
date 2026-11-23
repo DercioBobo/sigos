@@ -26,6 +26,7 @@
   "delegacao",
   "data_admissao",
   "fim_periodo_experimental",
+  "data_infracao",
   "sec_mot",
   "infracoes",
   "fundamentacao",
@@ -157,6 +158,13 @@
    "fieldtype": "Date",
    "label": "Fim do Período Experimental",
    "read_only": 1
+  },
+  {
+   "fieldname": "data_infracao",
+   "fieldtype": "Date",
+   "label": "Data da Infracção",
+   "read_only": 1,
+   "depends_on": "participacao"
   },
   {
    "fieldname": "sec_mot",

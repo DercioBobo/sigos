@@ -11,19 +11,13 @@ frappe.ui.form.on("Denuncia", {
 	vigilante: (frm) => _den_periodo(frm),
 });
 
-// Probation window banner: red when the guard is past the 3 months (submit is refused).
+// Only a red banner when the guard is outside the 3 months (submit is refused).
 function _den_periodo(frm) {
 	if (frm.doc.docstatus !== 0 || !frm.doc.vigilante) return;
-	frappe.xcall("sigos.disciplinar.doctype.denuncia.denuncia.elegibilidade", { vigilante: frm.doc.vigilante })
+	frappe.xcall("sigos.disciplinar.doctype.denuncia.denuncia.elegibilidade",
+		{ vigilante: frm.doc.vigilante, data_infracao: (frm.doc.participacao && frm.doc.data_infracao) || null })
 		.then((e) => {
-			if (!e || !e.fim) {
-				frm.dashboard.set_headline_alert(__("O vigilante não tem Data de Admissão."), "red");
-				return;
-			}
-			const ate = frappe.datetime.str_to_user(e.fim);
-			frm.dashboard.set_headline_alert(e.elegivel
-				? __("Período experimental até {0}. Ao submeter, cria a Demissão.", [ate])
-				: __("Fora do período experimental (terminou a {0}) — siga pelo Processo Disciplinar.", [ate]),
-				e.elegivel ? "orange" : "red");
+			if (!e || !e.fim) frm.dashboard.set_headline_alert(__("O vigilante não tem Data de Admissão."), "red");
+			else if (!e.elegivel) frm.dashboard.set_headline_alert(__("Fora dos 3 meses."), "red");
 		});
 }

@@ -618,10 +618,11 @@ function _botao_processo(frm) {
 	}
 	// Denúncia: dismissal without a Processo — only within the probation (3 months).
 	if (frappe.model.can_create("Denuncia") && frm.doc.vigilante) {
-		frappe.xcall("sigos.disciplinar.doctype.denuncia.denuncia.elegibilidade", { vigilante: frm.doc.vigilante })
+		frappe.xcall("sigos.disciplinar.doctype.denuncia.denuncia.elegibilidade",
+			{ vigilante: frm.doc.vigilante, data_infracao: frm.doc.data || null })
 			.then((e) => {
 				if (!e || !e.elegivel) return;
-				frm.add_custom_button(__("Denúncia (Período Experimental)"), () => _pt_denuncia(frm, e), __("Jurista"));
+				frm.add_custom_button(__("Denúncia"), () => _pt_denuncia(frm), __("Jurista"));
 			});
 	}
 	// The Jurista's outcomes: a light Repreensão (record only), a Termo or a Processo.
@@ -761,12 +762,10 @@ function _pt_css() {
 	$(`<style id="sigos-pt-css">${css}</style>`).appendTo("head");
 }
 
-// Denúncia dialog → draft Denúncia, reviewed and submitted on its own form (creates the Demissão).
-function _pt_denuncia(frm, e) {
+// Denúncia dialog → draft Denúncia, submitted on its own form (creates the Demissão).
+function _pt_denuncia(frm) {
 	frappe.prompt(
 		[
-			{ fieldtype: "HTML", options: `<p class="text-danger">${__("Admitido a {0} · período experimental até {1}. Termina sempre em Demissão.",
-				[frappe.datetime.str_to_user(e.admissao), frappe.datetime.str_to_user(e.fim)])}</p>` },
 			{ fieldname: "fundamentacao", fieldtype: "Small Text", label: __("Fundamentação"), reqd: 1 },
 			{ fieldname: "data_de_demissao", fieldtype: "Date", label: __("Data de Efeito"), default: frappe.datetime.get_today(), reqd: 1 },
 			{ fieldname: "uniforme", fieldtype: "Select", label: __("Uniforme"), options: ["", "Entregue", "Não Entregue"] },
@@ -774,7 +773,7 @@ function _pt_denuncia(frm, e) {
 		(v) => frm.call("criar_denuncia", v).then((r) => {
 			if (r.message) frappe.set_route("Form", "Denuncia", r.message);
 		}),
-		__("Denúncia (Período Experimental)"), __("Criar"),
+		__("Denúncia"), __("Criar"),
 	);
 }
 

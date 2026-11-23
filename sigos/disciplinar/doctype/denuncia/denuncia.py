@@ -19,12 +19,20 @@ def periodo_experimental(vigilante):
 	return adm, getdate(add_months(adm, MESES_PERIODO_EXPERIMENTAL))
 
 
+def dentro_do_periodo(adm, fim, data):
+	return bool(fim and data and adm <= getdate(data) <= fim)
+
+
 @frappe.whitelist()
-def elegibilidade(vigilante):
-	"""UI: can this guard still be dismissed by Denúncia?"""
+def elegibilidade(vigilante, data_infracao=None):
+	"""UI: can this guard be dismissed by Denúncia? Today within the probation and,
+	from a Participação, its infraction date (`data_infracao`) within it too."""
 	frappe.has_permission("Vigilante", "read", doc=vigilante, throw=True)
 	adm, fim = periodo_experimental(vigilante)
-	return {"admissao": adm, "fim": fim, "elegivel": bool(fim and getdate(today()) <= fim)}
+	ok = dentro_do_periodo(adm, fim, today())
+	if data_infracao:
+		ok = ok and dentro_do_periodo(adm, fim, data_infracao)
+	return {"admissao": adm, "fim": fim, "elegivel": ok}
 
 
 class Denuncia(Document):
@@ -55,6 +63,8 @@ class Denuncia(Document):
 		if getdate(self.data) > getdate(today()):
 			frappe.throw(_("A Data da Denúncia não pode ser no futuro."))
 		self._exigir_periodo(self.data, _("A Data da Denúncia"))
+		if self.participacao and self.data_infracao:
+			self._exigir_periodo(self.data_infracao, _("A infracção"))
 		if getdate(self.data_de_demissao) < getdate(self.data):
 			frappe.throw(_("A Data de Efeito não pode ser anterior à Data da Denúncia."))
 		self.jurista = self.jurista or frappe.session.user
@@ -67,17 +77,13 @@ class Denuncia(Document):
 			frappe.throw(_("Já existe a Demissão submetida <b>{0}</b> para este vigilante.").format(existente))
 
 	def _exigir_periodo(self, data, o_que):
-		if getdate(data) > self.fim_periodo_experimental:
-			frappe.throw(
-				_("{0} está fora do período experimental: admitido a {1}, terminou a {2} ({3} meses). "
-				  "Siga pela Participação / Processo Disciplinar.").format(
-					o_que, formatdate(self.data_admissao), formatdate(self.fim_periodo_experimental),
-					MESES_PERIODO_EXPERIMENTAL),
-				title=_("Fora do Período Experimental"))
+		if not dentro_do_periodo(getdate(self.data_admissao), getdate(self.fim_periodo_experimental), data):
+			frappe.throw(_("{0} está fora dos 3 meses (admitido a {1}).").format(
+				o_que, formatdate(self.data_admissao)), title=_("Fora dos 3 Meses"))
 
 	def _da_participacao(self):
 		p = frappe.db.get_value("Participacao", self.participacao,
-			["docstatus", "vigilante", "tipo_de_infracao"], as_dict=True)
+			["docstatus", "vigilante", "tipo_de_infracao", "data"], as_dict=True)
 		if not p or p.docstatus != 1:
 			frappe.throw(_("A denúncia parte de uma <b>Participação submetida</b>."))
 		from sigos.disciplinar.desfechos import exigir_livre
@@ -88,6 +94,7 @@ class Denuncia(Document):
 			frappe.throw(_("Esta participação já tem o Processo Disciplinar <b>{0}</b> — a decisão é tomada lá.")
 				.format(pd), title=_("Participação com Processo"))
 		self.vigilante = p.vigilante
+		self.data_infracao = p.data
 		infr = frappe.get_all("Participacao Infracao",
 			filters={"parent": self.participacao, "parenttype": "Participacao"},
 			pluck="tipo_de_infracao", order_by="idx")
