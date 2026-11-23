@@ -16,6 +16,7 @@ frappe.provide("sigos.historico");
 		"Outubro", "Novembro", "Dezembro"];
 	const MES_CURTO = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 	const DIAS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+	const PASSO = 15; // events per page of the timeline
 
 	// category icons (24px stroke paths)
 	const ICON = {
@@ -204,8 +205,11 @@ frappe.provide("sigos.historico");
 				${alertas ? `<div class="hv-alertas">${alertas}</div>` : ""}
 				<div class="hv-kpis">${kpis.join("")}</div>`);
 			this.$r.find('[data-hv="print"]').on("click", () => {
+				const limite = this.limite;
+				this.limite = Infinity; this._feed(true); // print the whole filtered timeline
 				this.$r.addClass("hv-print-all");
 				window.print();
+				this.limite = limite; this._feed(true);
 				setTimeout(() => this.$r.removeClass("hv-print-all"), 500);
 			});
 		}
@@ -282,15 +286,21 @@ frappe.provide("sigos.historico");
 			});
 		}
 
-		_feed() {
+		// Trimmed by default (PASSO events); "Carregar mais" / "Mostrar tudo" at the bottom.
+		// Any filter change re-renders from the first page (manter = keep the current limit).
+		_feed(manter) {
 			const $f = this.$r.find('[data-hv="feed"]');
 			if (!this.dados) return;
-			const ev = this._filtrados();
+			if (!manter || !this.limite) this.limite = PASSO;
+			const todos = this._filtrados();
+			const ev = todos.slice(0, this.limite);
 			if (!ev.length) {
 				$f.html(`<div class="hv-vazio">${ico(this.st.cat, "hv-ico-xl")}<b>${__("Nada a mostrar")}</b>
 					<span>${this.st.busca ? __("Nenhum registo corresponde à pesquisa.") : __("Sem registos nesta categoria e período.")}</span></div>`);
 				return;
 			}
+			const porMes = {};
+			todos.forEach((e) => { const k = e.data.slice(0, 7); porMes[k] = (porMes[k] || 0) + 1; });
 			const meses = [];
 			ev.forEach((e) => {
 				const k = e.data.slice(0, 7);
@@ -300,10 +310,16 @@ frappe.provide("sigos.historico");
 			$f.html(meses.map((m) => {
 				const [a, mm] = m.k.split("-");
 				return `<section class="hv-mes">
-					<header class="hv-mes-h"><span>${MESES[+mm - 1]} <b>${a}</b></span><i>${m.ev.length} ${m.ev.length === 1 ? __("registo") : __("registos")}</i></header>
+					<header class="hv-mes-h"><span>${MESES[+mm - 1]} <b>${a}</b></span><i>${porMes[m.k]} ${porMes[m.k] === 1 ? __("registo") : __("registos")}</i></header>
 					<ol class="hv-tl">${m.ev.map((e, i) => this._evento(e, `${m.k}-${i}`)).join("")}</ol>
 				</section>`;
-			}).join(""));
+			}).join("") + (todos.length > ev.length ? `<div class="hv-mais-feed">
+					<span>${__("A mostrar {0} de {1}", [ev.length, todos.length])}</span>
+					<button class="hv-btn hv-btn-ghost" data-hv="mais">${__("Carregar mais")}</button>
+					<button class="hv-btn hv-btn-ghost" data-hv="tudo">${__("Mostrar tudo")}</button>
+				</div>` : (todos.length > PASSO ? `<div class="hv-mais-feed"><span>${__("Fim do histórico · {0} registos", [todos.length])}</span></div>` : "")));
+			$f.find('[data-hv="mais"]').on("click", () => { this.limite += PASSO; this._feed(true); });
+			$f.find('[data-hv="tudo"]').on("click", () => { this.limite = Infinity; this._feed(true); });
 			$f.off("click.hv").on("click.hv", "[data-abrir]", (e) => {
 				const k = $(e.currentTarget).attr("data-abrir");
 				this.abertos.has(k) ? this.abertos.delete(k) : this.abertos.add(k);
@@ -594,6 +610,8 @@ a.hv-ev-t:hover { color:var(--accentInk) !important; }
 .hv-mais { margin-left:auto; border:0; background:transparent; color:var(--accentInk); font-weight:600; font-size:12px; cursor:pointer; padding:0; }
 .hv-mais-doc { text-decoration:none !important; color:var(--accentInk) !important; }
 .hv-mais-doc + .hv-mais-doc, .hv-mais + .hv-mais-doc { margin-left:12px; }
+.hv-mais-feed { display:flex; align-items:center; justify-content:center; gap:10px; flex-wrap:wrap; margin:6px 0 24px; padding:14px; border:1px dashed var(--line2); border-radius:14px; color:var(--ink3); font-size:12.5px; }
+.hv-print-all .hv-mais-feed { display:none; }
 .hv-mais .f { display:none; } .hv-ev.aberto .hv-mais .a { display:none; } .hv-ev.aberto .hv-mais .f { display:inline; }
 .hv-ev.canc .hv-ev-card { opacity:.55; } .hv-ev.canc .hv-ev-t { text-decoration:line-through !important; }
 .hv-ev.rasc .hv-ev-card { border-style:dashed; }
