@@ -2,6 +2,16 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 
+# Readmission is an HR act: only these roles create, edit or submit it — enforced
+# server-side too, so a site-level permission tweak can't hand it to Operações.
+PAPEIS_READMISSAO = ("System Manager", "SIGOS Manager", "Aprovador RH", "RH Normal")
+
+
+def _exigir_rh():
+	if not set(frappe.get_roles()) & set(PAPEIS_READMISSAO):
+		frappe.throw(_("A Readmissão é feita pela equipa de <b>Recursos Humanos</b>."),
+			title=_("Sem Permissão"), exc=frappe.PermissionError)
+
 
 def _buscar_ultima_demissao(vigilante):
 	return frappe.db.get_value(
@@ -26,7 +36,14 @@ def ultima_demissao(vigilante):
 class Readimissao(Document):
 
 	def validate(self):
+		_exigir_rh()
 		self._preencher_ultima_demissao()
+
+	def before_submit(self):
+		_exigir_rh()
+
+	def before_cancel(self):
+		_exigir_rh()
 
 	def _preencher_ultima_demissao(self):
 		"""Server-side snapshot so the context survives regardless of how the
