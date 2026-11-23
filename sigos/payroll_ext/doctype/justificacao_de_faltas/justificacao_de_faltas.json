@@ -13,6 +13,12 @@
   "col_break_1",
   "vigilante",
   "funcionario",
+  "sec_fora_de_prazo",
+  "justificacao_fora_de_prazo",
+  "col_fora_de_prazo",
+  "fora_de_prazo",
+  "dias_de_atraso",
+  "fora_de_prazo_autorizado_por",
   "sec_faltas",
   "dia_de_inicio",
   "dias_a_justificar",
@@ -66,6 +72,45 @@
    "fetch_from": "vigilante.funcionario",
    "read_only": 1,
    "link_filters": "[[\"Employee\",\"status\",\"!=\",\"Left\"]]"
+  },
+  {
+   "fieldname": "sec_fora_de_prazo",
+   "fieldtype": "Section Break",
+   "label": "Fora de Prazo",
+   "hidden": 1
+  },
+  {
+   "fieldname": "justificacao_fora_de_prazo",
+   "fieldtype": "Small Text",
+   "label": "Motivo (Fora de Prazo)",
+   "description": "Obrigatório fora do prazo. Só RH pode aceitar."
+  },
+  {
+   "fieldname": "col_fora_de_prazo",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "fora_de_prazo",
+   "fieldtype": "Check",
+   "label": "Aceite Fora de Prazo",
+   "read_only": 1,
+   "no_copy": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "dias_de_atraso",
+   "fieldtype": "Int",
+   "label": "Dias Além do Prazo",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "fora_de_prazo_autorizado_por",
+   "fieldtype": "Link",
+   "options": "User",
+   "label": "Autorizado Por",
+   "read_only": 1,
+   "no_copy": 1
   },
   {
    "fieldname": "sec_faltas",
@@ -149,7 +194,7 @@
  ],
  "is_submittable": 1,
  "links": [],
- "modified": "2026-10-24 09:00:00.000000",
+ "modified": "2026-11-23 16:00:00.000000",
  "modified_by": "Administrator",
  "module": "Payroll Ext",
  "name": "Justificacao De Faltas",

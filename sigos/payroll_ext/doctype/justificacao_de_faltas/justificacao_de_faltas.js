@@ -11,15 +11,17 @@ frappe.ui.form.on("Justificacao De Faltas", {
 
 		// The prazo itself is enforced server-side (_validar_prazo reads SIGOS Settings);
 		// here we only surface the configured value so the user knows the rule.
-		frappe.db.get_single_value("SIGOS Settings", "prazo_justificacao_faltas").then(val => {
-			const prazo = cint(val) || 3;
+		frappe.xcall("sigos.payroll_ext.doctype.justificacao_de_faltas.justificacao_de_faltas.regras_prazo").then((r) => {
+			frm._jf_regras = r;
 			frm.set_df_property("data_do_justificativo", "description",
-				__("Prazo: até {0} dia(s) após o Dia de Fim da falta.", [prazo]));
+				__("Prazo: até {0} dia(s) após o Dia de Fim da falta.", [r.prazo]));
+			_jf_prazo(frm);
 		});
 	},
 
 	refresh(frm) {
 		_jf_buscar_faltas(frm, true);
+		_jf_prazo(frm);
 	},
 
 	dia_de_inicio(frm) {
@@ -34,6 +36,7 @@ frappe.ui.form.on("Justificacao De Faltas", {
 
 	dia_de_fim(frm) {
 		_jf_buscar_faltas(frm);
+		_jf_prazo(frm);
 	},
 
 	vigilante(frm) {
@@ -42,8 +45,36 @@ frappe.ui.form.on("Justificacao De Faltas", {
 
 	data_do_justificativo(frm) {
 		_jf_buscar_faltas(frm);
+		_jf_prazo(frm);
 	}
 });
+
+
+// Fora de prazo: RH may still accept it with a mandatory reason (server-enforced in
+// _validar_prazo); here the section appears, the reason becomes required and the
+// user is told what is going on. Abandono de Posto windows are exempt server-side.
+function _jf_prazo(frm) {
+	const r = frm._jf_regras;
+	if (!r) return;
+	const d = frm.doc;
+	const atraso = d.dia_de_fim && d.data_do_justificativo
+		? frappe.datetime.get_diff(d.data_do_justificativo, d.dia_de_fim) - r.prazo : 0;
+	const tarde = atraso > 0;
+	const editavel = d.docstatus === 0;
+	frm.toggle_display("sec_fora_de_prazo", tarde || !!d.fora_de_prazo || !!d.justificacao_fora_de_prazo);
+	frm.toggle_reqd("justificacao_fora_de_prazo", tarde && r.pode_forcar && editavel);
+	frm.set_df_property("justificacao_fora_de_prazo", "read_only", !r.pode_forcar || !editavel ? 1 : 0);
+	frm.dashboard.clear_headline();
+	if (d.fora_de_prazo && !editavel) {
+		frm.dashboard.set_headline_alert(__("Aceite fora de prazo ({0} dia(s) além do prazo) por {1}.",
+			[d.dias_de_atraso || 0, frappe.user.full_name(d.fora_de_prazo_autorizado_por) || "-"]), "orange");
+	} else if (tarde && editavel) {
+		frm.dashboard.set_headline_alert(r.pode_forcar
+			? __("Fora do prazo de {0} dia(s) ({1} dia(s) além). Pode aceitar indicando o motivo.", [r.prazo, atraso])
+			: __("Fora do prazo de {0} dia(s) ({1} dia(s) além). Só o RH pode aceitar.", [r.prazo, atraso]),
+			r.pode_forcar ? "orange" : "red");
+	}
+}
 
 
 function _jf_calcular_fim(frm) {

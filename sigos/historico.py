@@ -280,12 +280,17 @@ class _Historico:
 
 	def _assiduidade(self):
 		for r in self._docs("Justificacao De Faltas", {"vigilante": self.vig},
-				["dia_de_inicio", "dia_de_fim", "numero", "doenca", "observacoes"], "data_do_justificativo"):
+				["dia_de_inicio", "dia_de_fim", "numero", "doenca", "observacoes", "fora_de_prazo",
+				 "justificacao_fora_de_prazo", "dias_de_atraso"], "data_do_justificativo"):
 			self.add("assiduidade", "justificacao", r.data_do_justificativo, _("Justificação de Faltas"),
 				"Justificacao De Faltas", r.name,
 				sub=self._txt(_("{0} a {1}").format(self._d(r.dia_de_inicio), self._d(r.dia_de_fim)),
-					_("{0} falta(s)").format(r.numero) if r.numero else None, _("doença") if r.doenca else None),
-				detalhe=r.observacoes, tom="good" if r.docstatus == 1 else None, row=r)
+					_("{0} falta(s)").format(r.numero) if r.numero else None, _("doença") if r.doenca else None,
+					_("fora de prazo (+{0} dia(s))").format(r.dias_de_atraso or 0) if r.fora_de_prazo else None),
+				detalhe=self._txt(r.observacoes, r.fora_de_prazo and _("Motivo fora de prazo: {0}").format(
+					r.justificacao_fora_de_prazo or "-")),
+				estado=_("Fora de prazo") if r.fora_de_prazo and r.docstatus == 1 else None,
+				tom="amber" if r.fora_de_prazo else ("good" if r.docstatus == 1 else None), row=r)
 		pedidos_la = set()
 		for r in self._docs("Pedido De Licenca", {"vigilante": self.vig},
 				["tipo_de_licenca", "data_inicio", "data_fim", "dias_aprovados", "motivo", "leave_application_ref"],

@@ -9,6 +9,24 @@ MESES_PT = ("Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho",
 	"Agosto", "Setembro", "Outubro", "Novembro", "Dezembro")
 
 
+# RH roles allowed to accept a justification after the deadline (with a reason).
+PAPEIS_FORA_DE_PRAZO = ("System Manager", "SIGOS Manager", "Aprovador RH", "RH Normal")
+
+
+def prazo_justificacao():
+	return cint(frappe.db.get_single_value("SIGOS Settings", "prazo_justificacao_faltas")) or 3
+
+
+def pode_aceitar_fora_de_prazo(user=None):
+	return bool(set(frappe.get_roles(user or frappe.session.user)) & set(PAPEIS_FORA_DE_PRAZO))
+
+
+@frappe.whitelist()
+def regras_prazo():
+	"""Form: the deadline and whether this user may accept late justifications."""
+	return {"prazo": prazo_justificacao(), "pode_forcar": pode_aceitar_fora_de_prazo()}
+
+
 def _outras_justificacoes(vigilante, de, ate, excluir=None):
 	"""Approved justifications of the same guard overlapping [de, ate]."""
 	from sigos.payroll_ext.salary_slip_hooks import _aprovado_filter
@@ -138,27 +156,53 @@ class JustificacaoDeFaltas(Document):
 			and getdate(self.dia_de_fim) <= fim_ep)
 
 	def _validar_prazo(self):
+		"""Deadline (SIGOS Settings prazo_justificacao_faltas, default 3 days after the
+		falta). Late → refused, EXCEPT that RH (PAPEIS_FORA_DE_PRAZO) may accept it with
+		a mandatory reason (e.g. guard hospitalised for months): stamped fora_de_prazo +
+		dias_de_atraso + who authorised it, so it stays tracked (also via track_changes)."""
 		if not self.dia_de_fim or not self.data_do_justificativo:
+			self._limpar_fora_de_prazo()
 			return
 		if self._cobre_abandono():
+			self._limpar_fora_de_prazo()
 			return  # Abandono de Posto episode — proof arrives with the return
 
 		# Single source of truth for the deadline (the form no longer duplicates it).
 		# An unset/0 value falls back to the 3-day default.
-		prazo = cint(frappe.db.get_single_value("SIGOS Settings", "prazo_justificacao_faltas")) or 3
+		prazo = prazo_justificacao()
 
 		diff = date_diff(self.data_do_justificativo, self.dia_de_fim)
-		if diff > prazo:
-			frappe.throw(
-				_("O prazo para justificar faltas é de {0} dias após a falta. "
-				  "A data do justificativo ({1}) está {2} dias depois do fim da falta ({3}).").format(
-					prazo,
-					frappe.format(self.data_do_justificativo, {"fieldtype": "Date"}),
-					diff,
-					frappe.format(self.dia_de_fim, {"fieldtype": "Date"}),
-				),
-				title=_("Prazo Expirado"),
+		if diff <= prazo:
+			self._limpar_fora_de_prazo()
+			return
+
+		msg = _("O prazo para justificar faltas é de {0} dias após a falta. "
+			"A data do justificativo ({1}) está {2} dias depois do fim da falta ({3}).").format(
+				prazo,
+				frappe.format(self.data_do_justificativo, {"fieldtype": "Date"}),
+				diff,
+				frappe.format(self.dia_de_fim, {"fieldtype": "Date"}),
 			)
+		motivo = (self.justificacao_fora_de_prazo or "").strip()
+		antes = self.get_doc_before_save()
+		ja_autorizado = (self.fora_de_prazo and antes and antes.fora_de_prazo
+			and (antes.justificacao_fora_de_prazo or "").strip() == motivo and motivo)
+		if not ja_autorizado:
+			if not pode_aceitar_fora_de_prazo():
+				frappe.throw(msg + "<br><br>" + _("Só o RH pode aceitar uma justificação fora de prazo."),
+					title=_("Prazo Expirado"))
+			if not motivo:
+				frappe.throw(msg + "<br><br>" + _("Para aceitar fora de prazo, preencha o <b>Motivo (Fora de Prazo)</b>."),
+					title=_("Prazo Expirado"))
+			self.fora_de_prazo_autorizado_por = frappe.session.user
+		self.fora_de_prazo = 1
+		self.dias_de_atraso = diff - prazo
+
+	def _limpar_fora_de_prazo(self):
+		if self.fora_de_prazo:
+			self.fora_de_prazo = 0
+			self.dias_de_atraso = 0
+			self.fora_de_prazo_autorizado_por = None
 
 	def _validar_justificativo(self):
 		obrigatorio = frappe.db.get_single_value("SIGOS Settings", "justificativo_faltas_obrigatorio")
