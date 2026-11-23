@@ -7,6 +7,9 @@ from frappe.utils import formatdate
 
 _ORDEM_GRAVIDADE = {"Baixa": 1, "Média": 2, "Alta": 3}
 
+# Who may refuse (Recusar) a submitted participação.
+PAPEIS_RECUSA = ("Jurista", "SIGOS Manager", "System Manager")
+
 
 def _sem_termo(participacao, accao):
 	from sigos.disciplinar.doctype.termo_de_responsabilidade.termo_de_responsabilidade import exigir_sem_termo
@@ -202,6 +205,54 @@ class Participacao(Document):
 			"propor_processo": rep.numero >= lim and not self.processo_disciplinar}
 
 	@frappe.whitelist()
+	def recusar(self, motivo):
+		"""Jurista rejects the participação (unfounded, insufficient…). Final: once
+		refused nothing else (Repreensão, Termo, Denúncia, PD) may follow, and it no
+		longer counts for the accumulation rule. Only while no outcome exists."""
+		frappe.only_for(PAPEIS_RECUSA)
+		motivo = (motivo or "").strip()
+		if self.docstatus != 1:
+			frappe.throw(_("Só uma participação submetida pode ser recusada."))
+		if not motivo:
+			frappe.throw(_("Indique o <b>Motivo da Recusa</b>."), title=_("Recusar Participação"))
+		if self.recusada:
+			frappe.throw(_("Esta participação já foi recusada."))
+		if self.suspensao_desde and not self.suspensao_ate:
+			frappe.throw(_("O vigilante está <b>suspenso preventivamente</b> por esta participação — "
+				"registe o regresso antes de a recusar."), title=_("Suspensão em Curso"))
+		pd = self.processo_disciplinar or frappe.db.get_value(
+			"Processo Disciplinar", {"participacao_referente": self.name, "docstatus": ["<", 2]})
+		desfecho = (pd and (_("Processo Disciplinar"), pd)) \
+			or (self.repreensao and (_("Repreensão"), self.repreensao))
+		if not desfecho:
+			from sigos.disciplinar.desfechos import desfecho_exclusivo
+			desfecho = desfecho_exclusivo(self.name)
+		if desfecho:
+			frappe.throw(_("Esta participação já tem {0} <b>{1}</b> — não pode ser recusada.").format(*desfecho),
+				title=_("Recusar Participação"))
+		self.db_set({"recusada": 1, "motivo_recusa": motivo, "recusada_por": frappe.session.user,
+			"data_recusa": frappe.utils.now_datetime()})
+		self._registar_timeline(_("recusada pelo Jurista"))
+		self._notificar_recusa(motivo)
+		return True
+
+	def _notificar_recusa(self, motivo):
+		"""Bell to whoever filed it. Never blocks the refusal."""
+		try:
+			destino = self.registado_por or self.owner
+			if not destino or destino in ("Administrator", "Guest", frappe.session.user):
+				return
+			frappe.get_doc({
+				"doctype": "Notification Log",
+				"subject": _("Participação {0} recusada pelo Jurista").format(self.name),
+				"email_content": frappe.utils.escape_html(motivo),
+				"for_user": destino, "type": "Alert",
+				"document_type": "Participacao", "document_name": self.name,
+			}).insert(ignore_permissions=True)
+		except Exception as e:
+			frappe.log_error(f"Participacao {self.name}: erro ao notificar recusa: {e}", "SIGOS Participacao")
+
+	@frappe.whitelist()
 	def criar_termo_responsabilidade(self):
 		"""Jurista: draft Termo de Responsabilidade (acknowledgment, not a sanction) with
 		the declaration pre-filled — reviewed, printed and signed before submit.
@@ -320,7 +371,7 @@ class Participacao(Document):
 		)
 
 		def _contar(gravidade):
-			filtros = {"vigilante": self.vigilante, "gravidade": gravidade, "docstatus": 1}
+			filtros = {"vigilante": self.vigilante, "gravidade": gravidade, "docstatus": 1, "recusada": 0}
 			if desde:
 				filtros["creation"] = [">", desde]
 			return frappe.db.count("Participacao", filtros)

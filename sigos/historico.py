@@ -330,21 +330,24 @@ class _Historico:
 	def _disciplinar(self):
 		parts = self._docs("Participacao", {"vigilante": self.vig},
 			["gravidade", "tipo_de_infracao", "relato", "posto_nome", "suspensao_desde", "suspensao_ate",
-			 "suspensao_remuneracao", "processo_disciplinar", "repreensao", "termo_responsabilidade", "denuncia"], "data")
+			 "suspensao_remuneracao", "processo_disciplinar", "repreensao", "termo_responsabilidade", "denuncia", "recusada", "motivo_recusa"], "data")
 		infr = {}
 		for row in frappe.get_all("Participacao Infracao",
 				filters={"parenttype": "Participacao", "parent": ["in", [p.name for p in parts] or [""]]},
 				fields=["parent", "tipo_de_infracao"], order_by="idx"):
 			infr.setdefault(row.parent, []).append(row.tipo_de_infracao)
 		for r in parts:
-			desfecho = (_("Processo {0}").format(r.processo_disciplinar) if r.processo_disciplinar
+			desfecho = (_("Recusada pelo Jurista") if r.recusada
+				else _("Processo {0}").format(r.processo_disciplinar) if r.processo_disciplinar
 				else _("Denúncia") if r.denuncia else _("Termo de Responsabilidade") if r.termo_responsabilidade
 				else _("Repreensão") if r.repreensao else (_("Aguarda Jurista") if r.docstatus == 1 else None))
 			self.add("disciplinar", "participacao", r.data,
 				_("Participação — {0}").format(", ".join(infr.get(r.name) or [r.tipo_de_infracao or ""])),
 				"Participacao", r.name,
 				sub=self._txt(r.gravidade and _("gravidade {0}").format(r.gravidade), r.posto_nome, desfecho),
-				detalhe=(r.relato or "")[:400], tom=_tom_grav(r.gravidade), row=r)
+				detalhe=(_("Motivo da recusa: {0}").format(r.motivo_recusa) if r.recusada else (r.relato or "")[:400]),
+				estado=_("Recusada") if r.recusada else None,
+				tom=None if r.recusada else _tom_grav(r.gravidade), row=r)
 			if r.suspensao_desde and r.docstatus == 1:
 				self.add("disciplinar", "suspensao", r.suspensao_desde, _("Suspensão Preventiva"), "Participacao", r.name,
 					sub=self._txt(_("até {0}").format(self._d(r.suspensao_ate)) if r.suspensao_ate else _("em curso"),

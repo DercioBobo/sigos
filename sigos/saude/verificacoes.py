@@ -308,7 +308,7 @@ def participacao_sem_seguimento():
 	prazo, out = prazo_processo(), []
 	for p in frappe.get_all("Participacao",
 			filters={"docstatus": 1, "processo_disciplinar": ["is", "not set"],
-				"repreensao": ["is", "not set"], "termo_responsabilidade": ["is", "not set"], "denuncia": ["is", "not set"],
+				"repreensao": ["is", "not set"], "termo_responsabilidade": ["is", "not set"], "denuncia": ["is", "not set"], "recusada": 0,
 				"data_conhecimento_infracao": ["is", "set"]},
 			fields=["name", "nome_do_vigilante", "delegacao", "data_conhecimento_infracao"]):
 		e = estado(p.data_conhecimento_infracao, prazo)

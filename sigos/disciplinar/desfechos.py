@@ -1,6 +1,7 @@
 """Exclusive outcomes of a Participação.
 
-A Termo de Responsabilidade (Jurista's, not PD-born) or a Denúncia closes the
+The Jurista's Recusa (final, with a motivo), a Termo de Responsabilidade
+(Jurista's, not PD-born) or a Denúncia closes the
 participação: nothing else (Repreensão, Processo Disciplinar, the other one) may
 follow. Deleting/cancelling the outcome reopens it.
 """
@@ -13,7 +14,9 @@ def desfecho_exclusivo(participacao, excluir=None):
 	"""(label, name) of the participação's exclusive outcome, or None."""
 	if not participacao:
 		return None
-	t = frappe.db.get_value("Termo De Responsabilidade",
+	if frappe.db.get_value("Participacao", participacao, "recusada"):
+		return _("Recusa do Jurista"), participacao
+	t =frappe.db.get_value("Termo De Responsabilidade",
 		{"participacao": participacao, "processo_disciplinar": ["is", "not set"],
 		 "docstatus": ["<", 2], "name": ["!=", excluir or ""]})
 	if t:

@@ -331,7 +331,7 @@ function _pt_prazo(frm) {
 	const dc = frm.doc.data_conhecimento_infracao;
 	if (!p || !dc || frm.doc.docstatus === 2) { $c.html(""); $j.toggle(!!frm.doc.justificacao_fora_de_prazo); return; }
 	const submetida = frm.doc.docstatus === 1;
-	if (submetida && (frm.doc.processo_disciplinar || frm.doc.repreensao || frm.doc.termo_responsabilidade || frm.doc.denuncia)) {
+	if (submetida && (frm.doc.processo_disciplinar || frm.doc.repreensao || frm.doc.termo_responsabilidade || frm.doc.denuncia || frm.doc.recusada)) {
 		$c.html(""); $j.toggle(!!frm.doc.justificacao_fora_de_prazo); return;
 	}
 	const prazo = submetida ? p.processo : p.participacao;
@@ -575,6 +575,13 @@ function _botao_processo(frm) {
 	if (frm.doc.docstatus !== 1) return;
 	const abrir_pd = (nome) => frappe.set_route("Form", "Processo Disciplinar", nome);
 
+	if (frm.doc.recusada) {
+		// the Jurista's refusal is final: nothing else from here
+		frm.dashboard.set_headline_alert(__("Recusada pelo Jurista a {0} por {1}: {2}", [
+			frappe.datetime.str_to_user(frm.doc.data_recusa), frappe.user.full_name(frm.doc.recusada_por),
+			frappe.utils.escape_html(frm.doc.motivo_recusa || "")]), "gray");
+		return;
+	}
 	if (frm.doc.repreensao) {
 		frm.add_custom_button(__("Ver Repreensão"), () => frappe.set_route("Form", "Repreensao", frm.doc.repreensao));
 	}
@@ -604,6 +611,10 @@ function _botao_processo(frm) {
 			() => frm.call("criar_termo_responsabilidade").then((r) => {
 				if (r.message) frappe.set_route("Form", "Termo De Responsabilidade", r.message);
 			})), __("Jurista"));
+	}
+	// Recusar: the Jurista rejects it (motivo mandatory) — final, only with no outcome yet.
+	if (!frm.doc.repreensao && frappe.user.has_role(["Jurista", "SIGOS Manager", "System Manager"])) {
+		frm.add_custom_button(__("Recusar Participação"), () => _pt_recusar(frm), __("Jurista"));
 	}
 	// Denúncia: dismissal without a Processo — only within the probation (3 months).
 	if (frappe.model.can_create("Denuncia") && frm.doc.vigilante) {
@@ -765,4 +776,26 @@ function _pt_denuncia(frm, e) {
 		}),
 		__("Denúncia (Período Experimental)"), __("Criar"),
 	);
+}
+
+// Recusar dialog — mandatory motivo, final (no further action on the participação).
+function _pt_recusar(frm) {
+	const d = new frappe.ui.Dialog({
+		title: __("Recusar Participação"),
+		fields: [
+			{ fieldtype: "HTML", options: `<p class="text-danger">${__("A recusa é definitiva: a participação fica encerrada.")}</p>` },
+			{ fieldname: "motivo", fieldtype: "Small Text", label: __("Motivo da Recusa"), reqd: 1 },
+		],
+		primary_action_label: __("Recusar"),
+		primary_action(v) {
+			if (!(v.motivo || "").trim()) return;
+			d.hide();
+			frm.call("recusar", { motivo: v.motivo }).then(() => {
+				frappe.show_alert({ message: __("Participação recusada."), indicator: "orange" }, 5);
+				frm.reload_doc();
+			});
+		},
+	});
+	d.get_primary_btn().removeClass("btn-primary").addClass("btn-danger");
+	d.show();
 }

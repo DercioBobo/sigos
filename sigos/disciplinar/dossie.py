@@ -218,7 +218,7 @@ def _salario(v):
 
 def _disciplinar(v, hoje, processo=None):
 	parts = frappe.get_all(
-		"Participacao", filters={"vigilante": v.name, "docstatus": 1},
+		"Participacao", filters={"vigilante": v.name, "docstatus": 1, "recusada": 0},
 		fields=["name", "data", "gravidade", "tipo_de_infracao", "processo_disciplinar", "relato"],
 		order_by="data desc",
 	)
