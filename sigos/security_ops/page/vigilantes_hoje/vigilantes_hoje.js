@@ -131,6 +131,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		if (this._loading) return;
 		this._loading = true;
 		this.$root.find(".vh-stamp").text(__("A actualizar…"));
+		this._carregar_calendario();
 
 		const escalaCall = new Promise((resolve) => {
 			frappe.call({
@@ -168,6 +169,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 				nome_do_posto: v.nome_do_posto,
 				indicativo: v.indicativo,
 				turno: v.turno,
+				turno_equipa: v.turno_equipa,   // team vaga (Calendário de Equipas): "Falta 1 — Equipa 2"
 				regime: v.regime,
 				delegacao: v.delegacao,
 				vigilante_anterior: v.vigilante_anterior,
@@ -396,7 +398,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 	// no click-to-expand, no call button, no menu: there's nothing to act on here
 	// except go find someone to cover it.
 	_render_vaga_row($parent, row) {
-		const metaLine = `<b>${frappe.utils.escape_html(row.turno || "")}</b><span class="dot">·</span>${frappe.utils.escape_html(row.regime || "")}<span class="dot">·</span>${frappe.utils.escape_html(row.delegacao || "")}`;
+		const metaLine = `${this._equipa_dot(row.turno_equipa)}<b>${frappe.utils.escape_html(row.turno_equipa || row.turno || "")}</b><span class="dot">·</span>${frappe.utils.escape_html(row.regime || "")}<span class="dot">·</span>${frappe.utils.escape_html(row.delegacao || "")}`;
 		const nota = this._vaga_nota(row);
 		const $row = $(`
 			<div class="vh-row vh-row-vaga" data-status="Desfalcado">
@@ -547,7 +549,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 					${nota ? `<span class="vh-tbl-lic" title="${frappe.utils.escape_html(nota)}">${this._icon("info")}</span>` : ""}
 				</td>
 				<td><span class="vh-tbl-posto-dot"></span>${frappe.utils.escape_html(postoNome || "—")}</td>
-				<td>${frappe.utils.escape_html(row.turno || "—")}</td>
+				<td>${this._equipa_dot(row.turno_equipa)}${frappe.utils.escape_html(row.turno_equipa || row.turno || "—")}</td>
 				<td>${frappe.utils.escape_html(row.regime || "—")}</td>
 				<td><span class="vh-status-txt">${__("Desfalque")}</span></td>
 				<td class="vh-tbl-accao"><button type="button" class="vh-tbl-fill-btn vh-vaga-fill-btn">${__("Preencher")}</button></td>
@@ -1194,6 +1196,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 					</div>
 				</div>
 
+				<div class="vh-cal"></div>
 				<div class="vh-sum">
 					<div class="vh-pill tot vh-sum-total"><b class="num">0</b><span>${__("Escalados")}</span></div>
 					<div class="vh-pill done vh-sum-done"><b class="num">0</b><span>${__("Já Registados")}</span></div>
@@ -1252,6 +1255,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		});
 		this.$root.find('[data-role="equipa-filtro"]').on("change", (e) => {
 			this.state.equipaFiltro = e.target.value || null;
+			this.$root.find(".vh-cal-eq").each((_, b) => $(b).toggleClass("on", $(b).attr("data-eq") === this.state.equipaFiltro));
 			this._render();
 		});
 		this.$root.find(".vh-search input").on("input", frappe.utils.debounce((e) => {
@@ -1316,6 +1320,29 @@ sigos.VigilantesHoje = class VigilantesHoje {
 				});
 			}
 		);
+	}
+
+	// Calendário de Equipas strip: what each team does on the chosen date, per regime
+	// (sigos.calendario_equipas.equipas_do_dia). Empty when no calendar is set up.
+	_carregar_calendario() {
+		frappe.xcall("sigos.calendario_equipas.equipas_do_dia", { data: this.state.data }).then((cals) => {
+			const esc = frappe.utils.escape_html;
+			const $c = this.$root.find(".vh-cal");
+			if (!cals || !cals.length) { $c.empty().hide(); return; }
+			$c.html(cals.map((c) => `<div class="vh-cal-row">
+				<span class="vh-cal-reg">${esc(c.regime)}</span>
+				${c.equipas.map((e) => `<button type="button" class="vh-cal-eq ${e.e_folga ? "folga" : ""} ${this.state.equipaFiltro === e.equipa ? "on" : ""}"
+					data-eq="${esc(e.equipa)}" title="${__("Filtrar por esta equipa")}">
+					${this._equipa_dot(e.equipa)}<b>${esc(e.equipa)}</b><span>${esc(e.turno)}</span></button>`).join("")}
+			</div>`).join("")).show();
+			$c.find(".vh-cal-eq").on("click", (ev) => {
+				const eq = $(ev.currentTarget).attr("data-eq");
+				this.state.equipaFiltro = this.state.equipaFiltro === eq ? null : eq;
+				this.$root.find('[data-role="equipa-filtro"]').val(this.state.equipaFiltro || "");
+				$c.find(".vh-cal-eq").each((_, b) => $(b).toggleClass("on", $(b).attr("data-eq") === this.state.equipaFiltro));
+				this._render();
+			});
+		}).catch(() => this.$root.find(".vh-cal").empty().hide());
 	}
 
 	_populate_posto_filter() {
@@ -1456,6 +1483,14 @@ sigos.VigilantesHoje = class VigilantesHoje {
 .vh-select:hover { border-color:var(--accent); color:var(--accent); }
 
 .vh-sum { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+.vh-cal { display:flex; flex-direction:column; gap:6px; margin:0 0 12px; }
+.vh-cal-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.vh-cal-reg { font-size:11px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--ink3); min-width:44px; }
+.vh-cal-eq { display:inline-flex; align-items:center; gap:7px; padding:5px 12px; border-radius:999px; border:1px solid var(--line); background:var(--paper2); color:var(--ink); font-size:12.5px; cursor:pointer; }
+.vh-cal-eq b { font-weight:600; }
+.vh-cal-eq span { color:var(--ink2); }
+.vh-cal-eq.folga span { color:var(--ink3); font-style:italic; }
+.vh-cal-eq.on { border-color:var(--accent, #4F46E5); box-shadow:0 0 0 2px rgba(79,70,229,.15); }
 .vh-pill { display:flex; align-items:baseline; gap:7px; background:var(--paper2); border:1px solid var(--line);
   border-radius:999px; padding:8px 16px; box-shadow:var(--shadow); }
 .vh-pill b { font-family:var(--display); font-size:17px; font-weight:600; }

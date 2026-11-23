@@ -1,0 +1,42 @@
+{
+ "actions": [],
+ "creation": "2026-11-23 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "istable": 1,
+ "field_order": [
+  "turno_equipa",
+  "turno"
+ ],
+ "fields": [
+  {
+   "fieldname": "turno_equipa",
+   "fieldtype": "Link",
+   "label": "Equipa",
+   "options": "Turno Da Equipa",
+   "reqd": 1,
+   "in_list_view": 1,
+   "columns": 5
+  },
+  {
+   "fieldname": "turno",
+   "fieldtype": "Link",
+   "label": "Turno na Data de Referência",
+   "options": "Turno",
+   "reqd": 1,
+   "in_list_view": 1,
+   "columns": 5
+  }
+ ],
+ "links": [],
+ "modified": "2026-11-23 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Security Ops",
+ "name": "Calendario De Equipas Item",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

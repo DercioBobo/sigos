@@ -40,11 +40,89 @@ class EscalaDoVigilante(Document):
 		self._bloquear_mudanca_de_identidade()
 		self._validar_um_por_posto()
 		self._validar_um_por_delegacao()
-		self._sincronizar_turno_por_equipa()
+		self._aplicar_calendario()   # calendar regimes; else the old per-escala team sync
 		self._validar_turnos()
 		self._validar_capacidade_posto()
 		self._auto_arquivar_se_vazia()   # before reconcile — skips generation when empty
 		self.reconciliar_escala()
+		self._avisar_descanso()
+
+	def on_update(self):
+		self._registar_mudancas_de_equipa()
+
+	# ─── Calendário de Equipas (sigos.calendario_equipas) ───────────────────────
+
+	def _aplicar_calendario(self):
+		"""Regime with an active Calendário de Equipas: every guard row gets a team
+		(planear) and the team's turno_inicial, counted from the calendar's reference
+		date (see reconciliar_escala). Without a calendar: the per-escala team sync."""
+		from sigos import calendario_equipas as ce
+		cal = ce.calendario(self.regime_do_vigilante) if self.regime_do_vigilante else None
+		if not cal:
+			self.usa_calendario = 0
+			self.calendario_de_equipas = None
+			self._sincronizar_turno_por_equipa()
+			return
+		if int(self.ajuste_local_dias or 0) and not (self.ajuste_local_motivo or "").strip():
+			frappe.throw(_("Indique o <b>Motivo do Ajuste</b> local."), title=_("Ajuste Local"))
+		if not int(self.ajuste_local_dias or 0):
+			self.ajuste_local_motivo = None
+		for p in ce.planear(self, cal):
+			p["row"].turno_equipa = p["equipa"]
+			p["row"].turno_inicial = p["turno_inicial"]
+		self.usa_calendario = 1
+		self.calendario_de_equipas = cal.name
+
+	def _guardas_alterados(self):
+		"""Guards whose (turno_inicial, team) changed this save, incl. new ones."""
+		before = self.get_doc_before_save()
+		antes = {g.vigilante: (g.turno_inicial, g.turno_equipa) for g in (before.tab_vigilante_do_posto if before else [])}
+		return {g.vigilante: antes.get(g.vigilante) for g in self.tab_vigilante_do_posto or []
+			if g.vigilante and antes.get(g.vigilante) != (g.turno_inicial, g.turno_equipa)}
+
+	def _avisar_descanso(self):
+		"""Warning only: a guard whose turno changed and who did a Noite yesterday now
+		starts with a Manhã today (sigos.calendario_equipas.aviso_descanso)."""
+		if self.estado == "Arquivado":
+			return
+		alterados = self._guardas_alterados()
+		if not alterados:
+			return
+		from sigos.calendario_equipas import aviso_descanso
+		hoje = getdate(nowdate())
+		avisos = []
+		for r in self.tabela_de_escala or []:
+			if r.vigilante in alterados and getdate(r.data) == hoje:
+				a = aviso_descanso(r.vigilante, hoje, r.periodo, r.turno)
+				if a:
+					avisos.append(a)
+		if avisos:
+			frappe.msgprint("<br>".join(avisos), title=_("Atenção ao Descanso"), indicator="orange")
+
+	def _registar_mudancas_de_equipa(self):
+		"""Log (Mudanca De Equipa) every guard whose team differs from the last one
+		logged for them — read by the Histórico do Vigilante."""
+		if not self.usa_calendario:
+			return
+		before = self.get_doc_before_save()
+		antes = {g.vigilante: g.turno_equipa for g in (before.tab_vigilante_do_posto if before else [])}
+		hoje = getdate(nowdate())
+		origem = frappe.flags.get("sigos_origem_escala") or (None, None)
+		for g in self.tab_vigilante_do_posto or []:
+			if not (g.vigilante and g.turno_equipa) or antes.get(g.vigilante) == g.turno_equipa:
+				continue
+			ultima = frappe.db.get_value("Mudanca De Equipa", {"vigilante": g.vigilante}, "equipa_nova",
+				order_by="creation desc")
+			if ultima == g.turno_equipa:
+				continue
+			turno_hoje = next((r.turno for r in self.tabela_de_escala or []
+				if r.vigilante == g.vigilante and getdate(r.data) == hoje), None)
+			frappe.get_doc({
+				"doctype": "Mudanca De Equipa", "vigilante": g.vigilante, "data": hoje,
+				"equipa_anterior": ultima, "equipa_nova": g.turno_equipa, "turno_hoje": turno_hoje,
+				"escala": self.name, "posto": self.posto_de_vigilancia, "regime": self.regime_do_vigilante,
+				"origem_doctype": origem[0], "origem": origem[1], "utilizador": frappe.session.user,
+			}).insert(ignore_permissions=True)
 
 	# ─── Validation ────────────────────────────────────────────────────────────
 
@@ -288,6 +366,12 @@ class EscalaDoVigilante(Document):
 			for v, t in guards.items():
 				if antes.get(v) != (t, equipas.get(v)):
 					forcar.add(v)
+		# The cycle's anchor itself moved (escala joined/left the calendar, local
+		# adjustment, or the calendar was re-applied): every guard regenerates.
+		if self.flags.get("regenerar_tudo") or (before and (
+				int(before.get("usa_calendario") or 0) != int(self.usa_calendario or 0)
+				or int(before.get("ajuste_local_dias") or 0) != int(self.ajuste_local_dias or 0))):
+			forcar.update(guards)
 
 		# Prune future rows that must be dropped
 		mantidas = []
@@ -302,6 +386,12 @@ class EscalaDoVigilante(Document):
 
 		existing = {(r.vigilante, str(getdate(r.data))) for r in self.tabela_de_escala}
 		anchor_date = getdate(self.data_de_inicio)
+		if self.usa_calendario:
+			# calendar escala: turno_inicial is the team's turno ON the reference date
+			from sigos.calendario_equipas import calendario
+			cal = calendario(self.regime_do_vigilante)
+			if cal:
+				anchor_date = cal.data_referencia
 
 		# Generate forward
 		for vig, turno_ini in guards.items():
@@ -480,7 +570,23 @@ def obter_turno_inicial_actual(vigilante, posto, regime):
 	)
 
 
-def _adicionar_vigilante_a_escala(vigilante, posto, regime, turno_inicial=None, evitar_colisao=True):
+def _usa_calendario(regime):
+	from sigos.calendario_equipas import calendario
+	return bool(calendario(regime))
+
+
+def obter_equipa_actual(vigilante, posto, regime):
+	"""Guard's Turno da Equipa on the (posto, regime) escala, or None."""
+	nome = _escala_do_par(posto, regime)
+	if not nome:
+		return None
+	return frappe.db.get_value(
+		"Tab Vigilante Do Posto", {"parent": nome, "vigilante": vigilante}, "turno_equipa"
+	)
+
+
+def _adicionar_vigilante_a_escala(vigilante, posto, regime, turno_inicial=None, evitar_colisao=True,
+                                  turno_equipa=None):
 	nome = _escala_do_par(posto, regime)
 	criada = False
 	if nome:
@@ -497,6 +603,25 @@ def _adicionar_vigilante_a_escala(vigilante, posto, regime, turno_inicial=None, 
 		criada = True
 
 	turno_ocupado = None
+	calendario = _usa_calendario(regime)
+	if calendario and not any(g.vigilante == vigilante for g in esc.tab_vigilante_do_posto):
+		# Calendário de Equipas: the slot IS the team. A carried turno_inicial maps to
+		# its team (same at every posto); else the guard keeps their team (plain move)
+		# or joins the least-filled one — EscalaDoVigilante._aplicar_calendario decides.
+		# Team members legitimately share a turno_inicial, so no collision bumping.
+		esc.append("tab_vigilante_do_posto", {
+			"vigilante": vigilante,
+			"turno_inicial": turno_inicial or None,
+			"turno_equipa": None if turno_inicial else turno_equipa,
+		})
+		esc.save(ignore_permissions=True)
+		if evitar_colisao:
+			turno_ocupado = next((g.turno_inicial for g in esc.tab_vigilante_do_posto
+				if g.vigilante == vigilante), None)
+			if turno_ocupado:
+				from sigos.security_ops.doctype.vaga_de_posto.vaga_de_posto import fechar_vaga
+				fechar_vaga(posto, regime, turno_ocupado, vigilante)
+		return esc.name, criada
 	if not any(g.vigilante == vigilante for g in esc.tab_vigilante_do_posto):
 		if turno_inicial:
 			# Explicit slot (typically a vacated one carried forward from whoever this
@@ -534,7 +659,7 @@ def _adicionar_vigilante_a_escala(vigilante, posto, regime, turno_inicial=None, 
 
 
 def migrar_escala_vigilante(vigilante, old_posto, old_regime, new_posto, new_regime, turno_inicial=None,
-                             evitar_colisao=True):
+                             evitar_colisao=True, turno_equipa=None):
 	"""
 	Move a guard from the (old_posto, old_regime) escala to the (new_posto, new_regime)
 	escala. Pass new_posto/new_regime as None to only remove (e.g. demissão / inactive).
@@ -548,11 +673,15 @@ def migrar_escala_vigilante(vigilante, old_posto, old_regime, new_posto, new_reg
 	if (old_posto, old_regime) == (new_posto, new_regime):
 		return None
 
+	# Plain move between calendar escalas: the guard keeps their team (same rhythm).
+	if not turno_inicial and not turno_equipa and old_posto and old_regime:
+		turno_equipa = obter_equipa_actual(vigilante, old_posto, old_regime)
 	removido = _remover_vigilante_da_escala(vigilante, old_posto, old_regime)
 	adicionado, criada = (None, False)
 	if new_posto and new_regime:
 		adicionado, criada = _adicionar_vigilante_a_escala(
 			vigilante, new_posto, new_regime, turno_inicial=turno_inicial, evitar_colisao=evitar_colisao,
+			turno_equipa=turno_equipa,
 		)
 
 	if not (removido or adicionado):
@@ -631,7 +760,9 @@ def adicionar_vigilante_a_escala_reserva(vigilante, delegacao, turno_inicial=Non
 		if turno_inicial in validos:
 			turno = turno_inicial
 
-	if not turno:
+	if _usa_calendario(esc.regime_do_vigilante):
+		pass  # team escala: _aplicar_calendario maps the carried slot / picks a team
+	elif not turno:
 		turno = _turno_inicial_livre(esc, esc.regime_do_vigilante)
 	elif any(g.turno_inicial == turno for g in esc.tab_vigilante_do_posto):
 		# Carried-over slot collides with someone already on it — bump THEM to a

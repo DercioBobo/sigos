@@ -572,7 +572,8 @@ def actualizar_escala_apos_mudanca(
 			turno = working[0]["turno"] if working else None
 
 		# Collision: another guard already on this slot → swap them to the vacated slot
-		if turno and turno != vacated and vacated:
+		# (not on a Calendário de Equipas escala — team members share a slot)
+		if turno and turno != vacated and vacated and not escala.get("usa_calendario"):
 			colidente = next(
 				(g for g in escala.tab_vigilante_do_posto if g.turno_inicial == turno),
 				None,
@@ -769,6 +770,7 @@ def get_vagas_desfalcadas(periodo=None, grupo_delegados=None):
 			p.nome_do_posto,
 			p.indicativo,
 			vp.turno,
+			vp.turno_equipa,
 			vp.regime,
 			vp.delegacao,
 			vp.vigilante_anterior,

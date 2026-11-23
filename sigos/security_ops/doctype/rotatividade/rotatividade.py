@@ -64,6 +64,15 @@ class Rotatividade(Document):
 			return
 		if not self.vigilante:
 			return
+		# Team changes logged by the escalas during this request point back here
+		# (EscalaDoVigilante._registar_mudancas_de_equipa → Histórico).
+		frappe.flags.sigos_origem_escala = ("Rotatividade", self.name)
+		try:
+			self._aplicar_operacao()
+		finally:
+			frappe.flags.sigos_origem_escala = None
+
+	def _aplicar_operacao(self):
 
 		op = self._get_operacao()
 

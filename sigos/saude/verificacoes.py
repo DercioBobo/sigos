@@ -103,11 +103,38 @@ def vagas_antigas():
 	limite = add_days(now_datetime(), -VAGA_ANTIGA)
 	return [
 		linha("Vaga De Posto", g.name, g.posto_de_vigilancia, g.name,
-			_("{0} · {1} · aberta há {2} dias").format(g.regime or "—", g.turno or "—", _ha(g.data_abertura)),
+			_("{0} · {1} · aberta há {2} dias").format(g.regime or "—", g.turno_equipa or g.turno or "—", _ha(g.data_abertura)),
 			g.delegacao, _ha(g.data_abertura))
 		for g in frappe.get_all("Vaga De Posto",
 			filters={"estado": "Aberta", "data_abertura": ["<", limite]},
-			fields=["name", "posto_de_vigilancia", "regime", "turno", "delegacao", "data_abertura"])
+			fields=["name", "posto_de_vigilancia", "regime", "turno", "turno_equipa", "delegacao", "data_abertura"])
+	]
+
+
+@verificacao("escalas_fora_do_calendario", "operacoes", "Escalas fora do Calendário de Equipas", AVISO, OPS,
+	"Escalas de um regime com Calendário de Equipas que ainda não o seguem.")
+def escalas_fora_do_calendario():
+	regimes = frappe.get_all("Calendario De Equipas", filters={"activo": 1}, pluck="regime")
+	if not regimes:
+		return []
+	return [
+		linha("Escala Do Vigilante", e.name, e.nome_do_posto or e.delegacao or e.name, e.name,
+			_("Regime {0} · use Aplicar às Escalas no calendário").format(e.regime_do_vigilante), e.delegacao)
+		for e in frappe.get_all("Escala Do Vigilante",
+			filters={"regime_do_vigilante": ["in", regimes], "estado": "Activo", "usa_calendario": 0},
+			fields=["name", "nome_do_posto", "delegacao", "regime_do_vigilante"])
+	]
+
+
+@verificacao("escalas_ajuste_local", "operacoes", "Escalas com Ajuste Local", INFO, SUPERVISAO,
+	"Postos desfasados do Calendário de Equipas, com o motivo.")
+def escalas_ajuste_local():
+	return [
+		linha("Escala Do Vigilante", e.name, e.nome_do_posto or e.delegacao or e.name, e.name,
+			_("{0:+d} dia(s) · {1}").format(int(e.ajuste_local_dias), e.ajuste_local_motivo or "—"), e.delegacao)
+		for e in frappe.get_all("Escala Do Vigilante",
+			filters={"usa_calendario": 1, "estado": "Activo", "ajuste_local_dias": ["!=", 0]},
+			fields=["name", "nome_do_posto", "delegacao", "ajuste_local_dias", "ajuste_local_motivo"])
 	]
 
 

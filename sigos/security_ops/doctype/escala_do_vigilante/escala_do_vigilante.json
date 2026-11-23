@@ -22,6 +22,12 @@
   "data_de_inicio",
   "col_break_per",
   "gerado_ate",
+  "sec_calendario",
+  "usa_calendario",
+  "calendario_de_equipas",
+  "col_calendario",
+  "ajuste_local_dias",
+  "ajuste_local_motivo",
   "sec_vigilantes",
   "sincronizar_vigilantes",
   "distribuir_turnos",
@@ -147,6 +153,44 @@
    "read_only": 1,
    "in_list_view": 1,
    "description": "Última data gerada automaticamente"
+  },
+  {
+   "fieldname": "sec_calendario",
+   "fieldtype": "Section Break",
+   "label": "Calendário de Equipas",
+   "depends_on": "usa_calendario"
+  },
+  {
+   "fieldname": "usa_calendario",
+   "fieldtype": "Check",
+   "label": "Segue o Calendário de Equipas",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "calendario_de_equipas",
+   "fieldtype": "Link",
+   "label": "Calendário",
+   "options": "Calendario De Equipas",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "col_calendario",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "ajuste_local_dias",
+   "fieldtype": "Int",
+   "label": "Ajuste Local (dias)",
+   "description": "Adianta (+) ou atrasa (−) todas as equipas deste posto."
+  },
+  {
+   "fieldname": "ajuste_local_motivo",
+   "fieldtype": "Small Text",
+   "label": "Motivo do Ajuste",
+   "depends_on": "ajuste_local_dias",
+   "mandatory_depends_on": "ajuste_local_dias"
   },
   {
    "fieldname": "sec_vigilantes",

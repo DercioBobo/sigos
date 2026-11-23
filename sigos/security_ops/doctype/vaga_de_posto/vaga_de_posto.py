@@ -7,15 +7,28 @@ class VagaDePosto(Document):
 	pass
 
 
+def _equipa_do_slot(posto, regime, turno):
+	"""Calendário de Equipas: the team owning this turno_inicial slot at this posto."""
+	from sigos import calendario_equipas as ce
+	cal = ce.calendario(regime)
+	if not cal:
+		return None
+	ajuste = frappe.db.get_value("Escala Do Vigilante",
+		{"posto_de_vigilancia": posto, "regime_do_vigilante": regime}, "ajuste_local_dias") or 0
+	return ce.equipa_do_turno_inicial(cal, turno, ajuste)
+
+
 def abrir_vaga(posto, regime, turno, vigilante_anterior=None, origem_rotatividade=None):
 	"""
 	Persist a posto+regime+turno slot vacated with nobody taking it over immediately.
-	Idempotent: won't duplicate an already-open vacancy for the same exact slot.
+	Idempotent per slot AND leaving guard: on a Calendário de Equipas escala several
+	guards share one team slot, so two of them leaving are two vagas. The team
+	(turno_equipa) is recorded for the board ("Falta 1 — Equipa 2").
 	"""
-	existente = frappe.db.exists(
-		"Vaga De Posto",
-		{"posto_de_vigilancia": posto, "regime": regime, "turno": turno, "estado": "Aberta"},
-	)
+	filtros = {"posto_de_vigilancia": posto, "regime": regime, "turno": turno, "estado": "Aberta"}
+	if vigilante_anterior:
+		filtros["vigilante_anterior"] = vigilante_anterior
+	existente = frappe.db.exists("Vaga De Posto", filtros)
 	if existente:
 		return existente
 
@@ -24,6 +37,7 @@ def abrir_vaga(posto, regime, turno, vigilante_anterior=None, origem_rotatividad
 		"posto_de_vigilancia": posto,
 		"regime": regime,
 		"turno": turno,
+		"turno_equipa": _equipa_do_slot(posto, regime, turno),
 		"vigilante_anterior": vigilante_anterior,
 		"origem_rotatividade": origem_rotatividade,
 		"data_abertura": now_datetime(),
@@ -34,11 +48,12 @@ def abrir_vaga(posto, regime, turno, vigilante_anterior=None, origem_rotatividad
 
 
 def fechar_vaga(posto, regime, turno, vigilante=None):
-	"""Auto-resolve any open vacancy matching this exact slot once someone fills it."""
+	"""Auto-resolve the OLDEST open vacancy of this exact slot once someone fills it
+	(one guard fills one vaga — a team slot may have several open)."""
 	abertas = frappe.get_all(
 		"Vaga De Posto",
 		filters={"posto_de_vigilancia": posto, "regime": regime, "turno": turno, "estado": "Aberta"},
-		pluck="name",
+		pluck="name", order_by="data_abertura asc", limit=1,
 	)
 	for nome in abertas:
 		frappe.db.set_value(

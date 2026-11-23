@@ -12,6 +12,7 @@
   "posto_de_vigilancia",
   "regime",
   "turno",
+  "turno_equipa",
   "col_break_1",
   "delegacao",
   "estado",
@@ -58,6 +59,15 @@
    "label": "Turno",
    "options": "Turno",
    "reqd": 1,
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "turno_equipa",
+   "fieldtype": "Link",
+   "label": "Equipa",
+   "options": "Turno Da Equipa",
    "read_only": 1,
    "in_list_view": 1,
    "in_standard_filter": 1

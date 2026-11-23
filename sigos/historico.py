@@ -177,6 +177,16 @@ class _Historico:
 				detalhe=r.motivo_readimissao, tom="good", row=r)
 
 	def _operacoes(self):
+		# Turno da Equipa changes (Calendário de Equipas escalas — Mudanca De Equipa log)
+		for r in self._docs("Mudanca De Equipa", {"vigilante": self.vig},
+				["equipa_anterior", "equipa_nova", "turno_hoje", "posto", "origem_doctype", "origem"], "data"):
+			self.add("operacoes", "equipa", r.data,
+				_("Equipa: {0} → {1}").format(r.equipa_anterior, r.equipa_nova) if r.equipa_anterior
+				else _("Atribuído à {0}").format(r.equipa_nova),
+				"Mudanca De Equipa", r.name,
+				sub=self._txt(r.turno_hoje and _("turno no dia: {0}").format(r.turno_hoje),
+					r.posto and frappe.db.get_value("Posto De Vigilancia", r.posto, "nome_do_posto"),
+					r.origem and f"{_(r.origem_doctype)} {r.origem}"))
 		for r in self._docs("Rotatividade", {"vigilante": self.vig},
 				["abreviatura_op", "motivo", "antigo_posto_nome", "novo_posto_nome", "novo_posto_do_reserva_nome",
 				 "motivo_rotatividade", "novo_regime"], "data"):

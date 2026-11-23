@@ -56,7 +56,26 @@ frappe.ui.form.on("Escala Do Vigilante", {
 // without teams simply leaves it empty.
 const _turno_equipa_activo = true;
 function _toggle_turno_equipa(frm) {
-	frm.fields_dict.deck_escala?.$wrapper.find('[data-act="equipas"]').show();
+	// Calendário de Equipas (sigos.calendario_equipas): the team decides the turno —
+	// turno_inicial is derived server-side, so it's read-only and "Distribuir Turnos"
+	// (which sets turno_inicial per guard) has nothing to do.
+	const cal = !!frm.doc.usa_calendario;
+	const $deck = frm.fields_dict.deck_escala?.$wrapper;
+	$deck?.find('[data-act="equipas"]').show();
+	$deck?.find('[data-act="dist"]').toggle(!cal);
+	const grid = frm.fields_dict.tab_vigilante_do_posto?.grid;
+	if (grid) {
+		grid.update_docfield_property("turno_inicial", "read_only", cal ? 1 : 0);
+		grid.refresh();
+	}
+	if (cal) {
+		const aj = parseInt(frm.doc.ajuste_local_dias || 0, 10);
+		frm.dashboard.set_headline_alert(aj
+			? __("Segue o Calendário de Equipas ({0}) com ajuste local de {1} dia(s).", [frm.doc.calendario_de_equipas, aj])
+			: __("Segue o Calendário de Equipas ({0}).", [frm.doc.calendario_de_equipas]), aj ? "orange" : "blue");
+		frm.add_custom_button(__("Calendário de Equipas"),
+			() => frappe.set_route("Form", "Calendario De Equipas", frm.doc.calendario_de_equipas));
+	}
 }
 
 function _gerar_escala(frm) {
@@ -433,8 +452,13 @@ function _atribuir_equipas(frm) {
 	Promise.all([
 		frappe.xcall("sigos.api.get_regime_turnos", { regime: frm.doc.regime_do_vigilante }),
 		frappe.db.get_list("Turno Da Equipa", { filters: { activo: 1 }, fields: ["name"], order_by: "name asc", limit: 0 }),
-	]).then(([seq, equipasRaw]) => {
+		frappe.xcall("sigos.calendario_equipas.turnos_das_equipas",
+			{ regime: frm.doc.regime_do_vigilante, ajuste: frm.doc.ajuste_local_dias || 0 }).catch(() => null),
+	]).then(([seq, equipasRaw, cal]) => {
 		seq = seq || [];
+		// Calendário de Equipas: only the calendar's teams, each with its fixed turno
+		// (shown as today's turno) — the dialog only assigns guards to teams.
+		if (cal && cal.equipas && cal.equipas.length) equipasRaw = cal.equipas.map((e) => ({ name: e.equipa }));
 		if (!seq.length) { frappe.msgprint(__("Regime sem turnos.")); return; }
 		if (!equipasRaw.length) {
 			frappe.msgprint(__("Nenhuma Turno da Equipa activa. Crie as equipas primeiro (ex: Equipa A, B, C)."));
@@ -444,7 +468,9 @@ function _atribuir_equipas(frm) {
 		_inject_equipas_modal_css();
 
 		const CORES = ["#7a5ee0", "#1f9d7c", "#d6336c", "#c9821a", "#3a7ec5", "#5a3fc0"];
-		const equipas = equipasRaw.map((e, i) => ({ nome: e.name, cor: CORES[i % CORES.length], turno: null }));
+		const fixo = cal && cal.equipas ? Object.fromEntries(cal.equipas.map((e) => [e.equipa, e])) : null;
+		const equipas = equipasRaw.map((e, i) => ({ nome: e.name, cor: CORES[i % CORES.length],
+			turno: fixo ? fixo[e.name].turno_inicial : null, hoje: fixo ? fixo[e.name].hoje : null }));
 		const equipaByName = new Map(equipas.map(e => [e.nome, e]));
 		const turnoOpts = seq.map(t => t.turno);
 
@@ -474,12 +500,12 @@ function _atribuir_equipas(frm) {
 			},
 		});
 		d.show();
-		_render_equipas_modal(d.fields_dict.body.$wrapper, { model, equipas, equipaByName, turnoOpts });
+		_render_equipas_modal(d.fields_dict.body.$wrapper, { model, equipas, equipaByName, turnoOpts, calendario: !!fixo });
 	});
 }
 
 function _render_equipas_modal($body, ctx) {
-	const { model, equipas, equipaByName, turnoOpts } = ctx;
+	const { model, equipas, equipaByName, turnoOpts, calendario } = ctx;
 	const esc = frappe.utils.escape_html;
 
 	const turnoOptsHtml = `<option value="">${__("— turno —")}</option>` +
@@ -489,14 +515,16 @@ function _render_equipas_modal($body, ctx) {
 
 	$body.html(`
 		<div id="sigos-eq-modal">
-			<div class="eqm-hint">${__("Atribua cada vigilante a uma equipa e o turno de cada equipa — os membros herdam automaticamente o turno da sua equipa.")}</div>
+			<div class="eqm-hint">${calendario
+				? __("Os turnos seguem o Calendário de Equipas — atribua cada vigilante a uma equipa.")
+				: __("Atribua cada vigilante a uma equipa e o turno de cada equipa — os membros herdam automaticamente o turno da sua equipa.")}</div>
 			<div class="eqm-quick">
 				<button type="button" class="eqm-qbtn" data-qact="split">${__("Repartir Equipas Automaticamente")}</button>
-				<button type="button" class="eqm-qbtn" data-qact="stagger">${__("Escalonar Turnos das Equipas")}</button>
+				${calendario ? "" : `<button type="button" class="eqm-qbtn" data-qact="stagger">${__("Escalonar Turnos das Equipas")}</button>`}
 			</div>
 			<div class="eqm-teams" data-eqm-teams></div>
 			<table class="eqm-table">
-				<thead><tr><th>${__("Vigilante")}</th><th>${__("Equipa")}</th><th>${__("Turno")}</th></tr></thead>
+				<thead><tr><th>${__("Vigilante")}</th><th>${__("Equipa")}</th><th>${calendario ? __("Turno hoje") : __("Turno")}</th></tr></thead>
 				<tbody data-eqm-rows></tbody>
 			</table>
 		</div>
@@ -504,7 +532,9 @@ function _render_equipas_modal($body, ctx) {
 
 	const $teams = $body.find("[data-eqm-teams]");
 	const $rows = $body.find("[data-eqm-rows]");
-	const turnoDe = (m) => m.equipa ? (equipaByName.get(m.equipa)?.turno || null) : m.row.turno_inicial;
+	const turnoDe = (m) => m.equipa
+		? ((calendario ? equipaByName.get(m.equipa)?.hoje : equipaByName.get(m.equipa)?.turno) || null)
+		: (calendario ? null : m.row.turno_inicial);
 
 	function redrawTeams() {
 		$teams.empty();
@@ -518,6 +548,11 @@ function _render_equipas_modal($body, ctx) {
 					<select class="eqm-team-turno">${turnoOptsHtml}</select>
 				</div>
 			`);
+			if (calendario) {
+				$card.find("select").replaceWith(`<span class="eqm-team-turno eqm-fixo">${esc(e.hoje || "")}</span>`);
+				$teams.append($card);
+				return;
+			}
 			$card.find("select").val(e.turno || "").on("change", function () {
 				e.turno = $(this).val() || null;
 				redrawRows();
