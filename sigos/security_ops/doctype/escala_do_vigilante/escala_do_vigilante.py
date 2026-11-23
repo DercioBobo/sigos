@@ -67,7 +67,7 @@ class EscalaDoVigilante(Document):
 			frappe.throw(_("Indique o <b>Motivo do Ajuste</b> local."), title=_("Ajuste Local"))
 		if not int(self.ajuste_local_dias or 0):
 			self.ajuste_local_motivo = None
-		for p in ce.planear(self, cal):
+		for p in ce.planear(self, cal, rectificar_desde=self.flags.get("rectificar_desde")):
 			p["row"].turno_equipa = p["equipa"]
 			p["row"].turno_inicial = p["turno_inicial"]
 		self.usa_calendario = 1

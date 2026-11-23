@@ -17,7 +17,7 @@ from Doença/Suspensão, Cobridor, Reserva) carry the team for free.
 
 import frappe
 from frappe import _
-from frappe.utils import getdate, nowdate
+from frappe.utils import add_days, getdate, nowdate
 
 
 def calendario(regime):
@@ -161,44 +161,63 @@ def aviso_descanso(vigilante, data, periodo_novo, turno_novo=None):
 
 # ─── Team assignment of an escala (shared by the escala itself and the preview) ──
 
-def _turno_de_hoje_antigo(esc, vigilante, hoje):
-	"""Guard's turno today under the escala's CURRENT rows / old anchor (before the calendar)."""
+def _turno_no_dia(esc, vigilante, dia):
+	"""Guard's turno on `dia` in the escala's CURRENT rows (before regeneration)."""
 	for r in esc.tabela_de_escala or []:
-		if r.vigilante == vigilante and getdate(r.data) == hoje:
+		if r.vigilante == vigilante and getdate(r.data) == dia:
 			return r.turno
 	return None
 
 
-def planear(esc, cal):
-	"""Team + turno_inicial for every guard row of `esc` under calendar `cal`, in order:
-	  1. a valid team already on the row is kept;
-	  2. escala already on the calendar + a carried turno_inicial (substitute, Vaga,
-	     return…) → the team owning that slot (turno_inicial is the same at every posto);
-	  3. escala moving onto the calendar → the team doing the guard's current turno today,
-	     else the team just behind it (rectification: 2a Manhã → the 1a Manhã team);
-	  4. otherwise the team with fewest guards here.
+def _fase_real_hoje(esc, cal, vigilante, hoje, desde=None):
+	"""What the guard is REALLY doing today by their own rhythm: their row on `desde`
+	(e.g. yesterday, untouched by any regeneration) advanced to today; else today's row."""
+	seq = [x["turno"] for x in cal.sequencia]
+	if desde:
+		t = _turno_no_dia(esc, vigilante, desde)
+		if t in seq:
+			return seq[(seq.index(t) + (hoje - desde).days) % len(seq)]
+		return None
+	t = _turno_no_dia(esc, vigilante, hoje)
+	if t:
+		return t
+	ontem = getdate(add_days(hoje, -1))
+	t = _turno_no_dia(esc, vigilante, ontem)
+	return seq[(seq.index(t) + 1) % len(seq)] if t in seq else None
+
+
+def planear(esc, cal, rectificar_desde=None):
+	"""Team + turno_inicial for every guard row of `esc` under calendar `cal`.
+	  · escala JOINING the calendar, or a rectification (`rectificar_desde` = a past
+	    date whose rows show the guards' real rhythm): the team doing the guard's REAL
+	    turno today, else the team just behind it (2a Manhã → the 1a Manhã team).
+	    Old per-posto team labels are ignored — they were never company-aligned.
+	  · escala already on the calendar: keep a valid team; a carried turno_inicial
+	    (substitute, Vaga, return…) → the team owning that slot.
+	  · otherwise the team with fewest guards here.
 	Returns [{row, vigilante, equipa, turno_inicial, turno_antes, turno_depois}]."""
 	hoje = getdate(nowdate())
 	ajuste = int(esc.get("ajuste_local_dias") or 0)
-	ja_no_calendario = bool(esc.get("usa_calendario"))
+	pela_fase = bool(rectificar_desde) or not esc.get("usa_calendario")
+	desde = getdate(rectificar_desde) if rectificar_desde else None
 	contagem = {eq: 0 for eq in cal.equipas}
-	for g in esc.tab_vigilante_do_posto or []:
-		if g.turno_equipa in contagem:
-			contagem[g.turno_equipa] += 1
 	plano = []
 	for g in esc.tab_vigilante_do_posto or []:
 		if not g.vigilante:
 			continue
-		antes = _turno_de_hoje_antigo(esc, g.vigilante, hoje)
-		eq = g.turno_equipa if g.turno_equipa in cal.equipas else None
-		if not eq and ja_no_calendario and g.turno_inicial:
+		antes = _turno_no_dia(esc, g.vigilante, hoje)
+		eq = None
+		if pela_fase:
+			real = _fase_real_hoje(esc, cal, g.vigilante, hoje, desde)
+			if real:
+				eq = equipa_pela_fase(cal, real, hoje, ajuste)
+		if not eq and g.turno_equipa in cal.equipas:
+			eq = g.turno_equipa
+		if not eq and not pela_fase and g.turno_inicial:
 			eq = equipa_do_turno_inicial(cal, g.turno_inicial, ajuste)
-		if not eq and not ja_no_calendario and antes:
-			eq = equipa_pela_fase(cal, antes, hoje, ajuste)
 		if not eq:
 			eq = min(sorted(contagem), key=lambda k: (contagem[k], cal.equipas[k]))
-		if g.turno_equipa not in cal.equipas:
-			contagem[eq] += 1
+		contagem[eq] += 1
 		plano.append({"row": g, "vigilante": g.vigilante, "nome": g.get("nome_completo"), "equipa": eq,
 			"equipa_antes": g.turno_equipa, "turno_inicial": turno_inicial(cal, eq, ajuste),
 			"turno_antes": antes, "turno_depois": turno_em(cal, eq, hoje, ajuste)["turno"]})

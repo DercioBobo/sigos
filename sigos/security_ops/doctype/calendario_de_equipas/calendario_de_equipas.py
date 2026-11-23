@@ -45,7 +45,7 @@ class CalendarioDeEquipas(Document):
 			fields=["name", "posto_de_vigilancia", "nome_do_posto", "delegacao", "tipo_de_escala"], order_by="name")
 
 	@frappe.whitelist()
-	def pre_visualizar(self):
+	def pre_visualizar(self, rectificar_desde=None):
 		"""Per escala: which guards' turno changes today, without saving anything."""
 		frappe.only_for(PAPEIS_APLICAR)
 		ce.limpar_cache()
@@ -56,7 +56,7 @@ class CalendarioDeEquipas(Document):
 		out = []
 		for e in self._escalas():
 			esc = frappe.get_doc("Escala Do Vigilante", e.name)
-			plano = ce.planear(esc, cal)
+			plano = ce.planear(esc, cal, rectificar_desde=self._data_rectificacao(rectificar_desde))
 			mudancas = [{k: v for k, v in p.items() if k != "row"}
 				for p in plano if p["turno_antes"] != p["turno_depois"]]
 			out.append({"escala": e.name, "posto": e.nome_do_posto or e.posto_de_vigilancia or e.delegacao,
@@ -64,7 +64,7 @@ class CalendarioDeEquipas(Document):
 		return {"data": str(hoje), "escalas": out}
 
 	@frappe.whitelist()
-	def aplicar(self):
+	def aplicar(self, rectificar_desde=None):
 		"""Re-save every escala of the regime (EscalaDoVigilante._aplicar_calendario does
 		the work: assigns teams, re-derives turno_inicial, regenerates future days)."""
 		frappe.only_for(PAPEIS_APLICAR)
@@ -76,6 +76,9 @@ class CalendarioDeEquipas(Document):
 			try:
 				esc = frappe.get_doc("Escala Do Vigilante", e.name)
 				esc.flags.regenerar_tudo = True  # the reference date/turnos may have moved
+				if rectificar_desde:
+					# re-derive every team from that day's rows (the guards' real rhythm)
+					esc.flags.rectificar_desde = self._data_rectificacao(rectificar_desde)
 				esc.save(ignore_permissions=True)
 				ok.append(e.name)
 			except Exception as ex:
@@ -84,6 +87,16 @@ class CalendarioDeEquipas(Document):
 				frappe.log_error(frappe.get_traceback(), f"SIGOS Calendário de Equipas: {e.name}")
 		frappe.flags.sigos_origem_escala = None
 		return {"aplicadas": ok, "erros": erros}
+
+	@staticmethod
+	def _data_rectificacao(data):
+		"""A past day whose escala rows are still right (before any regeneration)."""
+		if not data:
+			return None
+		d = getdate(data)
+		if d >= getdate(nowdate()):
+			frappe.throw(_("A data de referência da rectificação tem de ser anterior a hoje."))
+		return d
 
 	@frappe.whitelist()
 	def previsao(self, dias=14):

@@ -8,6 +8,12 @@ frappe.ui.form.on("Calendario De Equipas", {
 		if (frm.is_new() || !frm.doc.activo) return;
 		if (frappe.user.has_role(["System Manager", "SIGOS Manager", "Aprovador Operações"])) {
 			frm.add_custom_button(__("Aplicar às Escalas"), () => _cal_aplicar(frm)).addClass("btn-primary");
+			// Escalas already applied with wrong teams: re-derive every team from a past
+			// day whose rows still show each guard's real rhythm (default: yesterday).
+			frm.add_custom_button(__("Rectificar pela Escala de um Dia"), () => frappe.prompt(
+				[{ fieldname: "data", fieldtype: "Date", label: __("Dia em que a escala estava correcta"), reqd: 1,
+					default: frappe.datetime.add_days(frappe.datetime.get_today(), -1) }],
+				(v) => _cal_aplicar(frm, v.data), __("Rectificar Equipas"), __("Pré-visualizar")));
 		}
 		frm.add_custom_button(__("Escalas do Regime"),
 			() => frappe.set_route("List", "Escala Do Vigilante", { regime_do_vigilante: frm.doc.regime }));
@@ -54,9 +60,10 @@ function _cal_previsao(frm) {
 	});
 }
 
-function _cal_aplicar(frm) {
+function _cal_aplicar(frm, rectificar_desde) {
 	if (frm.is_dirty()) { frappe.msgprint(__("Grave o calendário primeiro.")); return; }
-	frm.call("pre_visualizar").then((r) => {
+	const args = rectificar_desde ? { rectificar_desde } : {};
+	frm.call("pre_visualizar", args).then((r) => {
 		const p = r.message || { escalas: [] };
 		const esc = frappe.utils.escape_html;
 		const total = p.escalas.reduce((t, e) => t + e.mudancas.length, 0);
@@ -77,7 +84,7 @@ function _cal_aplicar(frm) {
 			primary_action() {
 				d.hide();
 				frappe.dom.freeze(__("A actualizar escalas…"));
-				frm.call("aplicar").then((x) => {
+				frm.call("aplicar", args).then((x) => {
 					const res = x.message || {};
 					frappe.msgprint({
 						title: __("Calendário aplicado"),
