@@ -331,7 +331,7 @@ function _pt_prazo(frm) {
 	const dc = frm.doc.data_conhecimento_infracao;
 	if (!p || !dc || frm.doc.docstatus === 2) { $c.html(""); $j.toggle(!!frm.doc.justificacao_fora_de_prazo); return; }
 	const submetida = frm.doc.docstatus === 1;
-	if (submetida && (frm.doc.processo_disciplinar || frm.doc.repreensao)) {
+	if (submetida && (frm.doc.processo_disciplinar || frm.doc.repreensao || frm.doc.termo_responsabilidade || frm.doc.denuncia)) {
 		$c.html(""); $j.toggle(!!frm.doc.justificacao_fora_de_prazo); return;
 	}
 	const prazo = submetida ? p.processo : p.participacao;
@@ -578,11 +578,42 @@ function _botao_processo(frm) {
 	if (frm.doc.repreensao) {
 		frm.add_custom_button(__("Ver Repreensão"), () => frappe.set_route("Form", "Repreensao", frm.doc.repreensao));
 	}
+	if (frm.doc.termo_responsabilidade) {
+		// the Termo is the participação's only outcome: nothing else from here
+		frm.add_custom_button(__("Ver Termo de Responsabilidade"),
+			() => frappe.set_route("Form", "Termo De Responsabilidade", frm.doc.termo_responsabilidade));
+		frm.dashboard.set_headline_alert(__("Encerrada com Termo de Responsabilidade."), "green");
+		return;
+	}
+	if (frm.doc.denuncia) {
+		// Denúncia (probation dismissal) is exclusive too
+		frm.add_custom_button(__("Ver Denúncia"), () => frappe.set_route("Form", "Denuncia", frm.doc.denuncia));
+		frm.dashboard.set_headline_alert(__("Encerrada com Denúncia (período experimental)."), "red");
+		return;
+	}
 	if (frm.doc.processo_disciplinar) {
 		frm.add_custom_button(__("Ver Processo Disciplinar"), () => abrir_pd(frm.doc.processo_disciplinar));
 		return;
 	}
-	// The Jurista's two outcomes: a light Repreensão (record only) or a Processo.
+	const decidida = frm.doc.repreensao;
+	// Termo de Responsabilidade: an acknowledgment the guard signs (not a sanction) —
+	// exclusive, so only while the Jurista hasn't taken any other action.
+	if (!frm.doc.repreensao && frappe.model.can_create("Termo De Responsabilidade")) {
+		frm.add_custom_button(__("Termo de Responsabilidade"), () => frappe.confirm(
+			__("Encerrar esta participação com um Termo de Responsabilidade? Depois não admite repreensão nem processo."),
+			() => frm.call("criar_termo_responsabilidade").then((r) => {
+				if (r.message) frappe.set_route("Form", "Termo De Responsabilidade", r.message);
+			})), __("Jurista"));
+	}
+	// Denúncia: dismissal without a Processo — only within the probation (3 months).
+	if (frappe.model.can_create("Denuncia") && frm.doc.vigilante) {
+		frappe.xcall("sigos.disciplinar.doctype.denuncia.denuncia.elegibilidade", { vigilante: frm.doc.vigilante })
+			.then((e) => {
+				if (!e || !e.elegivel) return;
+				frm.add_custom_button(__("Denúncia (Período Experimental)"), () => _pt_denuncia(frm, e), __("Jurista"));
+			});
+	}
+	// The Jurista's outcomes: a light Repreensão (record only), a Termo or a Processo.
 	if (!frm.doc.repreensao && frappe.model.can_create("Repreensao")) {
 		frm.add_custom_button(__("Registar Repreensão"), () => {
 			frappe.prompt(
@@ -611,12 +642,12 @@ function _botao_processo(frm) {
 		}, __("Jurista"));
 	}
 	if (!frappe.model.can_create("Processo Disciplinar")) {
-		if (!frm.doc.repreensao) {
-			frm.dashboard.set_headline_alert(__("Submetida — aguarda o <b>Jurista</b> (repreensão ou processo disciplinar)."), "blue");
+		if (!decidida) {
+			frm.dashboard.set_headline_alert(__("Submetida — aguarda o <b>Jurista</b> (repreensão, termo ou processo disciplinar)."), "blue");
 		}
 		return;
 	}
-	if (!frm.doc.repreensao) frm.dashboard.set_headline_alert(__("Aguarda decisão: repreensão ou processo disciplinar."), "orange");
+	if (!decidida) frm.dashboard.set_headline_alert(__("Aguarda decisão: repreensão, termo ou processo disciplinar."), "orange");
 	frm.add_custom_button(__("Abrir Processo Disciplinar"), () => {
 		_pt_com_prazo(frm, (just) => frappe.confirm(
 			__("Abrir um Processo Disciplinar para <b>{0}</b> a partir desta participação?",
@@ -717,4 +748,21 @@ function _pt_css() {
 	.pt-title { font-size: 21px; }
 }`;
 	$(`<style id="sigos-pt-css">${css}</style>`).appendTo("head");
+}
+
+// Denúncia dialog → draft Denúncia, reviewed and submitted on its own form (creates the Demissão).
+function _pt_denuncia(frm, e) {
+	frappe.prompt(
+		[
+			{ fieldtype: "HTML", options: `<p class="text-danger">${__("Admitido a {0} · período experimental até {1}. Termina sempre em Demissão.",
+				[frappe.datetime.str_to_user(e.admissao), frappe.datetime.str_to_user(e.fim)])}</p>` },
+			{ fieldname: "fundamentacao", fieldtype: "Small Text", label: __("Fundamentação"), reqd: 1 },
+			{ fieldname: "data_de_demissao", fieldtype: "Date", label: __("Data de Efeito"), default: frappe.datetime.get_today(), reqd: 1 },
+			{ fieldname: "uniforme", fieldtype: "Select", label: __("Uniforme"), options: ["", "Entregue", "Não Entregue"] },
+		],
+		(v) => frm.call("criar_denuncia", v).then((r) => {
+			if (r.message) frappe.set_route("Form", "Denuncia", r.message);
+		}),
+		__("Denúncia (Período Experimental)"), __("Criar"),
+	);
 }

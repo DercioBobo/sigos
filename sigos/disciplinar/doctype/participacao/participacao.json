@@ -41,6 +41,8 @@
   "ocorrencia_referente",
   "processo_disciplinar",
   "repreensao",
+  "termo_responsabilidade",
+  "denuncia",
   "sec_relatorio",
   "posto",
   "posto_nome",
@@ -284,6 +286,26 @@
    "in_standard_filter": 1
   },
   {
+   "fieldname": "termo_responsabilidade",
+   "fieldtype": "Link",
+   "options": "Termo De Responsabilidade",
+   "label": "Termo de Responsabilidade",
+   "read_only": 1,
+   "no_copy": 1,
+   "allow_on_submit": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "denuncia",
+   "fieldtype": "Link",
+   "options": "Denuncia",
+   "label": "Denúncia",
+   "read_only": 1,
+   "no_copy": 1,
+   "allow_on_submit": 1,
+   "in_standard_filter": 1
+  },
+  {
    "fieldname": "sec_relatorio",
    "fieldtype": "Section Break",
    "label": "Relatório"
@@ -457,7 +479,7 @@
   }
  ],
  "links": [],
- "modified": "2026-11-19 12:00:00.000000",
+ "modified": "2026-11-23 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Disciplinar",
  "name": "Participacao",

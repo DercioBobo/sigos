@@ -248,7 +248,13 @@ def _disciplinar(v, hoje, processo=None):
 		"Repreensao", filters={"vigilante": v.name, "docstatus": 1},
 		fields=["name", "data", "numero", "infracoes", "processo_disciplinar"], order_by="data desc",
 	)
+	termos = frappe.get_all(
+		"Termo De Responsabilidade", filters={"vigilante": v.name, "docstatus": 1},
+		fields=["name", "data", "infracoes", "participacao", "processo_disciplinar", "documento_assinado"], order_by="data desc",
+	)
 	return {
+		"termos": termos[:10],
+		"total_termos": len(termos),
 		"repreensoes": repreensoes[:10],
 		"total_repreensoes": len(repreensoes),
 		"repreensoes_desde_processo": contar_repreensoes(v.name),

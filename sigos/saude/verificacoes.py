@@ -302,13 +302,14 @@ def suspenso_sem_processo():
 
 @verificacao("participacao_sem_seguimento", "disciplinar", "Participações sem Processo", CRITICO,
 	JURISTA + ("Aprovador Operações",),
-	"Submetidas, sem Processo nem Repreensão, com o prazo a acabar ou expirado.")
+	"Submetidas, sem Processo, Repreensão nem Termo, com o prazo a acabar ou expirado.")
 def participacao_sem_seguimento():
 	from sigos.disciplinar.prazos import estado, prazo_processo
 	prazo, out = prazo_processo(), []
 	for p in frappe.get_all("Participacao",
 			filters={"docstatus": 1, "processo_disciplinar": ["is", "not set"],
-				"repreensao": ["is", "not set"], "data_conhecimento_infracao": ["is", "set"]},
+				"repreensao": ["is", "not set"], "termo_responsabilidade": ["is", "not set"], "denuncia": ["is", "not set"],
+				"data_conhecimento_infracao": ["is", "set"]},
 			fields=["name", "nome_do_vigilante", "delegacao", "data_conhecimento_infracao"]):
 		e = estado(p.data_conhecimento_infracao, prazo)
 		if e["restam"] > PARTICIPACAO_AVISO_PRAZO:

@@ -681,7 +681,17 @@
   },
   {
    "group": "Disciplinar",
+   "link_doctype": "Termo De Responsabilidade",
+   "link_fieldname": "vigilante"
+  },
+  {
+   "group": "Disciplinar",
    "link_doctype": "Processo Disciplinar",
+   "link_fieldname": "vigilante"
+  },
+  {
+   "group": "Disciplinar",
+   "link_doctype": "Denuncia",
    "link_fieldname": "vigilante"
   }
  ],

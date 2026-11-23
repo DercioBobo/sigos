@@ -8,6 +8,11 @@ from frappe.utils import formatdate
 _ORDEM_GRAVIDADE = {"Baixa": 1, "Média": 2, "Alta": 3}
 
 
+def _sem_termo(participacao, accao):
+	from sigos.disciplinar.doctype.termo_de_responsabilidade.termo_de_responsabilidade import exigir_sem_termo
+	exigir_sem_termo(participacao, accao)
+
+
 class Participacao(Document):
 	"""
 	Participação — follows the paper form (XSS_OP.FR.006): O Participante (who
@@ -144,7 +149,8 @@ class Participacao(Document):
 					"email_content": (
 						_("Processo Disciplinar <b>{0}</b> já aberto automaticamente.").format(pd) if pd
 						else _("Participação submetida ({0}, gravidade {1}). Abra-a para decidir: "
-							   "<b>Repreensão</b> ou <b>Processo Disciplinar</b>.").format(infracoes, self.gravidade or "-")
+							   "<b>Repreensão</b>, <b>Termo de Responsabilidade</b> ou "
+							   "<b>Processo Disciplinar</b>.").format(infracoes, self.gravidade or "-")
 					),
 					"for_user": user,
 					"type": "Alert",
@@ -184,6 +190,7 @@ class Participacao(Document):
 		frappe.has_permission("Repreensao", "create", throw=True)
 		if self.docstatus != 1:
 			frappe.throw(_("Submeta a participação primeiro."))
+		_sem_termo(self.name, _("Repreensão"))
 		rep = frappe.get_doc({
 			"doctype": "Repreensao", "participacao": self.name,
 			"observacoes": (observacoes or "").strip() or None,
@@ -193,6 +200,40 @@ class Participacao(Document):
 		lim = limite_repreensoes()
 		return {"name": rep.name, "numero": rep.numero, "limite": lim,
 			"propor_processo": rep.numero >= lim and not self.processo_disciplinar}
+
+	@frappe.whitelist()
+	def criar_termo_responsabilidade(self):
+		"""Jurista: draft Termo de Responsabilidade (acknowledgment, not a sanction) with
+		the declaration pre-filled — reviewed, printed and signed before submit.
+		Returns the (existing or new) name."""
+		frappe.has_permission("Termo De Responsabilidade", "create", throw=True)
+		if self.docstatus != 1:
+			frappe.throw(_("Submeta a participação primeiro."))
+		existente = frappe.db.get_value("Termo De Responsabilidade",
+			{"participacao": self.name, "processo_disciplinar": ["is", "not set"], "docstatus": ["<", 2]})
+		if existente:
+			return existente
+		termo = frappe.get_doc({"doctype": "Termo De Responsabilidade", "participacao": self.name})
+		termo.insert()
+		return termo.name
+
+	@frappe.whitelist()
+	def criar_denuncia(self, fundamentacao, data_de_demissao=None, uniforme=None):
+		"""Jurista: draft Denúncia (dismissal in the probation period, no Processo) —
+		reviewed and submitted on its own form, which creates the Demissão."""
+		frappe.has_permission("Denuncia", "create", throw=True)
+		if self.docstatus != 1:
+			frappe.throw(_("Submeta a participação primeiro."))
+		existente = frappe.db.get_value("Denuncia", {"participacao": self.name, "docstatus": ["<", 2]})
+		if existente:
+			return existente
+		den = frappe.get_doc({
+			"doctype": "Denuncia", "participacao": self.name, "vigilante": self.vigilante,
+			"fundamentacao": fundamentacao, "uniforme": uniforme or None,
+			"data_de_demissao": data_de_demissao or frappe.utils.today(),
+		})
+		den.insert()
+		return den.name
 
 	@frappe.whitelist()
 	def criar_processo_disciplinar(self, justificacao_fora_de_prazo=None):
@@ -207,6 +248,7 @@ class Participacao(Document):
 		frappe.has_permission("Processo Disciplinar", "create", throw=True)
 		if self.docstatus != 1:
 			frappe.throw(_("Submeta a participação antes de abrir um Processo Disciplinar."))
+		_sem_termo(self.name, _("Processo Disciplinar"))
 
 		existente = frappe.db.exists(
 			"Processo Disciplinar", {"participacao_referente": self.name, "docstatus": ["<", 2]}

@@ -10,6 +10,10 @@ frappe.ui.form.on("Processo Disciplinar", {
 		_ficha(frm);
 		_tramitacao(frm);
 		_pd_visual(frm);
+		if (frm.doc.termo_responsabilidade_doc) {
+			frm.add_custom_button(__("Ver Termo de Responsabilidade"),
+				() => frappe.set_route("Form", "Termo De Responsabilidade", frm.doc.termo_responsabilidade_doc));
+		}
 	},
 
 	// header follows the fields it shows
@@ -239,7 +243,7 @@ const _PD_SANCOES = [
 	{ v: "Suspensão do Trabalho", ic: "S", sub: __("Até 10 dias sem remuneração"), tom: "m" },
 	{ v: "Multa", ic: "M", sub: __("Até 20 dias de salário"), tom: "m" },
 	{ v: "Despromoção", ic: "D", sub: __("Categoria inferior, até 12 meses"), tom: "m" },
-	{ v: "Termo de Responsabilidade", ic: "T", sub: __("Documento assinado"), tom: "b" },
+	{ v: "Termo de Responsabilidade", ic: "T", sub: __("Criado ao aprovar, para assinar"), tom: "b" },
 	{ v: "Despedimento", ic: "X", sub: __("Cria a Demissão"), tom: "a" },
 	{ v: "Arquivamento", ic: "A", sub: __("Sem sanção"), tom: "n" },
 ];

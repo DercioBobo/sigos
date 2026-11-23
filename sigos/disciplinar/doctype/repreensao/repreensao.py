@@ -54,6 +54,8 @@ class Repreensao(Document):
 			"Repreensao", {"participacao": self.participacao, "docstatus": ["<", 2], "name": ["!=", self.name]})
 		if outra:
 			frappe.throw(_("Esta participação já tem a Repreensão <b>{0}</b>.").format(outra))
+		from sigos.disciplinar.doctype.termo_de_responsabilidade.termo_de_responsabilidade import exigir_sem_termo
+		exigir_sem_termo(self.participacao, _("Repreensão"))
 		self.vigilante = p.vigilante
 		self.nome_do_vigilante = p.nome_do_vigilante
 		self.mecanografico = p.mecanografico

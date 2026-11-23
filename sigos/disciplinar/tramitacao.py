@@ -13,7 +13,8 @@ Disciplinar — Prazos):
 Fase (read-only) is recomputed on every save and by the daily job.
 
 Sanctions (decisão) and their effects (applied when the process is approved):
-  Repreensão / Termo de Responsabilidade / Arquivamento — recorded;
+  Repreensão / Arquivamento — recorded;
+  Termo de Responsabilidade — a draft Termo De Responsabilidade to print and sign;
   Suspensão do Trabalho (≤10 days) — those days unpaid and no absences recorded
     (dias_suspensao_trabalho / periodo_suspensao_trabalho);
   Multa (≤20 days of salary) — base/30 × days via Outras Deduções;
@@ -223,9 +224,6 @@ def validar_decisao(pd):
 		if not pd.despromocao_inicio:
 			pd.despromocao_inicio = today()
 		pd.despromocao_fim = add_days(add_months(getdate(pd.despromocao_inicio), meses), -1)
-	elif dec == D_TERMO:
-		if not pd.termo_de_responsabilidade:
-			frappe.throw(_("Anexe o <b>Termo de Responsabilidade</b> assinado."))
 
 
 def valor_multa(vigilante, dias):

@@ -130,8 +130,10 @@
   "col_ss_impressos",
   "codigo_formulario_participacao",
   "codigo_formulario_presuncao",
+  "codigo_formulario_termo",
   "presuncao_assinatura",
   "presuncao_base_legal",
+  "texto_termo_responsabilidade",
   "contactos_documentos"
  ],
  "fields": [
@@ -886,6 +888,12 @@
    "description": "1.ª linha à esquerda, restantes à direita."
   },
   {
+   "fieldname": "codigo_formulario_termo",
+   "fieldtype": "Small Text",
+   "label": "Código do Formulário — Termo de Responsabilidade",
+   "description": "Uma linha por linha impressa."
+  },
+  {
    "fieldname": "presuncao_assinatura",
    "fieldtype": "Data",
    "label": "Assinatura — Presunção de Abandono",
@@ -896,6 +904,12 @@
    "fieldtype": "Small Text",
    "label": "Base Legal — Presunção de Abandono",
    "description": "Vazio = n.º 3 do art. 115 da Lei n.º 13/2023."
+  },
+  {
+   "fieldname": "texto_termo_responsabilidade",
+   "fieldtype": "Text",
+   "label": "Texto do Termo de Responsabilidade",
+   "description": "Vazio = texto padrão. Campos: {nome} {numero} {categoria} {origem} {participacao} {processo} {infracoes} {data} {posto}"
   },
   {
    "fieldname": "contactos_documentos",
@@ -950,7 +964,7 @@
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-11-19 12:00:00.000000",
+ "modified": "2026-11-23 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "SIGOS Setup",
  "name": "SIGOS Settings",

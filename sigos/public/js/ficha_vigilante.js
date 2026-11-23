@@ -98,6 +98,10 @@ frappe.provide("sigos.ficha_vigilante");
 				[__("Data"), __("N.º"), __("Infracções"), __("Processo")],
 				di.repreensoes.map((r) => [lnk("Repreensao", r.name, dt(r.data)), `${r.numero || "?"}.ª`,
 					esc(r.infracoes || ""), r.processo_disciplinar ? lnk("Processo Disciplinar", r.processo_disciplinar) : "—"])) : ""}
+			${(di.termos || []).length ? `<div class="fv-sub">${__("Termos de Responsabilidade")}</div>` + tabela(
+				[__("Data"), __("Infracções"), __("Origem"), __("Assinado")],
+				di.termos.map((t) => [lnk("Termo De Responsabilidade", t.name, dt(t.data)), esc(t.infracoes || ""),
+					t.processo_disciplinar ? lnk("Processo Disciplinar", t.processo_disciplinar) : (t.participacao ? lnk("Participacao", t.participacao) : "—"), t.documento_assinado ? __("Sim") : __("Não")])) : ""}
 			${(di.processos_anteriores || []).length ? `<div class="fv-sub">${__("Processos anteriores")}</div>` + tabela(
 				[__("Data"), __("Motivo"), __("Decisão")],
 				di.processos_anteriores.map((p) => [lnk("Processo Disciplinar", p.name, dt(p.data)),

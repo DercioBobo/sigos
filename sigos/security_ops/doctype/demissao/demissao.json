@@ -43,7 +43,7 @@
    "fieldname": "motivo",
    "fieldtype": "Select",
    "label": "Motivo",
-   "options": "\nAbandono\nRescisão\nDisciplinar\nFim de Contrato\nOutro",
+   "options": "\nAbandono\nRescisão\nDisciplinar\nDenúncia\nFim de Contrato\nOutro",
    "reqd": 1
   },
   {

@@ -7,7 +7,7 @@ frappe.query_reports["Demissoes"] = {
 		{ fieldname: "posto", label: __("Último Posto"), fieldtype: "Link", options: "Posto De Vigilancia" },
 		{
 			fieldname: "motivo", label: __("Motivo"), fieldtype: "Select",
-			options: "\nAbandono\nRescisão\nDisciplinar\nFim de Contrato\nOutro Motivo",
+			options: "\nAbandono\nRescisão\nDisciplinar\nDenúncia\nFim de Contrato\nOutro Motivo",
 		},
 		{
 			fieldname: "origem", label: __("Origem"), fieldtype: "Select",

@@ -54,6 +54,8 @@ class ProcessoDisciplinar(Document):
 		antes = self.get_doc_before_save()
 		if not (self.is_new() or (antes and antes.participacao_referente != self.participacao_referente)):
 			return
+		from sigos.disciplinar.doctype.termo_de_responsabilidade.termo_de_responsabilidade import exigir_sem_termo
+		exigir_sem_termo(self.participacao_referente, _("Processo Disciplinar"))
 		conhecimento = frappe.db.get_value(
 			"Participacao", self.participacao_referente, "data_conhecimento_infracao")
 		e = exigir(self, conhecimento, prazo_processo(), _("o Processo Disciplinar tem de ser aberto"))
@@ -113,6 +115,9 @@ class ProcessoDisciplinar(Document):
 	def on_cancel(self):
 		self._cancelar_cobertura_se_existir()
 		self._ligar_participacao(None)
+		if self.termo_responsabilidade_doc:
+			from sigos.disciplinar.doctype.termo_de_responsabilidade.termo_de_responsabilidade import anular_do_processo
+			anular_do_processo(self)
 
 	def on_trash(self):
 		self._ligar_participacao(None)
@@ -153,6 +158,12 @@ class ProcessoDisciplinar(Document):
 			if (self.get("workflow_state") or "Aprovado") == "Aprovado":
 				from sigos.disciplinar.tramitacao import aplicar_despromocao
 				aplicar_despromocao(self)  # today, or by the daily job on the start day
+
+		elif decisao == "Termo de Responsabilidade" and (self.get("workflow_state") or "Aprovado") == "Aprovado":
+			from sigos.disciplinar.doctype.termo_de_responsabilidade.termo_de_responsabilidade import criar_do_processo
+			termo = criar_do_processo(self)
+			frappe.msgprint(_("Termo de Responsabilidade {0} criado — imprima, recolha a assinatura do vigilante e submeta.")
+				.format(frappe.utils.get_link_to_form("Termo De Responsabilidade", termo)), alert=True)
 
 		from sigos.timeline import registar
 		registar(self.vigilante, _("Processo Disciplinar <b>{0}</b> decidido: <b>{1}</b>").format(
