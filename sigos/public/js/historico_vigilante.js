@@ -113,7 +113,6 @@ frappe.provide("sigos.historico");
 			const ava = id.foto ? `<img src="${esc(id.foto)}" alt="">` : esc(ini);
 			const ferias = (d.ferias || []).reduce((t, f) => t + (f.saldo || 0), 0);
 			const delta = (a.mes_atual || 0) - (a.mes_anterior || 0);
-			const material = (d.material || []).reduce((t, m) => t + (m.em_posse || 0), 0);
 
 			const chip = (lbl, val, mono) => val ? `<span class="hv-meta"><i>${lbl}</i><b class="${mono ? "hv-mono" : ""}">${esc(val)}</b></span>` : "";
 			const kpi = (cat, lbl, val, sub, tom, sm) => `
@@ -134,12 +133,11 @@ frappe.provide("sigos.historico");
 				kpi("disciplinar", __("Participações 12m"), di.participacoes_12m || 0,
 					__("{0} processo(s) · {1} repreensão(ões)", [(di.processos_anteriores || []).length, di.total_repreensoes || 0]),
 					(di.participacoes_12m || 0) >= 3 ? "bad" : ""),
-				kpi("material", __("Material em posse"), material, __("{0} item(ns) retornável(eis)", [(d.material || []).length])),
 			];
 			if (s) {
 				kpis.push(kpi("salario", __("Salário base"), moeda(s.base),
 					s.ssa ? __("desde {0}", [dt(s.ssa.from_date)]) : "", "", true));
-				kpis.push(kpi("salario", __("Dívida restante"), moeda(s.divida_total),
+				if (s.divida_total > 0) kpis.push(kpi("salario", __("Dívida restante"), moeda(s.divida_total),
 					__("{0} empréstimo(s) · {1} dedução(ões)", [(s.emprestimos || []).length, (s.deducoes || []).length]),
 					s.divida_total > 0 ? "amber" : "", true));
 			}
@@ -282,7 +280,8 @@ frappe.provide("sigos.historico");
 			$f.off("click.hv").on("click.hv", "[data-abrir]", (e) => {
 				const k = $(e.currentTarget).attr("data-abrir");
 				this.abertos.has(k) ? this.abertos.delete(k) : this.abertos.add(k);
-				$(e.currentTarget).closest(".hv-ev").toggleClass("aberto", this.abertos.has(k));
+				const $ev = $(e.currentTarget).closest(".hv-ev").toggleClass("aberto", this.abertos.has(k));
+				if (this.abertos.has(k)) this._doc($ev);
 			});
 		}
 
@@ -297,7 +296,8 @@ frappe.provide("sigos.historico");
 				? `<span class="hv-valor ${e.valor < 0 ? "neg" : ""}">${moeda(e.valor)}</span>`
 				: (e.valor != null && e.tipo === "faltas" ? `<span class="hv-valor hv-valor-f ${e.tom ? "hv-t-" + e.tom : ""}">${e.valor}<small>${__("faltas")}</small></span>` : "");
 			const itens = (e.itens || []);
-			const temMais = itens.length || (e.detalhe && e.detalhe.length > 0);
+			const temDoc = !!(e.doctype && e.name);
+			const temMais = itens.length || (e.detalhe && e.detalhe.length > 0) || temDoc;
 			return `<li class="hv-ev ${e.cancelado ? "canc" : ""} ${e.rascunho ? "rasc" : ""} ${aberto ? "aberto" : ""} ${e.tom ? "hv-t-" + e.tom : ""}">
 				<div class="hv-ev-dia"><b>${d.getDate()}</b><span>${DIAS[d.getDay()]}</span></div>
 				<div class="hv-ev-no hv-c-${e.cat}">${ico(e.cat, "hv-ico-s")}</div>
@@ -311,12 +311,27 @@ frappe.provide("sigos.historico");
 						${i.estado ? `<span class="hv-pill hv-pill-neutral">${esc(i.estado)}</span>` : ""}
 						${i.doctype && i.name ? `<a href="${url(i.doctype, i.name)}" class="hv-mono">${esc(i.name)}</a>` : ""}
 					</li>`).join("")}</ul>` : ""}
+					${temDoc ? `<div class="hv-doc" data-dt="${esc(e.doctype)}" data-dn="${esc(e.name)}"></div>` : ""}
 					<div class="hv-ev-foot">
-						${e.name && e.doctype ? `<span class="hv-mono hv-ev-ref">${esc(e.name)}</span>` : ""}
+						${temDoc ? `<a class="hv-mono hv-ev-ref" href="${url(e.doctype, e.name)}" title="${__("Abrir documento")}">${esc(e.name)} &#8599;</a>` : ""}
 						${temMais ? `<button class="hv-mais" data-abrir="${esc(k)}"><span class="a">${itens.length ? __("Ver {0} registo(s)", [itens.length]) : __("Ver detalhe")}</span><span class="f">${__("Fechar")}</span></button>` : ""}
 					</div>
 				</div>
 			</li>`;
+		}
+
+		// Inline document detail (sigos.historico.detalhe_documento), cached per doc.
+		_doc($ev) {
+			const $d = $ev.find(".hv-doc");
+			if (!$d.length || $d.data("ok")) return;
+			const dtp = $d.attr("data-dt"), dn = $d.attr("data-dn"), chave = `${dtp}|${dn}`;
+			this.docs = this.docs || {};
+			const desenhar = (x) => { $d.data("ok", 1).html(docHtml(x)); };
+			if (this.docs[chave]) return desenhar(this.docs[chave]);
+			$d.html(`<div class="hv-doc-load">${__("A carregar documento…")}</div>`);
+			frappe.xcall("sigos.historico.detalhe_documento", { doctype: dtp, name: dn })
+				.then((x) => { this.docs[chave] = x; desenhar(x); })
+				.catch(() => $d.html(`<div class="hv-doc-load">${__("Sem permissão para ver este documento.")}</div>`));
 		}
 
 		// ─── side summary (page mode) ─────────────────────────────────────
@@ -370,10 +385,6 @@ frappe.provide("sigos.historico");
 					blocos.push(`<div class="hv-card"><h3>${ico("assiduidade", "hv-ico-s")} ${__("Férias e licenças")}</h3>
 						<ul class="hv-list">${d.ferias.map((f) => `<li><span>${esc(f.leave_type)}</span><b>${Math.round((f.saldo || 0) * 10) / 10} ${__("dias")}</b></li>`).join("")}</ul></div>`);
 				}
-				if ((d.material || []).length) {
-					blocos.push(`<div class="hv-card"><h3>${ico("material", "hv-ico-s")} ${__("Material em posse")}</h3>
-						<ul class="hv-list">${d.material.map((m) => `<li><a href="${url("Alocacao De Material", m.alocacao)}">${esc(m.material)}</a><b>${m.em_posse}</b></li>`).join("")}</ul></div>`);
-				}
 				const s = d.salario;
 				if (s) {
 					blocos.push(`<div class="hv-card"><h3>${ico("salario", "hv-ico-s")} ${__("Salário")}</h3>
@@ -386,6 +397,24 @@ frappe.provide("sigos.historico");
 			}
 			$s.html(blocos.join(""));
 		}
+	}
+
+	function docHtml(x) {
+		const campo = (c) => {
+			let v = esc(c.valor);
+			if (c.link) v = `<a href="${url(c.link.doctype, c.link.name)}">${v}</a>`;
+			else if (c.ficheiro) v = `<a href="${esc(c.ficheiro)}" target="_blank">${__("Ver anexo")}</a>`;
+			return `<div class="hv-f ${c.longo ? "hv-f-longo" : ""}"><span>${esc(c.label)}</span><b>${v}</b></div>`;
+		};
+		const secs = (x.seccoes || []).map((s) => `
+			${s.label ? `<div class="hv-doc-sec">${esc(s.label)}</div>` : ""}
+			<div class="hv-doc-grid">${s.campos.map(campo).join("")}</div>`).join("");
+		const tabs = (x.tabelas || []).map((t) => `
+			<div class="hv-doc-sec">${esc(t.label)}</div>
+			<div class="hv-doc-tw"><table class="hv-doc-t"><thead><tr>${t.colunas.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead>
+			<tbody>${t.linhas.map((l) => `<tr>${l.map((v) => `<td>${esc(v)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>
+			${t.mais ? `<div class="hv-nota">${__("+ {0} linha(s)", [t.mais])}</div>` : ""}`).join("");
+		return (secs + tabs) || `<div class="hv-doc-load">${__("Sem dados adicionais.")}</div>`;
 	}
 
 	function tomStatus(s) {
@@ -529,7 +558,23 @@ a.hv-ev-t:hover { color:var(--accentInk) !important; }
 .hv-ev.aberto .hv-itens li, .hv-print-all .hv-itens li { display:flex; }
 .hv-ev-foot { display:flex; align-items:center; gap:10px; margin-top:6px; }
 .hv-ev-foot:empty { display:none; }
-.hv-ev-ref { color:var(--ink3); font-size:11px; }
+.hv-ev-ref { color:var(--ink3) !important; font-size:11px; text-decoration:none !important; border-radius:6px; padding:1px 4px; margin-left:-4px; }
+.hv-ev-ref:hover { color:var(--accentInk) !important; background:var(--wash); }
+.hv-doc { display:none; margin-top:10px; border-top:1px dashed var(--line2); padding-top:6px; }
+.hv-ev.aberto .hv-doc { display:block; }
+.hv-doc-load { color:var(--ink3); font-size:12px; padding:8px 0; }
+.hv-doc-sec { color:var(--ink3); text-transform:uppercase; font-size:10.5px; letter-spacing:.05em; font-weight:600; margin:10px 0 6px; }
+.hv-doc-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:8px 18px; }
+.hv-f { display:flex; flex-direction:column; gap:1px; min-width:0; }
+.hv-f span { color:var(--ink3); font-size:11px; }
+.hv-f b { font-weight:500; color:var(--ink); font-size:12.5px; overflow-wrap:anywhere; }
+.hv-f b a { color:var(--accentInk); }
+.hv-f-longo { grid-column:1 / -1; }
+.hv-f-longo b { white-space:pre-wrap; background:var(--paper3); border-radius:8px; padding:6px 9px; color:var(--ink2); }
+.hv-doc-tw { overflow-x:auto; border:1px solid var(--line); border-radius:10px; }
+.hv-doc-t { width:100%; border-collapse:collapse; font-size:12px; }
+.hv-doc-t th { background:var(--paper3); color:var(--ink2); font-weight:600; text-align:left; padding:6px 9px; white-space:nowrap; }
+.hv-doc-t td { padding:6px 9px; border-top:1px solid var(--line); color:var(--ink); }
 .hv-mais { margin-left:auto; border:0; background:transparent; color:var(--accentInk); font-weight:600; font-size:12px; cursor:pointer; padding:0; }
 .hv-mais .f { display:none; } .hv-ev.aberto .hv-mais .a { display:none; } .hv-ev.aberto .hv-mais .f { display:inline; }
 .hv-ev.canc .hv-ev-card { opacity:.55; } .hv-ev.canc .hv-ev-t { text-decoration:line-through !important; }

@@ -432,3 +432,90 @@ def _tom_estado(estado):
 	if estado in ("Activa", "Por Atribuir", "Aberta", "Em Curso", "Em Investigação", "Open"):
 		return "amber"
 	return None
+
+
+# ─── Inline document detail ("Ver detalhe" on any event) ────────────────────────
+
+_SEM_VALOR = {"Section Break", "Column Break", "Tab Break", "HTML", "Button", "Fold", "Heading", "Image",
+	"Password", "Signature", "Geolocation", "Table", "Table MultiSelect"}
+_IGNORAR = {"naming_series", "amended_from", "owner", "idx"}
+_LIMITE_LINHAS = 30
+
+
+@frappe.whitelist()
+def detalhe_documento(doctype, name):
+	"""Readable summary of any document in the history, so the user doesn't have to
+	leave the page: non-empty fields grouped by section, plus child tables (list-view
+	columns). Respects document AND field-level (permlevel) read permissions."""
+	frappe.only_for(PAPEIS_DOSSIE)
+	doc = frappe.get_doc(doctype, name)
+	doc.check_permission("read")
+	doc.apply_fieldlevel_read_permissions()
+	meta = doc.meta
+
+	seccoes, tabelas, atual = [], [], {"label": None, "campos": []}
+	for df in meta.fields:
+		if df.fieldtype in ("Section Break", "Tab Break"):
+			if atual["campos"]:
+				seccoes.append(atual)
+			atual = {"label": _(df.label) if df.label else None, "campos": []}
+			continue
+		if df.hidden or df.fieldname in _IGNORAR:
+			continue
+		valor = doc.get(df.fieldname)
+		if df.fieldtype == "Table":
+			linhas = valor or []
+			if not linhas:
+				continue
+			tabelas.append(_tabela(df, linhas))
+			continue
+		if df.fieldtype == "Table MultiSelect":
+			linhas = valor or []
+			if linhas:
+				cm = frappe.get_meta(df.options)
+				lf = next((c.fieldname for c in cm.fields if c.fieldtype == "Link"), None)
+				atual["campos"].append({"label": _(df.label), "valor": ", ".join(str(r.get(lf) or "") for r in linhas)})
+			continue
+		if df.fieldtype in _SEM_VALOR or valor in (None, ""):
+			continue
+		if df.fieldtype == "Check":
+			if not valor:
+				continue
+			txt = _("Sim")
+		elif df.fieldtype in ("Currency", "Float", "Int", "Percent") and not flt(valor):
+			continue
+		elif df.fieldtype == "Text Editor":
+			txt = frappe.utils.strip_html(valor).strip()
+		elif df.fieldtype == "Attach":
+			txt = valor
+		else:
+			txt = frappe.format_value(valor, df, doc=doc)
+			txt = frappe.utils.strip_html(str(txt)) if txt is not None else ""
+		if not str(txt).strip():
+			continue
+		item = {"label": _(df.label or df.fieldname), "valor": str(txt),
+			"longo": df.fieldtype in ("Text", "Small Text", "Long Text", "Text Editor", "Code")}
+		if df.fieldtype == "Link" and df.options and valor:
+			item["link"] = {"doctype": df.options, "name": valor}
+		elif df.fieldtype == "Attach":
+			item["ficheiro"] = valor
+		atual["campos"].append(item)
+	if atual["campos"]:
+		seccoes.append(atual)
+
+	estado = _("Cancelado") if doc.docstatus == 2 else (_("Rascunho") if doc.docstatus == 0 and meta.is_submittable else None)
+	return {"doctype": doctype, "name": name, "estado": doc.get("workflow_state") or estado,
+		"seccoes": seccoes, "tabelas": tabelas}
+
+
+def _tabela(df, linhas):
+	cm = frappe.get_meta(df.options)
+	cols = [c for c in cm.fields if c.in_list_view and c.fieldtype not in _SEM_VALOR and not c.hidden][:6]
+	if not cols:
+		cols = [c for c in cm.fields if c.fieldtype not in _SEM_VALOR and not c.hidden][:4]
+	out = []
+	for r in linhas[:_LIMITE_LINHAS]:
+		out.append([frappe.utils.strip_html(str(frappe.format_value(r.get(c.fieldname), c, doc=r) or ""))
+			if r.get(c.fieldname) not in (None, "") else "" for c in cols])
+	return {"label": _(df.label or df.options), "colunas": [_(c.label or c.fieldname) for c in cols], "linhas": out,
+		"mais": max(0, len(linhas) - _LIMITE_LINHAS)}
