@@ -121,7 +121,6 @@
   "valor_subsidio_chefia_turno",
   "valor_subsidio_chefia_posto",
   "valor_subsidio_canino",
-  "turno_equipa_activo",
   "admissao_automatica_activo",
   "posto_interno_por_omissao",
   "nao_herdar_salario_por_omissao",
@@ -830,13 +829,6 @@
    "fieldtype": "Currency",
    "label": "Valor — Canino (Com Cão)",
    "depends_on": "eval:doc.subsidios_categoria_funcao_activo"
-  },
-  {
-   "fieldname": "turno_equipa_activo",
-   "fieldtype": "Check",
-   "label": "Escala: Turno da Equipa",
-   "default": "0",
-   "description": "Mostra a coluna Turno da Equipa na escala (só etiqueta)."
   },
   {
    "fieldname": "admissao_automatica_activo",

@@ -154,7 +154,7 @@ class EscalaDoVigilante(Document):
 
 	def _sincronizar_turno_por_equipa(self):
 		"""
-		Customer-specific team rostering (SIGOS Settings.turno_equipa_activo): guards
+		Team rostering (Turno da Equipa): guards
 		sharing a turno_equipa (Equipa A/B/C...) must always share the same turno_inicial
 		— editing one member's anchor via the native grid, the bulk dialog, the sync
 		button, or the API all funnel through here, so it can't be bypassed. Rows without
@@ -272,7 +272,7 @@ class EscalaDoVigilante(Document):
 			g.vigilante: g.turno_inicial
 			for g in self.tab_vigilante_do_posto if g.vigilante
 		}
-		# Turno da Equipa (customer-specific, SIGOS Settings.turno_equipa_activo): a
+		# Turno da Equipa: a
 		# label/grouping only — carried onto generated rows below, never affects which
 		# turno/periodo a guard is assigned.
 		equipas = {

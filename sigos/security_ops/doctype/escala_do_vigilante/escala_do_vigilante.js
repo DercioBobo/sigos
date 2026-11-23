@@ -49,38 +49,14 @@ frappe.ui.form.on("Escala Do Vigilante", {
 	btn_limpar_tudo(frm) { _limpar_tudo(frm); },
 });
 
-// ─── Turno da Equipa (customer-specific, SIGOS Settings.turno_equipa_activo) ──────
+// ─── Turno da Equipa (general) ──────────────────────────────────────────────────
 // Label/grouping column on both the roster grid and the generated schedule grid —
-// never affects the rotation itself (sigos/security_ops/doctype/escala_do_vigilante/
-// escala_do_vigilante.py reconciliar_escala carries it through unchanged). Hidden by
-// default, same session-cached toggle pattern as Vigilante's Posição/Subsídios fields.
-let _turno_equipa_activo = null;
+// never affects the rotation itself (escala_do_vigilante.py reconciliar_escala carries
+// it through unchanged). Always on (was a customer flag until 2026-11-23); an escala
+// without teams simply leaves it empty.
+const _turno_equipa_activo = true;
 function _toggle_turno_equipa(frm) {
-	const aplicar = () => {
-		const show = !!_turno_equipa_activo;
-		frm.fields_dict.tab_vigilante_do_posto?.grid.toggle_display("turno_equipa", show);
-		frm.fields_dict.tabela_de_escala?.grid.toggle_display("turno_equipa", show);
-		// Tipo (Vigilante/Supervisor/Chefe...) is redundant once teams are in play —
-		// swap it out for Turno da Equipa on the roster grid, same toggle.
-		frm.fields_dict.tab_vigilante_do_posto?.grid.toggle_display("tipo_de_vigilante", !show);
-		// "Atribuir Equipas em Bloco" only makes sense in team mode — same toggle.
-		frm.fields_dict.deck_escala?.$wrapper.find('[data-act="equipas"]').toggle(show);
-		// The async Settings fetch below usually resolves AFTER the grid has already
-		// painted with the default column set — toggle_display alone can leave
-		// already-rendered rows stale/misaligned for a flash. Force a clean re-layout
-		// once the real column state is known, instead of waiting for some other
-		// trigger to happen to refresh it.
-		frm.fields_dict.tab_vigilante_do_posto?.grid.refresh();
-		frm.fields_dict.tabela_de_escala?.grid.refresh();
-	};
-	if (_turno_equipa_activo === null) {
-		frappe.db.get_single_value("SIGOS Settings", "turno_equipa_activo").then((v) => {
-			_turno_equipa_activo = !!v;
-			aplicar();
-		});
-	} else {
-		aplicar();
-	}
+	frm.fields_dict.deck_escala?.$wrapper.find('[data-act="equipas"]').show();
 }
 
 function _gerar_escala(frm) {
@@ -137,7 +113,7 @@ frappe.ui.form.on("Tab Vigilante Do Posto", {
 		const antigo = frm._slot_snap?.[cdn];
 		if (!novo) { _snapshot_slots(frm); return; }
 
-		// Turno da Equipa (customer-specific): team rows are synced server-side on
+		// Turno da Equipa: team rows are synced server-side on
 		// save (_sincronizar_turno_por_equipa) — skip the single-guard swap here so
 		// editing one teammate doesn't visibly bump a stranger before the server
 		// corrects it back to the whole team's shared value.
@@ -269,7 +245,7 @@ function _sincronizar_vigilantes(frm) {
 					// Noite, 1a/2a Folga) land on 1a Manhã / 1a Noite / 1a Folga (one of each
 					// type) instead of piling into the first 3 slots.
 					//
-					// Turno da Equipa (customer-specific): a UNIT is a whole equipa, not a
+					// Turno da Equipa: a UNIT is a whole equipa, not a
 					// single guard, so every member of the same team always lands on the same
 					// slot (server-side _sincronizar_turno_por_equipa is the ultimate
 					// authority — this just avoids the sync button visibly scrambling teammates
@@ -357,7 +333,7 @@ function _distribuir_turnos(frm) {
 
 		const opts = "\n" + seq.map(t => t.turno).join("\n");
 
-		// Turno da Equipa (customer-specific): group guards into UNITS so a whole team
+		// Turno da Equipa: group guards into UNITS so a whole team
 		// is edited — and staggered — as one, every member always getting the same
 		// turno_inicial. Guards without an equipa tag are their own unit, same as before.
 		const equipaAtiva = !!_turno_equipa_activo;
@@ -436,7 +412,7 @@ function _distribuir_turnos(frm) {
 	});
 }
 
-// ─── Combined Equipas & Turnos modal (customer-specific, turno_equipa_activo) ──
+// ─── Combined Equipas & Turnos modal ──
 // One live-updating view that does both halves at once: tag each guard into a
 // Turno Da Equipa, AND set each team's shared turno_inicial — every member's
 // turno updates on screen the instant their team's turno changes, before
@@ -625,9 +601,8 @@ function _load_and_render(frm) {
 	const licencas = (frm.doc.name && !frm.is_new())
 		? frappe.xcall("sigos.api.licencas_na_escala", { escala_name: frm.doc.name }).catch(() => ({}))
 		: Promise.resolve({});
-	// Fetched unconditionally (cheap, small table) rather than gated on
-	// turno_equipa_activo — on non-team escalas every row's turno_equipa is
-	// simply empty, so the label suffix is a no-op either way.
+	// Cheap, small table — on non-team escalas every row's turno_equipa is
+	// simply empty, so the label suffix is a no-op.
 	const equipas = frappe.db.get_list("Turno Da Equipa", { fields: ["name", "codigo"], limit_page_length: 0 })
 		.catch(() => []);
 	Promise.all([

@@ -1087,9 +1087,6 @@ def get_sigos_settings_flags():
 		"supervisor_activo": frappe.db.get_single_value(
 			"SIGOS Settings", "supervisor_activo"
 		),
-		"turno_equipa_activo": frappe.db.get_single_value(
-			"SIGOS Settings", "turno_equipa_activo"
-		),
 	}
 
 

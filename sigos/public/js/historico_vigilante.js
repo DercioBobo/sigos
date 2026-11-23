@@ -112,13 +112,14 @@ frappe.provide("sigos.historico");
 			const h = this.hoje;
 			if (!h) return "";
 			const trab = (h.turnos || []).filter((t) => !t.e_folga);
+			const equipa = (t) => t.turno_equipa || null; // the team name as registered (e.g. "Equipa A")
 			let txt, tom = "";
 			if (trab.length) {
-				txt = trab.map((t) => [t.turno, t.periodo && t.periodo !== t.turno ? t.periodo : null, t.nome_do_posto || t.posto]
+				txt = trab.map((t) => [t.turno, equipa(t), t.periodo && t.periodo !== t.turno ? t.periodo : null, t.nome_do_posto || t.posto]
 					.filter(Boolean).join(" · ")).join(" + ");
 				tom = "on";
 			} else if ((h.turnos || []).length) {
-				txt = __("Folga");
+				txt = [__("Folga"), equipa(h.turnos[0])].filter(Boolean).join(" · ");
 			} else {
 				txt = __("Sem escala");
 			}

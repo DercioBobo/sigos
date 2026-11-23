@@ -55,6 +55,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 			busca: "",
 			statusFiltro: null,
 			postoFiltro: null,
+			equipaFiltro: null,   // Turno da Equipa name, or "__sem__" for guards without one
 		};
 		this.expandedRowKey = null;
 		this.userToggledPostos = new Map();
@@ -88,13 +89,6 @@ sigos.VigilantesHoje = class VigilantesHoje {
 			method: "sigos.api.get_sigos_settings_flags",
 			callback: (r) => {
 				this.settingsFlags = r.message || {};
-				// Turno da Equipa (customer-specific): "Único" período only makes
-				// sense for team-rostered regimes — hidden otherwise, same gate as
-				// the Escala Do Vigilante columns/buttons. No default-période override
-				// needed here anymore — "Todos" (the page default) already includes
-				// Único guards, so there's nothing team-specific left to switch to.
-				this.$root.find('.vh-seg[data-role="periodo"] button[data-p="Único"]')
-					.toggle(!!this.settingsFlags.turno_equipa_activo);
 			},
 		});
 		frappe.call({
@@ -185,6 +179,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 			}));
 			this.rows = [...escala, ...vagaRows];
 			this._populate_posto_filter();
+			this._populate_equipa_filter();
 			this._render();
 			const agora = new Date().toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
 			this.$root.find(".vh-stamp").text(__("Actualizado às {0}", [agora]));
@@ -217,10 +212,16 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		const filtradas = this.rows.filter((r) => {
 			if (this.state.statusFiltro && r._status !== this.state.statusFiltro) return false;
 			if (this.state.postoFiltro && this._posto_label(r) !== this.state.postoFiltro) return false;
+			if (this.state.equipaFiltro) {
+				if (this.state.equipaFiltro === "__sem__" ? !!r.turno_equipa : r.turno_equipa !== this.state.equipaFiltro) return false;
+			}
 			if (!q) return true;
 			return (r.nome_completo || "").toLowerCase().includes(q)
 				|| (r.mecanografico || "").toLowerCase().includes(q)
-				|| this._posto_label(r).toLowerCase().includes(q);
+				|| this._posto_label(r).toLowerCase().includes(q)
+				|| (r.turno || "").toLowerCase().includes(q)
+				|| (r.turno_equipa || "").toLowerCase().includes(q)
+				|| (this.equipaLabel[r.turno_equipa] || "").toLowerCase() === q;
 		});
 
 		const grupos = new Map();
@@ -1165,7 +1166,7 @@ sigos.VigilantesHoje = class VigilantesHoje {
 					<div class="vh-seg" data-role="periodo">
 						<button data-p="Manhã">${__("Manhã")}</button>
 						<button data-p="Noite">${__("Noite")}</button>
-						<button data-p="Único" style="display:none">${__("Único")}</button>
+						<button data-p="Único">${__("Único")}</button>
 						<button data-p="" class="on">${__("Todos")}</button>
 					</div>
 					<div id="vh-ctrl-grupo"></div>
@@ -1184,9 +1185,12 @@ sigos.VigilantesHoje = class VigilantesHoje {
 					<select class="vh-select" data-role="posto-filtro">
 						<option value="">${__("Todos os Postos")}</option>
 					</select>
+					<select class="vh-select" data-role="equipa-filtro" style="display:none">
+						<option value="">${__("Todas as Equipas")}</option>
+					</select>
 					<div class="vh-search">
 						${this._icon("search")}
-						<input type="text" placeholder="${__("Procurar vigilante, mecanográfico ou posto…")}" />
+						<input type="text" placeholder="${__("Procurar vigilante, mecanográfico, posto, turno ou equipa…")}" />
 					</div>
 				</div>
 
@@ -1244,6 +1248,10 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		});
 		this.$root.find('[data-role="posto-filtro"]').on("change", (e) => {
 			this.state.postoFiltro = e.target.value || null;
+			this._render();
+		});
+		this.$root.find('[data-role="equipa-filtro"]').on("change", (e) => {
+			this.state.equipaFiltro = e.target.value || null;
 			this._render();
 		});
 		this.$root.find(".vh-search input").on("input", frappe.utils.debounce((e) => {
@@ -1319,6 +1327,25 @@ sigos.VigilantesHoje = class VigilantesHoje {
 		postos.forEach((p) => $sel.append(`<option value="${frappe.utils.escape_html(p)}">${frappe.utils.escape_html(p)}</option>`));
 		if (actual && postos.includes(actual)) $sel.val(actual);
 		else if (actual) { this.state.postoFiltro = null; }
+	}
+
+	// Turno da Equipa filter — only the equipas present on the board for this
+	// date/período; hidden when nobody is in a team. "Sem Equipa" when mixed.
+	_populate_equipa_filter() {
+		const $sel = this.$root.find('[data-role="equipa-filtro"]');
+		if (!$sel.length) return;
+		const actual = this.state.equipaFiltro;
+		const pessoas = this.rows.filter((r) => !r._isVaga);
+		const equipas = [...new Set(pessoas.map((r) => r.turno_equipa).filter(Boolean))].sort();
+		const semEquipa = pessoas.some((r) => !r.turno_equipa);
+		const esc = frappe.utils.escape_html;
+		$sel.empty().append(`<option value="">${__("Todas as Equipas")}</option>`);
+		equipas.forEach((e) => $sel.append(`<option value="${esc(e)}">${esc(e)}</option>`));
+		if (equipas.length && semEquipa) $sel.append(`<option value="__sem__">${__("Sem Equipa")}</option>`);
+		$sel.toggle(equipas.length > 0);
+		const valido = actual && (equipas.includes(actual) || (actual === "__sem__" && semEquipa));
+		if (valido) $sel.val(actual);
+		else if (actual) this.state.equipaFiltro = null;
 	}
 
 	_apply_theme() {

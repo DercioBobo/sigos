@@ -25,14 +25,16 @@
    "in_list_view": 1,
    "in_grid_view": 1,
    "search_index": 1,
-   "link_filters": "[[\"Vigilante\",\"status\",\"!=\",\"Demitido\"]]"
+   "link_filters": "[[\"Vigilante\",\"status\",\"!=\",\"Demitido\"]]",
+   "columns": 2
   },
   {
    "fieldname": "posto",
    "fieldtype": "Link",
    "label": "Posto",
    "options": "Posto De Vigilancia",
-   "in_list_view": 1
+   "in_list_view": 1,
+   "columns": 2
   },
   {
    "fieldname": "data",
@@ -41,7 +43,8 @@
    "reqd": 1,
    "in_list_view": 1,
    "in_grid_view": 1,
-   "search_index": 1
+   "search_index": 1,
+   "columns": 1
   },
   {
    "fieldname": "turno",
@@ -49,7 +52,8 @@
    "label": "Turno",
    "options": "Turno",
    "in_list_view": 1,
-   "in_grid_view": 1
+   "in_grid_view": 1,
+   "columns": 2
   },
   {
    "fieldname": "turno_equipa",
@@ -57,8 +61,8 @@
    "label": "Turno da Equipa",
    "options": "Turno Da Equipa",
    "read_only": 1,
-   "hidden": 1,
-   "in_list_view": 1
+   "in_list_view": 1,
+   "columns": 2
   },
   {
    "fieldname": "regime",
@@ -71,7 +75,8 @@
    "fieldtype": "Select",
    "label": "Período",
    "options": "\nManhã\nNoite\nTarde\nÚnico",
-   "in_list_view": 1
+   "in_list_view": 1,
+   "columns": 1
   },
   {
    "fieldname": "override",

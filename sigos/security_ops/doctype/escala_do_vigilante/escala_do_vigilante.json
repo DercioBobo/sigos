@@ -166,8 +166,7 @@
   {
    "fieldname": "atribuir_equipas",
    "fieldtype": "Button",
-   "label": "Equipas & Turnos",
-   "description": "Turno da Equipa (customer-specific) — só aparece quando SIGOS Settings.turno_equipa_activo está ligado."
+   "label": "Equipas & Turnos"
   },
   {
    "fieldname": "tab_vigilante_do_posto",

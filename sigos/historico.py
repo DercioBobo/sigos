@@ -44,13 +44,13 @@ def historico_vigilante(vigilante, de=None, ate=None, incluir_cancelados=0):
 
 @frappe.whitelist()
 def hoje_vigilante(vigilante):
-	"""Header chip: the guard's escala today (active escalas) — turno, período, posto,
-	folga — plus an absence already registered for today (submitted Ausências)."""
+	"""Header chip: the guard's escala today (active escalas) — turno, Turno da Equipa,
+	período, posto, folga — plus an absence already registered today (submitted Ausências)."""
 	frappe.only_for(PAPEIS_DOSSIE)
 	hoje = getdate(nowdate())
 	turnos = frappe.db.sql("""
 		SELECT te.turno, COALESCE(NULLIF(te.periodo, ''), t.periodo) AS periodo,
-		       COALESCE(t.e_folga, 0) AS e_folga, te.posto, p.nome_do_posto
+		       COALESCE(t.e_folga, 0) AS e_folga, te.posto, p.nome_do_posto, te.turno_equipa
 		FROM `tabTabela De Escala De Vigilante` te
 		JOIN `tabEscala Do Vigilante` e ON e.name = te.parent AND e.estado = 'Activo'
 		LEFT JOIN `tabTurno` t ON t.name = te.turno
