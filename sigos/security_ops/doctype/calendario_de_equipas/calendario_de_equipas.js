@@ -6,15 +6,11 @@ frappe.ui.form.on("Calendario De Equipas", {
 		_cal_css();
 		_cal_previsao(frm);
 		if (frm.is_new() || !frm.doc.activo) return;
-		if (frappe.user.has_role(["System Manager", "SIGOS Manager", "Aprovador Operações"])) {
-			frm.add_custom_button(__("Aplicar às Escalas"), () => _cal_aplicar(frm)).addClass("btn-primary");
-			// Escalas already applied with wrong teams: re-derive every team from a past
-			// day whose rows still show each guard's real rhythm (default: yesterday).
-			frm.add_custom_button(__("Rectificar pela Escala de um Dia"), () => frappe.prompt(
-				[{ fieldname: "data", fieldtype: "Date", label: __("Dia em que a escala estava correcta"), reqd: 1,
-					default: frappe.datetime.add_days(frappe.datetime.get_today(), -1) }],
-				(v) => _cal_aplicar(frm, v.data), __("Rectificar Equipas"), __("Pré-visualizar")));
-		}
+		frappe.db.get_single_value("SIGOS Settings", "calendario_equipas_activo").then((on) => {
+			if (on) _cal_botoes(frm);
+			else frm.dashboard.set_headline_alert(
+				__("Desactivado em SIGOS Settings — as escalas ainda não seguem este calendário."), "orange");
+		});
 		frm.add_custom_button(__("Escalas do Regime"),
 			() => frappe.set_route("List", "Escala Do Vigilante", { regime_do_vigilante: frm.doc.regime }));
 	},
@@ -37,6 +33,17 @@ frappe.ui.form.on("Calendario De Equipas", {
 		});
 	},
 });
+
+function _cal_botoes(frm) {
+	if (!frappe.user.has_role(["System Manager", "SIGOS Manager", "Aprovador Operações"])) return;
+	frm.add_custom_button(__("Aplicar às Escalas"), () => _cal_aplicar(frm)).addClass("btn-primary");
+	// Escalas already applied with wrong teams: re-derive every team from a past
+	// day whose rows still show each guard's real rhythm (default: yesterday).
+	frm.add_custom_button(__("Rectificar pela Escala de um Dia"), () => frappe.prompt(
+		[{ fieldname: "data", fieldtype: "Date", label: __("Dia em que a escala estava correcta"), reqd: 1,
+			default: frappe.datetime.add_days(frappe.datetime.get_today(), -1) }],
+		(v) => _cal_aplicar(frm, v.data), __("Rectificar Equipas"), __("Pré-visualizar")));
+}
 
 function _cal_previsao(frm) {
 	const $w = frm.fields_dict.previsao.$wrapper;

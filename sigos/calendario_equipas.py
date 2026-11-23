@@ -20,34 +20,45 @@ from frappe import _
 from frappe.utils import add_days, getdate, nowdate
 
 
+def activo():
+	"""Master switch (SIGOS Settings.calendario_equipas_activo). Off → every calendar
+	path is inert and escalas/vagas/teams behave exactly as before the calendar."""
+	return bool(frappe.db.get_single_value("SIGOS Settings", "calendario_equipas_activo"))
+
+
 def calendario(regime):
-	"""Active calendar of a regime as a dict, or None.
+	"""Active calendar of a regime as a dict, or None (always None when switched off).
 	{name, regime, data_referencia, sequencia:[{turno, periodo, e_folga}], equipas:{equipa: indice}}"""
-	if not regime:
+	if not regime or not activo():
 		return None
 	cache = getattr(frappe.local, "sigos_cal_equipas", None)
 	if cache is None:
 		cache = frappe.local.sigos_cal_equipas = {}
-	if regime in cache:
-		return cache[regime]
-	nome = frappe.db.get_value("Calendario De Equipas", {"regime": regime, "activo": 1}, "name")
-	out = None
-	if nome:
-		cal = frappe.get_cached_doc("Calendario De Equipas", nome)
-		reg = frappe.get_cached_doc("Regime", regime)
-		seq = [{"turno": r.turno, "periodo": r.periodo, "e_folga": r.e_folga}
-			for r in sorted(reg.turnos, key=lambda x: x.idx)]
-		if reg.tipo_ciclo == "Rotativo" and seq and cal.data_referencia:
-			idx = {}
-			for linha in cal.equipas or []:
-				i = next((k for k, s in enumerate(seq) if s["turno"] == linha.turno), None)
-				if linha.turno_equipa and i is not None:
-					idx[linha.turno_equipa] = i
-			if idx:
-				out = frappe._dict(name=nome, regime=regime, data_referencia=getdate(cal.data_referencia),
-					sequencia=seq, equipas=idx)
-	cache[regime] = out
-	return out
+	if regime not in cache:
+		nome = frappe.db.get_value("Calendario De Equipas", {"regime": regime, "activo": 1}, "name")
+		cache[regime] = carregar(nome) if nome else None
+	return cache[regime]
+
+
+def carregar(nome):
+	"""Calendar `nome` as a dict regardless of the switch / its activo flag, or None."""
+	if not nome or not frappe.db.exists("Calendario De Equipas", nome):
+		return None
+	cal = frappe.get_cached_doc("Calendario De Equipas", nome)
+	reg = frappe.get_cached_doc("Regime", cal.regime)
+	seq = [{"turno": r.turno, "periodo": r.periodo, "e_folga": r.e_folga}
+		for r in sorted(reg.turnos, key=lambda x: x.idx)]
+	if reg.tipo_ciclo != "Rotativo" or not seq or not cal.data_referencia:
+		return None
+	idx = {}
+	for linha in cal.equipas or []:
+		i = next((k for k, s in enumerate(seq) if s["turno"] == linha.turno), None)
+		if linha.turno_equipa and i is not None:
+			idx[linha.turno_equipa] = i
+	if not idx:
+		return None
+	return frappe._dict(name=nome, regime=cal.regime, data_referencia=getdate(cal.data_referencia),
+		sequencia=seq, equipas=idx)
 
 
 def limpar_cache():
@@ -101,6 +112,8 @@ def equipas_do_dia(data=None, regime=None):
 	"""Every active calendar's teams and their turno on `data` — the "Hoje" strip."""
 	from sigos.api import PAPEIS_INTERNOS
 	frappe.only_for(PAPEIS_INTERNOS)
+	if not activo():
+		return []
 	d = getdate(data or nowdate())
 	filtros = {"activo": 1}
 	if regime:

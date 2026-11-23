@@ -8,6 +8,12 @@ from sigos import calendario_equipas as ce
 PAPEIS_APLICAR = ("System Manager", "SIGOS Manager", "Aprovador Operações")
 
 
+def _exigir_activo():
+	if not ce.activo():
+		frappe.throw(_("Active primeiro <b>Escala: Calendário de Equipas</b> em SIGOS Settings."),
+			title=_("Calendário de Equipas Desactivado"))
+
+
 class CalendarioDeEquipas(Document):
 	"""Company-wide team rotation of one Rotativo regime — see sigos.calendario_equipas.
 	Saving does NOT touch escalas: "Aplicar às Escalas" previews and then applies."""
@@ -31,6 +37,8 @@ class CalendarioDeEquipas(Document):
 
 	def on_update(self):
 		ce.limpar_cache()
+		if not ce.activo():
+			return
 		antes = self.get_doc_before_save()
 		mudou = not antes or (
 			str(antes.data_referencia) != str(self.data_referencia) or antes.activo != self.activo
@@ -48,6 +56,7 @@ class CalendarioDeEquipas(Document):
 	def pre_visualizar(self, rectificar_desde=None):
 		"""Per escala: which guards' turno changes today, without saving anything."""
 		frappe.only_for(PAPEIS_APLICAR)
+		_exigir_activo()
 		ce.limpar_cache()
 		cal = ce.calendario(self.regime)
 		if not cal:
@@ -68,6 +77,7 @@ class CalendarioDeEquipas(Document):
 		"""Re-save every escala of the regime (EscalaDoVigilante._aplicar_calendario does
 		the work: assigns teams, re-derives turno_inicial, regenerates future days)."""
 		frappe.only_for(PAPEIS_APLICAR)
+		_exigir_activo()
 		ce.limpar_cache()
 		ok, erros = [], []
 		frappe.flags.sigos_origem_escala = ("Calendario De Equipas", self.name)
@@ -102,7 +112,7 @@ class CalendarioDeEquipas(Document):
 	def previsao(self, dias=14):
 		"""Form preview: each team's turno for the next `dias` days."""
 		ce.limpar_cache()
-		cal = ce.calendario(self.regime) if not self.is_new() else None
+		cal = ce.carregar(self.name) if not self.is_new() else None  # preview works even when switched off
 		if not cal:
 			return None
 		hoje = getdate(nowdate())

@@ -113,6 +113,7 @@
   "faltas_normal_vermelha_activo",
   "posicao_no_posto_activo",
   "supervisor_activo",
+  "calendario_equipas_activo",
   "subsidios_categoria_funcao_activo",
   "componente_subsidio_chefia_turno",
   "componente_subsidio_chefia_posto",
@@ -779,6 +780,13 @@
    "label": "Vigilante: Campo Supervisor",
    "default": "0",
    "description": "Mostra o campo Supervisor no Vigilante."
+  },
+  {
+   "fieldname": "calendario_equipas_activo",
+   "fieldtype": "Check",
+   "label": "Escala: Calendário de Equipas",
+   "default": "0",
+   "description": "As escalas seguem o Calendário de Equipas da empresa (por regime)."
   },
   {
    "fieldname": "subsidios_categoria_funcao_activo",

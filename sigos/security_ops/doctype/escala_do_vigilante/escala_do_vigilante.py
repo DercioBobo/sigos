@@ -59,6 +59,8 @@ class EscalaDoVigilante(Document):
 		from sigos import calendario_equipas as ce
 		cal = ce.calendario(self.regime_do_vigilante) if self.regime_do_vigilante else None
 		if not cal:
+			if self.usa_calendario:
+				self._sair_do_calendario(ce)
 			self.usa_calendario = 0
 			self.calendario_de_equipas = None
 			self._sincronizar_turno_por_equipa()
@@ -73,6 +75,19 @@ class EscalaDoVigilante(Document):
 		self.usa_calendario = 1
 		self.calendario_de_equipas = cal.name
 
+	def _sair_do_calendario(self, ce):
+		"""Calendar switched off (or removed) for this escala: re-anchor every guard's
+		turno_inicial on the escala's own data_de_inicio so the rotation continues
+		exactly where the calendar left it — nobody's turno jumps."""
+		cal = ce.carregar(self.calendario_de_equipas)
+		if not (cal and self.data_de_inicio):
+			return
+		seq = [x["turno"] for x in cal.sequencia]
+		desloc = (getdate(self.data_de_inicio) - cal.data_referencia).days
+		for g in self.tab_vigilante_do_posto or []:
+			if g.turno_inicial in seq:
+				g.turno_inicial = seq[(seq.index(g.turno_inicial) + desloc) % len(seq)]
+
 	def _guardas_alterados(self):
 		"""Guards whose (turno_inicial, team) changed this save, incl. new ones."""
 		before = self.get_doc_before_save()
@@ -85,6 +100,9 @@ class EscalaDoVigilante(Document):
 		starts with a Manhã today (sigos.calendario_equipas.aviso_descanso)."""
 		if self.estado == "Arquivado":
 			return
+		from sigos.calendario_equipas import activo
+		if not activo():
+			return  # part of the Calendário de Equipas feature
 		alterados = self._guardas_alterados()
 		if not alterados:
 			return

@@ -114,6 +114,9 @@ def vagas_antigas():
 @verificacao("escalas_fora_do_calendario", "operacoes", "Escalas fora do Calendário de Equipas", AVISO, OPS,
 	"Escalas de um regime com Calendário de Equipas que ainda não o seguem.")
 def escalas_fora_do_calendario():
+	from sigos.calendario_equipas import activo
+	if not activo():
+		return []
 	regimes = frappe.get_all("Calendario De Equipas", filters={"activo": 1}, pluck="regime")
 	if not regimes:
 		return []
@@ -129,6 +132,9 @@ def escalas_fora_do_calendario():
 @verificacao("escalas_ajuste_local", "operacoes", "Escalas com Ajuste Local", INFO, SUPERVISAO,
 	"Postos desfasados do Calendário de Equipas, com o motivo.")
 def escalas_ajuste_local():
+	from sigos.calendario_equipas import activo
+	if not activo():
+		return []
 	return [
 		linha("Escala Do Vigilante", e.name, e.nome_do_posto or e.delegacao or e.name, e.name,
 			_("{0:+d} dia(s) · {1}").format(int(e.ajuste_local_dias), e.ajuste_local_motivo or "—"), e.delegacao)
