@@ -68,6 +68,19 @@ class Denuncia(Document):
 		if getdate(self.data_de_demissao) < getdate(self.data):
 			frappe.throw(_("A Data de Efeito não pode ser anterior à Data da Denúncia."))
 		self.jurista = self.jurista or frappe.session.user
+		if not (self.texto_carta or "").strip():
+			from sigos.disciplinar.cartas import texto_denuncia
+			self.texto_carta = texto_denuncia(self)
+
+	@frappe.whitelist()
+	def regenerar_carta(self):
+		"""Rebuild the letter text (e.g. after changing the Data de Efeito)."""
+		frappe.has_permission("Denuncia", "write", doc=self, throw=True)
+		if self.docstatus == 2:
+			frappe.throw(_("Denúncia cancelada."))
+		from sigos.disciplinar.cartas import texto_denuncia
+		self.db_set("texto_carta", texto_denuncia(self))
+		return self.texto_carta
 
 	def before_submit(self):
 		# the act itself must happen within the probation, not only its stated date

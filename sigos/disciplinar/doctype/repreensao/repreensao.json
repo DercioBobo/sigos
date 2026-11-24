@@ -20,15 +20,22 @@
   "nome_do_vigilante",
   "col_2",
   "mecanografico",
+  "categoria",
   "delegacao",
   "sec_inf",
   "infracoes",
   "col_3",
   "gravidade",
   "data_conhecimento_infracao",
+  "data_ocorrencia",
+  "hora_ocorrencia",
+  "posto",
+  "posto_nome",
   "sec_obs",
   "observacoes",
-  "processo_disciplinar"
+  "processo_disciplinar",
+  "sec_carta",
+  "texto_carta"
  ],
  "fields": [
   {
@@ -112,6 +119,12 @@
    "fetch_from": "vigilante.mecanografico"
   },
   {
+   "fieldname": "categoria",
+   "fieldtype": "Data",
+   "label": "Categoria",
+   "read_only": 1
+  },
+  {
    "fieldname": "delegacao",
    "fieldtype": "Link",
    "options": "Delegacao",
@@ -149,6 +162,31 @@
    "description": "Da Participação."
   },
   {
+   "fieldname": "data_ocorrencia",
+   "fieldtype": "Date",
+   "label": "Data da Ocorrência",
+   "read_only": 1
+  },
+  {
+   "fieldname": "hora_ocorrencia",
+   "fieldtype": "Data",
+   "label": "Hora",
+   "read_only": 1
+  },
+  {
+   "fieldname": "posto",
+   "fieldtype": "Link",
+   "label": "Posto",
+   "options": "Posto De Vigilancia",
+   "read_only": 1
+  },
+  {
+   "fieldname": "posto_nome",
+   "fieldtype": "Data",
+   "label": "Nome do Posto",
+   "read_only": 1
+  },
+  {
    "fieldname": "sec_obs",
    "fieldtype": "Section Break",
    "label": "Repreensão"
@@ -167,10 +205,22 @@
    "read_only": 1,
    "allow_on_submit": 1,
    "no_copy": 1
+  },
+  {
+   "fieldname": "sec_carta",
+   "fieldtype": "Section Break",
+   "label": "Carta"
+  },
+  {
+   "fieldname": "texto_carta",
+   "fieldtype": "Text",
+   "label": "Texto da Repreensão",
+   "allow_on_submit": 1,
+   "description": "Gerado da participação; pode ser editado antes de imprimir."
   }
  ],
  "links": [],
- "modified": "2026-10-23 18:00:00.000000",
+ "modified": "2026-11-24 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Disciplinar",
  "name": "Repreensao",
@@ -297,5 +347,6 @@
  "title_field": "nome_do_vigilante",
  "show_title_field_in_link": 1,
  "track_changes": 1,
- "app": "sigos"
+ "app": "sigos",
+ "default_print_format": "Repreensão Registada"
 }

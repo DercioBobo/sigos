@@ -4,6 +4,12 @@ frappe.ui.form.on("Repreensao", {
 		if (frm.doc.participacao) {
 			frm.add_custom_button(__("Ver Participação"), () => frappe.set_route("Form", "Participacao", frm.doc.participacao));
 		}
+		if (frm.doc.docstatus !== 2) {
+			frm.add_custom_button(__("Imprimir Carta"), () => frm.print_doc(), __("Carta"));
+			frm.add_custom_button(__("Regenerar Texto"), () => frappe.confirm(
+				__("Substituir o texto da carta pelo texto gerado da participação?"),
+				() => frm.call("regenerar_carta").then(() => frm.reload_doc())), __("Carta"));
+		}
 		if (frm.doc.processo_disciplinar) {
 			frm.add_custom_button(__("Ver Processo Disciplinar"),
 				() => frappe.set_route("Form", "Processo Disciplinar", frm.doc.processo_disciplinar));

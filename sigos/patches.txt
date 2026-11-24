@@ -39,3 +39,4 @@ sigos.patches.pd_tramitacao_sancoes
 sigos.patches.perfis_de_faturacao
 sigos.patches.nome_faturacao_categorias
 sigos.patches.backfill_turnos_extras_nome_vigilante
+sigos.patches.enquadramento_legal_infracoes

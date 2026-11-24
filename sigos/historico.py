@@ -427,9 +427,12 @@ class _Historico:
 			self.add("disciplinar", "repreensao", r.data, _("Repreensão ({0}.ª)").format(r.numero or "?"), "Repreensao", r.name,
 				sub=r.infracoes, detalhe=r.observacoes, row=r)
 		for r in self._docs("Termo De Responsabilidade", {"vigilante": self.vig},
-				["infracoes", "documento_assinado", "processo_disciplinar"], "data"):
+				["infracoes", "documento_assinado", "processo_disciplinar", "com_deducao", "valor_deducao",
+				 "prestacoes", "outras_deducoes"], "data"):
 			self.add("disciplinar", "termo", r.data, _("Termo de Responsabilidade"), "Termo De Responsabilidade", r.name,
 				sub=self._txt(r.infracoes, _("assinado") if r.documento_assinado else (_("falta assinatura") if r.docstatus == 1 else None)),
+				detalhe=self._txt(_("Dedução de {0} em {1} prestação(ões)").format(
+					frappe.utils.fmt_money(r.valor_deducao), r.prestacoes or 1), r.outras_deducoes) if r.com_deducao else None,
 				row=r)
 		for r in self._docs("Denuncia", {"vigilante": self.vig}, ["fundamentacao", "demissao", "infracoes"], "data"):
 			self.add("disciplinar", "denuncia", r.data, _("Denúncia (período experimental)"), "Denuncia", r.name,

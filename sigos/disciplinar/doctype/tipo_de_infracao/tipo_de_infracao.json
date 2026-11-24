@@ -15,7 +15,13 @@
   "ordem",
   "pede_descricao",
   "sec_desc",
-  "descricao"
+  "descricao",
+  "sec_lei",
+  "lei_dever_ref",
+  "lei_dever_texto",
+  "col_lei",
+  "lei_infracao_ref",
+  "lei_infracao_texto"
  ],
  "fields": [
   {
@@ -68,10 +74,42 @@
    "fieldname": "descricao",
    "fieldtype": "Small Text",
    "label": "Descrição"
+  },
+  {
+   "fieldname": "sec_lei",
+   "fieldtype": "Section Break",
+   "label": "Enquadramento Legal",
+   "description": "Usado no texto da Repreensão (Lei n.º 13/2023)."
+  },
+  {
+   "fieldname": "lei_dever_ref",
+   "fieldtype": "Data",
+   "label": "Dever Violado — Referência",
+   "description": "Ex.: alínea d) do artigo 59"
+  },
+  {
+   "fieldname": "lei_dever_texto",
+   "fieldtype": "Small Text",
+   "label": "Dever Violado — Texto"
+  },
+  {
+   "fieldname": "col_lei",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "lei_infracao_ref",
+   "fieldtype": "Data",
+   "label": "Infracção — Referência",
+   "description": "Ex.: alínea d) do n.º 1 do artigo 67"
+  },
+  {
+   "fieldname": "lei_infracao_texto",
+   "fieldtype": "Small Text",
+   "label": "Infracção — Texto"
   }
  ],
  "links": [],
- "modified": "2026-10-23 18:00:00.000000",
+ "modified": "2026-11-24 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Disciplinar",
  "name": "Tipo De Infracao",

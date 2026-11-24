@@ -281,7 +281,8 @@ class Participacao(Document):
 		den = frappe.get_doc({
 			"doctype": "Denuncia", "participacao": self.name, "vigilante": self.vigilante,
 			"fundamentacao": fundamentacao, "uniforme": uniforme or None,
-			"data_de_demissao": data_de_demissao or frappe.utils.today(),
+			# art. 51 n.º 2: at least 7 days' written notice
+			"data_de_demissao": data_de_demissao or frappe.utils.add_days(frappe.utils.today(), 7),
 		})
 		den.insert()
 		return den.name

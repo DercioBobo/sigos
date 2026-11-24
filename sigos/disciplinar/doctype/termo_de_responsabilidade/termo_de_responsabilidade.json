@@ -32,7 +32,15 @@
   "data_conhecimento_infracao",
   "sec_termo",
   "declaracao",
-  "observacoes"
+  "observacoes",
+  "sec_deducao",
+  "com_deducao",
+  "valor_deducao",
+  "prestacoes",
+  "col_deducao",
+  "mes_inicio_deducao",
+  "valor_prestacao",
+  "outras_deducoes"
  ],
  "fields": [
   {
@@ -194,10 +202,64 @@
    "fieldname": "observacoes",
    "fieldtype": "Small Text",
    "label": "Observações do Jurista"
+  },
+  {
+   "fieldname": "sec_deducao",
+   "fieldtype": "Section Break",
+   "label": "Dedução Salarial"
+  },
+  {
+   "fieldname": "com_deducao",
+   "fieldtype": "Check",
+   "label": "Com Dedução no Salário"
+  },
+  {
+   "fieldname": "valor_deducao",
+   "fieldtype": "Currency",
+   "label": "Valor a Deduzir",
+   "depends_on": "com_deducao",
+   "mandatory_depends_on": "com_deducao"
+  },
+  {
+   "fieldname": "prestacoes",
+   "fieldtype": "Int",
+   "label": "N.º de Prestações",
+   "default": "1",
+   "depends_on": "com_deducao",
+   "mandatory_depends_on": "com_deducao"
+  },
+  {
+   "fieldname": "col_deducao",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "mes_inicio_deducao",
+   "fieldtype": "Select",
+   "label": "Mês da 1.ª Prestação",
+   "options": "\nJaneiro\nFevereiro\nMarço\nAbril\nMaio\nJunho\nJulho\nAgosto\nSetembro\nOutubro\nNovembro\nDezembro",
+   "depends_on": "com_deducao",
+   "mandatory_depends_on": "com_deducao"
+  },
+  {
+   "fieldname": "valor_prestacao",
+   "fieldtype": "Currency",
+   "label": "Valor por Prestação",
+   "read_only": 1,
+   "depends_on": "com_deducao"
+  },
+  {
+   "fieldname": "outras_deducoes",
+   "fieldtype": "Link",
+   "label": "Dedução Criada",
+   "options": "Outras Deducoes",
+   "read_only": 1,
+   "no_copy": 1,
+   "allow_on_submit": 1,
+   "depends_on": "outras_deducoes"
   }
  ],
  "links": [],
- "modified": "2026-11-23 12:00:00.000000",
+ "modified": "2026-11-24 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Disciplinar",
  "name": "Termo De Responsabilidade",

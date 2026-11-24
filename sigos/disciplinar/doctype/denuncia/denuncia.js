@@ -6,6 +6,12 @@ frappe.ui.form.on("Denuncia", {
 		if (frm.doc.demissao) {
 			frm.add_custom_button(__("Ver Demissão"), () => frappe.set_route("Form", "Demissao", frm.doc.demissao));
 		}
+		if (!frm.is_new() && frm.doc.docstatus !== 2) {
+			frm.add_custom_button(__("Imprimir Carta"), () => frm.print_doc(), __("Carta"));
+			frm.add_custom_button(__("Regenerar Texto"), () => frappe.confirm(
+				__("Substituir o texto da carta pelo texto gerado?"),
+				() => frm.call("regenerar_carta").then(() => frm.reload_doc())), __("Carta"));
+		}
 		_den_periodo(frm);
 	},
 	vigilante: (frm) => _den_periodo(frm),

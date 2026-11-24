@@ -46,7 +46,8 @@ class Repreensao(Document):
 		p = frappe.db.get_value(
 			"Participacao", self.participacao,
 			["docstatus", "vigilante", "nome_do_vigilante", "mecanografico", "delegacao", "gravidade",
-			 "tipo_de_infracao", "data_conhecimento_infracao"], as_dict=True,
+			 "tipo_de_infracao", "data_conhecimento_infracao", "categoria", "data", "horas", "posto",
+			 "posto_nome"], as_dict=True,
 		)
 		if not p or p.docstatus != 1:
 			frappe.throw(_("A repreensão parte de uma <b>Participação submetida</b>."))
@@ -66,7 +67,35 @@ class Repreensao(Document):
 			filters={"parent": self.participacao, "parenttype": "Participacao"},
 			pluck="tipo_de_infracao", order_by="idx")
 		self.infracoes = ", ".join(infr) or p.tipo_de_infracao
+		self.categoria = p.categoria
+		self.data_ocorrencia = p.data
+		self.hora_ocorrencia = p.horas
+		self.posto = p.posto
+		self.posto_nome = p.posto_nome
 		self.jurista = self.jurista or frappe.session.user
+		if not (self.texto_carta or "").strip():
+			from sigos.disciplinar.cartas import texto_repreensao
+			self.texto_carta = texto_repreensao(self)
+
+	@frappe.whitelist()
+	def regenerar_carta(self):
+		"""Rebuild the letter text from the participação and the infraction types."""
+		frappe.has_permission("Repreensao", "write", doc=self, throw=True)
+		if self.docstatus == 2:
+			frappe.throw(_("Repreensão cancelada."))
+		p = frappe.db.get_value("Participacao", self.participacao,
+			["categoria", "data", "horas", "posto", "posto_nome"], as_dict=True) or {}
+		# repreensões made before these fields existed get them now
+		self.categoria = self.categoria or p.get("categoria")
+		self.data_ocorrencia = self.data_ocorrencia or p.get("data")
+		self.hora_ocorrencia = self.hora_ocorrencia or p.get("horas")
+		self.posto = self.posto or p.get("posto")
+		self.posto_nome = self.posto_nome or p.get("posto_nome")
+		from sigos.disciplinar.cartas import texto_repreensao
+		self.db_set({"categoria": self.categoria, "data_ocorrencia": self.data_ocorrencia,
+			"hora_ocorrencia": self.hora_ocorrencia, "posto": self.posto, "posto_nome": self.posto_nome,
+			"texto_carta": texto_repreensao(self)})
+		return self.texto_carta
 
 	def before_submit(self):
 		self.numero = contar_repreensoes(self.vigilante, self.name) + 1

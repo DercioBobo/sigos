@@ -767,7 +767,7 @@ function _pt_denuncia(frm) {
 	frappe.prompt(
 		[
 			{ fieldname: "fundamentacao", fieldtype: "Small Text", label: __("Fundamentação"), reqd: 1 },
-			{ fieldname: "data_de_demissao", fieldtype: "Date", label: __("Data de Efeito"), default: frappe.datetime.get_today(), reqd: 1 },
+			{ fieldname: "data_de_demissao", fieldtype: "Date", label: __("Data de Efeito"), default: frappe.datetime.add_days(frappe.datetime.get_today(), 7), reqd: 1 },
 			{ fieldname: "uniforme", fieldtype: "Select", label: __("Uniforme"), options: ["", "Entregue", "Não Entregue"] },
 		],
 		(v) => frm.call("criar_denuncia", v).then((r) => {

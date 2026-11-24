@@ -32,7 +32,9 @@
   "fundamentacao",
   "col_3",
   "uniforme",
-  "observacoes"
+  "observacoes",
+  "sec_carta",
+  "texto_carta"
  ],
  "fields": [
   {
@@ -198,10 +200,22 @@
    "fieldname": "observacoes",
    "fieldtype": "Small Text",
    "label": "Observações"
+  },
+  {
+   "fieldname": "sec_carta",
+   "fieldtype": "Section Break",
+   "label": "Carta"
+  },
+  {
+   "fieldname": "texto_carta",
+   "fieldtype": "Text",
+   "label": "Texto da Denúncia",
+   "allow_on_submit": 1,
+   "description": "Gerado ao gravar; pode ser editado antes de imprimir."
   }
  ],
  "links": [],
- "modified": "2026-11-23 14:00:00.000000",
+ "modified": "2026-11-24 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Disciplinar",
  "name": "Denuncia",
@@ -328,5 +342,6 @@
  "title_field": "nome_do_vigilante",
  "show_title_field_in_link": 1,
  "track_changes": 1,
- "app": "sigos"
+ "app": "sigos",
+ "default_print_format": "Denúncia do Período Probatório"
 }

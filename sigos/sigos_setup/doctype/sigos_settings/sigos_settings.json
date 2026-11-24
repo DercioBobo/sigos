@@ -131,6 +131,9 @@
   "codigo_formulario_participacao",
   "codigo_formulario_presuncao",
   "codigo_formulario_termo",
+  "codigo_formulario_repreensao",
+  "codigo_formulario_denuncia",
+  "representante_rh",
   "presuncao_assinatura",
   "presuncao_base_legal",
   "texto_termo_responsabilidade",
@@ -891,7 +894,25 @@
    "fieldname": "codigo_formulario_termo",
    "fieldtype": "Small Text",
    "label": "Código do Formulário — Termo de Responsabilidade",
-   "description": "Uma linha por linha impressa."
+   "description": "1.ª linha à esquerda, restantes à direita."
+  },
+  {
+   "fieldname": "codigo_formulario_repreensao",
+   "fieldtype": "Small Text",
+   "label": "Código do Formulário — Repreensão",
+   "description": "1.ª linha à esquerda, restantes à direita."
+  },
+  {
+   "fieldname": "codigo_formulario_denuncia",
+   "fieldtype": "Small Text",
+   "label": "Código do Formulário — Denúncia",
+   "description": "1.ª linha à esquerda, restantes à direita."
+  },
+  {
+   "fieldname": "representante_rh",
+   "fieldtype": "Data",
+   "label": "Representante de RH (Denúncia)",
+   "description": "Ex.: Sr. Hélio Mavie. Vazio = não aparece na carta."
   },
   {
    "fieldname": "presuncao_assinatura",
@@ -909,7 +930,7 @@
    "fieldname": "texto_termo_responsabilidade",
    "fieldtype": "Text",
    "label": "Texto do Termo de Responsabilidade",
-   "description": "Vazio = texto padrão. Campos: {nome} {numero} {categoria} {origem} {participacao} {processo} {infracoes} {data} {posto}"
+   "description": "Vazio = texto padrão. Campos: {nome} {numero} {categoria} {admissao} {indicativo} {origem} {participacao} {processo} {infracoes} {data} {posto}"
   },
   {
    "fieldname": "contactos_documentos",
@@ -964,7 +985,7 @@
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-11-23 10:00:00.000000",
+ "modified": "2026-11-24 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "SIGOS Setup",
  "name": "SIGOS Settings",
